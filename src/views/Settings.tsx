@@ -119,7 +119,7 @@ export default function Settings() {
 
           <section className="card set-card">
             <h3><Info size={18} /> О приложении</h3>
-            <p className="small muted" style={{ margin: 0 }}>2Mind 1.1 — бесплатные интеллект-карты, ежедневник и доска задач. Все функции открыты, без подписок.</p>
+            <p className="small muted" style={{ margin: 0 }}>2Mind 1.2 — бесплатные интеллект-карты, ежедневник и доска задач. Все функции открыты, без подписок.</p>
           </section>
         </div>
       </div>

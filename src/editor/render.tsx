@@ -245,9 +245,29 @@ export function Toggle({ n, visible, k = 1 }: { n: LNode; visible: boolean; k?: 
 }
 
 /** Кнопка «+» у выбранной темы — быстро добавить подтему */
+function PlusButton({ id, x, y, sc, side }: { id: string; x: number; y: number; sc: number; side?: 'left' | 'right' }) {
+  return (
+    <g className="no-export" data-add={id} data-side={side} transform={`translate(${x},${y}) scale(${sc})`} style={{ cursor: 'pointer' }}>
+      <circle r={20} fill="transparent" />
+      <circle r={11} fill={ACCENT} />
+      <path d="M-5 0 H5 M0 -5 V5" stroke="#fff" strokeWidth={2.2} strokeLinecap="round" />
+    </g>
+  );
+}
+
+/** Кнопка «+» у выбранной темы — быстро добавить подтему (у центральной темы карты — слева и справа) */
 export function AddHandle({ n, structure, k = 1 }: { n: LNode; structure: string; k?: number }) {
   // на телефоне кнопка не мельчит при отдалении
   const sc = Math.min(2.4, Math.max(1, 0.9 / k));
+  const cy = n.y + n.h / 2;
+  if (structure === 'map' && n.depth === 0 && n.level === 'central') {
+    return (
+      <>
+        <PlusButton id={n.id} side="left" x={n.x - 20 * sc} y={cy} sc={sc} />
+        <PlusButton id={n.id} side="right" x={n.x + n.w + 20 * sc} y={cy} sc={sc} />
+      </>
+    );
+  }
   const vertical = structure === 'org' || (structure === 'tree' && n.depth === 0);
   const indented = (structure === 'tree' || structure === 'timeline') && n.depth >= 1;
   const hasKids = n.topic.children.length > 0 && !n.topic.collapsed;
@@ -255,7 +275,7 @@ export function AddHandle({ n, structure, k = 1 }: { n: LNode; structure: string
   if (vertical || indented) {
     // дети уходят вниз — кнопка справа от темы
     x = n.x + n.w + 18 * sc;
-    y = n.y + n.h / 2;
+    y = cy;
   } else if (hasKids) {
     // справа уже ветви — кнопка под темой, чтобы не закрывать подтемы
     x = n.x + n.w / 2;
@@ -264,15 +284,9 @@ export function AddHandle({ n, structure, k = 1 }: { n: LNode; structure: string
     const gap = (n.toggle ? 34 : 18) * sc;
     const side = n.depth === 0 ? (structure === 'logic-left' ? -1 : 1) : n.side;
     x = side > 0 ? n.x + n.w + gap : n.x - gap;
-    y = n.style.shape === 'underline' ? n.y + n.h : n.y + n.h / 2;
+    y = cy;
   }
-  return (
-    <g className="no-export" data-add={n.id} transform={`translate(${x},${y}) scale(${sc})`} style={{ cursor: 'pointer' }}>
-      <circle r={20} fill="transparent" />
-      <circle r={11} fill={ACCENT} />
-      <path d="M-5 0 H5 M0 -5 V5" stroke="#fff" strokeWidth={2.2} strokeLinecap="round" />
-    </g>
-  );
+  return <PlusButton id={n.id} x={x} y={y} sc={sc} />;
 }
 
 // ---------- Связи ----------

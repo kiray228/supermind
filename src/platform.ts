@@ -27,6 +27,19 @@ export async function nativeSaveBlob(blob: Blob, filename: string) {
 }
 
 export function setupPlatform() {
+  // iOS Safari игнорирует запрет масштабирования страницы — блокируем жесты вручную,
+  // чтобы щипок всегда масштабировал карту, а не весь интерфейс
+  const stop = (e: Event) => e.preventDefault();
+  document.addEventListener('gesturestart', stop);
+  document.addEventListener('gesturechange', stop);
+  document.addEventListener('gestureend', stop);
+  document.addEventListener(
+    'touchmove',
+    (e) => {
+      if (e.touches.length > 1) e.preventDefault();
+    },
+    { passive: false },
+  );
   if (isNative()) {
     document.documentElement.classList.add('native');
     import('@capacitor/app').then(({ App }) => {

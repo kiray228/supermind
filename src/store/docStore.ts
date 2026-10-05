@@ -4,6 +4,7 @@ import type {
 } from '../types';
 import { clone, findInSheet, isAncestor, newTopic, reId, uid, visibleOrder, pathTo } from '../utils/tree';
 import { saveDoc, saveLocked } from './db';
+import { mapSides } from '../layout/layout';
 import { encryptDoc } from '../utils/crypto';
 
 export function newSheet(title = 'Лист 1', rootText = 'Центральная тема', structure: StructureType = 'map'): Sheet {
@@ -65,7 +66,8 @@ interface DocState {
   updateTopic(id: ID, patch: Partial<Topic>): void;
   updateTopics(ids: ID[], fn: (t: Topic) => void): void;
   updateStyle(ids: ID[], patch: Partial<TopicStyle>): void;
-  addChild(id?: ID, text?: string): ID | null;
+  addChild(id?: ID, text?: string, side?: 'left' | 'right'): ID | null;
+  setSide(id: ID, side: 'left' | 'right'): void;
   addSibling(id?: ID, before?: boolean, text?: string): ID | null;
   addParent(id?: ID): ID | null;
   addFloating(x: number, y: number): ID;
@@ -73,7 +75,7 @@ interface DocState {
   deleteTopics(ids?: ID[]): void;
   toggleCollapse(id: ID, value?: boolean): void;
   collapseAll(collapsed: boolean, depth?: number): void;
-  move(id: ID, newParentId: ID, index: number): void;
+  move(id: ID, newParentId: ID, index: number, side?: 'left' | 'right'): void;
   moveFloating(id: ID, x: number, y: number): void;
   detach(id: ID, x: number, y: number): void;
   reorder(id: ID, dir: -1 | 1): void;
@@ -94,7 +96,7 @@ interface DocState {
   updateSummary(id: ID, patch: Partial<Summary>): void;
   removeSummary(id: ID): void;
 
-  setSheetProps(patch: Partial<Pick<Sheet, 'structure' | 'themeId' | 'rainbow' | 'lineStyle' | 'spacing' | 'title' | 'background'>>): void;
+  setSheetProps(patch: Partial<Pick<Sheet, 'structure' | 'themeId' | 'rainbow' | 'lineStyle' | 'spacing' | 'title' | 'background' | 'shapes'>>): void;
   addSheet(sheet?: Sheet): void;
   removeSheet(id: ID): void;
   duplicateSheet(id: ID): void;
@@ -281,16 +283,25 @@ export const useDoc = create<DocState>((set, get) => {
         }
       });
     },
-    addChild(id, text) {
+    setSide(id, side) {
+      get().mutate((s) => {
+        freezeMainSides(s);
+        const f = findInSheet(s, id);
+        if (f) f.topic.side = side;
+      });
+    },
+    addChild(id, text, side) {
       const tid = target(id);
       if (!tid) return null;
       const sh = get().sheet();
       const pf = sh ? findInSheet(sh, tid) : null;
       if (!pf) return null;
       const t = newTopic(text ?? defaultTopicText(sh, pf.topic));
+      if (side && sh && pf.topic.id === sh.root.id) t.side = side;
       get().mutate((s) => {
         const f = findInSheet(s, tid);
         if (!f) return;
+        if (t.side && f.topic.id === s.root.id) freezeMainSides(s);
         f.topic.collapsed = false;
         f.topic.children.push(t);
       });
@@ -308,9 +319,11 @@ export const useDoc = create<DocState>((set, get) => {
         return get().addChild(tid, text);
       }
       const t = newTopic(text ?? defaultTopicText(s, f.parent));
+      if (f.parent.id === s.root.id && s.structure === 'map') t.side = topicSide(s, f.topic.id);
       get().mutate((sh) => {
         const ff = findInSheet(sh, tid);
         if (!ff || !ff.parent) return;
+        if (t.side) freezeMainSides(sh);
         ff.parent.children.splice(ff.index + (before ? 0 : 1), 0, t);
       });
       set({ selection: [t.id], editingId: t.id });
@@ -407,7 +420,7 @@ export const useDoc = create<DocState>((set, get) => {
         s.floating.forEach((f) => rec(f, 0));
       });
     },
-    move(id, newParentId, index) {
+    move(id, newParentId, index, side) {
       const s = get().sheet();
       if (!s || id === s.root.id || isAncestor(s, id, newParentId)) return;
       get().mutate((sh) => {
@@ -432,6 +445,12 @@ export const useDoc = create<DocState>((set, get) => {
         let idx = index;
         if (oldParent && oldParent.id === p.topic.id && oldIndex < idx) idx--;
         p.topic.collapsed = false;
+        if (p.topic.id === sh.root.id && sh.structure === 'map') {
+          if (side) {
+            freezeMainSides(sh);
+            node.side = side;
+          }
+        } else delete node.side;
         p.topic.children.splice(Math.max(0, Math.min(idx, p.topic.children.length)), 0, node);
       });
     },
@@ -684,6 +703,13 @@ export const useDoc = create<DocState>((set, get) => {
   };
 });
 
+/** Зафиксировать текущие стороны основных тем, чтобы при ручном выборе стороны остальные не «перескакивали» */
+function freezeMainSides(s: Sheet) {
+  if (s.structure !== 'map') return;
+  const m = mapSides(s.root);
+  for (const c of s.root.children) if (!c.side) c.side = m.get(c.id);
+}
+
 /** Оставить в выделении только существующие и видимые темы */
 function cleanSelection(d: MindDoc, sel: ID[]): ID[] {
   const sh = d.sheets.find((x) => x.id === d.activeSheet) ?? d.sheets[0];
@@ -716,8 +742,7 @@ export function topicSide(s: Sheet, id: ID): 'left' | 'right' {
   if (s.structure !== 'map') return 'right';
   const path = pathTo(s, id);
   if (path.length < 2 || path[0] !== s.root) return 'right';
-  const idx = s.root.children.indexOf(path[1]);
-  return idx >= Math.ceil(s.root.children.length / 2) ? 'left' : 'right';
+  return mapSides(s.root).get(path[1].id) ?? 'right';
 }
 
 export type { LineStyle };

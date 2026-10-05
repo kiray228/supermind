@@ -221,3 +221,38 @@
   -webkit-user-select: none;
   user-select: none;
 }
+
+.zoom-badge {
+  position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 12; pointer-events: none;
+  padding: 6px 14px; border-radius: 999px; font-weight: 700; font-size: 14px; color: var(--text);
+  background: var(--glass); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: var(--shadow);
+}
+
+/* ===== Liquid Glass в редакторе: карта во весь экран, панели парят над ней ===== */
+.ed-main { position: absolute; inset: 0; }
+.ed-top {
+  position: absolute; z-index: 20; top: calc(8px + var(--safe-top)); left: 10px; right: 10px;
+  padding: 6px 8px; border-radius: 22px; border-bottom: none;
+}
+.editor.panel-open .ed-top { right: 350px; }
+.ed-search { top: calc(70px + var(--safe-top)); border-radius: 18px; }
+.ed-panel {
+  background: var(--lg-solid);
+  -webkit-backdrop-filter: var(--lg-blur);
+  backdrop-filter: var(--lg-blur);
+  border-left-color: var(--lg-border);
+}
+.ed-toolbar { border-radius: 22px; padding: 6px; }
+.tb-btn { border-radius: 14px; }
+.tb-btn.active, .icon-btn.active { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.sheet-tab {
+  background: var(--lg-bg); border-color: var(--lg-border);
+  box-shadow: var(--lg-highlight), var(--shadow);
+}
+.ed-title:hover, .ed-title:focus { background: color-mix(in srgb, var(--surface-2) 70%, transparent); }
+@media (max-width: 760px) {
+  .ed-top { left: 8px; right: 8px; padding: 4px 4px; border-radius: 20px; }
+  .editor.panel-open .ed-top { right: 8px; }
+  .ed-panel { border-radius: 26px 26px 0 0; border-top: 1px solid var(--lg-border); }
+  .ed-main.sheet-open .ed-stage { height: 40vh; }
+}

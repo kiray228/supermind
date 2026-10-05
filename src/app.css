@@ -29,3 +29,22 @@
   .nav-item.active { background: none; }
   .app-main { height: 100%; }
 }
+
+/* Liquid Glass: боковая панель и плавающее нижнее меню */
+.sidebar {
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+  -webkit-backdrop-filter: var(--lg-blur);
+  backdrop-filter: var(--lg-blur);
+  border-right-color: var(--lg-border);
+}
+.nav-item.active { background: var(--lg-solid); box-shadow: var(--lg-highlight), 0 2px 10px rgba(15, 23, 42, 0.08); }
+@media (max-width: 760px) {
+  .sidebar {
+    left: 12px; right: 12px; bottom: calc(10px + var(--safe-bottom)); padding: 6px; border-radius: 28px;
+    background: var(--lg-bg); border: 1px solid var(--lg-border);
+    box-shadow: var(--lg-highlight), 0 0 0 0.5px var(--lg-edge), var(--lg-shadow);
+  }
+  .nav-item { height: 54px; border-radius: 22px; }
+  .nav-item.active { background: var(--lg-solid); color: var(--accent); }
+  .page-body { padding-bottom: calc(100px + var(--safe-bottom)); }
+}

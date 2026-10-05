@@ -49,6 +49,7 @@
 
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
+html, body { touch-action: pan-x pan-y; }
 body { background: var(--bg); overflow: hidden; overscroll-behavior: none; }
 button, input, textarea, select { font: inherit; color: inherit; }
 button { cursor: pointer; }
@@ -184,4 +185,82 @@ button.chip:hover { border-color: var(--border); }
 @media (pointer: coarse) {
   .menu .kbd { display: none; }
   .menu button { height: 42px; font-size: 15px; }
+}
+
+/* ================= Liquid Glass ================= */
+:root {
+  --lg-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.52));
+  --lg-border: rgba(255, 255, 255, 0.75);
+  --lg-edge: rgba(15, 23, 42, 0.08);
+  --lg-shadow: 0 10px 34px rgba(15, 23, 42, 0.14), 0 2px 6px rgba(15, 23, 42, 0.06);
+  --lg-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 0 rgba(255, 255, 255, 0.35);
+  --lg-blur: blur(26px) saturate(1.9);
+  --lg-solid: rgba(255, 255, 255, 0.9);
+}
+:root[data-theme='dark'] {
+  --lg-bg: linear-gradient(135deg, rgba(48, 52, 62, 0.72), rgba(24, 26, 32, 0.6));
+  --lg-border: rgba(255, 255, 255, 0.14);
+  --lg-edge: rgba(0, 0, 0, 0.4);
+  --lg-shadow: 0 12px 38px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
+  --lg-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+  --lg-solid: rgba(28, 30, 36, 0.92);
+}
+
+.glass, .lg {
+  background: var(--lg-bg);
+  -webkit-backdrop-filter: var(--lg-blur);
+  backdrop-filter: var(--lg-blur);
+  border: 1px solid var(--lg-border);
+  box-shadow: var(--lg-highlight), 0 0 0 0.5px var(--lg-edge), var(--lg-shadow);
+}
+
+/* мягкий цветной фон, который «просвечивает» сквозь стекло */
+body {
+  background:
+    radial-gradient(900px 600px at 0% 0%, rgba(255, 106, 61, 0.10), transparent 60%),
+    radial-gradient(800px 600px at 100% 10%, rgba(168, 85, 247, 0.09), transparent 60%),
+    radial-gradient(900px 700px at 50% 100%, rgba(14, 165, 233, 0.08), transparent 60%),
+    var(--bg);
+  background-attachment: fixed;
+}
+.page, .app-main { background: transparent; }
+
+/* кнопки со стеклянным бликом */
+.btn { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5); }
+.btn-primary {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, #fff), var(--accent));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 4px 14px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.btn-ghost { box-shadow: none; }
+.segmented {
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+.segmented button.active {
+  background: var(--lg-solid);
+  box-shadow: var(--lg-highlight), 0 2px 8px rgba(15, 23, 42, 0.12);
+}
+
+/* карточки и окна — полупрозрачное стекло */
+.card, .modal, .menu {
+  background: var(--lg-solid);
+  -webkit-backdrop-filter: var(--lg-blur);
+  backdrop-filter: var(--lg-blur);
+  border-color: var(--lg-border);
+  box-shadow: var(--lg-highlight), 0 0 0 0.5px var(--lg-edge), var(--lg-shadow);
+}
+.modal-backdrop { background: rgba(10, 12, 16, 0.32); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+.toast {
+  background: rgba(20, 22, 28, 0.82);
+  -webkit-backdrop-filter: var(--lg-blur);
+  backdrop-filter: var(--lg-blur);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 10px 18px;
+}
+.page-header {
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+  -webkit-backdrop-filter: var(--lg-blur);
+  backdrop-filter: var(--lg-blur);
+  border-bottom-color: var(--lg-border);
 }

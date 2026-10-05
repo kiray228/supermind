@@ -438,6 +438,21 @@ function MapPanel() {
           </button>
         ))}
       </div>
+      {(['main', 'sub'] as const).map((lvl) => (
+        <div key={lvl}>
+          <label className="label">{lvl === 'main' ? 'Форма основных тем' : 'Форма подтем'}</label>
+          <div className="grid-4">
+            <button className={`tile ${!sheet.shapes?.[lvl] ? 'active' : ''}`} title="Как в теме оформления" onClick={() => st.setSheetProps({ shapes: { ...sheet.shapes, [lvl]: undefined } })}>
+              <span className="tiny bold">Авто</span>
+            </button>
+            {SHAPES.filter((x) => x.id !== 'diamond').map((sh) => (
+              <button key={sh.id} className={`tile ${sheet.shapes?.[lvl] === sh.id ? 'active' : ''}`} title={sh.name} onClick={() => st.setSheetProps({ shapes: { ...sheet.shapes, [lvl]: sh.id } })}>
+                <ShapePreview shape={sh.id} />
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
       <label className="row small" style={{ marginTop: 12, cursor: 'pointer' }}>
         <input type="checkbox" checked={!!sheet.rainbow} onChange={(e) => st.setSheetProps({ rainbow: e.target.checked })} />
         Радужные ветви

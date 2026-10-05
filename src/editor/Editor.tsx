@@ -2,9 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft, Undo2, Redo2, Sparkles, SlidersHorizontal, Search, MoreHorizontal, Plus, CornerDownRight, Trash2, Spline, SquareDashed,
   Braces, Minus, Maximize, Presentation, Expand, Download, Lock, Unlock, Network, ListTree, CalendarRange, X, ChevronLeft, ChevronRight,
-  Keyboard, Copy, Scissors, ClipboardPaste, FilePlus2, Pencil, ChevronsDownUp, ArrowUpFromLine, CopyPlus, StickyNote, Cloud, Check,
+  Keyboard, Copy, Scissors, ClipboardPaste, FilePlus2, Pencil, ChevronsDownUp, ArrowUpFromLine, CopyPlus, StickyNote, Cloud, Check, Palette, ArrowLeftRight,
 } from 'lucide-react';
-import { useDoc } from '../store/docStore';
+import { useDoc, topicSide } from '../store/docStore';
 import { toast } from '../store/appStore';
 import { leaveEditor } from '../actions';
 import { MapCanvas, type MapCanvasHandle } from './MapCanvas';
@@ -67,6 +67,13 @@ export default function Editor() {
   const [pitch, setPitch] = useState<{ slides: string[]; i: number } | null>(null);
   const [zoom, setZoom] = useState(1);
   const [showKeys, setShowKeys] = useState(false);
+  const [isMobileView, setIsMobileView] = useState(isMobile);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 760px)');
+    const on = () => setIsMobileView(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
 
   const st = useDoc.getState();
 
@@ -254,6 +261,9 @@ export default function Editor() {
           { icon: <ArrowUpFromLine size={16} />, label: 'Родительская тема', kbd: 'Ctrl+Enter', onClick: () => st.addParent(topicId) },
         ] : []),
         'sep',
+        ...(f?.parent?.id === sheet.root.id && sheet.structure === 'map'
+          ? [{ icon: <ArrowLeftRight size={16} />, label: topicSide(sheet, topicId) === 'left' ? 'Перенести направо' : 'Перенести налево', onClick: () => st.setSide(topicId, topicSide(sheet, topicId) === 'left' ? 'right' : 'left') }]
+          : []),
         { icon: <Spline size={16} />, label: 'Связь', onClick: startRel },
         { icon: <SquareDashed size={16} />, label: 'Граница', onClick: () => st.addBoundary(topicId) },
         { icon: <Braces size={16} />, label: 'Итог', onClick: () => st.addSummary(topicId) },
@@ -423,7 +433,7 @@ export default function Editor() {
   const showChrome = !zen && !pitch;
 
   return (
-    <div className={`editor ${zen ? 'zen' : ''}`}>
+    <div className={`editor ${zen ? 'zen' : ''} ${showChrome && panel ? 'panel-open' : ''}`}>
       {showChrome && (
         <header className="ed-top glass">
           <button className="icon-btn" onClick={() => leaveEditor('home')} title="К списку карт">
@@ -499,19 +509,30 @@ export default function Editor() {
 
           {mode === 'map' && showChrome && (
             <div className="ed-toolbar glass">
-              <button className="tb-btn" onClick={addChild} title="Подтема (Tab)"><CornerDownRight /><span>Подтема</span></button>
-              <button className="tb-btn" onClick={addSibling} disabled={!hasSel} title="Тема рядом (Enter)"><Plus /><span>Рядом</span></button>
-              <button className="tb-btn" onClick={() => { if (!selId) return; primeKeyboard(); st.setEditing(selId); }} disabled={!hasSel} title="Изменить текст (F2)"><Pencil /><span>Текст</span></button>
-              <button className={`tb-btn ${relMode ? 'active' : ''}`} onClick={() => (relMode ? setRelMode(false) : startRel())} title="Связь"><Spline /><span>Связь</span></button>
-              <button className="tb-btn hide-xs" onClick={() => st.addBoundary()} disabled={!hasSel} title="Граница"><SquareDashed /><span>Граница</span></button>
-              <button className="tb-btn hide-xs" onClick={() => st.addSummary()} disabled={!hasSel} title="Итог"><Braces /><span>Итог</span></button>
-              <button className="tb-btn" onClick={del} disabled={!selection.some((id) => id !== sheet.root.id) && !selectedRel} title="Удалить (Del)"><Trash2 /><span>Удалить</span></button>
+              {hasSel || selectedRel || !isMobileView ? (
+                <>
+                  <button className="tb-btn" onClick={addChild} title="Подтема (Tab)"><CornerDownRight /><span>Подтема</span></button>
+                  <button className="tb-btn" onClick={addSibling} disabled={!hasSel} title="Тема рядом (Enter)"><Plus /><span>Рядом</span></button>
+                  <button className="tb-btn" onClick={() => { if (!selId) return; primeKeyboard(); st.setEditing(selId); }} disabled={!hasSel} title="Изменить текст (F2)"><Pencil /><span>Текст</span></button>
+                  <button className="tb-btn" onClick={() => { setInspTab('style'); setPanel('inspector'); }} disabled={!hasSel} title="Стиль темы: форма, цвет, шрифт"><Palette /><span>Стиль</span></button>
+                  <button className={`tb-btn ${relMode ? 'active' : ''}`} onClick={() => (relMode ? setRelMode(false) : startRel())} title="Связь"><Spline /><span>Связь</span></button>
+                  <button className="tb-btn hide-xs" onClick={() => st.addBoundary()} disabled={!hasSel} title="Граница"><SquareDashed /><span>Граница</span></button>
+                  <button className="tb-btn hide-xs" onClick={() => st.addSummary()} disabled={!hasSel} title="Итог"><Braces /><span>Итог</span></button>
+                  <button className="tb-btn" onClick={del} disabled={!selection.some((id) => id !== sheet.root.id) && !selectedRel} title="Удалить (Del)"><Trash2 /><span>Удалить</span></button>
+                </>
+              ) : (
+                <>
+                  <button className="tb-btn" onClick={addChild} title="Новая основная тема"><Plus /><span>Тема</span></button>
+                  <button className="tb-btn" onClick={() => { setInspTab('map'); setPanel('inspector'); }} title="Структура, тема оформления, формы"><Palette /><span>Оформл.</span></button>
+                  <button className="tb-btn" onClick={() => st.redo()} disabled={!canRedo}><Redo2 /><span>Повтор</span></button>
+                </>
+              )}
               <span className="tb-sep hide-mobile" />
               <button className="tb-btn show-mobile" onClick={() => st.undo()} disabled={!canUndo}><Undo2 /><span>Отмена</span></button>
               <button className="tb-btn hide-mobile" onClick={() => canvas.current?.zoomBy(1 / 1.2)} title="Уменьшить"><Minus /></button>
               <button className="tb-zoom hide-mobile" onClick={() => canvas.current?.setZoom(1)} title="100%">{Math.round(zoom * 100)}%</button>
               <button className="tb-btn hide-mobile" onClick={() => canvas.current?.zoomBy(1.2)} title="Увеличить"><Plus /></button>
-              <button className="tb-btn" onClick={() => canvas.current?.fit()} title="Вписать (Ctrl+0)"><Maximize /><span className="show-mobile-inline">Вписать</span></button>
+              <button className={`tb-btn ${hasSel && isMobileView ? 'hide-xs' : ''}`} onClick={() => canvas.current?.fit()} title="Вписать (Ctrl+0)"><Maximize /><span className="show-mobile-inline">Вписать</span></button>
             </div>
           )}
 

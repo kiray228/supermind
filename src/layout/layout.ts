@@ -237,6 +237,9 @@ export function layoutSheet(sheet: Sheet): LayoutResult {
     else color = t.style?.lineColor ?? parent.color;
 
     const st: ResolvedStyle = { ...base, italic: false, strike: false };
+    if (level === 'main' && sheet.shapes?.main) st.shape = sheet.shapes.main;
+    if (level === 'sub' && sheet.shapes?.sub) st.shape = sheet.shapes.sub;
+    if (st.shape === 'underline') st.fill = 'transparent';
     if (sheet.rainbow && depth >= 1) {
       if (level === 'main') {
         if (theme.fillMainWithBranch) {
@@ -244,6 +247,8 @@ export function layoutSheet(sheet: Sheet): LayoutResult {
           st.textColor = '#ffffff';
           st.borderColor = 'transparent';
         } else if (st.borderWidth > 0) st.borderColor = color;
+      } else if (level === 'sub' && st.borderWidth > 0 && st.shape !== 'underline' && st.shape !== 'none') {
+        st.borderColor = color;
       }
     }
     const o = t.style ?? {};
@@ -476,9 +481,9 @@ export function layoutSheet(sheet: Sheet): LayoutResult {
     const ks = kids(root);
     switch (structure) {
       case 'map': {
-        const nRight = Math.ceil(ks.length / 2);
-        const right = ks.slice(0, nRight);
-        const left = ks.slice(nRight);
+        const sides = mapSides(root.topic);
+        const right = ks.filter((c) => sides.get(c.id) !== 'left');
+        const left = ks.filter((c) => sides.get(c.id) === 'left');
         const side = (arr: LNode[], dir: 1 | -1) => {
           const total = arr.reduce((s, c) => s + subH(c), 0) + vGap(root) * Math.max(0, arr.length - 1);
           let y = cy - total / 2;
@@ -632,6 +637,21 @@ export function layoutSheet(sheet: Sheet): LayoutResult {
     maxY = Math.max(maxY, n.y + n.h);
   }
   return { nodes, order, edges, extras, bounds: { x: minX, y: minY, w: maxX - minX, h: maxY - minY }, theme };
+}
+
+/**
+ * Стороны основных тем в «Интеллект-карте»: явно заданные (topic.side) остаются,
+ * остальные распределяются поровну — первые направо, следующие налево.
+ */
+export function mapSides(root: Topic): Map<ID, 'left' | 'right'> {
+  const res = new Map<ID, 'left' | 'right'>();
+  const kids = root.children;
+  const explicitRight = kids.filter((c) => c.side === 'right').length;
+  const free = kids.filter((c) => !c.side);
+  const needRight = Math.max(0, Math.ceil(kids.length / 2) - explicitRight);
+  free.forEach((c, i) => res.set(c.id, i < needRight ? 'right' : 'left'));
+  kids.forEach((c) => c.side && res.set(c.id, c.side));
+  return res;
 }
 
 function countDesc(t: Topic): number {

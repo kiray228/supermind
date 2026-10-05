@@ -62,6 +62,8 @@ export interface TopicImage {
 export interface Topic {
   id: ID;
   text: string;
+  /** сторона для основных тем в «Интеллект-карте» */
+  side?: 'left' | 'right';
   children: Topic[];
   collapsed?: boolean;
   style?: TopicStyle;
@@ -120,6 +122,8 @@ export interface Sheet {
   /** Радужные ветви */
   rainbow?: boolean;
   lineStyle?: LineStyle;
+  /** Формы по умолчанию для уровней (перекрывают тему оформления) */
+  shapes?: { main?: ShapeType; sub?: ShapeType };
   /** Плотность: расстояния между темами */
   spacing?: number;
   background?: string;

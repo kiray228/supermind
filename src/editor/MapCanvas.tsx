@@ -70,10 +70,24 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
   const [dropTarget, setDropTarget] = useState<{ id: ID; zone: 'child' | 'before' | 'after' } | null>(null);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const lastTap = useRef<{ id: string; t: number }>({ id: '', t: 0 });
-  const pendingAdd = useRef<string | null>(null);
+  const pendingAdd = useRef<{ id: string; side?: 'left' | 'right' } | null>(null);
   const lastPointerType = useRef('mouse');
   const longPress = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [dragWorld, setDragWorld] = useState<{ x: number; y: number } | null>(null);
+  // инерция прокрутки и подсказка масштаба
+  const samples = useRef<{ x: number; y: number; t: number }[]>([]);
+  const inertia = useRef(0);
+  const stopInertia = () => {
+    if (inertia.current) cancelAnimationFrame(inertia.current);
+    inertia.current = 0;
+  };
+  const [zoomBadge, setZoomBadge] = useState(false);
+  const zoomBadgeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flashZoom = () => {
+    setZoomBadge(true);
+    if (zoomBadgeTimer.current) clearTimeout(zoomBadgeTimer.current);
+    zoomBadgeTimer.current = setTimeout(() => setZoomBadge(false), 900);
+  };
 
   useEffect(() => {
     onViewChange?.(view);
@@ -201,7 +215,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
       const el = wrapRef.current;
       if (!n || !el) return;
       const v = viewRef.current;
-      const k = Math.max(v.k, 0.8);
+      const k = v.k < 0.55 ? 0.75 : v.k;
       const targetY = el.clientHeight * 0.28;
       const cx = n.x + n.w / 2;
       const sxOld = cx * v.k + v.x;
@@ -222,7 +236,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusReq?.n]);
 
-  // держать выделенную тему в зоне видимости
+  // держать выделенную тему в зоне видимости (только если она действительно ушла за экран)
   useEffect(() => {
     const id = selection[selection.length - 1];
     const n = id && lay.nodes.get(id);
@@ -233,16 +247,23 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
     const sy = n.y * v.k + v.y;
     const sw = n.w * v.k;
     const sh = n.h * v.k;
-    const m = 56;
+    const W = el.clientWidth;
+    const H = el.clientHeight;
+    const bottom = 84; // нижняя панель
+    const top = 72; // верхняя стеклянная панель
+    const outside = sx + sw < 12 || sx > W - 12 || sy + sh < top || sy > H - bottom;
+    const partly = sx < 8 || sx + sw > W - 8 || sy < top - 8 || sy + sh > H - bottom;
+    if (!outside && !(partly && lastPointerType.current === 'mouse')) return;
+    const m = 40;
     let dx = 0;
     let dy = 0;
     if (sx < m) dx = m - sx;
-    else if (sx + sw > el.clientWidth - m) dx = el.clientWidth - m - sx - sw;
-    if (sy < m) dy = m - sy;
-    else if (sy + sh > el.clientHeight - m - 60) dy = el.clientHeight - m - 60 - sy - sh;
+    else if (sx + sw > W - m) dx = W - m - sx - sw;
+    if (sy < top + 8) dy = top + 8 - sy;
+    else if (sy + sh > H - bottom - 16) dy = H - bottom - 16 - sy - sh;
     if (dx || dy) animateTo({ ...v, x: v.x + dx, y: v.y + dy }, true, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selection, lay]);
+  }, [selection]);
 
   // колесо: прокрутка = панорама, ctrl/pinch = зум
   useEffect(() => {
@@ -258,15 +279,23 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
         setView({ ...v, x: v.x - e.deltaX, y: v.y - e.deltaY });
       }
     };
-    // Safari жесты трекпада
+    // Safari: щипок не должен масштабировать страницу — только карту
     const onGesture = (e: Event) => e.preventDefault();
+    const onTouchMove = (e: TouchEvent) => {
+      if ((e.target as HTMLElement).closest?.('textarea')) return;
+      e.preventDefault();
+    };
     el.addEventListener('wheel', onWheel, { passive: false });
     el.addEventListener('gesturestart', onGesture);
     el.addEventListener('gesturechange', onGesture);
+    el.addEventListener('gestureend', onGesture);
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
     return () => {
       el.removeEventListener('wheel', onWheel);
       el.removeEventListener('gesturestart', onGesture);
       el.removeEventListener('gesturechange', onGesture);
+      el.removeEventListener('gestureend', onGesture);
+      el.removeEventListener('touchmove', onTouchMove);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -299,6 +328,9 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
   const onPointerDown = (e: React.PointerEvent) => {
     interacted.current = true;
     lastPointerType.current = e.pointerType;
+    stopInertia();
+    if (animating) setAnimating(false);
+    samples.current = [{ x: e.clientX, y: e.clientY, t: performance.now() }];
     if ((e.target as HTMLElement).closest('textarea')) return;
     if (e.button === 2) return;
     try {
@@ -329,7 +361,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
     const addEl = target.closest('[data-add]');
     if (addEl && !readOnly) {
       // добавление — по отпусканию пальца (жест пользователя, клавиатура откроется)
-      pendingAdd.current = addEl.getAttribute('data-add');
+      pendingAdd.current = { id: addEl.getAttribute('data-add')!, side: (addEl.getAttribute('data-side') as 'left' | 'right' | null) ?? undefined };
       return;
     }
     const toggleEl = target.closest('[data-toggle]');
@@ -416,10 +448,19 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
     // фон
     if (relMode) return;
     const now = Date.now();
-    if (lastTap.current.id === '__bg' && now - lastTap.current.t < 350 && !readOnly) {
-      const w = toWorld(e.clientX, e.clientY);
-      st.addFloating(w.x, w.y);
+    if (lastTap.current.id === '__bg' && now - lastTap.current.t < 350) {
       lastTap.current = { id: '', t: 0 };
+      if (e.pointerType !== 'mouse') {
+        // двойной тап по пустому месту: приблизить, а если уже крупно — показать всю карту
+        const r = rect();
+        if (viewRef.current.k < 0.95) zoomAt(Math.min(2.5, 1.6), e.clientX - r.left, e.clientY - r.top, true);
+        else fit();
+        return;
+      }
+      if (!readOnly) {
+        const w = toWorld(e.clientX, e.clientY);
+        st.addFloating(w.x, w.y);
+      }
       return;
     }
     lastTap.current = { id: '__bg', t: now };
@@ -464,7 +505,10 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
       const cy = (a.y + b.y) / 2 - r.top;
       const wx = (d.cx - d.vx) / d.k0;
       const wy = (d.cy - d.vy) / d.k0;
-      setView({ k, x: cx - wx * k, y: cy - wy * k });
+      const nv = { k, x: cx - wx * k, y: cy - wy * k };
+      viewRef.current = nv;
+      setView(nv);
+      flashZoom();
       return;
     }
     if (d.kind === 'pan') {
@@ -474,7 +518,14 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
         d.moved = true;
         clearLongPress();
       }
-      if (d.moved) setView({ ...viewRef.current, x: d.vx + dx, y: d.vy + dy });
+      if (d.moved) {
+        const nv = { ...viewRef.current, x: d.vx + dx, y: d.vy + dy };
+        viewRef.current = nv;
+        setView(nv);
+        const now = performance.now();
+        samples.current.push({ x: e.clientX, y: e.clientY, t: now });
+        while (samples.current.length > 2 && now - samples.current[0].t > 100) samples.current.shift();
+      }
       return;
     }
     if (d.kind === 'select') {
@@ -513,10 +564,10 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
     pointers.current.delete(e.pointerId);
     clearLongPress();
     if (pendingAdd.current) {
-      const id = pendingAdd.current;
+      const { id, side } = pendingAdd.current;
       pendingAdd.current = null;
       primeKeyboard();
-      useDoc.getState().addChild(id);
+      useDoc.getState().addChild(id, undefined, side);
       return;
     }
     const d = dragRef.current;
@@ -530,6 +581,34 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
     }
     if (pointers.current.size > 0) return;
     const st = useDoc.getState();
+    if (d.kind === 'pan' && d.moved && e.pointerType !== 'mouse') {
+      // инерция: карта плавно докатывается после свайпа
+      const sm = samples.current;
+      const a = sm[0];
+      const b = sm[sm.length - 1];
+      const dt = b && a ? b.t - a.t : 0;
+      if (dt > 0 && performance.now() - b.t < 80) {
+        let vx = (b.x - a.x) / dt;
+        let vy = (b.y - a.y) / dt;
+        if (Math.hypot(vx, vy) > 0.25) {
+          let last = performance.now();
+          const step = () => {
+            const now = performance.now();
+            const ms = Math.min(32, now - last);
+            last = now;
+            const v = viewRef.current;
+            const nv = { ...v, x: v.x + vx * ms, y: v.y + vy * ms };
+            viewRef.current = nv;
+            setView(nv);
+            const f = Math.pow(0.94, ms / 16);
+            vx *= f;
+            vy *= f;
+            inertia.current = Math.hypot(vx, vy) > 0.02 ? requestAnimationFrame(step) : 0;
+          };
+          inertia.current = requestAnimationFrame(step);
+        }
+      }
+    }
     if (d.kind === 'pan') {
       if (!d.moved && !d.onTopic) {
         st.select(null);
@@ -554,12 +633,28 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
       if (dt) {
         const tn = lay.nodes.get(dt.id)!;
         if (dt.zone === 'child') st.move(d.id, dt.id, tn.topic.children.length);
-        else if (tn.parentId) st.move(d.id, tn.parentId, tn.index + (dt.zone === 'after' ? 1 : 0));
+        else if (tn.parentId) {
+          // рядом с основной темой карты — встать на её сторону
+          const side = tn.parentId === sheet.root.id && sheet.structure === 'map' ? (tn.side < 0 ? 'left' : 'right') : undefined;
+          st.move(d.id, tn.parentId, tn.index + (dt.zone === 'after' ? 1 : 0), side);
+        }
       } else {
         const n = lay.nodes.get(d.id)!;
         const nx = w.x - d.offX + n.w / 2;
         const ny = w.y - d.offY + n.h / 2;
-        if (d.floating) {
+        const rootN = lay.nodes.get(sheet.root.id)!;
+        if (!d.floating && n.parentId === sheet.root.id && sheet.structure === 'map') {
+          // основную тему перетащили на пустое место — переносим на нужную сторону карты
+          const side: 'left' | 'right' = nx < rootN.x + rootN.w / 2 ? 'left' : 'right';
+          const sameSide = sheet.root.children.filter((c) => c.id !== d.id && (lay.nodes.get(c.id)!.side < 0 ? 'left' : 'right') === side);
+          const before = sameSide.find((c) => {
+            const cn = lay.nodes.get(c.id)!;
+            return cn.y + cn.h / 2 > ny;
+          });
+          // move() сам учитывает сдвиг индекса при перестановке внутри одного родителя
+          const idx = before ? sheet.root.children.indexOf(before) : sameSide.length ? sheet.root.children.indexOf(sameSide[sameSide.length - 1]) + 1 : sheet.root.children.length;
+          st.move(d.id, sheet.root.id, idx, side);
+        } else if (d.floating) {
           const f = sheet.floating.find((x) => x.id === d.id)!;
           // плавающая хранит центр корня; сдвигаем на разницу
           st.moveFloating(d.id, f.x + (nx - (n.x + n.w / 2)), f.y + (ny - (n.y + n.h / 2)));
@@ -691,6 +786,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
           </marker>
         </defs>
       </svg>
+      {zoomBadge && <div className="zoom-badge">{Math.round(view.k * 100)}%</div>}
       {editingId && lay.nodes.get(editingId) && <InlineEditor key={editingId} n={lay.nodes.get(editingId)!} view={view} />}
     </div>
   );
