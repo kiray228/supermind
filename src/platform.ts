@@ -19,7 +19,7 @@ export async function nativeSaveBlob(blob: Blob, filename: string) {
   const written = await Filesystem.writeFile({ path: filename, data, directory: Directory.Cache });
   try {
     // копия в «Документы», чтобы файл остался на устройстве
-    await Filesystem.writeFile({ path: '2Mind/' + filename, data, directory: Directory.Documents, recursive: true });
+    await Filesystem.writeFile({ path: 'SuperMind/' + filename, data, directory: Directory.Documents, recursive: true });
   } catch {
     /* нет разрешения — достаточно «Поделиться» */
   }

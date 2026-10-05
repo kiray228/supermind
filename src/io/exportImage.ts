@@ -224,7 +224,7 @@ export async function exportPdf(svg: SVGSVGElement, bg: string, title: string): 
       format: [pw, ph],
       compress: true,
     });
-    pdf.setProperties({ title: title || 'Карта', creator: '2Mind' });
+    pdf.setProperties({ title: title || 'Карта', creator: 'SuperMind' });
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
     // вписать с сохранением пропорций

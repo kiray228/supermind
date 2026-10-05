@@ -17,14 +17,14 @@ export { buildExportSvg, exportSvgBlob, exportPng, exportPdf } from './exportIma
 
 /** Значение accept для <input type="file"> */
 export const IMPORT_ACCEPT =
-  '.2mind,.xmind,.md,.markdown,.txt,.opml,.json,text/markdown,text/plain,text/x-opml,application/json';
+  '.supermind,.2mind,.xmind,.md,.markdown,.txt,.opml,.json,text/markdown,text/plain,text/x-opml,application/json';
 
 // ---------------------------------------------------------------------
-// Нативный формат .2mind (JSON MindDoc)
+// Нативный формат .supermind (JSON MindDoc; старые файлы .2mind тоже открываются)
 // ---------------------------------------------------------------------
 
 export function exportNative(doc: MindDoc): Blob {
-  return new Blob([JSON.stringify({ format: '2mind', version: 1, ...doc })], { type: 'application/json' });
+  return new Blob([JSON.stringify({ format: 'supermind', version: 1, ...doc })], { type: 'application/json' });
 }
 
 const STRUCTURES: StructureType[] = ['map', 'logic-right', 'logic-left', 'org', 'tree', 'timeline', 'fishbone', 'brace'];
@@ -88,7 +88,7 @@ function normSheet(v: unknown, i: number): Sheet {
   return sheet;
 }
 
-/** Проверка и нормализация JSON документа 2Mind. Принимает также отдельный лист или тему. */
+/** Проверка и нормализация JSON документа SuperMind. Принимает также отдельный лист или тему. */
 export function parseNative(json: string, filename?: string): MindDoc {
   let raw: unknown;
   try {
@@ -133,7 +133,7 @@ function docFromTopic(root: Topic, filename: string): MindDoc {
 
 export async function importFile(file: File): Promise<MindDoc> {
   let ext = fileExt(file.name);
-  if (!ext || !['xmind', 'md', 'markdown', 'txt', 'opml', '2mind', 'json'].includes(ext)) {
+  if (!ext || !['xmind', 'md', 'markdown', 'txt', 'opml', 'supermind', '2mind', 'json'].includes(ext)) {
     // определяем по содержимому
     const head = new Uint8Array(await file.slice(0, 4).arrayBuffer());
     if (head[0] === 0x50 && head[1] === 0x4b) ext = 'xmind';
@@ -149,6 +149,7 @@ export async function importFile(file: File): Promise<MindDoc> {
       return importXmind(await file.arrayBuffer(), file.name);
     case 'opml':
       return docFromTopic(opmlToTopic(await file.text()), file.name);
+    case 'supermind':
     case '2mind':
     case 'json':
       return parseNative(await file.text(), file.name);

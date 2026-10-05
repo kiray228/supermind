@@ -88,7 +88,7 @@ export default function Home() {
       case 'export': {
         const d = await loadDoc(id);
         if (!d || 'locked' in d) return toast('Зашифрованную карту экспортируйте из редактора');
-        await downloadBlob(exportNative(d), safeFilename(d.title) + '.2mind');
+        await downloadBlob(exportNative(d), safeFilename(d.title) + '.supermind');
         break;
       }
       case 'trash':
@@ -216,7 +216,7 @@ export default function Home() {
                 <button onClick={() => act(menu.id, 'rename')}><Pencil size={16} /> Переименовать</button>
                 <button onClick={() => act(menu.id, 'star')}><Star size={16} /> {docs.find((d) => d.id === menu.id)?.starred ? 'Убрать из избранного' : 'В избранное'}</button>
                 <button onClick={() => act(menu.id, 'dup')}><Copy size={16} /> Дублировать</button>
-                <button onClick={() => act(menu.id, 'export')}><Download size={16} /> Скачать .2mind</button>
+                <button onClick={() => act(menu.id, 'export')}><Download size={16} /> Скачать .supermind</button>
                 <div className="sep" />
                 <button style={{ color: 'var(--danger)' }} onClick={() => act(menu.id, 'trash')}><Trash2 size={16} /> В корзину</button>
               </>

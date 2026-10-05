@@ -35,9 +35,9 @@ export default function Settings() {
     const all: Record<string, unknown> = {};
     // API-ключ в копию не попадает
     for (const k of await keys()) if (String(k) !== 'settings') all[String(k)] = await get(k);
-    const blob = new Blob([JSON.stringify({ format: '2mind-backup', version: 1, createdAt: Date.now(), data: all })], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify({ format: 'supermind-backup', version: 1, createdAt: Date.now(), data: all })], { type: 'application/json' });
     const d = new Date();
-    await downloadBlob(blob, `2mind-backup-${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}.json`);
+    await downloadBlob(blob, `supermind-backup-${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}.json`);
   };
 
   const restore = async () => {
@@ -45,7 +45,7 @@ export default function Settings() {
     if (!f) return;
     try {
       const j = JSON.parse(await f.text());
-      if (j.format !== '2mind-backup' || !j.data) throw new Error('Это не резервная копия 2Mind');
+      if ((j.format !== 'supermind-backup' && j.format !== '2mind-backup') || !j.data) throw new Error('Это не резервная копия SuperMind');
       if (!(await confirmDialog('Восстановить из копии?', 'Карты из копии будут добавлены, совпадающие — заменены. Ежедневник и доска будут заменены.', { okText: 'Восстановить' }))) return;
       const cur = ((await get('docs:index')) ?? []) as { id: string }[];
       for (const [k, v] of Object.entries(j.data)) {
@@ -114,12 +114,12 @@ export default function Settings() {
           <section className="card set-card">
             <h3><Smartphone size={18} /> Установка на телефон</h3>
             <p className="small"><b>iPhone:</b> откройте сайт в Safari → «Поделиться» → «На экран „Домой“». Приложение будет работать как обычное, в том числе офлайн.</p>
-            <p className="small"><b>Android:</b> установите APK-файл 2Mind или в Chrome откройте меню ⋮ → «Установить приложение».</p>
+            <p className="small"><b>Android:</b> установите APK-файл SuperMind или в Chrome откройте меню ⋮ → «Установить приложение».</p>
           </section>
 
           <section className="card set-card">
             <h3><Info size={18} /> О приложении</h3>
-            <p className="small muted" style={{ margin: 0 }}>2Mind 1.2 — бесплатные интеллект-карты, ежедневник и доска задач. Все функции открыты, без подписок.</p>
+            <p className="small muted" style={{ margin: 0 }}>SuperMind 1.3 — бесплатные интеллект-карты, ежедневник и доска задач. Все функции открыты, без подписок.</p>
           </section>
         </div>
       </div>

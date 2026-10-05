@@ -632,7 +632,7 @@ export async function exportXmind(doc: MindDoc): Promise<Blob> {
   });
 
   zip.file('content.json', JSON.stringify(content));
-  zip.file('metadata.json', JSON.stringify({ creator: { name: '2Mind', version: '1.0' } }));
+  zip.file('metadata.json', JSON.stringify({ creator: { name: 'SuperMind', version: '1.0' } }));
   zip.file(
     'manifest.json',
     JSON.stringify({ 'file-entries': { 'content.json': {}, 'metadata.json': {}, ...ctx.manifest } }),

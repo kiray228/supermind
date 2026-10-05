@@ -182,7 +182,7 @@ export default function Editor() {
           case 'docx': await downloadBlob(await exportDocx(doc), name + '.docx'); break;
           case 'xlsx': await downloadBlob(await exportXlsx(doc), name + '.xlsx'); break;
           case 'pptx': await downloadBlob(await exportPptx(doc), name + '.pptx'); break;
-          case '2mind': await downloadBlob(exportNative(doc), name + '.2mind'); break;
+          case 'native': await downloadBlob(exportNative(doc), name + '.supermind'); break;
         }
       } catch (e) {
         toast('Ошибка экспорта: ' + (e instanceof Error ? e.message : String(e)));
@@ -225,7 +225,7 @@ export default function Editor() {
         { icon: <Download size={16} />, label: 'PowerPoint (.pptx)', onClick: () => exportAs('pptx') },
         { icon: <Download size={16} />, label: 'Markdown', onClick: () => exportAs('md') },
         { icon: <Download size={16} />, label: 'OPML', onClick: () => exportAs('opml') },
-        { icon: <Download size={16} />, label: 'Файл 2Mind (резервная копия)', onClick: () => exportAs('2mind') },
+        { icon: <Download size={16} />, label: 'Файл SuperMind (резервная копия)', onClick: () => exportAs('native') },
         'sep',
         { icon: password ? <Unlock size={16} /> : <Lock size={16} />, label: password ? 'Снять пароль' : 'Защитить паролем', onClick: togglePassword },
         { icon: <Keyboard size={16} />, label: 'Горячие клавиши', onClick: () => setShowKeys(true) },

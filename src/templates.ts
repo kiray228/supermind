@@ -67,7 +67,7 @@ export function docFromMarkdown(md: string, title?: string, structure: Structure
   return newDoc(title ?? (root.text || 'Новая карта'), sheet);
 }
 
-export const WELCOME_MD = `# Добро пожаловать в 2Mind
+export const WELCOME_MD = `# Добро пожаловать в SuperMind
 - Основы
   - Нажмите на тему — выбрать
   - Нажмите ещё раз — изменить текст

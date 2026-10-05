@@ -32,6 +32,7 @@ const MIME_BY_EXT: Record<string, string> = {
   csv: 'text/csv',
   opml: 'text/x-opml',
   json: 'application/json',
+  supermind: 'application/json',
   '2mind': 'application/json',
   xmind: 'application/vnd.xmind.workbook',
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -99,7 +100,7 @@ function acceptForPlatform(accept: string): string {
   if (!accept || !isIOS()) return accept;
   const tokens = accept.split(',').map((t) => t.trim()).filter(Boolean);
   const ok = tokens.every((t) => t.includes('/') || IOS_SAFE_EXT.has(t.toLowerCase()));
-  // с «экзотическими» расширениями (.xmind, .2mind, .opml) iOS делает файлы недоступными —
+  // с «экзотическими» расширениями (.xmind, .supermind, .opml) iOS делает файлы недоступными —
   // в этом случае разрешаем любые файлы, а формат проверяется при импорте
   return ok ? accept : '';
 }

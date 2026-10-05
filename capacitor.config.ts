@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'app.twomind.mindmap',
-  appName: '2Mind',
+  appName: 'SuperMind',
   webDir: 'dist',
   android: {
     allowMixedContent: false,

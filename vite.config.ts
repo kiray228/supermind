@@ -4,13 +4,13 @@ import { defineConfig, type Plugin } from 'vite'
 /** Генерирует sw.js со списком всех файлов сборки — приложение работает офлайн */
 function serviceWorker(): Plugin {
   return {
-    name: '2mind-sw',
+    name: 'supermind-sw',
     apply: 'build',
     generateBundle(_, bundle) {
       const files = Object.keys(bundle).filter((f) => !f.endsWith('.map'))
       const assets = ['./', './index.html', ...files.map((f) => './' + f), './icon.svg', './icon-192.png', './icon-512.png', './manifest.webmanifest', './apple-touch-icon.png']
       const version = Date.now().toString(36)
-      const code = `const CACHE = '2mind-${version}';
+      const code = `const CACHE = 'supermind-${version}';
 const ASSETS = ${JSON.stringify([...new Set(assets)])};
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => Promise.all(ASSETS.map((a) => c.add(a).catch(() => {})))).then(() => self.skipWaiting()));

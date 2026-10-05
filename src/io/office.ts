@@ -76,7 +76,7 @@ function addDocProps(zip: Zip, title: string, mainTarget: string) {
       '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" ' +
       'xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" ' +
       'xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">' +
-      `<dc:title>${escXml(title)}</dc:title><dc:creator>2Mind</dc:creator><cp:lastModifiedBy>2Mind</cp:lastModifiedBy>` +
+      `<dc:title>${escXml(title)}</dc:title><dc:creator>SuperMind</dc:creator><cp:lastModifiedBy>SuperMind</cp:lastModifiedBy>` +
       `<dcterms:created xsi:type="dcterms:W3CDTF">${now}</dcterms:created>` +
       `<dcterms:modified xsi:type="dcterms:W3CDTF">${now}</dcterms:modified>` +
       '</cp:coreProperties>',
@@ -85,7 +85,7 @@ function addDocProps(zip: Zip, title: string, mainTarget: string) {
     'docProps/app.xml',
     XML_DECL +
       '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" ' +
-      'xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>2Mind</Application></Properties>',
+      'xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>SuperMind</Application></Properties>',
   );
   zip.file(
     '_rels/.rels',
@@ -441,17 +441,17 @@ function aPara(text: string, lvl = 0, noBullet = false): string {
 
 const PPT_THEME =
   XML_DECL +
-  `<a:theme xmlns:a="${A_NS}" name="2Mind"><a:themeElements>` +
-  '<a:clrScheme name="2Mind">' +
+  `<a:theme xmlns:a="${A_NS}" name="SuperMind"><a:themeElements>` +
+  '<a:clrScheme name="SuperMind">' +
   '<a:dk1><a:sysClr val="windowText" lastClr="000000"/></a:dk1><a:lt1><a:sysClr val="window" lastClr="FFFFFF"/></a:lt1>' +
   '<a:dk2><a:srgbClr val="1F2937"/></a:dk2><a:lt2><a:srgbClr val="F3F4F6"/></a:lt2>' +
   '<a:accent1><a:srgbClr val="4F46E5"/></a:accent1><a:accent2><a:srgbClr val="F97316"/></a:accent2>' +
   '<a:accent3><a:srgbClr val="22C55E"/></a:accent3><a:accent4><a:srgbClr val="EAB308"/></a:accent4>' +
   '<a:accent5><a:srgbClr val="06B6D4"/></a:accent5><a:accent6><a:srgbClr val="E11D48"/></a:accent6>' +
   '<a:hlink><a:srgbClr val="0563C1"/></a:hlink><a:folHlink><a:srgbClr val="954F72"/></a:folHlink></a:clrScheme>' +
-  '<a:fontScheme name="2Mind"><a:majorFont><a:latin typeface="Calibri"/><a:ea typeface=""/><a:cs typeface=""/></a:majorFont>' +
+  '<a:fontScheme name="SuperMind"><a:majorFont><a:latin typeface="Calibri"/><a:ea typeface=""/><a:cs typeface=""/></a:majorFont>' +
   '<a:minorFont><a:latin typeface="Calibri"/><a:ea typeface=""/><a:cs typeface=""/></a:minorFont></a:fontScheme>' +
-  '<a:fmtScheme name="2Mind"><a:fillStyleLst>' +
+  '<a:fmtScheme name="SuperMind"><a:fillStyleLst>' +
   '<a:solidFill><a:schemeClr val="phClr"/></a:solidFill>'.repeat(3) +
   '</a:fillStyleLst><a:lnStyleLst>' +
   [6350, 12700, 19050].map((w) => `<a:ln w="${w}"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln>`).join('') +

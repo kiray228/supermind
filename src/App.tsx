@@ -87,7 +87,7 @@ export default function App() {
         <nav className="sidebar">
           <div className="brand">
             <img src="./icon.svg" alt="" width={30} height={30} />
-            <span>2Mind</span>
+            <span>SuperMind</span>
           </div>
           {NAV.map((n) => (
             <button key={n.id} className={`nav-item ${view === n.id ? 'active' : ''}`} onClick={() => go(n.id)}>
