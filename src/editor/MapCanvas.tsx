@@ -83,9 +83,9 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
     return { x: (cx - r.left - v.x) / v.k, y: (cy - r.top - v.y) / v.k };
   }, []);
 
-  const animateTo = (v: View, animate = true) => {
+  const animateTo = (v: View, animate = true, mark = true) => {
     viewRef.current = v;
-    interacted.current = true;
+    if (mark) interacted.current = true;
     if (animate) {
       setAnimating(true);
       setTimeout(() => setAnimating(false), 420);
@@ -147,10 +147,12 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
     const el = wrapRef.current;
     if (!el || !el.clientWidth) return;
     const b = lay.bounds;
-    const fitsK = Math.min((el.clientWidth - 60) / b.w, (el.clientHeight - 60) / b.h);
+    const small = el.clientWidth < 600;
+    const pad = small ? 24 : 60;
+    const fitsK = Math.min((el.clientWidth - pad) / b.w, (el.clientHeight - pad) / b.h);
     const r = lay.nodes.get(sheet.root.id)!;
     // слишком большая карта — не мельчим, а центрируем на главной теме
-    const minK = el.clientWidth < 600 ? 0.62 : 0.5;
+    const minK = small ? 0.48 : 0.5;
     const v = fitsK >= 1 || fitsK < minK
       ? (() => {
           const k = fitsK >= 1 ? 1 : minK;
@@ -212,7 +214,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
     else if (sx + sw > el.clientWidth - m) dx = el.clientWidth - m - sx - sw;
     if (sy < m) dy = m - sy;
     else if (sy + sh > el.clientHeight - m - 60) dy = el.clientHeight - m - 60 - sy - sh;
-    if (dx || dy) animateTo({ ...v, x: v.x + dx, y: v.y + dy });
+    if (dx || dy) animateTo({ ...v, x: v.x + dx, y: v.y + dy }, true, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selection, lay]);
 
