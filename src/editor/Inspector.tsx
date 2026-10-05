@@ -3,7 +3,7 @@ import {
   Bold, Italic, Strikethrough, Image as ImageIcon, Trash2, Link2, X, Plus, CheckSquare, StickyNote, Tag, Palette, Map as MapIcon, Shapes,
 } from 'lucide-react';
 import type { LineStyle, ShapeType, StructureType, TaskStatus, Topic } from '../types';
-import { useDoc } from '../store/docStore';
+import { useDoc, beginBatch, endBatch } from '../store/docStore';
 import { findInSheet } from '../utils/tree';
 import { MARKER_GROUPS, MARKERS, toggleMarker } from '../markers';
 import { COLOR_SWATCHES, THEMES } from '../themes';
@@ -54,6 +54,21 @@ function ShapePreview({ shape }: { shape: ShapeType }) {
       {shape === 'underline' && <line x1="2" y1="16" x2="32" y2="16" stroke="currentColor" strokeWidth="2" />}
       {shape === 'none' && <text x="17" y="14" textAnchor="middle" fontSize="10" fill="currentColor">Aa</text>}
     </svg>
+  );
+}
+
+/** Ползунок: всё перетаскивание — один шаг отмены */
+function Range(props: React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <input
+      type="range"
+      {...props}
+      onPointerDown={beginBatch}
+      onPointerUp={endBatch}
+      onPointerCancel={endBatch}
+      onBlur={endBatch}
+      onKeyUp={endBatch}
+    />
   );
 }
 
@@ -137,14 +152,29 @@ function TopicPanel({ t, ids }: { t: Topic; ids: string[] }) {
   const [label, setLabel] = useState('');
   const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => () => {
-    if (noteTimer.current) clearTimeout(noteTimer.current);
-  }, []);
+  const pendingNote = useRef<string | null>(null);
+  // при переключении темы/закрытии панели — дописать заметку, а не терять её
+  useEffect(
+    () => () => {
+      if (noteTimer.current) clearTimeout(noteTimer.current);
+      if (pendingNote.current !== null) {
+        const v = pendingNote.current;
+        const sh = useDoc.getState().sheet();
+        if (sh && findInSheet(sh, t.id)) useDoc.getState().updateTopic(t.id, { note: v || undefined });
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   const saveNote = (v: string) => {
     setNote(v);
+    pendingNote.current = v;
     if (noteTimer.current) clearTimeout(noteTimer.current);
-    noteTimer.current = setTimeout(() => st.updateTopic(t.id, { note: v || undefined }), 400);
+    noteTimer.current = setTimeout(() => {
+      pendingNote.current = null;
+      st.updateTopic(t.id, { note: v || undefined });
+    }, 400);
   };
 
   const onImage = async (file: File) => {
@@ -199,7 +229,7 @@ function TopicPanel({ t, ids }: { t: Topic; ids: string[] }) {
           </div>
           <div className="row">
             <span className="small muted" style={{ width: 80 }}>Прогресс</span>
-            <input type="range" min={0} max={100} step={5} className="grow" value={task.progress ?? 0} onChange={(e) => setTask({ progress: Number(e.target.value) })} />
+            <Range min={0} max={100} step={5} className="grow" value={task.progress ?? 0} onChange={(e) => setTask({ progress: Number(e.target.value) })} />
             <span className="small bold" style={{ width: 38, textAlign: 'right' }}>{task.progress ?? 0}%</span>
           </div>
           <button className="btn btn-sm btn-ghost btn-danger" onClick={() => setTask(null)}>
@@ -263,7 +293,13 @@ function TopicPanel({ t, ids }: { t: Topic; ids: string[] }) {
           placeholder="https://…"
           value={link}
           onChange={(e) => setLink(e.target.value)}
-          onBlur={() => st.updateTopic(t.id, { link: link.trim() ? normalizeUrl(link.trim()) : undefined })}
+          onBlur={() => {
+            const v = link.trim() ? normalizeUrl(link.trim()) : undefined;
+            if (v !== t.link) {
+              st.updateTopic(t.id, { link: v });
+              if (v) setLink(v);
+            }
+          }}
           onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
         />
         {t.link && (
@@ -351,7 +387,7 @@ function StylePanel({ t, ids }: { t: Topic; ids: string[] }) {
       <Swatches value={s.borderColor} onChange={(v) => set({ borderColor: v, borderWidth: v && v !== 'transparent' ? s.borderWidth ?? 2 : s.borderWidth })} />
       <div className="row">
         <span className="small muted">Толщина</span>
-        <input type="range" className="grow" min={0} max={6} step={0.5} value={s.borderWidth ?? 0} onChange={(e) => set({ borderWidth: Number(e.target.value) })} />
+        <Range className="grow" min={0} max={6} step={0.5} value={s.borderWidth ?? 0} onChange={(e) => set({ borderWidth: Number(e.target.value) })} />
       </div>
       <label className="label">Линия ветви</label>
       <Swatches value={s.lineColor} onChange={(v) => set({ lineColor: v })} />
@@ -363,7 +399,7 @@ function StylePanel({ t, ids }: { t: Topic; ids: string[] }) {
       </select>
       <div className="row">
         <span className="small muted">Толщина</span>
-        <input type="range" className="grow" min={0.5} max={8} step={0.5} value={s.lineWidth ?? 2} onChange={(e) => set({ lineWidth: Number(e.target.value) })} />
+        <Range className="grow" min={0.5} max={8} step={0.5} value={s.lineWidth ?? 2} onChange={(e) => set({ lineWidth: Number(e.target.value) })} />
       </div>
       <button className="btn btn-sm btn-ghost" style={{ marginTop: 12 }} onClick={() => st.updateTopics(ids, (x) => void delete x.style)}>
         Сбросить стиль
@@ -414,7 +450,7 @@ function MapPanel() {
         ))}
       </select>
       <label className="label">Плотность</label>
-      <input type="range" min={0.6} max={2} step={0.1} value={sheet.spacing ?? 1} onChange={(e) => st.setSheetProps({ spacing: Number(e.target.value) })} />
+      <Range min={0.6} max={2} step={0.1} value={sheet.spacing ?? 1} onChange={(e) => st.setSheetProps({ spacing: Number(e.target.value) })} />
       <label className="label">Фон</label>
       <Swatches value={sheet.background} onChange={(v) => st.setSheetProps({ background: v === 'transparent' ? undefined : v })} />
       <div className="divider" />
@@ -441,7 +477,7 @@ function RelationshipPanel({ id }: { id: string }) {
         <input type="checkbox" checked={r.dashed !== false} onChange={(e) => st.updateRelationship(id, { dashed: e.target.checked })} /> Пунктир
       </label>
       <label className="label">Изгиб</label>
-      <input type="range" min={-250} max={250} step={5} value={r.bend ?? 0} onChange={(e) => st.updateRelationship(id, { bend: Number(e.target.value) })} />
+      <Range min={-250} max={250} step={5} value={r.bend ?? 0} onChange={(e) => st.updateRelationship(id, { bend: Number(e.target.value) })} />
       <button className="btn btn-sm btn-danger" style={{ marginTop: 14 }} onClick={() => st.removeRelationship(id)}>
         <Trash2 size={14} /> Удалить связь
       </button>

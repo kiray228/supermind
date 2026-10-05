@@ -8,6 +8,8 @@ interface AppState {
   view: View;
   settings: Settings;
   toast: string | null;
+  /** меняется, когда список документов обновлён извне */
+  docsVersion: number;
   go(view: View): void;
   setSettings(patch: Partial<Settings>): void;
   showToast(msg: string): void;
@@ -19,6 +21,7 @@ export const useApp = create<AppState>((set, get) => ({
   view: 'home',
   settings: DEFAULT_SETTINGS,
   toast: null,
+  docsVersion: 0,
   go(view) {
     set({ view });
   },

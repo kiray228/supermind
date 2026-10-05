@@ -218,14 +218,15 @@ function dueColor(due: string, status?: string) {
   return '#64748b';
 }
 
-export function Toggle({ n, visible }: { n: LNode; visible: boolean }) {
+export function Toggle({ n, visible, k = 1 }: { n: LNode; visible: boolean; k?: number }) {
+  const sc = Math.min(2, Math.max(1, 0.8 / k));
   if (!n.toggle) return null;
   const { x, y } = n.toggle;
   if (n.topic.collapsed) {
     const label = n.hidden > 99 ? '99+' : String(n.hidden);
     const w = Math.max(18, label.length * 7 + 8);
     return (
-      <g data-toggle={n.id} transform={`translate(${x},${y})`} style={{ cursor: 'pointer' }}>
+      <g data-toggle={n.id} transform={`translate(${x},${y}) scale(${sc})`} style={{ cursor: 'pointer' }}>
         <rect x={-w / 2} y={-9} width={w} height={18} rx={9} fill="#fff" stroke={n.color} strokeWidth={1.5} />
         <text y={4} textAnchor="middle" fontSize={11} fontWeight={700} fill={n.color} fontFamily={FONT_FAMILY}>
           {label}
@@ -235,9 +236,41 @@ export function Toggle({ n, visible }: { n: LNode; visible: boolean }) {
   }
   if (!visible) return null;
   return (
-    <g className="no-export" data-toggle={n.id} transform={`translate(${x},${y})`} style={{ cursor: 'pointer' }}>
+    <g className="no-export" data-toggle={n.id} transform={`translate(${x},${y}) scale(${sc})`} style={{ cursor: 'pointer' }}>
+      <circle r={14} fill="transparent" />
       <circle r={8} fill="#fff" stroke={n.color} strokeWidth={1.5} />
       <path d="M-4 0 H4" stroke={n.color} strokeWidth={1.8} strokeLinecap="round" />
+    </g>
+  );
+}
+
+/** Кнопка «+» у выбранной темы — быстро добавить подтему */
+export function AddHandle({ n, structure, k = 1 }: { n: LNode; structure: string; k?: number }) {
+  // на телефоне кнопка не мельчит при отдалении
+  const sc = Math.min(2.4, Math.max(1, 0.9 / k));
+  const vertical = structure === 'org' || (structure === 'tree' && n.depth === 0);
+  const indented = (structure === 'tree' || structure === 'timeline') && n.depth >= 1;
+  const hasKids = n.topic.children.length > 0 && !n.topic.collapsed;
+  let x: number, y: number;
+  if (vertical || indented) {
+    // дети уходят вниз — кнопка справа от темы
+    x = n.x + n.w + 18 * sc;
+    y = n.y + n.h / 2;
+  } else if (hasKids) {
+    // справа уже ветви — кнопка под темой, чтобы не закрывать подтемы
+    x = n.x + n.w / 2;
+    y = n.y + n.h + 16 * sc;
+  } else {
+    const gap = (n.toggle ? 34 : 18) * sc;
+    const side = n.depth === 0 ? (structure === 'logic-left' ? -1 : 1) : n.side;
+    x = side > 0 ? n.x + n.w + gap : n.x - gap;
+    y = n.style.shape === 'underline' ? n.y + n.h : n.y + n.h / 2;
+  }
+  return (
+    <g className="no-export" data-add={n.id} transform={`translate(${x},${y}) scale(${sc})`} style={{ cursor: 'pointer' }}>
+      <circle r={20} fill="transparent" />
+      <circle r={11} fill={ACCENT} />
+      <path d="M-5 0 H5 M0 -5 V5" stroke="#fff" strokeWidth={2.2} strokeLinecap="round" />
     </g>
   );
 }

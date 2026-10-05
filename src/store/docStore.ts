@@ -40,6 +40,8 @@ interface DocState {
   past: MindDoc[];
   future: MindDoc[];
   clipboard: Topic[] | null;
+  /** текст, отправленный в системный буфер при копировании тем */
+  clipboardText: string | null;
   saving: boolean;
   /** счётчик для "сфокусировать камеру на теме" */
   focusReq: { id: ID; n: number } | null;
@@ -64,7 +66,7 @@ interface DocState {
   updateTopics(ids: ID[], fn: (t: Topic) => void): void;
   updateStyle(ids: ID[], patch: Partial<TopicStyle>): void;
   addChild(id?: ID, text?: string): ID | null;
-  addSibling(id?: ID, before?: boolean): ID | null;
+  addSibling(id?: ID, before?: boolean, text?: string): ID | null;
   addParent(id?: ID): ID | null;
   addFloating(x: number, y: number): ID;
   insertChildren(parentId: ID, topics: Topic[]): void;
@@ -124,11 +126,22 @@ export async function flushSave() {
 
 const HISTORY_LIMIT = 150;
 
+/** Пакет изменений (перетаскивание ползунка) — один шаг отмены */
+let batch: 'off' | 'open' | 'pushed' = 'off';
+export function beginBatch() {
+  batch = 'open';
+}
+export function endBatch() {
+  batch = 'off';
+}
+
 export const useDoc = create<DocState>((set, get) => {
   const activeSheet = (d: MindDoc) => d.sheets.find((s) => s.id === d.activeSheet) ?? d.sheets[0];
 
   const commit = (next: MindDoc, history = true) => {
     const { doc, past } = get();
+    if (history && batch === 'pushed') history = false;
+    else if (history && batch === 'open') batch = 'pushed';
     next.updatedAt = Date.now();
     set({
       doc: next,
@@ -150,11 +163,14 @@ export const useDoc = create<DocState>((set, get) => {
     past: [],
     future: [],
     clipboard: null,
+    clipboardText: null,
     saving: false,
     focusReq: null,
 
     open(doc, password = null) {
-      set({ doc, password, selection: [activeSheet(doc).root.id], editingId: null, past: [], future: [], selectedRel: null });
+      // на телефоне ничего не выделяем: первый тап по теме — выбор, а не редактирование
+      const touch = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
+      set({ doc, password, selection: touch ? [] : [activeSheet(doc).root.id], editingId: null, pendingText: null, past: [], future: [], selectedRel: null });
     },
     close() {
       flushSave();
@@ -182,14 +198,14 @@ export const useDoc = create<DocState>((set, get) => {
       const { past, doc, future } = get();
       if (!past.length || !doc) return;
       const prev = past[past.length - 1];
-      set({ doc: prev, past: past.slice(0, -1), future: [doc, ...future], editingId: null });
+      set({ doc: prev, past: past.slice(0, -1), future: [doc, ...future], editingId: null, pendingText: null, selection: cleanSelection(prev, get().selection) });
       scheduleSave();
     },
     redo() {
       const { past, doc, future } = get();
       if (!future.length || !doc) return;
       const nxt = future[0];
-      set({ doc: nxt, past: [...past, doc], future: future.slice(1), editingId: null });
+      set({ doc: nxt, past: [...past, doc], future: future.slice(1), editingId: null, pendingText: null, selection: cleanSelection(nxt, get().selection) });
       scheduleSave();
     },
     setPassword(p) {
@@ -265,10 +281,13 @@ export const useDoc = create<DocState>((set, get) => {
         }
       });
     },
-    addChild(id, text = '') {
+    addChild(id, text) {
       const tid = target(id);
       if (!tid) return null;
-      const t = newTopic(text);
+      const sh = get().sheet();
+      const pf = sh ? findInSheet(sh, tid) : null;
+      if (!pf) return null;
+      const t = newTopic(text ?? defaultTopicText(sh, pf.topic));
       get().mutate((s) => {
         const f = findInSheet(s, tid);
         if (!f) return;
@@ -278,7 +297,7 @@ export const useDoc = create<DocState>((set, get) => {
       set({ selection: [t.id], editingId: t.id });
       return t.id;
     },
-    addSibling(id, before) {
+    addSibling(id, before, text) {
       const tid = target(id);
       if (!tid) return null;
       const s = get().sheet();
@@ -286,9 +305,9 @@ export const useDoc = create<DocState>((set, get) => {
       if (!f) return null;
       if (!f.parent) {
         // у корня/плавающей нет соседей — добавляем ребёнка
-        return get().addChild(tid);
+        return get().addChild(tid, text);
       }
-      const t = newTopic('');
+      const t = newTopic(text ?? defaultTopicText(s, f.parent));
       get().mutate((sh) => {
         const ff = findInSheet(sh, tid);
         if (!ff || !ff.parent) return;
@@ -302,7 +321,7 @@ export const useDoc = create<DocState>((set, get) => {
       const s = get().sheet();
       const f = s && tid ? findInSheet(s, tid) : null;
       if (!f || !f.parent) return null;
-      const t = newTopic('');
+      const t = newTopic('Тема');
       get().mutate((sh) => {
         const ff = findInSheet(sh, tid!);
         if (!ff || !ff.parent) return;
@@ -366,8 +385,19 @@ export const useDoc = create<DocState>((set, get) => {
         const f = findInSheet(s, id);
         if (f && f.topic.children.length) f.topic.collapsed = value ?? !f.topic.collapsed;
       });
+      const d = get().doc;
+      const cur = get().selection;
+      if (d && cur.length) {
+        // если выделенная тема скрылась внутри свёрнутой ветви — выделить саму ветвь
+        const visible = cleanSelection(d, cur).filter((x) => cur.includes(x));
+        if (visible.length !== cur.length) set({ selection: [...new Set([...visible, id])] });
+      }
     },
     collapseAll(collapsed, depth = 1) {
+      queueMicrotask(() => {
+        const d = get().doc;
+        if (d) set({ selection: cleanSelection(d, get().selection) });
+      });
       get().mutate((s) => {
         const rec = (t: Topic, d: number) => {
           if (t.children.length) t.collapsed = collapsed ? d >= depth : false;
@@ -456,9 +486,10 @@ export const useDoc = create<DocState>((set, get) => {
         .selection.map((id) => findInSheet(s, id)?.topic)
         .filter(Boolean) as Topic[];
       if (!items.length) return;
-      set({ clipboard: clone(items) });
+      const outline = items.map((t) => toOutline(t)).join('');
+      set({ clipboard: clone(items), clipboardText: outline });
       try {
-        navigator.clipboard?.writeText(items.map((t) => toOutline(t)).join(''));
+        navigator.clipboard?.writeText(outline);
       } catch {
         /* нет доступа к буферу */
       }
@@ -603,6 +634,8 @@ export const useDoc = create<DocState>((set, get) => {
         doc.sheets = doc.sheets.filter((s) => s.id !== id);
         if (doc.activeSheet === id) doc.activeSheet = doc.sheets[0].id;
       });
+      const nd = get().doc!;
+      set({ selection: cleanSelection(nd, get().selection), editingId: null });
     },
     duplicateSheet(id) {
       const d = get().doc;
@@ -611,13 +644,27 @@ export const useDoc = create<DocState>((set, get) => {
       const copy = clone(src);
       copy.id = uid();
       copy.title = src.title + ' (копия)';
+      // новые id у всех тем, чтобы задачи копии не путались с оригиналом
+      const map = new Map<ID, ID>();
+      const re = (t: Topic) => {
+        const nid = uid();
+        map.set(t.id, nid);
+        t.id = nid;
+        t.children.forEach(re);
+      };
+      re(copy.root);
+      copy.floating.forEach(re);
+      const m = (id: ID) => map.get(id) ?? id;
+      copy.relationships = copy.relationships.map((r) => ({ ...r, id: uid(), from: m(r.from), to: m(r.to) }));
+      copy.boundaries = copy.boundaries.map((b) => ({ ...b, id: uid(), topicId: m(b.topicId) }));
+      copy.summaries = copy.summaries.map((b) => ({ ...b, id: uid(), topicId: m(b.topicId) }));
       get().addSheet(copy);
     },
     setActiveSheet(id) {
       const d = get().doc;
       if (!d) return;
       const next = { ...d, activeSheet: id };
-      set({ doc: next, selection: [next.sheets.find((s) => s.id === id)!.root.id], editingId: null });
+      set({ doc: next, selection: [next.sheets.find((s) => s.id === id)!.root.id], editingId: null, pendingText: null, selectedRel: null });
       scheduleSave();
     },
     setTitle(title) {
@@ -636,6 +683,23 @@ export const useDoc = create<DocState>((set, get) => {
     },
   };
 });
+
+/** Оставить в выделении только существующие и видимые темы */
+function cleanSelection(d: MindDoc, sel: ID[]): ID[] {
+  const sh = d.sheets.find((x) => x.id === d.activeSheet) ?? d.sheets[0];
+  const ok = sel.filter((id) => {
+    const path = pathTo(sh, id);
+    return path.length > 0 && !path.slice(0, -1).some((p) => p.collapsed);
+  });
+  return ok.length ? ok : [sh.root.id];
+}
+
+/** Текст новой темы по умолчанию, как в Xmind */
+function defaultTopicText(s: Sheet | null, parent: Topic | null): string {
+  if (!s || !parent) return 'Тема';
+  if (parent.id === s.root.id) return `Основная тема ${parent.children.length + 1}`;
+  return 'Подтема';
+}
 
 function collectIds(t: Topic, out: Set<ID>) {
   out.add(t.id);

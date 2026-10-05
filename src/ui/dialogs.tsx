@@ -37,6 +37,37 @@ export function confirmDialog(title: string, message?: string, opts: { okText?: 
   return push({ kind: 'confirm', title, message, ...opts }).then((v) => v === true);
 }
 
+const OVERLAYS = '.modal-backdrop, .menu-layer, .kb-menu-backdrop';
+
+/** Есть ли открытое окно/меню поверх экрана */
+export function hasOverlay(): boolean {
+  return !!document.querySelector(OVERLAYS);
+}
+
+/** Закрыть верхнее окно/меню (как нажатие на затемнение). true — если что-то закрыли */
+export function closeTopOverlay(): boolean {
+  const all = document.querySelectorAll<HTMLElement>(OVERLAYS);
+  const top = all[all.length - 1];
+  if (!top) return false;
+  top.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+  return true;
+}
+
+/** Обработчики «назад» (кнопка Android, Escape): последний зарегистрированный — первый */
+const backHandlers: (() => boolean)[] = [];
+export function onBack(fn: () => boolean): () => void {
+  backHandlers.push(fn);
+  return () => {
+    const i = backHandlers.lastIndexOf(fn);
+    if (i >= 0) backHandlers.splice(i, 1);
+  };
+}
+export function runBack(): boolean {
+  if (closeTopOverlay()) return true;
+  for (let i = backHandlers.length - 1; i >= 0; i--) if (backHandlers[i]()) return true;
+  return false;
+}
+
 export function DialogHost() {
   const queue = useDialogs((s) => s.queue);
   const req = queue[0];
@@ -47,12 +78,16 @@ export function DialogHost() {
 function Dialog({ req }: { req: DialogReq }) {
   const [value, setValue] = useState(req.value ?? '');
   const ref = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
+  const okRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     setTimeout(() => {
-      ref.current?.focus();
-      ref.current?.select();
+      if (req.kind === 'confirm') okRef.current?.focus();
+      else {
+        ref.current?.focus();
+        ref.current?.select();
+      }
     }, 30);
-  }, []);
+  }, [req.kind]);
   const done = (v: string | boolean | null) => {
     useDialogs.setState((s) => ({ queue: s.queue.slice(1) }));
     req.resolve(v);
@@ -85,7 +120,7 @@ function Dialog({ req }: { req: DialogReq }) {
           <button className="btn btn-ghost" onClick={() => done(req.kind === 'confirm' ? false : null)}>
             Отмена
           </button>
-          <button className={`btn ${req.danger ? 'btn-primary' : 'btn-primary'}`} style={req.danger ? { background: 'var(--danger)', borderColor: 'var(--danger)' } : undefined} onClick={ok}>
+          <button ref={okRef} className="btn btn-primary" style={req.danger ? { background: 'var(--danger)', borderColor: 'var(--danger)' } : undefined} onClick={ok}>
             {req.okText ?? 'OK'}
           </button>
         </div>

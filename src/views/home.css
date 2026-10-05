@@ -37,4 +37,4 @@
   .home-search input { width: 110px; }
   .hide-mobile { display: none !important; }
 }
-@media (max-width: 400px) { .hide-xs { display: none; } }
+@media (max-width: 480px) { .hide-xs { display: none; } }

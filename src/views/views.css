@@ -405,3 +405,6 @@
   .pl-task-btn { width: 30px; height: 30px; }
   .pl-time { min-width: 64px; padding: 0 4px; }
 }
+
+/* iOS: долгое нажатие на карточку не вызывает системное меню */
+.kb-card, .kb-card-main, [data-col-id] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }

@@ -3,11 +3,12 @@ import {
   Plus, Sparkles, Upload, Search, Star, Trash2, MoreHorizontal, Lock, Copy, Pencil, RotateCcw, Download, Network, Clock, X, Square,
 } from 'lucide-react';
 import type { DocMeta, StructureType } from '../types';
-import { deleteDoc, listDocs, loadDoc, saveDoc, updateMeta } from '../store/db';
+import { deleteDoc, listDocs, loadDoc, saveDoc, saveLocked, updateMeta } from '../store/db';
 import { createAndOpen, openDoc } from '../actions';
 import { TEMPLATES, docFromTemplate, docFromMarkdown } from '../templates';
 import { StructureIcon } from '../editor/StructureIcon';
-import { askText, confirmDialog } from '../ui/dialogs';
+import { askText, askPassword, confirmDialog } from '../ui/dialogs';
+import { decryptDoc, encryptDoc } from '../utils/crypto';
 import { toast, useApp } from '../store/appStore';
 import { pickFile, downloadBlob, safeFilename } from '../io/download';
 import { IMPORT_ACCEPT, importFile, exportNative } from '../io/index';
@@ -26,10 +27,11 @@ export default function Home() {
   const [aiOpen, setAiOpen] = useState(false);
   const [tplOpen, setTplOpen] = useState(false);
 
+  const docsVersion = useApp((s) => s.docsVersion);
   const refresh = () => listDocs().then(setDocs);
   useEffect(() => {
     refresh();
-  }, []);
+  }, [docsVersion]);
 
   const shown = useMemo(() => {
     const ql = q.trim().toLowerCase();
@@ -61,7 +63,17 @@ export default function Home() {
         if (!t) return;
         const d = await loadDoc(id);
         if (d && !('locked' in d)) await saveDoc({ ...d, title: t });
-        else await updateMeta(id, { title: t });
+        else if (d) {
+          // зашифрованная карта: меняем название и внутри документа
+          const p = await askPassword('Введите пароль карты', 'Нужен, чтобы переименовать защищённую карту');
+          if (!p) return;
+          try {
+            const plain = await decryptDoc(d, p);
+            await saveLocked(await encryptDoc({ ...plain, title: t, updatedAt: Date.now() }, p), t);
+          } catch {
+            return toast('Неверный пароль');
+          }
+        }
         break;
       }
       case 'star':
@@ -106,7 +118,7 @@ export default function Home() {
       <div className="page-header">
         <h1>Мои карты</h1>
         <div className="grow" />
-        <button className="btn hide-mobile" onClick={doImport}><Upload size={16} /> Импорт</button>
+        <button className="btn" onClick={doImport} title="Импорт файла (.xmind, .md, .opml)"><Upload size={16} /> <span className="hide-xs">Импорт</span></button>
         <button className="btn ai-grad" onClick={() => setAiOpen(true)}><Sparkles size={16} /> <span className="hide-xs">Создать с ИИ</span></button>
         <button className="btn btn-primary" onClick={() => createAndOpen(docFromTemplate(TEMPLATES[0]))}><Plus size={16} /> <span className="hide-xs">Новая</span></button>
       </div>

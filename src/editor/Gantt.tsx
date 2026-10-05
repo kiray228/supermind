@@ -6,6 +6,13 @@ import { pathTo, walkSheet } from '../utils/tree';
 import { getTheme } from '../themes';
 
 const DAY = 86400000;
+/** Сдвиг даты на n дней без ошибок перехода на летнее время */
+const addDays = (d: Date, n: number) => {
+  const r = new Date(d);
+  r.setDate(r.getDate() + n);
+  return r;
+};
+const dayDiff = (a: Date, b: Date) => Math.round((Date.UTC(b.getFullYear(), b.getMonth(), b.getDate()) - Date.UTC(a.getFullYear(), a.getMonth(), a.getDate())) / DAY);
 const toDate = (s: string) => {
   const [y, m, d] = s.split('-').map(Number);
   return new Date(y, m - 1, d);
@@ -57,13 +64,11 @@ export function Gantt() {
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  let min = Math.min(+rows[0].s, +today);
-  let max = Math.max(...rows.map((r) => +r.e), +today);
-  min -= 3 * DAY;
-  max += 7 * DAY;
-  const days = Math.round((max - min) / DAY) + 1;
-  const start = new Date(min);
-  const x = (d: Date) => Math.round((+d - min) / DAY) * dayW;
+  const minD = rows[0].s < today ? rows[0].s : today;
+  const maxD = rows.reduce((m, r) => (r.e > m ? r.e : m), today);
+  const start = addDays(minD, -3);
+  const days = dayDiff(start, addDays(maxD, 7)) + 1;
+  const x = (d: Date) => dayDiff(start, d) * dayW;
 
   const onDown = (e: React.PointerEvent, id: string, mode: 'move' | 'end' | 'start', s: Date, en: Date) => {
     e.stopPropagation();
@@ -73,11 +78,11 @@ export function Gantt() {
   const onMove = (e: React.PointerEvent) => {
     const d = dragRef.current;
     if (!d) return;
-    const delta = Math.round((e.clientX - d.x0) / dayW) * DAY;
+    const delta = Math.round((e.clientX - d.x0) / dayW);
     let s = d.s, en = d.e;
-    if (d.mode === 'move') { s = new Date(+d.s + delta); en = new Date(+d.e + delta); }
-    if (d.mode === 'end') en = new Date(Math.max(+d.s, +d.e + delta));
-    if (d.mode === 'start') s = new Date(Math.min(+d.e, +d.s + delta));
+    if (d.mode === 'move') { s = addDays(d.s, delta); en = addDays(d.e, delta); }
+    if (d.mode === 'end') { en = addDays(d.e, delta); if (en < d.s) en = d.s; }
+    if (d.mode === 'start') { s = addDays(d.s, delta); if (s > d.e) s = d.e; }
     setPreview({ id: d.id, s, e: en });
   };
   const onUp = () => {
@@ -102,7 +107,7 @@ export function Gantt() {
             <div className="gantt-name-col">Задача</div>
             <div className="gantt-days">
               {Array.from({ length: days }, (_, i) => {
-                const d = new Date(+start + i * DAY);
+                const d = addDays(start, i);
                 const we = d.getDay() === 0 || d.getDay() === 6;
                 return (
                   <div key={i} className={`gantt-day ${we ? 'we' : ''} ${+d === +today ? 'today' : ''}`} style={{ width: dayW }}>

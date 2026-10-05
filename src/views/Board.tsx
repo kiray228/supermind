@@ -513,18 +513,22 @@ export default function Board() {
   useEffect(() => {
     if (!dragging) return;
     let raf = 0;
+    let lastStep = 0;
     const tick = () => {
       const { x, y } = pointerRef.current;
       const sc = scrollerRef.current;
       let moved = false;
       if (sc) {
+        // у края — перелистываем ровно на одну колонку, с паузой, чтобы карточку можно было «положить»
         const r = sc.getBoundingClientRect();
-        const edge = Math.min(60, r.width * 0.12);
-        if (x < r.left + edge) {
-          sc.scrollLeft -= Math.ceil(((r.left + edge - x) / edge) * 14);
-          moved = true;
-        } else if (x > r.right - edge) {
-          sc.scrollLeft += Math.ceil(((x - (r.right - edge)) / edge) * 14);
+        const edge = Math.min(48, r.width * 0.1);
+        const now = performance.now();
+        const col = sc.querySelector<HTMLElement>('[data-col-id]');
+        const step = col ? col.offsetWidth + 12 : r.width * 0.8;
+        const dir = x < r.left + edge ? -1 : x > r.right - edge ? 1 : 0;
+        if (dir && now - lastStep > 900) {
+          sc.scrollBy({ left: dir * step, behavior: 'smooth' });
+          lastStep = now;
           moved = true;
         }
       }

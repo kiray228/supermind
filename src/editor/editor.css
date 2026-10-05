@@ -210,7 +210,14 @@
   .sheet-tab { flex-shrink: 0; }
   .gantt-name-col { width: 150px; }
 }
-@media (max-width: 400px) {
+@media (max-width: 480px) {
   .hide-xs { display: none !important; }
   .tb-btn { min-width: 46px; }
+}
+
+/* iOS: без системного меню «Скопировать/Выделить» при долгом нажатии */
+.map-canvas, .ed-toolbar, .ed-sheets, .sheet-tab, .tb-btn {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }

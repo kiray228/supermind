@@ -11,3 +11,10 @@ createRoot(document.getElementById('root')!).render(
 );
 
 setupPlatform();
+
+// Отладка (только в режиме разработки): доступ к состоянию из консоли и автотестов
+if (import.meta.env.DEV) {
+  Promise.all([import('./store/docStore'), import('./store/appStore'), import('./actions'), import('./templates')]).then(([doc, app, actions, templates]) => {
+    (window as unknown as Record<string, unknown>).__2mind = { doc, app, actions, templates };
+  });
+}

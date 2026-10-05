@@ -27,9 +27,20 @@ export function metaFor(doc: MindDoc, prev?: DocMeta): DocMeta {
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
     topicCount: doc.sheets.reduce((n, s) => n + countTopics(s), 0),
-    accent: sheet ? getTheme(sheet.themeId).central.fill : undefined,
+    accent: sheet ? accentOf(sheet.themeId) : undefined,
     locked: false,
   };
+}
+
+/** Цвет превью карты: заметный и на светлом, и на тёмном фоне */
+function accentOf(themeId: string): string {
+  const th = getTheme(themeId);
+  const c = th.central.fill;
+  const m = /^#([0-9a-f]{6})$/i.exec(c);
+  if (!m) return th.palette[0];
+  const n = parseInt(m[1], 16);
+  const lum = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+  return lum < 0.25 || lum > 0.85 ? th.palette[0] : c;
 }
 
 export async function saveDoc(doc: MindDoc) {

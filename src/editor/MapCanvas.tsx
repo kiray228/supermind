@@ -2,9 +2,10 @@ import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState,
 import type { ID, Sheet } from '../types';
 import { layoutSheet, subtreeBounds, type LayoutResult, type LNode } from '../layout/layout';
 import { useDoc } from '../store/docStore';
-import { BoundaryView, NodeView, RelationshipView, SummaryView, Toggle } from './render';
+import { AddHandle, BoundaryView, NodeView, RelationshipView, SummaryView, Toggle } from './render';
 import { fontString, FONT_FAMILY } from '../layout/measure';
-import { isAncestor } from '../utils/tree';
+import { findInSheet, isAncestor } from '../utils/tree';
+import { primeKeyboard } from '../ui/keyboard';
 
 export interface View {
   x: number;
@@ -40,8 +41,8 @@ interface Props {
 }
 
 type Drag =
-  | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number; moved: boolean; onTopic?: boolean }
-  | { kind: 'topic'; id: ID; sx: number; sy: number; wx: number; wy: number; offX: number; offY: number; active: boolean; floating: boolean }
+  | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number; moved: boolean; onTopic?: boolean; topicId?: ID; wasSelected?: boolean; touch?: boolean }
+  | { kind: 'topic'; id: ID; sx: number; sy: number; wx: number; wy: number; offX: number; offY: number; active: boolean; floating: boolean; armed?: boolean; cx?: number; cy?: number }
   | { kind: 'pinch'; d0: number; k0: number; cx: number; cy: number; vx: number; vy: number }
   | { kind: 'select'; sx: number; sy: number; x: number; y: number };
 
@@ -69,6 +70,8 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
   const [dropTarget, setDropTarget] = useState<{ id: ID; zone: 'child' | 'before' | 'after' } | null>(null);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const lastTap = useRef<{ id: string; t: number }>({ id: '', t: 0 });
+  const pendingAdd = useRef<string | null>(null);
+  const lastPointerType = useRef('mouse');
   const longPress = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [dragWorld, setDragWorld] = useState<{ x: number; y: number } | null>(null);
 
@@ -190,6 +193,29 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
     return () => ro.disconnect();
   }, [initialFit]);
 
+  // на телефоне редактируемая тема поднимается в верхнюю часть экрана (над клавиатурой)
+  useEffect(() => {
+    if (!editingId || !window.matchMedia('(pointer: coarse)').matches) return;
+    const place = () => {
+      const n = lay.nodes.get(editingId);
+      const el = wrapRef.current;
+      if (!n || !el) return;
+      const v = viewRef.current;
+      const k = Math.max(v.k, 0.8);
+      const targetY = el.clientHeight * 0.28;
+      const cx = n.x + n.w / 2;
+      const sxOld = cx * v.k + v.x;
+      const halfW = (n.w * k) / 2;
+      const keepX = sxOld - halfW > 8 && sxOld + halfW < el.clientWidth - 8;
+      const nx = keepX ? sxOld - cx * k : el.clientWidth / 2 - cx * k;
+      animateTo({ k, x: nx, y: targetY - (n.y + n.h / 2) * k }, true, false);
+    };
+    place();
+    const t = setTimeout(place, 450);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingId]);
+
   // запрос фокуса на теме
   useEffect(() => {
     if (focusReq) setTimeout(() => centerOn(focusReq.id), 30);
@@ -272,6 +298,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
   // ---------- указатель ----------
   const onPointerDown = (e: React.PointerEvent) => {
     interacted.current = true;
+    lastPointerType.current = e.pointerType;
     if ((e.target as HTMLElement).closest('textarea')) return;
     if (e.button === 2) return;
     try {
@@ -299,6 +326,12 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
     if (e.button === 2) return;
     const target = e.target as Element;
     const st = useDoc.getState();
+    const addEl = target.closest('[data-add]');
+    if (addEl && !readOnly) {
+      // добавление — по отпусканию пальца (жест пользователя, клавиатура откроется)
+      pendingAdd.current = addEl.getAttribute('data-add');
+      return;
+    }
     const toggleEl = target.closest('[data-toggle]');
     if (toggleEl) {
       if (!readOnly) st.toggleCollapse(toggleEl.getAttribute('data-toggle')!);
@@ -331,12 +364,17 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
         return;
       }
       if (editingId && editingId !== id) st.setEditing(null);
+      const wasSelected = selection.length === 1 && selection[0] === id;
       const additive = e.shiftKey || e.metaKey || e.ctrlKey;
+      const touchDown = e.pointerType !== 'mouse';
+      // на телефоне выделяем по отпусканию пальца, чтобы свайп по карте не выделял темы
       if (additive) st.select(id, true);
-      else if (!selection.includes(id) || selection.length > 1) st.select(id);
-      // двойной тап
+      else if (!touchDown && (!selection.includes(id) || selection.length > 1)) st.select(id);
+      // двойной тап / двойной клик — редактирование
       const now = Date.now();
       if (lastTap.current.id === id && now - lastTap.current.t < 350 && !readOnly) {
+        st.select(id);
+        primeKeyboard();
         st.setEditing(id);
         lastTap.current = { id: '', t: 0 };
         return;
@@ -345,21 +383,29 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
       const w = toWorld(e.clientX, e.clientY);
       const n = lay.nodes.get(id)!;
       const isRoot = id === sheet.root.id;
-      if (isRoot || readOnly) {
-        setDrag({ kind: 'pan', sx: e.clientX, sy: e.clientY, vx: viewRef.current.x, vy: viewRef.current.y, moved: false, onTopic: true });
+      const floating = sheet.floating.some((f) => f.id === id);
+      const touch = e.pointerType !== 'mouse';
+      if (isRoot || readOnly || touch) {
+        // на телефоне свайп по теме прокручивает карту, перенос — после долгого нажатия
+        setDrag({ kind: 'pan', sx: e.clientX, sy: e.clientY, vx: viewRef.current.x, vy: viewRef.current.y, moved: false, onTopic: true, topicId: id, wasSelected, touch });
       } else {
-        const floating = sheet.floating.some((f) => f.id === id);
         setDrag({ kind: 'topic', id, sx: e.clientX, sy: e.clientY, wx: w.x, wy: w.y, offX: w.x - n.x, offY: w.y - n.y, active: false, floating });
       }
-      if (e.pointerType === 'touch') {
+      if (touch) {
         clearLongPress();
         longPress.current = setTimeout(() => {
           const d = dragRef.current;
-          if (d && ((d.kind === 'topic' && !d.active) || (d.kind === 'pan' && !d.moved))) {
+          if (!d || d.kind !== 'pan' || d.moved) return;
+          st.select(id);
+          if (isRoot || readOnly) {
             setDrag(null);
             onContextMenu({ x: e.clientX, y: e.clientY, topicId: id, worldX: w.x, worldY: w.y });
+            return;
           }
-        }, 520);
+          // «взяли» тему: можно тянуть; если отпустить — откроется меню
+          navigator.vibrate?.(12);
+          setDrag({ kind: 'topic', id, sx: d.sx, sy: d.sy, wx: w.x, wy: w.y, offX: w.x - n.x, offY: w.y - n.y, active: false, floating, armed: true, cx: e.clientX, cy: e.clientY });
+        }, 420);
       }
       return;
     }
@@ -438,7 +484,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
     }
     if (d.kind === 'topic') {
       const dist = Math.hypot(e.clientX - d.sx, e.clientY - d.sy);
-      if (!d.active && dist > 6) {
+      if (!d.active && dist > (d.armed ? 4 : 6)) {
         d.active = true;
         clearLongPress();
         useDoc.getState().setEditing(null);
@@ -466,6 +512,13 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
   const onPointerUp = (e: React.PointerEvent) => {
     pointers.current.delete(e.pointerId);
     clearLongPress();
+    if (pendingAdd.current) {
+      const id = pendingAdd.current;
+      pendingAdd.current = null;
+      primeKeyboard();
+      useDoc.getState().addChild(id);
+      return;
+    }
     const d = dragRef.current;
     if (!d) return;
     if (d.kind === 'pinch') {
@@ -481,11 +534,20 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
       if (!d.moved && !d.onTopic) {
         st.select(null);
         st.selectRel(null);
+      } else if (!d.moved && d.touch && d.topicId) {
+        if (d.wasSelected && !readOnly) {
+          // тап по уже выбранной теме — редактирование (как в Xmind на телефоне)
+          primeKeyboard();
+          st.setEditing(d.topicId);
+          lastTap.current = { id: '', t: 0 };
+        } else st.select(d.topicId);
       }
     } else if (d.kind === 'select') {
       const x0 = Math.min(d.sx, d.x), x1 = Math.max(d.sx, d.x), y0 = Math.min(d.sy, d.y), y1 = Math.max(d.sy, d.y);
       const ids = lay.order.filter((n) => n.x < x1 && n.x + n.w > x0 && n.y < y1 && n.y + n.h > y0).map((n) => n.id);
       st.select(ids);
+    } else if (d.kind === 'topic' && d.armed && !d.active) {
+      onContextMenu({ x: d.cx ?? e.clientX, y: d.cy ?? e.clientY, topicId: d.id, worldX: d.wx, worldY: d.wy });
     } else if (d.kind === 'topic' && d.active) {
       const w = toWorld(e.clientX, e.clientY);
       const dt = dropTarget;
@@ -512,6 +574,8 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
 
   const onContext = (e: React.MouseEvent) => {
     e.preventDefault();
+    // на сенсорных экранах меню открывает наш обработчик долгого нажатия
+    if (lastPointerType.current !== 'mouse') return;
     const el = (e.target as Element).closest('[data-topic]');
     const id = el?.getAttribute('data-topic') ?? null;
     if (id && !useDoc.getState().selection.includes(id)) useDoc.getState().select(id);
@@ -604,8 +668,11 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
             />
           ))}
           {lay.order.map((n) => (
-            <Toggle key={'t' + n.id} n={n} visible={!readOnly && (hover === n.id || selSet.has(n.id))} />
+            <Toggle key={'t' + n.id} k={view.k} n={n} visible={!readOnly && (hover === n.id || selSet.has(n.id))} />
           ))}
+          {!readOnly && !relMode && selection.length === 1 && !editingId && !(drag?.kind === 'topic' && drag.active) && lay.nodes.get(selection[0]) && (
+            <AddHandle k={view.k} n={lay.nodes.get(selection[0])!} structure={lay.nodes.get(selection[0])!.level === 'floating' || lay.nodes.get(lay.nodes.get(selection[0])!.rootId)?.level === 'floating' ? 'logic-right' : sheet.structure} />
+          )}
           {sheet.relationships.map((r) => (
             <RelationshipView key={r.id} lay={lay} r={r} selected={selectedRel === r.id} color={theme.relColor} />
           ))}
@@ -636,6 +703,21 @@ function InlineEditor({ n, view }: { n: LNode; view: View }) {
   const initial = useRef(useDoc.getState().pendingText ?? n.topic.text);
   const [text, setText] = useState(initial.current);
   const done = useRef(false);
+  const textRef = useRef(text);
+  textRef.current = text;
+
+  // iOS Safari не присылает blur, когда поле удаляется из DOM, — сохраняем при размонтировании
+  useEffect(
+    () => () => {
+      if (done.current) return;
+      const st = useDoc.getState();
+      const sh = st.sheet();
+      const cur = sh ? findInSheet(sh, n.id)?.topic : null;
+      if (cur && cur.text !== textRef.current) st.setText(n.id, textRef.current);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   useEffect(() => {
     const el = ref.current!;
@@ -649,6 +731,7 @@ function InlineEditor({ n, view }: { n: LNode; view: View }) {
   const commit = (after?: 'child' | 'sibling') => {
     if (done.current) return;
     done.current = true;
+    if (after) primeKeyboard(); // клавиатура не закрывается между темами
     const st = useDoc.getState();
     if (text !== n.topic.text) st.setText(n.id, text);
     st.setEditing(null);

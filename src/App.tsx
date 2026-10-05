@@ -1,8 +1,10 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { Network, KanbanSquare, CalendarDays, Settings as SettingsIcon } from 'lucide-react';
 import { useApp, type View } from './store/appStore';
-import { loadSettings } from './store/db';
-import { DialogHost } from './ui/dialogs';
+import { listDocs, loadSettings, saveDoc } from './store/db';
+import { get as idbGet, set as idbSet } from 'idb-keyval';
+import { welcomeDoc } from './templates';
+import { DialogHost, closeTopOverlay } from './ui/dialogs';
 import Home from './views/Home';
 import { flushSave } from './store/docStore';
 import './app.css';
@@ -19,6 +21,8 @@ const NAV: { id: View; label: string; icon: typeof Network }[] = [
   { id: 'settings', label: 'Настройки', icon: SettingsIcon },
 ];
 
+let welcomeStarted = false;
+
 export default function App() {
   const view = useApp((s) => s.view);
   const go = useApp((s) => s.go);
@@ -27,10 +31,34 @@ export default function App() {
 
   useEffect(() => {
     loadSettings().then((s) => useApp.setState({ settings: s }));
+    // первая карта-подсказка при первом запуске
+    if (!welcomeStarted) (welcomeStarted = true) && (async () => {
+      if (await idbGet('welcomed')) return;
+      await idbSet('welcomed', true);
+      if ((await listDocs()).length) return;
+      await saveDoc(welcomeDoc());
+      useApp.setState({ docsVersion: Date.now() });
+    })();
+    // заранее подгружаем редактор и разделы, чтобы карта открывалась мгновенно
+    const preload = setTimeout(() => {
+      import('./editor/Editor');
+      import('./views/Board');
+      import('./views/Planner');
+    }, 800);
+    // Escape закрывает верхнее окно или меню
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && closeTopOverlay()) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    window.addEventListener('keydown', onEsc, true);
     const save = () => void flushSave();
     window.addEventListener('pagehide', save);
     document.addEventListener('visibilitychange', save);
     return () => {
+      clearTimeout(preload);
+      window.removeEventListener('keydown', onEsc, true);
       window.removeEventListener('pagehide', save);
       document.removeEventListener('visibilitychange', save);
     };

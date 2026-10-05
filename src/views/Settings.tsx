@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { Sparkles, Sun, Moon, Monitor, Download, Upload, Trash2, Smartphone, Eye, EyeOff, CheckCircle2, Info } from 'lucide-react';
 import { get, set, keys, clear } from 'idb-keyval';
 import { useApp, toast } from '../store/appStore';
@@ -33,7 +33,8 @@ export default function Settings() {
 
   const backup = async () => {
     const all: Record<string, unknown> = {};
-    for (const k of await keys()) all[String(k)] = await get(k);
+    // API-ключ в копию не попадает
+    for (const k of await keys()) if (String(k) !== 'settings') all[String(k)] = await get(k);
     const blob = new Blob([JSON.stringify({ format: '2mind-backup', version: 1, createdAt: Date.now(), data: all })], { type: 'application/json' });
     const d = new Date();
     await downloadBlob(blob, `2mind-backup-${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}.json`);
@@ -118,7 +119,7 @@ export default function Settings() {
 
           <section className="card set-card">
             <h3><Info size={18} /> О приложении</h3>
-            <p className="small muted" style={{ margin: 0 }}>2Mind 1.0 — бесплатные интеллект-карты, ежедневник и доска задач. Все функции открыты, без подписок.</p>
+            <p className="small muted" style={{ margin: 0 }}>2Mind 1.1 — бесплатные интеллект-карты, ежедневник и доска задач. Все функции открыты, без подписок.</p>
           </section>
         </div>
       </div>

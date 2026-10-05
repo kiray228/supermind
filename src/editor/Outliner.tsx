@@ -50,7 +50,7 @@ function Row({ t, depth }: { t: Topic; depth: number }) {
     if (e.key === 'Enter') {
       e.preventDefault();
       if (val !== t.text) st.setText(t.id, val);
-      const id = depth === 0 ? st.addChild(t.id) : st.addSibling(t.id);
+      const id = depth === 0 ? st.addChild(t.id, '') : st.addSibling(t.id, false, '');
       focusOther(id);
     } else if (e.key === 'Tab') {
       e.preventDefault();

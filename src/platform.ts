@@ -2,6 +2,7 @@ import { Capacitor } from '@capacitor/core';
 import { useApp } from './store/appStore';
 import { useDoc, flushSave } from './store/docStore';
 import { leaveEditor } from './actions';
+import { runBack } from './ui/dialogs';
 
 export const isNative = () => Capacitor.isNativePlatform();
 
@@ -32,10 +33,8 @@ export function setupPlatform() {
       App.addListener('backButton', async () => {
         const app = useApp.getState();
         const doc = useDoc.getState();
-        if (document.querySelector('.modal-backdrop')) {
-          (document.querySelector('.modal-backdrop') as HTMLElement).dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-          return;
-        }
+        // сначала закрываем окна, меню и панели
+        if (runBack()) return;
         if (app.view === 'editor') {
           if (doc.editingId) doc.setEditing(null);
           else await leaveEditor('home');

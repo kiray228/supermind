@@ -13,7 +13,8 @@ import { AIPanel } from './AIPanel';
 import { Outliner } from './Outliner';
 import { Gantt } from './Gantt';
 import { StructureIcon } from './StructureIcon';
-import { askText, confirmDialog } from '../ui/dialogs';
+import { askText, confirmDialog, hasOverlay, onBack } from '../ui/dialogs';
+import { primeKeyboard } from '../ui/keyboard';
 import { findInSheet, walkSheet } from '../utils/tree';
 import { subtreeBounds } from '../layout/layout';
 import { downloadBlob, downloadText, safeFilename } from '../io/download';
@@ -119,10 +120,14 @@ export default function Editor() {
   // ---------- действия ----------
   const selId = selection[selection.length - 1];
   const addChild = () => {
+    primeKeyboard();
     if (mode !== 'map') setMode('map');
     st.addChild(selId ?? sheet?.root.id);
   };
-  const addSibling = () => st.addSibling(selId ?? sheet?.root.id);
+  const addSibling = () => {
+    primeKeyboard();
+    st.addSibling(selId ?? sheet?.root.id);
+  };
   const del = () => {
     if (selectedRel) st.removeRelationship(selectedRel);
     else st.deleteTopics();
@@ -242,10 +247,10 @@ export default function Editor() {
     setMenu({
       x, y,
       items: [
-        { icon: <Pencil size={16} />, label: 'Редактировать', kbd: 'F2', onClick: () => st.setEditing(topicId) },
-        { icon: <CornerDownRight size={16} />, label: 'Подтема', kbd: 'Tab', onClick: () => st.addChild(topicId) },
+        { icon: <Pencil size={16} />, label: 'Редактировать', kbd: 'F2', onClick: () => { primeKeyboard(); st.setEditing(topicId); } },
+        { icon: <CornerDownRight size={16} />, label: 'Подтема', kbd: 'Tab', onClick: () => { primeKeyboard(); st.addChild(topicId); } },
         ...(!isRoot && f?.parent ? [
-          { icon: <Plus size={16} />, label: 'Тема рядом', kbd: 'Enter', onClick: () => st.addSibling(topicId) },
+          { icon: <Plus size={16} />, label: 'Тема рядом', kbd: 'Enter', onClick: () => { primeKeyboard(); st.addSibling(topicId); } },
           { icon: <ArrowUpFromLine size={16} />, label: 'Родительская тема', kbd: 'Ctrl+Enter', onClick: () => st.addParent(topicId) },
         ] : []),
         'sep',
@@ -265,11 +270,38 @@ export default function Editor() {
     });
   };
 
+  // при смене режима не оставлять «висящее» редактирование из «Структуры»
+  useEffect(() => {
+    useDoc.setState({ editingId: null, pendingText: null });
+  }, [mode]);
+
+  // «Назад» на Android: закрыть режимы и панели, прежде чем выйти из карты
+  const backState = useRef({ pitch, zen, search, panel, relMode, mode });
+  backState.current = { pitch, zen, search, panel, relMode, mode };
+  useEffect(
+    () =>
+      onBack(() => {
+        const b = backState.current;
+        const s = useDoc.getState();
+        if (b.pitch) { endPitch(); return true; }
+        if (s.editingId) { s.setEditing(null); return true; }
+        if (b.relMode) { setRelMode(false); return true; }
+        if (b.zen) { setZen(false); return true; }
+        if (b.search !== null) { setSearch(null); return true; }
+        if (b.panel) { setPanel(null); return true; }
+        if (b.mode !== 'map') { setMode('map'); return true; }
+        return false;
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
   // ---------- горячие клавиши ----------
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tgt = e.target as HTMLElement;
       if (tgt.closest('input, textarea, select, [contenteditable=true]')) return;
+      if (hasOverlay()) return;
       const s = useDoc.getState();
       const mod = e.ctrlKey || e.metaKey;
       const k = e.key;
@@ -302,7 +334,6 @@ export default function Editor() {
       const sel = s.selection[s.selection.length - 1];
       if (mod && k.toLowerCase() === 'c') { s.copy(); return; }
       if (mod && k.toLowerCase() === 'x') { s.copy(true); return; }
-      if (mod && k.toLowerCase() === 'v') { s.paste(); return; }
       if (mod && k.toLowerCase() === 'd') { e.preventDefault(); s.duplicate(); return; }
       if (mod && k.toLowerCase() === 'a') { e.preventDefault(); const ids: string[] = []; walkSheet(s.sheet()!, (t) => void ids.push(t.id)); s.select(ids); return; }
       if (mod && k.toLowerCase() === 'b' && s.selection.length) {
@@ -371,8 +402,13 @@ export default function Editor() {
         }
         return;
       }
-      if (s.clipboard) return; // внутренний буфер обработан по Ctrl+V
       const text = e.clipboardData?.getData('text/plain');
+      // свои скопированные темы (со стилями, заметками) — если в буфере их же текст
+      if (s.clipboard && (!text || text.trim() === (s.clipboardText ?? '').trim())) {
+        e.preventDefault();
+        s.paste(sel);
+        return;
+      }
       if (text?.trim()) {
         e.preventDefault();
         import('../io/markdown').then(({ textToTopics }) => s.insertChildren(sel, textToTopics(text)));
@@ -465,10 +501,11 @@ export default function Editor() {
             <div className="ed-toolbar glass">
               <button className="tb-btn" onClick={addChild} title="Подтема (Tab)"><CornerDownRight /><span>Подтема</span></button>
               <button className="tb-btn" onClick={addSibling} disabled={!hasSel} title="Тема рядом (Enter)"><Plus /><span>Рядом</span></button>
+              <button className="tb-btn" onClick={() => { if (!selId) return; primeKeyboard(); st.setEditing(selId); }} disabled={!hasSel} title="Изменить текст (F2)"><Pencil /><span>Текст</span></button>
               <button className={`tb-btn ${relMode ? 'active' : ''}`} onClick={() => (relMode ? setRelMode(false) : startRel())} title="Связь"><Spline /><span>Связь</span></button>
               <button className="tb-btn hide-xs" onClick={() => st.addBoundary()} disabled={!hasSel} title="Граница"><SquareDashed /><span>Граница</span></button>
               <button className="tb-btn hide-xs" onClick={() => st.addSummary()} disabled={!hasSel} title="Итог"><Braces /><span>Итог</span></button>
-              <button className="tb-btn" onClick={del} disabled={!hasSel && !selectedRel} title="Удалить (Del)"><Trash2 /><span>Удалить</span></button>
+              <button className="tb-btn" onClick={del} disabled={!selection.some((id) => id !== sheet.root.id) && !selectedRel} title="Удалить (Del)"><Trash2 /><span>Удалить</span></button>
               <span className="tb-sep hide-mobile" />
               <button className="tb-btn show-mobile" onClick={() => st.undo()} disabled={!canUndo}><Undo2 /><span>Отмена</span></button>
               <button className="tb-btn hide-mobile" onClick={() => canvas.current?.zoomBy(1 / 1.2)} title="Уменьшить"><Minus /></button>
