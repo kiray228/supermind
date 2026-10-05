@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { Sparkles, Sun, Moon, Monitor, Download, Upload, Trash2, Smartphone, Eye, EyeOff, CheckCircle2, Info } from 'lucide-react';
 import { get, set, keys, clear } from 'idb-keyval';
 import { useApp, toast } from '../store/appStore';
