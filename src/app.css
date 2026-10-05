@@ -48,3 +48,22 @@
   .nav-item.active { background: var(--lg-solid); color: var(--accent); }
   .page-body { padding-bottom: calc(100px + var(--safe-bottom)); }
 }
+
+/* значок с числом задач на сегодня и меню «Ещё» */
+.nav-ico { position: relative; display: inline-flex; }
+.nav-badge {
+  position: absolute; top: -6px; right: -10px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px; background: var(--accent); color: #fff;
+  font-size: 10px; font-weight: 800; font-style: normal; display: inline-flex; align-items: center; justify-content: center; line-height: 1;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.nav-more { display: none; }
+.nav-more-sheet { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.nav-sheet-item {
+  display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 16px 6px; border-radius: 16px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text); font-weight: 600; font-size: 13px;
+}
+.nav-sheet-item.active { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, transparent); background: var(--accent-soft); }
+@media (max-width: 760px) {
+  .nav-desk { display: none; }
+  .nav-more { display: flex; }
+}

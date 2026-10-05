@@ -1,5 +1,21 @@
-import { useState } from 'react';
-import { Sparkles, Sun, Moon, Monitor, Download, Upload, Trash2, Smartphone, Eye, EyeOff, CheckCircle2, Info } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Sparkles, Sun, Moon, Monitor, Download, Upload, Trash2, Smartphone, Eye, EyeOff, CheckCircle2, Info, BellRing, CalendarPlus } from 'lucide-react';
+import { isNative } from '../platform';
+import { isIOS } from '../io/download';
+import { ensureTasks, reloadTasks, setPrefs, useTasks } from '../tasks/store';
+import { ALLDAY_REMINDER_OPTIONS, TIMED_REMINDER_OPTIONS } from '../tasks/model';
+import {
+  enableCalendarSync,
+  exactAlarmState,
+  exportTasksIcs,
+  listPhoneCalendars,
+  notifyPermission,
+  openExactAlarmSettings,
+  requestNotifyPermission,
+  syncCalendar,
+  type NotifyPermission,
+  type PhoneCalendar,
+} from '../tasks/sync';
 import { get, set, keys, clear } from 'idb-keyval';
 import { useApp, toast } from '../store/appStore';
 import { AI_MODELS, streamText, AIError } from '../ai/claude';
@@ -55,6 +71,7 @@ export default function Settings() {
       const incoming = (j.data['docs:index'] ?? []) as { id: string }[];
       const merged = [...incoming, ...cur.filter((c) => !incoming.some((i) => i.id === c.id))];
       await set('docs:index', merged);
+      await reloadTasks();
       toast('Восстановлено карт: ' + incoming.length);
     } catch (e) {
       toast('Ошибка: ' + (e instanceof Error ? e.message : String(e)));
@@ -92,6 +109,8 @@ export default function Settings() {
             </button>
           </section>
 
+          <TaskSettings />
+
           <section className="card set-card">
             <h3>Оформление</h3>
             <div className="segmented">
@@ -119,10 +138,144 @@ export default function Settings() {
 
           <section className="card set-card">
             <h3><Info size={18} /> О приложении</h3>
-            <p className="small muted" style={{ margin: 0 }}>SuperMind 1.3 — бесплатные интеллект-карты, ежедневник и доска задач. Все функции открыты, без подписок.</p>
+            <p className="small muted" style={{ margin: 0 }}>SuperMind 1.4 — бесплатные интеллект-карты, задачи с напоминаниями, календарь, фокус, ежедневник и доска задач. Все функции открыты, без подписок.</p>
           </section>
         </div>
       </div>
     </div>
+  );
+}
+
+const PERM_TEXT: Record<NotifyPermission, string> = {
+  granted: 'разрешены',
+  denied: 'запрещены — включите в настройках телефона/браузера',
+  prompt: 'ещё не разрешены',
+  unsupported: 'не поддерживаются этим браузером',
+};
+
+function TaskSettings() {
+  const data = useTasks((s) => s.data);
+  const [perm, setPerm] = useState<NotifyPermission | null>(null);
+  const [exact, setExact] = useState<'granted' | 'denied' | 'n/a'>('n/a');
+  const [cals, setCals] = useState<PhoneCalendar[]>([]);
+  const native = isNative();
+
+  useEffect(() => {
+    void ensureTasks();
+    void notifyPermission().then(setPerm);
+    void exactAlarmState().then(setExact);
+  }, []);
+  useEffect(() => {
+    if (native && data?.prefs.calendarSync) void listPhoneCalendars().then((c) => setCals(c.filter((x) => x.writable)));
+  }, [native, data?.prefs.calendarSync]);
+
+  if (!data) return null;
+  const p = data.prefs;
+  const one = (arr: number[]) => (arr.length ? String(arr[0]) : 'none');
+  const fromSel = (v: string) => (v === 'none' ? [] : [Number(v)]);
+
+  return (
+    <section className="card set-card">
+      <h3>
+        <BellRing size={18} color="var(--accent)" /> Задачи и напоминания
+      </h3>
+      <label className="row small" style={{ gap: 10, cursor: 'pointer' }}>
+        <input type="checkbox" checked={p.notify} onChange={(e) => setPrefs({ notify: e.target.checked })} />
+        Напоминания о задачах и привычках
+      </label>
+      {perm && (
+        <p className="small muted" style={{ margin: '8px 0' }}>
+          Уведомления: <b>{PERM_TEXT[perm]}</b>{' '}
+          {perm === 'prompt' && (
+            <button className="btn btn-sm" onClick={async () => setPerm(await requestNotifyPermission())}>
+              Разрешить
+            </button>
+          )}
+        </p>
+      )}
+      {native && exact === 'denied' && (
+        <p className="small muted" style={{ margin: '8px 0' }}>
+          Точные будильники выключены — напоминания могут опаздывать.{' '}
+          <button className="btn btn-sm" onClick={() => void openExactAlarmSettings().then(() => exactAlarmState().then(setExact))}>
+            Включить
+          </button>
+        </p>
+      )}
+      {!native && (
+        <p className="tiny muted" style={{ margin: '6px 0' }}>
+          {isIOS()
+            ? 'iPhone: уведомления работают, когда SuperMind добавлен на экран «Домой» (iOS 16.4+) и запущен. Чтобы напоминание пришло даже при закрытом приложении, добавьте задачи в Календарь iPhone кнопкой ниже — он напомнит сам.'
+            : 'В браузере напоминания приходят, пока вкладка или установленное приложение открыто. В APK для Android напоминания работают всегда.'}
+        </p>
+      )}
+      <label className="label">По умолчанию для задач со временем</label>
+      <select className="select" value={one(p.timedReminders)} onChange={(e) => setPrefs({ timedReminders: fromSel(e.target.value) })}>
+        <option value="none">Без напоминания</option>
+        {TIMED_REMINDER_OPTIONS.map((o) => (
+          <option key={o.v} value={o.v}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+      <label className="label">По умолчанию для задач на весь день</label>
+      <select className="select" value={one(p.allDayReminders)} onChange={(e) => setPrefs({ allDayReminders: fromSel(e.target.value) })}>
+        <option value="none">Без напоминания</option>
+        {ALLDAY_REMINDER_OPTIONS.map((o) => (
+          <option key={o.v} value={o.v}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+      <label className="label">Настойчивое напоминание</label>
+      <select className="select" value={p.nag} onChange={(e) => setPrefs({ nag: Number(e.target.value) })}>
+        <option value={0}>Выключено</option>
+        {[5, 10, 15, 30].map((n) => (
+          <option key={n} value={n}>
+            Повторять каждые {n} мин (3 раза), пока не выполнено
+          </option>
+        ))}
+      </select>
+
+      <label className="label">Календарь телефона</label>
+      {native ? (
+        <>
+          <label className="row small" style={{ gap: 10, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={p.calendarSync}
+              onChange={async (e) => {
+                if (e.target.checked) await enableCalendarSync();
+                else {
+                  setPrefs({ calendarSync: false });
+                  void syncCalendar();
+                }
+              }}
+            />
+            Записывать задачи с датой в календарь телефона
+          </label>
+          {p.calendarSync && cals.length > 0 && (
+            <select className="select" style={{ marginTop: 8 }} value={p.calendarId ?? ''} onChange={(e) => setPrefs({ calendarId: e.target.value || undefined })}>
+              <option value="">Основной календарь</option>
+              {cals.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} {c.account && c.account !== c.name ? `(${c.account})` : ''}
+                </option>
+              ))}
+            </select>
+          )}
+          <label className="row small" style={{ gap: 10, cursor: 'pointer', marginTop: 8 }}>
+            <input type="checkbox" checked={p.showPhoneEvents} onChange={(e) => setPrefs({ showPhoneEvents: e.target.checked })} />
+            Показывать события календаря телефона в разделе «Календарь»
+          </label>
+        </>
+      ) : (
+        <p className="tiny muted" style={{ margin: 0 }}>
+          Автоматическая запись в календарь работает в приложении для Android. Здесь можно выгрузить задачи файлом .ics — его принимают Календарь iPhone, Google Календарь и Outlook.
+        </p>
+      )}
+      <button className="btn" style={{ marginTop: 10 }} onClick={() => void exportTasksIcs(data.tasks.filter((t) => !t.done))}>
+        <CalendarPlus size={16} /> Все задачи в календарь (.ics)
+      </button>
+    </section>
   );
 }

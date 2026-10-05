@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ArrowRight,
   BookOpen,
   CalendarDays,
   Check,
   ChevronLeft,
   ChevronRight,
   CircleAlert,
-  Clock,
   ExternalLink,
   Flame,
   ListChecks,
@@ -18,7 +16,13 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import type { Habit, PlannerData, PlannerDay, PlannerTask } from '../types';
+import type { Habit, PlannerData, PlannerDay } from '../types';
+import { useTasks, ensureTasks, addTask } from '../tasks/store';
+import { compareTasks, occurrences } from '../tasks/model';
+import { parseTask } from '../tasks/parse';
+import { askNotifyIfNeeded, syncSoon } from '../tasks/sync';
+import { TaskRow } from '../tasks/ui/TaskRow';
+import '../tasks/ui/tasks.css';
 import { loadAllDocs, loadPlanner, savePlanner } from '../store/db';
 import { addDaysYmd, collectMapTasks, fromYmd, PRIORITY_META, todayYmd, toYmd, updateMapTask } from '../utils/mapTasks';
 import type { MapTask } from '../utils/mapTasks';
@@ -49,7 +53,7 @@ const MOOD_NAMES: Record<string, string> = {
 const HABIT_COLORS = ['#22c55e', '#14b8a6', '#3b82f6', '#6366f1', '#a855f7', '#ec4899', '#ef4444', '#f97316', '#f59e0b', '#64748b'];
 
 const emptyDay = (): PlannerDay => ({ journal: '', tasks: [] });
-const isEmptyDay = (d: PlannerDay) => !d.journal.trim() && !d.mood && d.tasks.length === 0 && !d.habits?.length;
+const isEmptyDay = (d: PlannerDay) => !d.journal.trim() && !d.mood && !d.tasks?.length && !d.habits?.length;
 
 /** Понедельник недели, в которую входит дата */
 function mondayOf(ymd: string): string {
@@ -74,10 +78,6 @@ function relativeLabel(ymd: string, today: string): string {
   return diff > 0 ? `Через ${n} ${word}` : `${n} ${word} назад`;
 }
 
-function sortTasks(tasks: PlannerTask[]): PlannerTask[] {
-  return [...tasks].sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99'));
-}
-
 interface DayMarks {
   t?: boolean;
   j?: boolean;
@@ -93,11 +93,13 @@ export default function Planner() {
   const [mapTasks, setMapTasks] = useState<MapTask[]>([]);
   const [calOpen, setCalOpen] = useState(false);
   const [habitsOpen, setHabitsOpen] = useState(false);
+  const tasksDataState = useTasks((s) => s.data);
   const today = todayYmd();
 
   useEffect(() => {
     let alive = true;
-    loadPlanner().then((p) => {
+    // задачи дня хранятся в общем списке задач — сначала он (перенос старых задач ежедневника)
+    ensureTasks().then(() => loadPlanner()).then((p) => {
       if (!alive) return;
       const n: PlannerData = { days: p.days ?? {}, habits: p.habits ?? [] };
       dataRef.current = n;
@@ -146,11 +148,12 @@ export default function Planner() {
     const m: Record<string, DayMarks> = {};
     if (data)
       for (const [k, d] of Object.entries(data.days)) {
-        m[k] = { t: d.tasks.length > 0, j: !!d.journal.trim() };
+        m[k] = { j: !!d.journal.trim() };
       }
     for (const t of mapTasks) if (t.task.due) (m[t.task.due] ??= {}).m = true;
+    for (const t of tasksDataState?.tasks ?? []) if (t.date && !t.deleted && !t.wontDo) (m[t.date] ??= {}).t = true;
     return m;
-  }, [data, mapTasks]);
+  }, [data, mapTasks, tasksDataState]);
 
   if (!data) {
     return (
@@ -166,35 +169,28 @@ export default function Planner() {
   }
 
   const day = data.days[date] ?? emptyDay();
-  const tasks = sortTasks(day.tasks);
-  const doneCount = day.tasks.filter((t) => t.done).length;
+  const tasks = (tasksDataState?.tasks ?? [])
+    .filter((t) => !t.deleted && !t.wontDo && (t.date === date || (t.repeat && !t.done && occurrences(t, date, date).length > 0)))
+    .sort((a, b) => compareTasks(a, b, 'date'));
+  const doneCount = tasks.filter((t) => t.done).length;
 
-  // ----- задачи дня -----
-  const addTask = (raw: string) => {
-    let text = raw.trim();
-    if (!text) return;
-    let time: string | undefined;
-    const m = /^(\d{1,2})[:.](\d{2})\s+(.+)$/.exec(text);
-    if (m && +m[1] < 24 && +m[2] < 60) {
-      time = `${m[1].padStart(2, '0')}:${m[2]}`;
-      text = m[3].trim();
-    }
-    updateDay(date, (d) => ({ ...d, tasks: [...d.tasks, { id: uid(), text, done: false, ...(time ? { time } : {}) }] }));
-  };
-  const patchTask = (id: string, patch: Partial<PlannerTask>) =>
-    updateDay(date, (d) => ({ ...d, tasks: d.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t)) }));
-  const deleteTask = (id: string) => updateDay(date, (d) => ({ ...d, tasks: d.tasks.filter((t) => t.id !== id) }));
-  const moveTaskTomorrow = (id: string) => {
-    const tomorrow = addDaysYmd(date, 1);
-    updateDays((get, put) => {
-      const cur = get(date);
-      const task = cur.tasks.find((t) => t.id === id);
-      if (!task) return;
-      put(date, { ...cur, tasks: cur.tasks.filter((t) => t.id !== id) });
-      const next = get(tomorrow);
-      put(tomorrow, { ...next, tasks: [...next.tasks, { ...task, done: false }] });
+  // ----- задачи дня (общий список задач с напоминаниями) -----
+  const addDayTask = (raw: string) => {
+    const p = parseTask(raw);
+    if (!p.title.trim()) return;
+    const list = p.list ? tasksDataState?.lists.find((l) => l.name.toLowerCase().startsWith(p.list!.toLowerCase())) : undefined;
+    const t = addTask({
+      title: p.title,
+      date: p.date ?? date,
+      time: p.time,
+      duration: p.duration,
+      repeat: p.repeat,
+      priority: p.priority ?? 0,
+      tags: p.tags,
+      listId: list?.id,
+      ...(p.reminder !== undefined ? { reminders: [p.reminder] } : {}),
     });
-    toast('Задача перенесена на завтра');
+    if (t?.reminders.length) void askNotifyIfNeeded();
   };
 
   // ----- задачи из карт -----
@@ -226,6 +222,12 @@ export default function Planner() {
       d = addDaysYmd(d, -1);
     }
     return n;
+  };
+  const setHabitRemind = (h: Habit, remind: string | undefined) => {
+    const p = dataRef.current!;
+    commit({ ...p, habits: p.habits.map((x) => (x.id === h.id ? { ...x, remind } : x)) });
+    if (remind) void askNotifyIfNeeded();
+    syncSoon(300);
   };
   const addHabit = (name: string, color: string) => {
     const p = dataRef.current!;
@@ -303,29 +305,23 @@ export default function Planner() {
                     <ListChecks size={18} className="pl-sec-icon" />
                     <h3>Задачи дня</h3>
                     <div className="grow" />
-                    {day.tasks.length > 0 && (
+                    {tasks.length > 0 && (
                       <span className="pl-sec-meta">
-                        {doneCount} из {day.tasks.length}
+                        {doneCount} из {tasks.length}
                       </span>
                     )}
                   </header>
-                  {day.tasks.length > 0 && (
-                    <div className={`pl-progress${doneCount === day.tasks.length ? ' is-full' : ''}`}>
-                      <span style={{ width: `${(doneCount / day.tasks.length) * 100}%` }} />
+                  {tasks.length > 0 && (
+                    <div className={`pl-progress${doneCount === tasks.length ? ' is-full' : ''}`}>
+                      <span style={{ width: `${(doneCount / tasks.length) * 100}%` }} />
                     </div>
                   )}
                   <div className="pl-tasks">
                     {tasks.map((t) => (
-                      <TaskRow
-                        key={t.id}
-                        task={t}
-                        onPatch={(p) => patchTask(t.id, p)}
-                        onDelete={() => deleteTask(t.id)}
-                        onTomorrow={() => moveTaskTomorrow(t.id)}
-                      />
+                      <TaskRow key={t.id} task={t} list={tasksDataState?.lists.find((l) => l.id === t.listId)} showDate={false} tagColors={tasksDataState?.tagColors} />
                     ))}
                   </div>
-                  <AddTaskInput key={date} onAdd={addTask} />
+                  <AddTaskInput key={date} onAdd={addDayTask} />
                 </section>
 
                 {/* b) Из карт */}
@@ -466,7 +462,7 @@ export default function Planner() {
         </div>
       )}
 
-      {habitsOpen && <HabitsModal habits={data.habits} onAdd={addHabit} onDelete={deleteHabit} onClose={() => setHabitsOpen(false)} />}
+      {habitsOpen && <HabitsModal habits={data.habits} onAdd={addHabit} onRemind={setHabitRemind} onDelete={deleteHabit} onClose={() => setHabitsOpen(false)} />}
     </div>
   );
 }
@@ -614,79 +610,6 @@ function WeekStrip({
 
 // ---------- Задачи ----------
 
-function TaskRow({
-  task,
-  onPatch,
-  onDelete,
-  onTomorrow,
-}: {
-  task: PlannerTask;
-  onPatch: (p: Partial<PlannerTask>) => void;
-  onDelete: () => void;
-  onTomorrow: () => void;
-}) {
-  const [text, setText] = useState(task.text);
-  const [timeEdit, setTimeEdit] = useState(false);
-  useEffect(() => setText(task.text), [task.text]);
-  const commitText = () => {
-    const v = text.trim();
-    if (!v) setText(task.text);
-    else if (v !== task.text) onPatch({ text: v });
-  };
-  const pc = task.priority ? PRIORITY_META[task.priority] : undefined;
-  const cyclePriority = () => onPatch({ priority: task.priority ? (task.priority >= 3 ? undefined : task.priority + 1) : 1 });
-
-  return (
-    <div className={`pl-task${task.done ? ' is-done' : ''}`}>
-      <button className={`pl-check${task.done ? ' on' : ''}`} onClick={() => onPatch({ done: !task.done })} aria-label={task.done ? 'Отметить невыполненной' : 'Отметить выполненной'}>
-        {task.done && <Check size={14} strokeWidth={3} />}
-      </button>
-      <button
-        className="pl-prio"
-        style={pc ? { background: pc.color, borderColor: pc.color } : undefined}
-        title={pc ? `Приоритет: ${pc.label}` : 'Приоритет: нет (нажмите, чтобы изменить)'}
-        onClick={cyclePriority}
-        aria-label="Изменить приоритет"
-      />
-      <input
-        className="pl-task-text"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onBlur={commitText}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-          if (e.key === 'Escape') {
-            setText(task.text);
-            (e.target as HTMLInputElement).blur();
-          }
-        }}
-      />
-      {task.time || timeEdit ? (
-        <input
-          type="time"
-          className="pl-time"
-          value={task.time ?? ''}
-          autoFocus={timeEdit && !task.time}
-          onChange={(e) => onPatch({ time: e.target.value || undefined })}
-          onBlur={() => setTimeEdit(false)}
-        />
-      ) : (
-        <button className="pl-task-btn pl-time-add" onClick={() => setTimeEdit(true)} title="Указать время" aria-label="Указать время">
-          <Clock size={16} />
-        </button>
-      )}
-      <div className="pl-task-actions">
-        <button className="pl-task-btn" onClick={onTomorrow} title="Перенести на завтра" aria-label="Перенести на завтра">
-          <ArrowRight size={16} />
-        </button>
-        <button className="pl-task-btn danger" onClick={onDelete} title="Удалить" aria-label="Удалить">
-          <Trash2 size={16} />
-        </button>
-      </div>
-    </div>
-  );
-}
-
 function AddTaskInput({ onAdd }: { onAdd: (t: string) => void }) {
   const [text, setText] = useState('');
   const submit = () => {
@@ -699,7 +622,7 @@ function AddTaskInput({ onAdd }: { onAdd: (t: string) => void }) {
       <Plus size={18} className="pl-add-icon" />
       <input
         className="pl-add-input"
-        placeholder="Новая задача (напр. «09:30 Созвон»)"
+        placeholder="Новая задача, напр. «Созвон в 9:30»"
         value={text}
         enterKeyHint="done"
         onChange={(e) => setText(e.target.value)}
@@ -807,11 +730,13 @@ function Journal({ date, initial, onSave }: { date: string; initial: string; onS
 function HabitsModal({
   habits,
   onAdd,
+  onRemind,
   onDelete,
   onClose,
 }: {
   habits: Habit[];
   onAdd: (name: string, color: string) => void;
+  onRemind: (h: Habit, time: string | undefined) => void;
   onDelete: (h: Habit) => void;
   onClose: () => void;
 }) {
@@ -834,7 +759,7 @@ function HabitsModal({
           </button>
         </div>
         <p className="muted small" style={{ margin: '2px 0 10px' }}>
-          Отмечайте привычки каждый день и следите за сериями.
+          Отмечайте привычки каждый день и следите за сериями. Укажите время — придёт ежедневное напоминание.
         </p>
         {habits.length > 0 && (
           <div className="pl-habit-list">
@@ -842,6 +767,14 @@ function HabitsModal({
               <div key={h.id} className="pl-habit-item">
                 <span className="pl-habit-swatch" style={{ background: h.color }} />
                 <span className="grow ellipsis">{h.name}</span>
+                <input
+                  type="time"
+                  className="pl-time"
+                  title="Напоминать каждый день"
+                  aria-label="Время напоминания"
+                  value={h.remind ?? ''}
+                  onChange={(e) => onRemind(h, e.target.value || undefined)}
+                />
                 <button className="icon-btn" onClick={() => onDelete(h)} aria-label="Удалить привычку">
                   <Trash2 />
                 </button>

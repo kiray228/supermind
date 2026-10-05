@@ -186,6 +186,8 @@ export interface Habit {
   name: string;
   color: string;
   icon?: string;
+  /** время ежедневного напоминания HH:MM */
+  remind?: string;
 }
 
 export interface PlannerData {

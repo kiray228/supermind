@@ -1,0 +1,210 @@
+/* ================= Календарь ================= */
+.cv-page { position: relative; overflow: hidden; }
+.cv-header { flex-wrap: wrap; row-gap: 8px; }
+.cv-nav { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.cv-period { font-weight: 700; font-size: 16px; min-width: 130px; text-align: center; }
+.cv-views button { padding: 0 11px; }
+.cv-body { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+.cv-menu-back { position: fixed; inset: 0; z-index: 119; }
+
+/* ---------- Плавающая кнопка ---------- */
+.cv-fab {
+  position: absolute; right: 24px; bottom: 24px; z-index: 20; width: 54px; height: 54px; border-radius: 50%; border: none;
+  display: inline-flex; align-items: center; justify-content: center; color: #fff;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 85%, #fff), var(--accent));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 8px 24px color-mix(in srgb, var(--accent) 40%, transparent);
+  transition: transform .1s;
+}
+.cv-fab:active { transform: scale(.94); }
+
+/* ---------- Плашки задач ---------- */
+.cv-chip {
+  --c: var(--accent);
+  display: flex; align-items: center; gap: 4px; flex-shrink: 0; min-width: 0; height: 20px; padding: 0 5px 0 5px;
+  border-radius: 5px; border-left: 3px solid var(--c); font-size: 12px; line-height: 20px; color: var(--text);
+  background: color-mix(in srgb, var(--c) 14%, var(--surface)); cursor: pointer; user-select: none; -webkit-user-select: none;
+}
+.cv-chip:hover { background: color-mix(in srgb, var(--c) 24%, var(--surface)); }
+.cv-chip.movable { cursor: grab; }
+.cv-chip svg { flex-shrink: 0; color: var(--c); }
+.cv-chip-time { flex-shrink: 0; font-size: 11px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.cv-chip.done { opacity: .5; }
+.cv-chip.done .ellipsis { text-decoration: line-through; }
+.cv-chip.overdue { color: var(--danger); }
+.cv-chip.cv-phone { background: color-mix(in srgb, var(--c) 7%, transparent); color: var(--text-2); }
+.cv-ghost {
+  position: fixed; z-index: 150; pointer-events: none; max-width: 220px; padding: 5px 9px; border-radius: 7px;
+  border-left: 3px solid var(--accent); background: var(--lg-solid); box-shadow: var(--shadow-lg); font-size: 12.5px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ---------- Месяц ---------- */
+.cv-month { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: auto; padding: 12px 16px 16px; }
+.cv-mgrid {
+  flex: 1; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-template-rows: auto repeat(6, minmax(92px, 1fr));
+  gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+}
+.cv-wd { background: var(--surface); text-align: center; font-size: 11.5px; font-weight: 650; color: var(--text-3); padding: 6px 0; text-transform: uppercase; }
+.cv-wd.we { color: color-mix(in srgb, var(--accent) 60%, var(--text-3)); }
+.cv-cell {
+  background: var(--surface); min-width: 0; padding: 4px 4px 3px; display: flex; flex-direction: column; gap: 2px;
+  overflow: hidden; cursor: pointer; user-select: none; -webkit-user-select: none; transition: background .12s;
+}
+.cv-cell:hover { background: color-mix(in srgb, var(--surface-2) 55%, var(--surface)); }
+.cv-cell.out { background: color-mix(in srgb, var(--surface-2) 60%, var(--surface)); }
+.cv-cell.out .cv-num { color: var(--text-3); }
+.cv-cell.sel { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent); }
+.cv-cell.over { background: var(--accent-soft); }
+.cv-num {
+  align-self: flex-start; display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 24px;
+  padding: 0 5px; border-radius: 999px; font-size: 13px; font-weight: 600; flex-shrink: 0;
+}
+.cv-cell.today .cv-num { background: var(--accent); color: #fff; }
+.cv-more {
+  flex-shrink: 0; align-self: flex-start; height: 18px; padding: 0 6px; border: none; border-radius: 5px; background: none;
+  font-size: 11.5px; font-weight: 650; color: var(--text-2);
+}
+.cv-more:hover { background: var(--surface-2); }
+.cv-dots { display: flex; justify-content: center; gap: 3px; height: 5px; }
+.cv-dots i { width: 5px; height: 5px; border-radius: 50%; }
+.cv-dots i.done { opacity: .35; }
+
+/* узкий экран: в клетках точки, задачи выбранного дня — под сеткой */
+.cv-month.narrow { padding: 8px 10px calc(96px + var(--safe-bottom)); }
+.cv-month.narrow .cv-mgrid { flex: none; grid-template-rows: auto repeat(6, 48px); }
+.cv-month.narrow .cv-cell { align-items: center; padding: 5px 2px; gap: 4px; }
+.cv-month.narrow .cv-num { align-self: center; width: 28px; height: 28px; font-size: 14px; }
+.cv-month.narrow .cv-cell.sel { box-shadow: none; }
+.cv-month.narrow .cv-cell.today .cv-num { background: var(--accent-soft); color: var(--accent); }
+.cv-month.narrow .cv-cell.sel .cv-num { background: var(--accent); color: #fff; }
+.cv-daylist { margin-top: 14px; }
+.cv-none {
+  display: block; width: 100%; padding: 18px 12px; border: 1px dashed var(--border); border-radius: var(--radius);
+  background: none; color: var(--text-3); font-size: 13.5px;
+}
+
+/* ---------- Строки списков ---------- */
+.cv-list-head { display: flex; align-items: baseline; gap: 8px; margin: 0 4px 8px; min-width: 0; }
+.cv-list-head b { font-size: 15px; }
+.cv-list-head.today b { color: var(--accent); }
+.cv-list { padding: 4px; }
+.cv-row { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 6px 10px; border-radius: 10px; cursor: pointer; min-width: 0; }
+.cv-row:hover { background: var(--surface-2); }
+.cv-check {
+  --c: var(--text-3);
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 20px; height: 20px; padding: 0;
+  border: 2px solid var(--c); border-radius: 6px; background: transparent; color: #fff;
+}
+.cv-check.on { background: var(--c); }
+.cv-check:disabled { opacity: .45; border-style: dashed; cursor: default; }
+.cv-row-icon { display: inline-flex; justify-content: center; width: 20px; flex-shrink: 0; }
+.cv-row-title { font-size: 14.5px; }
+.cv-row.done .cv-row-title { text-decoration: line-through; color: var(--text-3); }
+.cv-row-phone .cv-row-title { color: var(--text-2); }
+.cv-row-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.cv-row-time { flex-shrink: 0; font-size: 12.5px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.cv-row.overdue .cv-row-time, .cv-row.overdue .cv-row-title { color: var(--danger); }
+
+/* ---------- Список ---------- */
+.cv-agenda { flex: 1; min-height: 0; overflow: auto; padding: 16px 20px 32px; }
+.cv-ag-day { max-width: 760px; margin: 0 auto 18px; }
+.cv-agenda-empty { flex: 1; }
+
+/* ---------- Сетка времени ---------- */
+.cv-tg {
+  --cv-gutter: 52px; --cv-hour: 52px;
+  flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; position: relative;
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+}
+.cv-tg-row { display: grid; grid-template-columns: var(--cols); }
+.cv-tg-sticky {
+  position: sticky; top: 0; z-index: 6; border-bottom: 1px solid var(--border);
+  background: var(--lg-solid); -webkit-backdrop-filter: var(--lg-blur); backdrop-filter: var(--lg-blur);
+}
+.cv-tg-head {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; padding: 6px 0 5px;
+  border: none; background: none; color: var(--text-2); border-radius: 8px;
+}
+.cv-tg-head:hover { background: var(--surface-2); }
+.cv-tg-wd { font-size: 11px; font-weight: 650; text-transform: uppercase; }
+.cv-tg-head.we .cv-tg-wd { color: color-mix(in srgb, var(--accent) 60%, var(--text-3)); }
+.cv-tg-date {
+  display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%;
+  font-size: 17px; font-weight: 700; color: var(--text);
+}
+.cv-tg-head.today .cv-tg-wd { color: var(--accent); }
+.cv-tg-head.today .cv-tg-date { background: var(--accent); color: #fff; }
+.cv-tg-allday { border-top: 1px solid var(--border); max-height: 96px; overflow-y: auto; }
+.cv-tg-gut { padding: 6px 6px 0 0; font-size: 10.5px; line-height: 1.15; color: var(--text-3); text-align: right; }
+.cv-tg-adcell { display: flex; flex-direction: column; gap: 2px; min-width: 0; min-height: 30px; padding: 3px 2px; border-left: 1px solid var(--border); cursor: pointer; }
+.cv-tg-body { position: relative; }
+.cv-tg-hours { position: relative; }
+.cv-tg-hours span {
+  position: absolute; right: 6px; transform: translateY(-50%); font-size: 10.5px; color: var(--text-3);
+  font-variant-numeric: tabular-nums; pointer-events: none;
+}
+.cv-tg-col {
+  position: relative; min-width: 0; border-left: 1px solid var(--border); cursor: pointer;
+  background-image: linear-gradient(to bottom, var(--border) 1px, transparent 1px);
+  background-size: 100% var(--cv-hour);
+}
+.cv-tg-col.today { background-color: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+.cv-block {
+  --c: var(--accent);
+  position: absolute; z-index: 1; overflow: hidden; padding: 2px 5px; border-radius: 6px; border-left: 3px solid var(--c);
+  font-size: 12px; line-height: 1.3; color: var(--text); background: color-mix(in srgb, var(--c) 20%, var(--surface));
+  box-shadow: 0 0 0 1px var(--surface); cursor: pointer;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
+.cv-block:hover { background: color-mix(in srgb, var(--c) 28%, var(--surface)); }
+.cv-block.movable { cursor: grab; }
+.cv-block-title { display: flex; align-items: center; gap: 4px; font-weight: 600; }
+.cv-block-title svg { flex-shrink: 0; color: var(--c); }
+.cv-block-time { flex-shrink: 0; font-size: 11px; font-weight: 500; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.cv-block.done { opacity: .5; }
+.cv-block.done .cv-block-title { text-decoration: line-through; }
+.cv-block.overdue .cv-block-title { color: var(--danger); }
+.cv-block.cv-phone { background: color-mix(in srgb, var(--c) 9%, var(--surface)); color: var(--text-2); }
+.cv-block.src { opacity: .35; }
+.cv-block.ghost {
+  z-index: 4; pointer-events: none; background: color-mix(in srgb, var(--c) 32%, var(--surface));
+  outline: 1.5px solid var(--c); box-shadow: var(--shadow-lg);
+}
+.cv-block-resize { position: absolute; left: 0; right: 0; bottom: 0; height: 9px; cursor: ns-resize; touch-action: none; }
+.cv-block-resize::after {
+  content: ''; position: absolute; left: 50%; bottom: 2px; width: 18px; height: 3px; margin-left: -9px; border-radius: 2px;
+  background: color-mix(in srgb, var(--c) 65%, transparent); opacity: 0; transition: opacity .15s;
+}
+.cv-block:hover .cv-block-resize::after { opacity: 1; }
+.cv-now { position: absolute; left: -1px; right: 0; z-index: 3; height: 2px; margin-top: -1px; background: #ef4444; pointer-events: none; }
+.cv-now::before { content: ''; position: absolute; left: -5px; top: -4px; width: 10px; height: 10px; border-radius: 50%; background: #ef4444; }
+
+@media (pointer: coarse) {
+  .cv-block-resize { height: 12px; }
+  .cv-block-resize::after { opacity: .8; }
+}
+
+/* ---------- Телефон ---------- */
+@media (max-width: 760px) {
+  .cv-h1, .cv-spacer { display: none; }
+  .cv-nav { order: 1; flex: 1; }
+  .cv-period { flex: 1; min-width: 0; font-size: 17px; }
+  .cv-today { order: 2; }
+  .cv-more-btn { order: 3; }
+  .cv-views { order: 4; display: flex; width: 100%; }
+  .cv-views button { flex: 1; min-width: 0; padding: 0 2px; font-size: 12.5px; }
+  .cv-fab { right: 16px; bottom: calc(96px + var(--safe-bottom)); }
+  .cv-agenda { padding: 12px 12px calc(96px + var(--safe-bottom)); }
+  .cv-agenda-empty { padding-bottom: calc(96px + var(--safe-bottom)); }
+
+  .cv-tg { --cv-gutter: 36px; padding-bottom: calc(84px + var(--safe-bottom)); }
+  .cv-tg-hours span { right: 4px; font-size: 9.5px; }
+  .cv-tg-gut { padding-right: 3px; font-size: 9px; }
+  .cv-tg-date { width: 26px; height: 26px; font-size: 15px; }
+  .cv-tg-wd { font-size: 10px; }
+  .cv-block { padding: 1px 3px; font-size: 11px; border-left-width: 2px; }
+  .cv-tg-7 .cv-block-time { display: none; }
+  .cv-tg-7 .cv-block-title svg, .cv-tg-7 .cv-chip svg, .cv-tg-7 .cv-chip-time { display: none; }
+  .cv-tg .cv-chip { font-size: 11px; padding: 0 3px; border-left-width: 2px; }
+}

@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { Settings } from '../types';
 import { DEFAULT_SETTINGS, saveSettings } from './db';
 
-export type View = 'home' | 'editor' | 'board' | 'planner' | 'settings';
+export type View = 'home' | 'editor' | 'board' | 'planner' | 'settings' | 'tasks' | 'calendar' | 'focus';
 
 interface AppState {
   view: View;

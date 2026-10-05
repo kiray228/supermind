@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  Bold, Italic, Strikethrough, Image as ImageIcon, Trash2, Link2, X, Plus, CheckSquare, StickyNote, Tag, Palette, Map as MapIcon, Shapes,
+  Bold, Italic, Strikethrough, Image as ImageIcon, Trash2, Link2, X, Plus, CheckSquare, StickyNote, Tag, Palette, Map as MapIcon, Shapes, Bell,
 } from 'lucide-react';
 import type { LineStyle, ShapeType, StructureType, TaskStatus, Topic } from '../types';
 import { useDoc, beginBatch, endBatch } from '../store/docStore';
@@ -232,6 +232,9 @@ function TopicPanel({ t, ids }: { t: Topic; ids: string[] }) {
             <Range min={0} max={100} step={5} className="grow" value={task.progress ?? 0} onChange={(e) => setTask({ progress: Number(e.target.value) })} />
             <span className="small bold" style={{ width: 38, textAlign: 'right' }}>{task.progress ?? 0}%</span>
           </div>
+          <button className="btn btn-sm" onClick={() => void remindTopic(t, task.due, task.priority)}>
+            <Bell size={14} /> Напоминание, время и календарь
+          </button>
           <button className="btn btn-sm btn-ghost btn-danger" onClick={() => setTask(null)}>
             Убрать задачу
           </button>
@@ -498,4 +501,21 @@ function RelationshipPanel({ id }: { id: string }) {
       </button>
     </div>
   );
+}
+
+/** Задача с напоминанием для темы карты (в разделе «Задачи»; выполнение отмечается и в карте) */
+async function remindTopic(t: Topic, due?: string, priority?: number) {
+  const { ensureTasks, addTask, openTask } = await import('../tasks/store');
+  const d = await ensureTasks();
+  const doc = useDoc.getState().doc;
+  if (!doc) return;
+  const found = d.tasks.find((x) => !x.deleted && x.source?.docId === doc.id && x.source.topicId === t.id);
+  if (found) return openTask(found.id);
+  const created = addTask({
+    title: t.text || 'Задача из карты',
+    date: due,
+    priority: (priority ?? 0) as 0 | 1 | 2 | 3,
+    source: { docId: doc.id, topicId: t.id, docTitle: doc.title },
+  });
+  if (created) openTask(created.id);
 }

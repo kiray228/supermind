@@ -29,6 +29,22 @@ self.addEventListener('fetch', (e) => {
   }
   e.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((r) => { if (r.ok) { const cp = r.clone(); caches.open(CACHE).then((c) => c.put(req, cp)); } return r; })));
 });
+// нажатие на напоминание или кнопку в нём («Выполнено», «Отложить»)
+self.addEventListener('notificationclick', (e) => {
+  const n = e.notification;
+  const data = n.data || {};
+  const action = e.action || 'open';
+  n.close();
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((cs) => {
+    const c = cs[0];
+    if (c) {
+      c.postMessage({ type: 'sm-notify', action, data });
+      return action === 'open' && c.focus ? c.focus() : undefined;
+    }
+    const q = new URLSearchParams({ task: data.taskId || '', date: data.date || '', action });
+    return self.clients.openWindow('./?' + q.toString());
+  }));
+});
 `
       this.emitFile({ type: 'asset', fileName: 'sw.js', source: code })
     },

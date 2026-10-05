@@ -1,5 +1,5 @@
 import { loadDoc, saveDoc } from './store/db';
-import { useApp, toast } from './store/appStore';
+import { useApp, toast, type View } from './store/appStore';
 import { useDoc, flushSave } from './store/docStore';
 import { decryptDoc } from './utils/crypto';
 import type { MindDoc } from './types';
@@ -45,7 +45,7 @@ export async function createAndOpen(doc: MindDoc) {
 }
 
 /** Выйти из редактора в раздел */
-export async function leaveEditor(view: 'home' | 'board' | 'planner' | 'settings' = 'home') {
+export async function leaveEditor(view: Exclude<View, 'editor'> = 'home') {
   await flushSave();
   useDoc.getState().close();
   useApp.getState().go(view);

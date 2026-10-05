@@ -8,6 +8,10 @@ const config: CapacitorConfig = {
     allowMixedContent: false,
   },
   plugins: {
+    LocalNotifications: {
+      smallIcon: 'ic_stat_supermind',
+      iconColor: '#FF4A2B',
+    },
     SplashScreen: {
       launchShowDuration: 600,
       backgroundColor: '#ee2a3a',
