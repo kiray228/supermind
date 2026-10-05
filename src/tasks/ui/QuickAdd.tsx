@@ -122,7 +122,13 @@ export function SmartInput({
       </div>
       {(!compact || text) && (
         <div className="qa-bar">
-          <button className={`qa-chip${date ? ' set' : ''}`} onClick={() => setPicking(true)}>
+          <button
+            className={`qa-chip${date ? ' set' : ''}`}
+            onClick={() => {
+              setPrioOpen(false);
+              setPicking(true);
+            }}
+          >
             <CalendarDays size={15} />
             {date ? whenLabel({ date, time, duration }) : 'Дата'}
             {repeat && <Repeat size={13} />}
@@ -134,7 +140,7 @@ export function SmartInput({
               {pc ? pc.label : 'Приоритет'}
             </button>
             {prioOpen && (
-              <div className="td-pop">
+              <div className="td-pop up">
                 {([1, 2, 3, 0] as Priority[]).map((p) => (
                   <button
                     key={p}

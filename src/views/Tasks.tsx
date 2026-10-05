@@ -208,6 +208,13 @@ export default function Tasks() {
   useEffect(() => {
     void ensureTasks();
   }, []);
+  // меню «⋯» закрывается касанием в любом другом месте
+  useEffect(() => {
+    if (!menu) return;
+    const close = (e: PointerEvent) => !(e.target as Element).closest?.('.td-pop-anchor') && setMenu(false);
+    document.addEventListener('pointerdown', close, true);
+    return () => document.removeEventListener('pointerdown', close, true);
+  }, [menu]);
   useEffect(() => {
     let alive = true;
     loadAllDocs()
@@ -473,7 +480,6 @@ export default function Tasks() {
           </button>
           {menu && (
             <>
-              <div className="menu-layer tk-menu-shield" onPointerDown={() => setMenu(false)} />
               <div className="td-pop right tk-menu" onClick={() => setMenu(false)}>
                 <div className="td-pop-label">Сортировка</div>
                 {(

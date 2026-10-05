@@ -26,7 +26,24 @@ export async function nativeSaveBlob(blob: Blob, filename: string) {
   await Share.share({ title: filename, files: [written.uri] });
 }
 
+/** Видимая область экрана без клавиатуры → CSS-переменные --vvh/--vvt (окна поднимаются над клавиатурой) */
+function trackVisualViewport() {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  const root = document.documentElement;
+  const apply = () => {
+    root.style.setProperty('--vvh', `${vv.height}px`);
+    root.style.setProperty('--vvt', `${vv.offsetTop}px`);
+    // iOS прокручивает страницу к полю ввода — возвращаем, окна позиционируются сами
+    if (vv.height >= window.innerHeight - 1 && window.scrollY) window.scrollTo(0, 0);
+  };
+  vv.addEventListener('resize', apply);
+  vv.addEventListener('scroll', apply);
+  apply();
+}
+
 export function setupPlatform() {
+  trackVisualViewport();
   // iOS Safari игнорирует запрет масштабирования страницы — блокируем жесты вручную,
   // чтобы щипок всегда масштабировал карту, а не весь интерфейс
   const stop = (e: Event) => e.preventDefault();

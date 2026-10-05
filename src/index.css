@@ -264,3 +264,10 @@ body {
   backdrop-filter: var(--lg-blur);
   border-bottom-color: var(--lg-border);
 }
+
+/* окна занимают только видимую часть экрана: на iPhone не прячутся под клавиатурой */
+.modal-backdrop { inset: auto 0 auto 0; top: var(--vvt, 0px); height: var(--vvh, 100%); }
+.modal { max-height: min(calc(var(--vvh, 100vh) - 24px), 900px); }
+@media (max-width: 640px) {
+  .modal { max-height: calc(var(--vvh, 100vh) - var(--safe-top) - 8px); }
+}

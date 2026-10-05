@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Bell, CalendarClock, ChevronLeft, ChevronRight, Clock, Plus, Repeat, Sun, Sunrise, CalendarX2, X, CalendarRange } from 'lucide-react';
 import { addDaysYmd, fromYmd, todayYmd, toYmd } from '../../utils/mapTasks';
 import {
@@ -60,7 +61,8 @@ export function DatePicker({ value, onDone, onClose }: { value: When; onDone: (v
   ];
   const presetIdx = presets.findIndex((p) => JSON.stringify(p.rule ?? null) === JSON.stringify(v.repeat ?? null));
 
-  return (
+  // в body: окно не должно зависеть от родителя (стекло и анимации «запирают» position: fixed)
+  return createPortal(
     <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal dp-modal">
         <div className="dp-quick">
@@ -182,7 +184,8 @@ export function DatePicker({ value, onDone, onClose }: { value: When; onDone: (v
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
