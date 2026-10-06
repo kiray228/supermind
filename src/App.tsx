@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { Network, KanbanSquare, Settings as SettingsIcon, CheckSquare, CalendarRange, Timer, Menu as MenuIcon, NotebookPen } from 'lucide-react';
 import { useApp, type View } from './store/appStore';
 import { listDocs, loadSettings, saveDoc } from './store/db';
-import { get as idbGet, set as idbSet } from 'idb-keyval';
+import { get as idbGet, set as idbSet } from './store/kv';
 import { welcomeDoc } from './templates';
 import { DialogHost, closeTopOverlay } from './ui/dialogs';
 import Home from './views/Home';

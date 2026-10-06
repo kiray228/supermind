@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { get, set } from 'idb-keyval';
+import { get, set } from '../store/kv';
 import type { ID, PlannerData } from '../types';
 import { uid } from '../utils/tree';
 import { todayYmd, updateMapTask } from '../utils/mapTasks';

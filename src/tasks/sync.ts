@@ -1,5 +1,5 @@
 import { registerPlugin } from '@capacitor/core';
-import { get, set } from 'idb-keyval';
+import { get, set } from '../store/kv';
 import { create } from 'zustand';
 import type { PlannerData } from '../types';
 import { isNative } from '../platform';

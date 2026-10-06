@@ -1,0 +1,13 @@
+{
+  "name": "supermind-server",
+  "private": true,
+  "type": "module",
+  "description": "API SuperMind: аккаунты, синхронизация, push-напоминания (Neon Function)",
+  "scripts": {
+    "test": "node --test test/*.test.ts",
+    "bundle": "node scripts/bundle.mjs"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

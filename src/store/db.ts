@@ -1,4 +1,4 @@
-import { get, set, del } from 'idb-keyval';
+import { get, set, del } from './kv';
 import type { BoardData, DocMeta, LockedDoc, MindDoc, PlannerData, Settings } from '../types';
 import { countTopics } from '../utils/tree';
 import { getTheme } from '../themes';

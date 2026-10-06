@@ -16,7 +16,7 @@ import {
   type NotifyPermission,
   type PhoneCalendar,
 } from '../tasks/sync';
-import { get, set, keys, clear } from 'idb-keyval';
+import { get, set, keys, clear } from '../store/kv';
 import { useApp, toast } from '../store/appStore';
 import { AI_MODELS, streamText, AIError } from '../ai/claude';
 import { downloadBlob, pickFile } from '../io/download';
