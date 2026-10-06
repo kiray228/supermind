@@ -6,21 +6,32 @@ import { parseTask } from '../parse';
 import { addTask, defaultReminders, useTasks } from '../store';
 import { askNotifyIfNeeded } from '../sync';
 import { DatePicker, type When } from './DatePicker';
+import { registerQuickInput } from '../../ui/keyboard';
 import './tasks.css';
 
 /** Окно быстрого добавления (кнопка «+» в любом разделе) */
+// Окно всегда в DOM (скрыто, пока закрыто): на iPhone клавиатура открывается, только если
+// фокус ставится в уже существующее поле прямо в обработчике нажатия на «+»
 export function QuickAddHost() {
   const preset = useTasks((s) => s.quickAdd);
-  if (!preset) return null;
-  return <QuickAdd preset={preset} onClose={() => useTasks.setState({ quickAdd: null })} />;
-}
-
-function QuickAdd({ preset, onClose }: { preset: Partial<TaskItem>; onClose: () => void }) {
   const [added, setAdded] = useState(0);
+  const [round, setRound] = useState(0);
+  const open = !!preset;
+  const close = () => {
+    (document.activeElement as HTMLElement | null)?.blur?.();
+    useTasks.setState({ quickAdd: null });
+    setAdded(0);
+    // сбросить введённое: новое поле при следующем открытии
+    setRound((r) => r + 1);
+  };
   return (
-    <div className="modal-backdrop qa-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div
+      className={open ? 'modal-backdrop qa-backdrop' : 'qa-hidden'}
+      aria-hidden={!open}
+      onPointerDown={(e) => open && e.target === e.currentTarget && close()}
+    >
       <div className="modal qa-modal">
-        <SmartInput key={added} preset={preset} autoFocus onAdded={() => setAdded((n) => n + 1)} onCancel={onClose} />
+        <SmartInput key={round} preset={preset ?? {}} quick hidden={!open} onAdded={() => setAdded((n) => n + 1)} onCancel={close} />
         {added > 0 && <div className="tiny muted qa-count">Добавлено: {added}. Можно ввести следующую задачу.</div>}
       </div>
     </div>
@@ -33,13 +44,16 @@ function QuickAdd({ preset, onClose }: { preset: Partial<TaskItem>; onClose: () 
  */
 export function SmartInput({
   preset,
-  autoFocus,
+  quick,
+  hidden,
   onAdded,
   onCancel,
   compact,
 }: {
   preset: Partial<TaskItem>;
-  autoFocus?: boolean;
+  /** поле окна быстрого ввода (регистрируется для мгновенного фокуса) */
+  quick?: boolean;
+  hidden?: boolean;
   onAdded?: (t: TaskItem) => void;
   onCancel?: () => void;
   compact?: boolean;
@@ -105,10 +119,13 @@ export function SmartInput({
           {highlighted.map((p, i) => (p.hit ? <mark key={i}>{p.s}</mark> : <span key={i}>{p.s}</span>))}
         </div>
         <input
-          ref={ref}
+          ref={(el) => {
+            ref.current = el;
+            if (quick) registerQuickInput(el);
+          }}
+          tabIndex={hidden ? -1 : undefined}
           className="qa-input"
           value={text}
-          autoFocus={autoFocus}
           enterKeyHint="send"
           placeholder={compact ? 'Добавить задачу…' : 'Например: «Созвон завтра в 15:00 #работа !1»'}
           onChange={(e) => setText(e.target.value)}
@@ -140,7 +157,7 @@ export function SmartInput({
               {pc ? pc.label : 'Приоритет'}
             </button>
             {prioOpen && (
-              <div className="td-pop up">
+              <div className="td-pop">
                 {([1, 2, 3, 0] as Priority[]).map((p) => (
                   <button
                     key={p}

@@ -267,12 +267,13 @@
 .dp-rep-sum { padding: 0 0 10px 28px; }
 
 /* ================= Быстрое добавление ================= */
-.qa-backdrop { align-items: flex-end; }
-.qa-modal { width: min(640px, 100%); padding: 12px 12px calc(12px + var(--safe-bottom)); border-radius: 20px 20px 0 0; margin-bottom: 0; }
-@media (min-width: 641px) {
-  .qa-backdrop { align-items: flex-start; padding-top: 14vh; }
-  .qa-modal { border-radius: 20px; }
-}
+.qa-backdrop { align-items: flex-start !important; padding: calc(var(--safe-top) + 10px) 10px 10px !important; }
+.qa-backdrop .qa-modal { width: min(640px, 100%); padding: 12px; border-radius: 20px; margin: 0; animation: qaDrop .2s ease; }
+@keyframes qaDrop { from { transform: translateY(-14px); opacity: 0; } }
+@media (min-width: 641px) { .qa-backdrop { padding-top: 14vh !important; } }
+/* закрытое окно: невидимо и не мешает, но поле ввода существует (для мгновенной клавиатуры на iPhone) */
+.qa-hidden { position: fixed; top: 0; left: 0; right: 0; padding: 10px; opacity: 0; pointer-events: none; z-index: -1; }
+.qa-hidden .qa-modal { animation: none; }
 .qa-count { padding: 6px 4px 0; }
 .qa { display: flex; flex-direction: column; gap: 8px; }
 .qa.compact { gap: 6px; }

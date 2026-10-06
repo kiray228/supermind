@@ -6,6 +6,17 @@
  */
 let proxy: HTMLInputElement | null = null;
 
+/** Поле быстрого ввода задачи: всегда в DOM, чтобы фокус ставился прямо в касании */
+let quickInput: HTMLInputElement | null = null;
+export function registerQuickInput(el: HTMLInputElement | null) {
+  quickInput = el;
+}
+/** Поставить курсор в поле быстрого ввода (синхронно, в обработчике нажатия) */
+export function focusQuickInput() {
+  if (quickInput) quickInput.focus({ preventScroll: true });
+  else primeKeyboard();
+}
+
 export function primeKeyboard() {
   if (!window.matchMedia('(pointer: coarse)').matches) return;
   if (!proxy) {

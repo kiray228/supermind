@@ -4,7 +4,7 @@ import type { ID, PlannerData } from '../types';
 import { uid } from '../utils/tree';
 import { todayYmd, updateMapTask } from '../utils/mapTasks';
 import { toast } from '../store/appStore';
-import { primeKeyboard } from '../ui/keyboard';
+import { focusQuickInput } from '../ui/keyboard';
 import {
   advanceRepeat,
   DEFAULT_PREFS,
@@ -364,7 +364,8 @@ export function openTask(id: ID | null) {
   useTasks.setState({ openTaskId: id });
 }
 export function openQuickAdd(p: Partial<TaskItem> = {}) {
-  // iOS открывает клавиатуру только при фокусе прямо в обработчике касания
-  primeKeyboard();
+  // iOS открывает клавиатуру только при фокусе прямо в обработчике касания:
+  // поле ввода уже есть на странице (скрыто), курсор ставится сразу
+  focusQuickInput();
   useTasks.setState({ quickAdd: p });
 }
