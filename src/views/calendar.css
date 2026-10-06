@@ -208,3 +208,8 @@
   .cv-tg-7 .cv-block-title svg, .cv-tg-7 .cv-chip svg, .cv-tg-7 .cv-chip-time { display: none; }
   .cv-tg .cv-chip { font-size: 11px; padding: 0 3px; border-left-width: 2px; }
 }
+
+/* на телефоне последний час не прячется под нижним меню и кнопкой «+» */
+@media (max-width: 760px) {
+  .cv-tg-body { margin-bottom: calc(120px + var(--safe-bottom)); }
+}
