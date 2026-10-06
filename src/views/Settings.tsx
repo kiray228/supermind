@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Sparkles, Sun, Moon, Monitor, Download, Upload, Trash2, Smartphone, Eye, EyeOff, CheckCircle2, Info, BellRing, CalendarPlus } from 'lucide-react';
 import { isNative } from '../platform';
+import { AccountCard, PushCard } from '../ui/AccountCard';
 import { isIOS } from '../io/download';
 import { ensureTasks, reloadTasks, setPrefs, useTasks } from '../tasks/store';
 import { ALLDAY_REMINDER_OPTIONS, TIMED_REMINDER_OPTIONS } from '../tasks/model';
@@ -89,6 +90,7 @@ export default function Settings() {
       <div className="page-header"><h1>Настройки</h1></div>
       <div className="page-body">
         <div className="settings">
+          <AccountCard />
           <section className="card set-card">
             <h3><Sparkles size={18} color="var(--accent)" /> Искусственный интеллект</h3>
             <p className="muted small">
@@ -201,6 +203,7 @@ function TaskSettings() {
           </button>
         </p>
       )}
+      <PushCard />
       {!native && (
         <p className="tiny muted" style={{ margin: '6px 0' }}>
           {isIOS()

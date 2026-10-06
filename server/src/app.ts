@@ -9,12 +9,15 @@
 import { hashPassword, newToken, tokenHash, verifyPassword } from './crypto.ts';
 import { ensureSchema, type Row, type Sql } from './sql.ts';
 import { generateVapidKeys, sendPush, type PushResult, type PushSubscription, type VapidKeys } from './webpush.ts';
+import type { NextDueStore } from './objectStore.ts';
 
 export interface Deps {
   sql: Sql;
   /** Отправка push — подменяется в тестах. */
   push?: (sub: PushSubscription, payload: object, keys: VapidKeys) => Promise<PushResult>;
   now?: () => number;
+  /** Время ближайшего напоминания вне базы: проверка раз в минуту не будит базу зря */
+  nextDue?: NextDueStore | null;
 }
 
 const VAPID_SUBJECT = 'https://kiray228.github.io/2mind/';
@@ -54,6 +57,20 @@ export function createApp(deps: Deps) {
   const { sql } = deps;
   const now = deps.now ?? Date.now;
   const push = deps.push ?? ((sub, payload, keys) => sendPush(sub, payload, keys, VAPID_SUBJECT));
+  const nextDue = deps.nextDue ?? null;
+
+  /** Записать время ближайшего неотправленного напоминания */
+  async function refreshNextDue() {
+    if (!nextDue) return;
+    try {
+      const r = await sql.query(
+        `SELECT (extract(epoch FROM min(fire_at)) * 1000)::bigint FROM push_queue WHERE sent_at IS NULL AND fire_at > now() - interval '6 hours'`,
+      );
+      await nextDue.set(r[0]?.[0] ? Number(r[0][0]) : null);
+    } catch {
+      await nextDue.set(undefined);
+    }
+  }
 
   let ready: Promise<void> | null = null;
   const init = () =>
@@ -286,6 +303,7 @@ export function createApp(deps: Deps) {
         ],
       );
     }
+    await refreshNextDue();
     return json({ scheduled: items.length });
   }
 
@@ -310,6 +328,16 @@ export function createApp(deps: Deps) {
 
   /** Раз в минуту: отправить наступившие напоминания (не старше 6 часов). */
   async function cron() {
+    if (nextDue) {
+      const next = await nextDue.get();
+      // ничего не наступило — базу не трогаем
+      if (next === null || (typeof next === 'number' && next > now() + 20_000)) {
+        console.log(`cron: пропуск, ближайшее ${next === null ? 'нет' : new Date(next).toISOString()}`);
+        return json({ skipped: true, next });
+      }
+      console.log(`cron: проверка базы (ближайшее ${next === undefined ? 'неизвестно' : new Date(next).toISOString()})`);
+    }
+    await init();
     const keys = await vapidKeys();
     const due = await sql.query(
       `UPDATE push_queue q SET sent_at = now()
@@ -338,6 +366,8 @@ export function createApp(deps: Deps) {
     // уборка: старые отправленные и просроченные
     await sql.query(`DELETE FROM push_queue WHERE fire_at < now() - interval '2 days'`);
     await sql.query(`DELETE FROM auth_failures WHERE at < now() - interval '1 day'`);
+    await refreshNextDue();
+    console.log(`cron: наступило ${due.length}, отправлено ${sent}`);
     return json({ due: due.length, sent, removedDevices: gone.size });
   }
 
@@ -347,15 +377,16 @@ export function createApp(deps: Deps) {
     const m = request.method;
     if (m === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
     if (m === 'GET' && path === '/') return json({ ok: true, service: 'supermind' });
-    await init();
 
-    // Function Trigger: прокси Neon удаляет клиентские x-neon-*, значит заголовок — от Neon
+    // Function Trigger: прокси Neon удаляет клиентские x-neon-*, значит заголовок — от Neon.
+    // До init(): обычно проверка не трогает базу вовсе
     if (m === 'POST' && path === '/cron') {
       const id = request.headers.get('x-neon-trigger-invocation-id');
       const b = await body<{ invocation_id?: string }>(request);
       if (!id || b.invocation_id !== id) throw new HttpError(401, 'Только для расписания');
       return cron();
     }
+    await init();
     if (m === 'POST' && path === '/auth/register') return register(request);
     if (m === 'POST' && path === '/auth/login') return login(request);
     if (m === 'POST' && path === '/auth/logout') return logout(request);

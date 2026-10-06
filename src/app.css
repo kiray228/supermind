@@ -74,3 +74,16 @@
 .toast.has-action > span { flex: 1; min-width: 0; }
 .toast-btn { border: none; background: rgba(255, 255, 255, 0.14); color: #ffb4a3; font-weight: 700; height: 32px; padding: 0 14px; border-radius: 999px; white-space: nowrap; }
 @media (max-width: 760px) { .toast { bottom: calc(100px + var(--safe-bottom)); } }
+
+/* аккаунт */
+.acc-card h3 { margin-bottom: 10px; }
+.acc-user { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.acc-avatar { width: 44px; height: 44px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px; color: #fff; background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #7c3aed)); flex-shrink: 0; }
+.acc-status { display: flex; align-items: flex-start; gap: 6px; color: var(--text-2); }
+.acc-status svg { flex-shrink: 0; margin-top: 2px; }
+.acc-status.error, .acc-status.offline { color: var(--danger); }
+.acc-seg { width: 100%; margin-bottom: 10px; }
+.acc-seg button { flex: 1; }
+.acc-form { display: flex; flex-direction: column; gap: 8px; }
+.acc-push { margin: 10px 0; padding: 12px; border-radius: 12px; background: color-mix(in srgb, var(--surface-2) 70%, transparent); }
+@media (max-width: 760px) { .acc-form .input { font-size: 16px; height: 44px; } }

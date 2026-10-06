@@ -3,6 +3,7 @@ import { get, set } from '../store/kv';
 import { create } from 'zustand';
 import type { PlannerData } from '../types';
 import { isNative } from '../platform';
+import { pushActive, uploadSchedule } from '../store/push';
 import { useApp, toast } from '../store/appStore';
 import { todayYmd, toYmd, addDaysYmd, fromYmd } from '../utils/mapTasks';
 import { isIOS, downloadText } from '../io/download';
@@ -124,7 +125,7 @@ export async function askNotifyIfNeeded() {
 const HORIZON_DAYS = 21;
 const MAX_NATIVE = 350;
 
-interface Planned {
+export interface Planned {
   id: number;
   at: number;
   title: string;
@@ -148,6 +149,16 @@ function reminderBody(t: TaskItem, date: string, at = Date.now()): string {
   const list = tasksData()?.lists.find((l) => l.id === t.listId);
   const extra = t.checklist.length ? ` · ${t.checklist.filter((c) => c.done).length}/${t.checklist.length}` : '';
   return [w, list && list.id !== 'inbox' ? list.name : '', t.notes?.split('\n')[0]?.slice(0, 80) ?? ''].filter(Boolean).join(' · ') + extra;
+}
+
+/** Расписание напоминаний (для уведомлений Android и для push-сервера) */
+export function planReminders(fromMs: number, toMs: number): Promise<Planned[]> {
+  return plan(fromMs, toMs);
+}
+
+/** Отложенные напоминания веб-версии — тоже уходят на push-сервер */
+export function pendingWebSnoozes(): { at: number; taskId: string; title: string }[] {
+  return webSnoozes.filter((s) => s.at > Date.now()).map((s) => ({ ...s, title: getTask(s.taskId)?.title ?? 'Задача' }));
 }
 
 async function plan(fromMs: number, toMs: number): Promise<Planned[]> {
@@ -268,6 +279,7 @@ async function snoozeOne(t: TaskItem, minutes: number) {
   } else {
     webSnoozes.push({ at, taskId: t.id });
     saveWebSnoozes();
+    void uploadSchedule(true);
   }
   toast(`Напомню через ${minutes === 60 ? 'час' : minutes + ' мин'}`);
 }
@@ -329,6 +341,8 @@ async function showWeb(title: string, body: string, data: Record<string, string>
     playChime();
   }
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  // с push системное уведомление присылает сервер — второе не нужно
+  if (pushActive()) return;
   const opts: NotificationOptions & { actions?: { action: string; title: string }[]; requireInteraction?: boolean } = {
     body,
     tag: `${data.taskId ?? data.habitId}|${data.date ?? ''}`,
@@ -565,7 +579,7 @@ export function syncSoon(delay = 1200) {
     if (isNative()) {
       void syncNative().catch(() => {});
       void syncCalendar().catch(() => {});
-    }
+    } else void uploadSchedule();
   }, delay);
 }
 

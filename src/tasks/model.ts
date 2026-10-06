@@ -153,6 +153,8 @@ export interface TasksData {
   focus: FocusSession[];
   countdowns: Countdown[];
   prefs: TaskPrefs;
+  /** удалённое навсегда (id) — чтобы синхронизация не вернула его с другого устройства */
+  gone?: Record<string, number>;
 }
 
 export const INBOX = 'inbox';

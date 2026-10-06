@@ -324,11 +324,32 @@ export function restoreTask(id: ID) {
     if (x) delete x.deleted;
   });
 }
+/** Отметка «удалено навсегда» для синхронизации */
+function bury(d: TasksData, ...ids: string[]) {
+  const now = Date.now();
+  d.gone ??= {};
+  for (const id of ids) d.gone[id] = now;
+}
+
 export function purgeTask(id: ID) {
-  mutateTasks((d) => void (d.tasks = d.tasks.filter((t) => t.id !== id)));
+  mutateTasks((d) => {
+    d.tasks = d.tasks.filter((t) => t.id !== id);
+    bury(d, id);
+  });
 }
 export function emptyTrash() {
-  mutateTasks((d) => void (d.tasks = d.tasks.filter((t) => !t.deleted)));
+  mutateTasks((d) => {
+    bury(d, ...d.tasks.filter((t) => t.deleted).map((t) => t.id));
+    d.tasks = d.tasks.filter((t) => !t.deleted);
+  });
+}
+
+/** Данные задач изменились на другом устройстве: перечитать (если нет несохранённых правок) */
+export async function reloadTasksFromSync(): Promise<boolean> {
+  if (saveTimer) return false;
+  const d = normalize(await get<TasksData>(KEY));
+  useTasks.setState({ data: d });
+  return true;
 }
 
 export function duplicateTask(id: ID): TaskItem | null {
@@ -362,6 +383,7 @@ export function deleteList(id: ID) {
   if (id === INBOX) return;
   mutateTasks((d) => {
     d.lists = d.lists.filter((l) => l.id !== id);
+    bury(d, id);
     const now = Date.now();
     for (const t of d.tasks) if (t.listId === id) {
       t.listId = INBOX;
@@ -379,7 +401,10 @@ export function saveFilter(f: TaskFilter) {
   });
 }
 export function deleteFilter(id: ID) {
-  mutateTasks((d) => void (d.filters = d.filters.filter((f) => f.id !== id)));
+  mutateTasks((d) => {
+    d.filters = d.filters.filter((f) => f.id !== id);
+    bury(d, id);
+  });
 }
 
 export function allTags(d: TasksData): string[] {
@@ -426,7 +451,10 @@ export function saveCountdown(c: Countdown) {
   });
 }
 export function deleteCountdown(id: ID) {
-  mutateTasks((d) => void (d.countdowns = d.countdowns.filter((c) => c.id !== id)));
+  mutateTasks((d) => {
+    d.countdowns = d.countdowns.filter((c) => c.id !== id);
+    bury(d, id);
+  });
 }
 
 export function setPrefs(patch: Partial<TaskPrefs>) {

@@ -29,6 +29,22 @@ self.addEventListener('fetch', (e) => {
   }
   e.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((r) => { if (r.ok) { const cp = r.clone(); caches.open(CACHE).then((c) => c.put(req, cp)); } return r; })));
 });
+// напоминание с сервера (приложение может быть закрыто)
+self.addEventListener('push', (e) => {
+  let m = {};
+  try { m = e.data ? e.data.json() : {}; } catch (err) { m = { title: 'SuperMind', body: e.data ? e.data.text() : '' }; }
+  const data = m.data || {};
+  const tag = data.taskId ? data.taskId + '|' + (data.date || '') : data.habitId ? 'habit|' + data.habitId : undefined;
+  e.waitUntil(self.registration.showNotification(m.title || 'SuperMind', {
+    body: m.body || '',
+    data,
+    tag,
+    renotify: !!tag,
+    icon: './icon-192.png',
+    badge: './icon-192.png',
+    actions: data.taskId ? [{ action: 'done', title: '✓ Выполнено' }, { action: 'snooze', title: 'Отложить 10 мин' }] : [],
+  }));
+});
 // нажатие на напоминание или кнопку в нём («Выполнено», «Отложить»)
 self.addEventListener('notificationclick', (e) => {
   const n = e.notification;

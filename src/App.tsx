@@ -53,6 +53,9 @@ export default function App() {
     loadSettings().then((s) => useApp.setState({ settings: s }));
     // задачи: загрузка, напоминания, календарь телефона, таймер фокуса
     void ensureTasks().then(() => initTaskSync());
+    // аккаунт и синхронизация между устройствами; push-напоминания (iPhone/веб)
+    void import('./store/cloudWire').then((m) => m.setupCloud()).catch(() => {});
+    void import('./store/push').then((m) => m.ensurePush()).catch(() => {});
     void import('./tasks/focusTimer').then((m) => m.initFocusTimer()).catch(() => {});
     // первая карта-подсказка при первом запуске
     if (!welcomeStarted) (welcomeStarted = true) && (async () => {

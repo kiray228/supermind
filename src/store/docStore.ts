@@ -112,8 +112,13 @@ function scheduleSave() {
   saveTimer = setTimeout(flushSave, 400);
 }
 
+/** Есть несохранённые изменения открытой карты */
+export const hasPendingSave = () => !!saveTimer;
+
 export async function flushSave() {
-  if (saveTimer) clearTimeout(saveTimer);
+  // нечего сохранять — не трогаем базу (иначе синхронизация считала бы карту изменённой)
+  if (!saveTimer) return;
+  clearTimeout(saveTimer);
   saveTimer = null;
   const { doc, password } = useDoc.getState();
   if (!doc) return;
