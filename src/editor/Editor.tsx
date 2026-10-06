@@ -210,7 +210,7 @@ export default function Editor() {
   const openMoreMenu = (e: React.MouseEvent) => {
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
     setMenu({
-      x: r.right - 240,
+      x: Math.max(8, Math.min(r.right - 240, window.innerWidth - 256)),
       y: r.bottom + 6,
       items: [
         { icon: <Presentation size={16} />, label: 'Презентация (Pitch)', onClick: startPitch },
@@ -228,7 +228,8 @@ export default function Editor() {
         { icon: <Download size={16} />, label: 'Файл SuperMind (резервная копия)', onClick: () => exportAs('native') },
         'sep',
         { icon: password ? <Unlock size={16} /> : <Lock size={16} />, label: password ? 'Снять пароль' : 'Защитить паролем', onClick: togglePassword },
-        { icon: <Keyboard size={16} />, label: 'Горячие клавиши', onClick: () => setShowKeys(true) },
+        // на телефоне клавиатурных сокращений нет
+        ...(window.matchMedia('(pointer: coarse)').matches ? [] : [{ icon: <Keyboard size={16} />, label: 'Горячие клавиши', onClick: () => setShowKeys(true) }]),
       ],
     });
   };
@@ -267,7 +268,7 @@ export default function Editor() {
         { icon: <Spline size={16} />, label: 'Связь', onClick: startRel },
         { icon: <SquareDashed size={16} />, label: 'Граница', onClick: () => st.addBoundary(topicId) },
         { icon: <Braces size={16} />, label: 'Итог', onClick: () => st.addSummary(topicId) },
-        { icon: <StickyNote size={16} />, label: 'Заметка / задача / маркеры', onClick: openNote },
+        { icon: <StickyNote size={16} />, label: 'Заметка, задача…', onClick: openNote },
         { icon: <Sparkles size={16} />, label: 'ИИ: идеи для темы', onClick: () => setPanel('ai') },
         'sep',
         { icon: <Copy size={16} />, label: 'Копировать', kbd: 'Ctrl+C', onClick: () => st.copy() },
@@ -431,9 +432,13 @@ export default function Editor() {
   if (!doc || !sheet) return null;
   const hasSel = selection.length > 0;
   const showChrome = !zen && !pitch;
+  // панели над картой — светлое или тёмное стекло в цвет фона карты (а не темы приложения)
+  const canvasBg = sheet.background ?? getTheme(sheet.themeId).background;
+  // в «Структуре» и «Ганте» фон — тема приложения, там стекло обычное
+  const chrome = mode !== 'map' ? '' : isLightColor(canvasBg) ? 'chrome-light' : 'chrome-dark';
 
   return (
-    <div className={`editor ${zen ? 'zen' : ''} ${showChrome && panel ? 'panel-open' : ''}`}>
+    <div className={`editor ${chrome} ${zen ? 'zen' : ''} ${showChrome && panel ? 'panel-open' : ''}`}>
       {showChrome && (
         <header className="ed-top glass">
           <button className="icon-btn" onClick={() => leaveEditor('home')} title="К списку карт">
@@ -524,11 +529,13 @@ export default function Editor() {
                 <>
                   <button className="tb-btn" onClick={addChild} title="Новая основная тема"><Plus /><span>Тема</span></button>
                   <button className="tb-btn" onClick={() => { setInspTab('map'); setPanel('inspector'); }} title="Структура, тема оформления, формы"><Palette /><span>Оформл.</span></button>
-                  <button className="tb-btn" onClick={() => st.redo()} disabled={!canRedo}><Redo2 /><span>Повтор</span></button>
                 </>
               )}
               <span className="tb-sep hide-mobile" />
               <button className="tb-btn show-mobile" onClick={() => st.undo()} disabled={!canUndo}><Undo2 /><span>Отмена</span></button>
+              {!hasSel && (
+                <button className="tb-btn show-mobile" onClick={() => st.redo()} disabled={!canRedo}><Redo2 /><span>Повтор</span></button>
+              )}
               <button className="tb-btn hide-mobile" onClick={() => canvas.current?.zoomBy(1 / 1.2)} title="Уменьшить"><Minus /></button>
               <button className="tb-zoom hide-mobile" onClick={() => canvas.current?.setZoom(1)} title="100%">{Math.round(zoom * 100)}%</button>
               <button className="tb-btn hide-mobile" onClick={() => canvas.current?.zoomBy(1.2)} title="Увеличить"><Plus /></button>
@@ -537,7 +544,7 @@ export default function Editor() {
           )}
 
           {showChrome && (
-            <div className="ed-sheets">
+            <div className={`ed-sheets${mode !== 'map' ? ' not-map' : ''}`}>
               {doc.sheets.map((s) => (
                 <button
                   key={s.id}
@@ -621,9 +628,17 @@ function ContextMenu({ menu, onClose }: { menu: Menu; onClose(): void }) {
       y: Math.max(8, Math.min(menu.y, window.innerHeight - r.height - 8)),
     });
   }, [menu]);
+  // на телефоне меню выезжает снизу (всегда целиком в пределах экрана и под большим пальцем)
+  const sheet = window.matchMedia('(pointer: coarse) and (max-width: 760px)').matches;
   return (
-    <div className="menu-layer" onPointerDown={onClose} onContextMenu={(e) => { e.preventDefault(); onClose(); }}>
-      <div ref={ref} className="menu" style={{ left: pos.x, top: pos.y, maxHeight: 'calc(100vh - 16px)', overflow: 'auto' }} onPointerDown={(e) => e.stopPropagation()}>
+    <div className={`menu-layer${sheet ? ' menu-sheet-layer' : ''}`} onPointerDown={onClose} onContextMenu={(e) => { e.preventDefault(); onClose(); }}>
+      <div
+        ref={ref}
+        className={`menu${sheet ? ' menu-sheet' : ''}`}
+        style={sheet ? undefined : { left: pos.x, top: pos.y, maxHeight: 'calc(100vh - 16px)', overflow: 'auto' }}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        {sheet && <div className="menu-sheet-grip" />}
         {menu.items.map((it, i) =>
           it === 'sep' ? (
             <div key={i} className="sep" />
@@ -682,3 +697,12 @@ function KeysHelp({ onClose }: { onClose(): void }) {
 }
 
 export { STRUCTURES };
+
+/** Светлый ли цвет фона (#rgb/#rrggbb); неизвестные считаем светлыми */
+function isLightColor(c: string): boolean {
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(c.trim());
+  if (!m) return true;
+  const h = m[1].length === 3 ? [...m[1]].map((x) => x + x).join('') : m[1];
+  const n = parseInt(h, 16);
+  return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255 > 0.55;
+}

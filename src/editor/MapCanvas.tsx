@@ -49,6 +49,8 @@ type Drag =
 export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(props, ref) {
   const { sheet, relMode, onRelTarget, onContextMenu, onOpenNote, onOpenLink, pitchFocus, readOnly, searchHits, onViewChange } = props;
   const lay = useMemo(() => layoutSheet(sheet), [sheet]);
+  const layRef = useRef(lay);
+  layRef.current = lay;
   const selection = useDoc((s) => s.selection);
   const editingId = useDoc((s) => s.editingId);
   const selectedRel = useDoc((s) => s.selectedRel);
@@ -71,6 +73,8 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const lastTap = useRef<{ id: string; t: number }>({ id: '', t: 0 });
   const pendingAdd = useRef<{ id: string; side?: 'left' | 'right' } | null>(null);
+  /** время последнего отпускания пальца: следом Android присылает «мышиные» события */
+  const lastTouchUp = useRef(0);
   const lastPointerType = useRef('mouse');
   const longPress = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [dragWorld, setDragWorld] = useState<{ x: number; y: number } | null>(null);
@@ -199,7 +203,22 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
       if (!interacted.current) initialFit();
       else {
         const v = viewRef.current;
-        setView({ ...v, x: v.x + (w - last.w) / 2, y: v.y + (h - last.h) / 2 });
+        let nv = { ...v, x: v.x + (w - last.w) / 2, y: v.y + (h - last.h) / 2 };
+        // выбранная тема не должна прятаться под верхней панелью, когда снизу открылась панель свойств
+        const st = useDoc.getState();
+        const id = st.selection[st.selection.length - 1];
+        const n = id ? layRef.current.nodes.get(id) : undefined;
+        if (n) {
+          const sy = n.y * nv.k + nv.y;
+          const sh = n.h * nv.k;
+          const top = 76;
+          if (sy < top || sy + sh > h - 12) nv = { ...nv, y: nv.y + (top + (h - top) / 2 - (sy + sh / 2)) };
+          const sx = n.x * nv.k + nv.x;
+          const sw = n.w * nv.k;
+          if (sx < 8 || sx + sw > w - 8) nv = { ...nv, x: nv.x + (w / 2 - (sx + sw / 2)) };
+        }
+        viewRef.current = nv;
+        setView(nv);
       }
       last = { w, h };
     });
@@ -562,6 +581,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
 
   const onPointerUp = (e: React.PointerEvent) => {
     pointers.current.delete(e.pointerId);
+    if (e.pointerType !== 'mouse') lastTouchUp.current = performance.now();
     clearLongPress();
     if (pendingAdd.current) {
       const { id, side } = pendingAdd.current;
@@ -716,6 +736,10 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
       className="map-canvas"
       style={{ background: bg, cursor: relMode ? 'crosshair' : drag?.kind === 'pan' && drag.moved ? 'grabbing' : 'default' }}
       onPointerDown={onPointerDown}
+      // запоздалый «клик мышью» после касания уводил фокус из только что открытого поля темы
+      onMouseDown={(e) => {
+        if (performance.now() - lastTouchUp.current < 800) e.preventDefault();
+      }}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}

@@ -256,3 +256,58 @@
   .ed-panel { border-radius: 26px 26px 0 0; border-top: 1px solid var(--lg-border); }
   .ed-main.sheet-open .ed-stage { height: 40vh; }
 }
+
+/* стекло панелей в цвет карты: на светлой карте — светлое, на тёмной — тёмное (независимо от темы приложения) */
+.editor.chrome-light :is(.ed-top, .ed-toolbar, .ed-sheets, .zoom-badge, .ed-search) {
+  --text: #16181d; --text-2: #5b6170; --text-3: #9097a6;
+  --surface: #ffffff; --surface-2: #f1f2f5; --surface-3: #e7e9ee; --border: #e3e5ea;
+  --lg-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.6));
+  --lg-border: rgba(255, 255, 255, 0.8); --lg-edge: rgba(15, 23, 42, 0.1);
+  --lg-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 0 rgba(255, 255, 255, 0.35);
+  --lg-shadow: 0 10px 30px rgba(15, 23, 42, 0.16), 0 2px 6px rgba(15, 23, 42, 0.08);
+  --lg-solid: rgba(255, 255, 255, 0.92); --glass: rgba(255, 255, 255, 0.78);
+  color: var(--text);
+}
+.editor.chrome-dark :is(.ed-top, .ed-toolbar, .ed-sheets, .zoom-badge, .ed-search) {
+  --text: #f1f2f4; --text-2: #a7adba; --text-3: #6e7584;
+  --surface: #17191e; --surface-2: #1f2228; --surface-3: #2a2e36; --border: #2c3038;
+  --lg-bg: linear-gradient(135deg, rgba(48, 52, 62, 0.78), rgba(24, 26, 32, 0.66));
+  --lg-border: rgba(255, 255, 255, 0.14); --lg-edge: rgba(0, 0, 0, 0.4);
+  --lg-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+  --lg-shadow: 0 12px 34px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
+  --lg-solid: rgba(28, 30, 36, 0.92); --glass: rgba(23, 25, 30, 0.78);
+  color: var(--text);
+}
+/* вкладки листов на телефоне: без размытия — Android рисовал тёмный прямоугольник вокруг */
+@media (max-width: 760px) {
+  .sheet-tab { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--lg-solid); }
+  /* поля внутри прокрутки, иначе тень вкладок обрезается прямоугольником */
+  .ed-sheets { left: 0; right: auto; max-width: 100%; padding: 10px 8px; margin-bottom: -10px; }
+  .sheet-tab { box-shadow: var(--lg-highlight), 0 2px 8px rgba(15, 23, 42, 0.14); }
+}
+
+/* «Структура» и «Гант» начинаются под парящей верхней панелью */
+.outliner-inner { padding-top: calc(84px + var(--safe-top)); }
+.gantt { padding-top: calc(76px + var(--safe-top)); }
+@media (max-width: 760px) {
+  .outliner-inner { padding: calc(78px + var(--safe-top)) 14px 160px; }
+}
+@media (max-width: 760px) {
+  /* в «Структуре» и «Ганте» вкладки листов не закрывают текст */
+  .ed-sheets.not-map { display: none; }
+  .ol-row.depth-0 .ol-input { font-size: 20px; }
+}
+
+/* меню на телефоне — выезжающая снизу панель */
+.menu-sheet-layer { background: rgba(10, 12, 16, 0.32); animation: fade .15s ease; }
+.menu.menu-sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; top: auto; min-width: 0; width: 100%;
+  max-height: min(78vh, calc(var(--vvh, 100vh) - 60px)); overflow: auto; overscroll-behavior: contain;
+  border-radius: 22px 22px 0 0; padding: 6px 10px calc(10px + var(--safe-bottom)); animation: sheet .2s ease;
+}
+.menu-sheet-grip { width: 40px; height: 5px; border-radius: 3px; background: var(--surface-3); margin: 4px auto 8px; }
+.menu.menu-sheet button { height: 48px; font-size: 16px; border-radius: 12px; }
+.menu.menu-sheet { display: grid; grid-template-columns: 1fr 1fr; column-gap: 4px; align-content: start; }
+.menu.menu-sheet .menu-sheet-grip, .menu.menu-sheet .sep { grid-column: 1 / -1; }
+.menu.menu-sheet button { height: 50px; font-size: 14.5px; padding: 0 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.menu.menu-sheet button svg { flex-shrink: 0; }

@@ -41,6 +41,9 @@ export async function openDoc(id: string, focusTopicId?: string): Promise<void> 
 export async function createAndOpen(doc: MindDoc) {
   await saveDoc(doc);
   useDoc.getState().open(doc);
+  // новая карта: центральная тема выбрана — сразу видно «+» и что нажать дальше
+  const root = doc.sheets.find((x) => x.id === doc.activeSheet)?.root;
+  if (root) useDoc.getState().select(root.id);
   useApp.getState().go('editor');
 }
 

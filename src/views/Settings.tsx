@@ -138,7 +138,7 @@ export default function Settings() {
 
           <section className="card set-card">
             <h3><Info size={18} /> О приложении</h3>
-            <p className="small muted" style={{ margin: 0 }}>SuperMind 1.5 — бесплатные интеллект-карты, задачи с напоминаниями, календарь, фокус, ежедневник и доска задач. Все функции открыты, без подписок.</p>
+            <p className="small muted" style={{ margin: 0 }}>SuperMind 1.6 — бесплатные интеллект-карты, задачи с напоминаниями, календарь, фокус, ежедневник и доска задач. Все функции открыты, без подписок.</p>
           </section>
         </div>
       </div>
