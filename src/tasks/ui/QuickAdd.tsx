@@ -7,6 +7,7 @@ import { addTask, defaultReminders, useTasks } from '../store';
 import { askNotifyIfNeeded } from '../sync';
 import { DatePicker, type When } from './DatePicker';
 import { registerQuickInput } from '../../ui/keyboard';
+import { Popover } from './Popover';
 import './tasks.css';
 
 /** Окно быстрого добавления (кнопка «+» в любом разделе) */
@@ -63,6 +64,7 @@ export function SmartInput({
   const [manual, setManual] = useState<Partial<When> & { priority?: Priority; listId?: string; tags?: string[] }>({});
   const [picking, setPicking] = useState(false);
   const [prioOpen, setPrioOpen] = useState(false);
+  const prioRef = useRef<HTMLButtonElement>(null);
   const ref = useRef<HTMLInputElement>(null);
   const parsed = useMemo(() => parseTask(text), [text]);
 
@@ -143,6 +145,8 @@ export function SmartInput({
             className={`qa-chip${date ? ' set' : ''}`}
             onClick={() => {
               setPrioOpen(false);
+              // убрать клавиатуру, чтобы она не закрывала окно выбора даты
+              ref.current?.blur();
               setPicking(true);
             }}
           >
@@ -152,12 +156,12 @@ export function SmartInput({
             {date && reminders.length > 0 && <Bell size={13} />}
           </button>
           <div className="qa-pop-anchor">
-            <button className={`qa-chip${pc ? ' set' : ''}`} style={pc ? ({ '--qc': pc.color } as CSSProperties) : undefined} onClick={() => setPrioOpen(!prioOpen)}>
+            <button ref={prioRef} className={`qa-chip${pc ? ' set' : ''}`} style={pc ? ({ '--qc': pc.color } as CSSProperties) : undefined} onClick={() => setPrioOpen(!prioOpen)}>
               <Flag size={15} fill={pc ? pc.color : 'none'} />
               {pc ? pc.label : 'Приоритет'}
             </button>
             {prioOpen && (
-              <div className="td-pop">
+              <Popover anchor={prioRef} onClose={() => setPrioOpen(false)}>
                 {([1, 2, 3, 0] as Priority[]).map((p) => (
                   <button
                     key={p}
@@ -170,7 +174,7 @@ export function SmartInput({
                     {p ? PRIORITY_META[p].label : 'Без приоритета'}
                   </button>
                 ))}
-              </div>
+              </Popover>
             )}
           </div>
           <label className="qa-chip qa-list">

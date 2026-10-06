@@ -28,6 +28,7 @@ import { allTags, duplicateTask, openTask, purgeTask, restoreTask, setWontDo, to
 import { addTaskToCalendar, askNotifyIfNeeded } from '../sync';
 import { DatePicker } from './DatePicker';
 import { TaskCheck } from './TaskRow';
+import { Popover } from './Popover';
 import './tasks.css';
 
 /** Окно задачи поверх любого раздела */
@@ -51,6 +52,8 @@ function TaskDetail({ task, onClose }: { task: TaskItem; onClose: () => void }) 
   const [notes, setNotes] = useState(task.notes ?? '');
   const [picking, setPicking] = useState(false);
   const [menu, setMenu] = useState<'more' | 'prio' | null>(null);
+  const prioRef = useRef<HTMLButtonElement>(null);
+  const moreRef = useRef<HTMLButtonElement>(null);
   const [tagInput, setTagInput] = useState('');
   const [aiBusy, setAiBusy] = useState(false);
   const latest = useRef({ title, notes, task });
@@ -129,7 +132,6 @@ function TaskDetail({ task, onClose }: { task: TaskItem; onClose: () => void }) 
       <div
         className="modal td-modal"
         onKeyDown={(e) => e.key === 'Escape' && onClose()}
-        onPointerDown={(e) => menu && !(e.target as Element).closest('.td-pop-anchor') && setMenu(null)}
       >
         {/* верхняя строка: выполнено, дата, приоритет, меню */}
         <div className="td-top">
@@ -142,11 +144,11 @@ function TaskDetail({ task, onClose }: { task: TaskItem; onClose: () => void }) 
           </button>
           <div className="grow" />
           <div className="td-pop-anchor">
-            <button className="icon-btn" onClick={() => setMenu(menu === 'prio' ? null : 'prio')} aria-label="Приоритет" style={pc ? { color: pc.color } : undefined}>
+            <button ref={prioRef} className="icon-btn" onClick={() => setMenu(menu === 'prio' ? null : 'prio')} aria-label="Приоритет" style={pc ? { color: pc.color } : undefined}>
               <Flag fill={pc ? pc.color : 'none'} />
             </button>
             {menu === 'prio' && (
-              <div className="td-pop">
+              <Popover anchor={prioRef} align="right" onClose={() => setMenu(null)}>
                 {PRIORITIES.map((p) => (
                   <button
                     key={p.p}
@@ -159,15 +161,15 @@ function TaskDetail({ task, onClose }: { task: TaskItem; onClose: () => void }) 
                     <Flag size={16} color={p.color} fill={p.p ? p.color : 'none'} /> {p.label}
                   </button>
                 ))}
-              </div>
+              </Popover>
             )}
           </div>
           <div className="td-pop-anchor">
-            <button className="icon-btn" onClick={() => setMenu(menu === 'more' ? null : 'more')} aria-label="Ещё">
+            <button ref={moreRef} className="icon-btn" onClick={() => setMenu(menu === 'more' ? null : 'more')} aria-label="Ещё">
               <MoreHorizontal />
             </button>
             {menu === 'more' && (
-              <div className="td-pop right">
+              <Popover anchor={moreRef} align="right" onClose={() => setMenu(null)}>
                 <button onClick={() => (setMenu(null), void addTaskToCalendar(task))}>
                   <CalendarPlus size={16} /> Добавить в календарь телефона
                 </button>
@@ -221,7 +223,7 @@ function TaskDetail({ task, onClose }: { task: TaskItem; onClose: () => void }) 
                     <Trash2 size={16} /> Удалить
                   </button>
                 )}
-              </div>
+              </Popover>
             )}
           </div>
           <button className="icon-btn" onClick={onClose} aria-label="Закрыть">

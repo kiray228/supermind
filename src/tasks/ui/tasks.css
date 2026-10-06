@@ -321,3 +321,7 @@
 .rm-actions { display: flex; gap: 6px; justify-content: flex-end; }
 
 .dp-chips .chip:not(.active), .dp-rem-pick .chip:not(.active) { background: var(--surface); border-color: var(--border); }
+
+/* всплывающие меню поверх всего (Popover) */
+.pop-shield { position: fixed; inset: 0; z-index: 290; }
+.td-pop.pop-float { position: fixed; z-index: 300; overflow: auto; overscroll-behavior: contain; }
