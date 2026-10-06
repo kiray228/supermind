@@ -212,4 +212,5 @@
 /* на телефоне последний час не прячется под нижним меню и кнопкой «+» */
 @media (max-width: 760px) {
   .cv-tg-body { margin-bottom: calc(120px + var(--safe-bottom)); }
+  .cv-month, .cv-agenda { padding-bottom: calc(180px + var(--safe-bottom)); }
 }

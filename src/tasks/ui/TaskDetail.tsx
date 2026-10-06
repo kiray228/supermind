@@ -24,7 +24,7 @@ import { uid } from '../../utils/tree';
 import { toast, useApp } from '../../store/appStore';
 import { openDoc } from '../../actions';
 import { isOverdue, repeatLabel, reminderLabel, whenLabel, type ChecklistItem, type Priority, type TaskItem } from '../model';
-import { allTags, duplicateTask, openTask, purgeTask, restoreTask, setWontDo, toggleDone, trashTask, updateTask, useTasks } from '../store';
+import { allTags, updateChecklist, duplicateTask, openTask, purgeTask, restoreTask, setWontDo, toggleDone, trashTask, updateTask, useTasks } from '../store';
 import { addTaskToCalendar, askNotifyIfNeeded } from '../sync';
 import { DatePicker } from './DatePicker';
 import { TaskCheck } from './TaskRow';
@@ -75,7 +75,7 @@ function TaskDetail({ task, onClose }: { task: TaskItem; onClose: () => void }) 
   const commitTitle = () => title.trim() && title.trim() !== task.title && save({ title: title.trim() });
   const commitNotes = () => notes !== (task.notes ?? '') && save({ notes: notes || undefined });
 
-  const setChecklist = (fn: (c: ChecklistItem[]) => ChecklistItem[]) => save({ checklist: fn(task.checklist) });
+  const setChecklist = (fn: (c: ChecklistItem[]) => ChecklistItem[]) => updateChecklist(task.id, fn);
   const list = data.lists.find((l) => l.id === task.listId);
   const pc = task.priority ? PRIORITY_META[task.priority] : undefined;
   const overdue = isOverdue(task);

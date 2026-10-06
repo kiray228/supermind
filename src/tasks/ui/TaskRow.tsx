@@ -1,7 +1,8 @@
 import { useRef, useState, type CSSProperties } from 'react';
 import { Bell, Check, CalendarDays, ListChecks, Network, Pin, Repeat, Trash2, Timer, AlignLeft } from 'lucide-react';
 import { PRIORITY_META, todayYmd } from '../../utils/mapTasks';
-import { isOverdue, whenLabel, type TaskItem, type TaskList } from '../model';
+import { dayLabel, isOverdue, whenLabel, type TaskItem, type TaskList } from '../model';
+import { toast } from '../../store/appStore';
 import { openTask, toggleDone, trashTask, updateTask } from '../store';
 import { DatePicker } from './DatePicker';
 
@@ -28,13 +29,19 @@ export function TaskRow({
   list,
   showList = true,
   showDate = true,
+  timeOnly,
   tagColors,
   draggable,
+  occurrence,
 }: {
+  /** дата показанного повтора (ежедневник/календарь); если это не текущий повтор — галочка недоступна */
+  occurrence?: string;
   task: TaskItem;
   list?: TaskList;
   showList?: boolean;
   showDate?: boolean;
+  /** показывать только время (в ежедневнике день и так выбран) */
+  timeOnly?: boolean;
   tagColors?: Record<string, string>;
   draggable?: boolean;
 }) {
@@ -44,10 +51,25 @@ export function TaskRow({
   const drag = useRef<{ x: number; y: number; id: number; horiz: boolean | null; base: number } | null>(null);
   const today = todayYmd();
   const overdue = isOverdue(task, today);
-  const when = task.date ? whenLabel(task, today) : '';
+  // сегодняшним задачам достаточно времени: «10:00–11:00» вместо «Сегодня, 10:00–11:00»
+  const when = !task.date
+    ? ''
+    : timeOnly
+      ? task.time
+        ? whenLabel({ ...task, date: today }, today).replace(/^Сегодня, /, '')
+        : ''
+      : task.date === today && task.time
+        ? whenLabel(task, today).replace(/^Сегодня, /, '')
+        : whenLabel(task, today);
   const checklistDone = task.checklist.filter((c) => c.done).length;
 
+  const future = !!occurrence && !!task.date && occurrence !== task.date;
   const done = () => {
+    if (completing) return;
+    if (future) {
+      toast(`Сначала отметьте повтор ${dayLabel(task.date!).toLowerCase()}`);
+      return;
+    }
     if (task.done) return toggleDone(task.id);
     // короткая анимация «вычёркивания» перед исчезновением из списка
     setCompleting(true);
@@ -76,7 +98,7 @@ export function TaskRow({
     if (!d?.horiz) return;
     if (dx > 80) {
       setDx(0);
-      done();
+      if (!future) done();
     } else if (dx < -60) setDx(-132);
     else setDx(0);
   };
@@ -121,7 +143,9 @@ export function TaskRow({
           e.dataTransfer.effectAllowed = 'move';
         }}
       >
-        <TaskCheck task={completing ? { ...task, done: true } : task} onToggle={done} />
+        <span className={future ? 'tk-check-future' : undefined}>
+          <TaskCheck task={completing ? { ...task, done: true } : task} onToggle={done} />
+        </span>
         <div className="tk-body">
           <div className="tk-title">
             {task.pinned && <Pin size={12} className="tk-pin" />}

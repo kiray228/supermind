@@ -54,6 +54,8 @@ self.addEventListener('notificationclick', (e) => {
 // base './' — работает и на GitHub Pages (подпапка), и в APK (Capacitor)
 export default defineConfig({
   base: './',
+  // IPv4: эмулятор Android подключается через adb reverse к 127.0.0.1
+  server: { host: '127.0.0.1' },
   plugins: [react(), serviceWorker()],
   build: {
     chunkSizeWarningLimit: 1500,

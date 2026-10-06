@@ -48,9 +48,18 @@ const queues: Record<string, Promise<void>> = {};
 /** Изменить задачу темы прямо в сохранённом документе */
 export function updateMapTask(docId: ID, topicId: ID, patch: Partial<TaskInfo>): Promise<void> {
   const prev = queues[docId] ?? Promise.resolve();
+  const viaEditor = import('../store/docStore').then(({ useDoc }) => {
+    const st = useDoc.getState();
+    const sheet = st.doc?.id === docId ? st.doc.sheets.find((sh) => sh.id === st.doc!.activeSheet) : undefined;
+    if (!sheet || !findInSheet(sheet, topicId)) return false;
+    st.updateTopics([topicId], (t) => void (t.task = { status: 'todo', ...t.task, ...patch }));
+    return true;
+  });
   const next = prev
     .catch(() => undefined)
     .then(async () => {
+      // карта открыта в редакторе — изменение уже внесено через него
+      if (await viaEditor.catch(() => false)) return;
       const raw = await loadDoc(docId);
       if (!raw || 'locked' in raw) return;
       const doc = raw;

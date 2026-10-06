@@ -81,7 +81,8 @@
 .tk-pin { color: var(--accent); margin-right: 4px; vertical-align: -1px; }
 .tk-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 3px; font-size: 12px; color: var(--text-3); min-width: 0; }
 .tk-when { color: var(--text-2); font-weight: 550; }
-.tk-when.today { color: var(--accent); }
+.tk-when.today { color: #2563eb; }
+:root[data-theme='dark'] .tk-when.today { color: #60a5fa; }
 .tk-when.overdue { color: var(--danger); }
 .tk-mi { color: var(--text-3); flex-shrink: 0; }
 .tk-mi-text { display: inline-flex; align-items: center; gap: 3px; }
@@ -325,3 +326,23 @@
 /* всплывающие меню поверх всего (Popover) */
 .pop-shield { position: fixed; inset: 0; z-index: 290; }
 .td-pop.pop-float { position: fixed; z-index: 300; overflow: auto; overscroll-behavior: contain; }
+
+.tk-group-act {
+  margin-left: 6px; height: 26px; padding: 0 10px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 650; white-space: nowrap;
+}
+.tk-group-toggle { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; height: 100%; border: none; background: none; padding: 0; color: inherit; font: inherit; text-align: left; }
+
+/* быстрый ввод: метки листаются в одну строку, кнопка «Добавить» всегда справа */
+.qa-bar { flex-wrap: nowrap; }
+.qa-chips { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 2px 0; }
+.qa-chips::-webkit-scrollbar { display: none; }
+.qa-chips > * { flex-shrink: 0; }
+.qa-send { flex-shrink: 0; }
+.qa-help { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 34px; height: 34px; border: none; background: none; border-radius: 50%; color: var(--text-3); display: inline-flex; align-items: center; justify-content: center; z-index: 1; }
+.qa-help:active { background: var(--surface-2); }
+.qa:not(.compact) .qa-input, .qa:not(.compact) .qa-hl { padding-right: 44px; }
+.qa-help-body { padding: 8px 10px; max-width: 300px; font-size: 13px; line-height: 1.45; white-space: normal; }
+.qa-help-body p { margin: 6px 0 0; color: var(--text-2); }
+.qa-help-body i { font-style: normal; color: var(--accent); font-weight: 600; }
+.tk-check-future { opacity: .4; display: inline-flex; }

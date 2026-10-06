@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type CSSProperties } from 'react';
-import { ArrowUp, Bell, CalendarDays, Flag, Inbox, Repeat, Tag, X } from 'lucide-react';
+import { ArrowUp, Bell, CalendarDays, Flag, HelpCircle, Inbox, Repeat, Tag, X } from 'lucide-react';
 import { PRIORITY_META } from '../../utils/mapTasks';
-import { repeatLabel, whenLabel, type Priority, type TaskItem } from '../model';
+import { parsedReminder, repeatLabel, whenLabel, type Priority, type TaskItem } from '../model';
 import { parseTask } from '../parse';
 import { addTask, defaultReminders, useTasks } from '../store';
 import { askNotifyIfNeeded } from '../sync';
@@ -65,11 +65,14 @@ export function SmartInput({
   const [picking, setPicking] = useState(false);
   const [prioOpen, setPrioOpen] = useState(false);
   const prioRef = useRef<HTMLButtonElement>(null);
+  const helpRef = useRef<HTMLButtonElement>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
   const ref = useRef<HTMLInputElement>(null);
   const parsed = useMemo(() => parseTask(text), [text]);
 
   const listByName = parsed.list ? data?.lists.find((l) => l.name.toLowerCase().startsWith(parsed.list!.toLowerCase())) : undefined;
-  const date = 'date' in manual ? manual.date : parsed.date ?? preset.date;
+  // «в 15:00» без даты в разделе «Завтра» или в выбранном дне календаря — на этот день, а не на сегодня
+  const date = 'date' in manual ? manual.date : parsed.dateImplicit && preset.date ? preset.date : parsed.date ?? preset.date;
   const time = 'time' in manual ? manual.time : parsed.time ?? (parsed.date ? undefined : preset.time);
   const duration = 'duration' in manual ? manual.duration : parsed.duration ?? preset.duration;
   const repeat = 'repeat' in manual ? manual.repeat : parsed.repeat ?? preset.repeat;
@@ -80,7 +83,7 @@ export function SmartInput({
     'reminders' in manual && manual.reminders
       ? manual.reminders
       : parsed.reminder !== undefined
-        ? [parsed.reminder]
+        ? [parsedReminder(parsed.reminder, !!time)]
         : date && data
           ? defaultReminders(data, !!time)
           : [];
@@ -129,7 +132,7 @@ export function SmartInput({
           className="qa-input"
           value={text}
           enterKeyHint="send"
-          placeholder={compact ? 'Добавить задачу…' : 'Например: «Созвон завтра в 15:00 #работа !1»'}
+          placeholder={compact ? 'Добавить задачу…' : 'Задача, напр. «Созвон завтра в 15:00»'}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
@@ -138,9 +141,30 @@ export function SmartInput({
             } else if (e.key === 'Escape') onCancel?.();
           }}
         />
+        {!compact && (
+          <>
+            <button ref={helpRef} className="qa-help" onPointerDown={(e) => e.preventDefault()} onClick={() => setHelpOpen(!helpOpen)} aria-label="Как писать даты и метки">
+              <HelpCircle size={15} />
+            </button>
+            {helpOpen && (
+              <Popover anchor={helpRef} align="right" onClose={() => setHelpOpen(false)}>
+                <div className="qa-help-body">
+                  <b>Пишите прямо в тексте — SuperMind поймёт:</b>
+                  <p>📅 <i>завтра в 18:30</i>, <i>в пятницу</i>, <i>15 октября</i>, <i>через 2 часа</i>, <i>вечером</i></p>
+                  <p>⏱ <i>с 14 до 16</i> — время и длительность</p>
+                  <p>🔁 <i>каждый день</i>, <i>по будням</i>, <i>каждый понедельник</i>, <i>каждые 2 недели</i></p>
+                  <p>🔔 <i>напомнить за 15 минут</i></p>
+                  <p>🚩 <i>!1</i> высокий, <i>!2</i> средний, <i>!3</i> низкий приоритет</p>
+                  <p>🏷 <i>#дом</i> — тег, <i>~Работа</i> — список</p>
+                </div>
+              </Popover>
+            )}
+          </>
+        )}
       </div>
       {(!compact || text) && (
         <div className="qa-bar">
+          <div className="qa-chips">
           <button
             className={`qa-chip${date ? ' set' : ''}`}
             onClick={() => {
@@ -200,7 +224,7 @@ export function SmartInput({
             </span>
           ))}
           {repeat && <span className="qa-chip set">{repeatLabel(repeat)}</span>}
-          <div className="grow" />
+          </div>
           <button className="qa-send" onClick={submit} disabled={!parsed.title.trim()} aria-label="Добавить">
             <ArrowUp size={18} />
           </button>

@@ -42,6 +42,7 @@ export default function App() {
   const go = useApp((s) => s.go);
   const theme = useApp((s) => s.settings.theme);
   const toastMsg = useApp((s) => s.toast);
+  const toastAction = useApp((s) => s.toastAction);
   const [more, setMore] = useState(false);
   const todayCount = useTasks((s) => {
     const t = todayYmd();
@@ -168,7 +169,22 @@ export default function App() {
       <QuickAddHost />
       <ReminderStack />
       <DialogHost />
-      {toastMsg && <div className="toast">{toastMsg}</div>}
+      {toastMsg && (
+        <div className={`toast${toastAction ? ' has-action' : ''}`}>
+          <span>{toastMsg}</span>
+          {toastAction && (
+            <button
+              className="toast-btn"
+              onClick={() => {
+                toastAction.run();
+                useApp.setState({ toast: null, toastAction: null });
+              }}
+            >
+              {toastAction.label}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -17,12 +17,16 @@ export interface ParsedTask {
   list?: string;
   repeat?: RepeatRule;
   reminder?: number;
+  /** дата не написана, а подставлена (сегодня/завтра по времени) — у выбранного дня приоритет */
+  dateImplicit?: boolean;
   /** найденные фрагменты [начало, конец) — для подсветки */
   spans: [number, number][];
 }
 
 const B = '(?<=^|[\\s,.;:()])';
 /** после «в N» без минут: время, только если дальше конец текста или дата/метка */
+/** после числа идёт единица измерения — это не дата */
+const UNIT_NEXT = /^(час|мин|сек|л\b|литр|мл|кг|г\b|гр|грам|м\b|км|см|мм|%|раз|шт|руб|₽|\$|тыс|недел|дн|лет|год|месяц)/i;
 const BARE_HOUR_NEXT = /^($|[#!~^,.]|сегодня|завтра|послезавтра|кажд|ежедн|еженед|по |в |во |на |напомн|через|\d{1,2}[./]\d|\d{1,2}\s+[а-яё]{3})/i;
 const E = '(?=$|[\\s,.;:!?()])';
 
@@ -147,15 +151,18 @@ export function parseTask(input: string, now = new Date()): ParsedTask {
 
   // ---------- время ----------
   if (!out.time) {
-    take(new RegExp(`${B}(?:в|к)\\s+${T}(?:\\s*(утра|дня|вечера|ночи))?${E}`, 'i'), (m) => {
+    take(new RegExp(`${B}(?:в|к)\\s+${T}(\\s*час(?:а|ов)?)?(?:\\s*(утра|дня|вечера|ночи))?${E}`, 'i'), (m) => {
       let h = +m[1];
       const mi = +(m[2] ?? 0);
-      const part = m[3]?.toLowerCase();
+      const hourWord = !!m[3];
+      const part = m[4]?.toLowerCase();
       if (part === 'дня' || part === 'вечера') h = h < 12 ? h + 12 : h;
       if (part === 'ночи' && h === 12) h = 0;
       if (h > 23 || mi > 59) return false;
       // «в 3 раза» — не время: голый час принимаем только в конце или перед датой/меткой
-      if (!m[2] && !part && !BARE_HOUR_NEXT.test(s.slice(m.index + m[0].length).trimStart())) return false;
+      if (!m[2] && !part && !hourWord && !BARE_HOUR_NEXT.test(s.slice(m.index + m[0].length).trimStart())) return false;
+      // «встреча в 3» — скорее днём, чем в 3 ночи
+      if (!m[2] && !part && h >= 1 && h <= 5) h += 12;
       out.time = `${pad2(h)}:${pad2(mi)}`;
     });
   }
@@ -221,8 +228,9 @@ export function parseTask(input: string, now = new Date()): ParsedTask {
     if (!m[3] && toYmd(d) < today) d = new Date(++year, mon, day);
     out.date = toYmd(d);
   });
-  take(new RegExp(`${B}(\\d{1,2})[./](\\d{1,2})(?:[./](\\d{2,4}))?${E}`, 'i'), (m) => {
+  take(new RegExp(`${B}(\\d{1,2})[./](\\d{2})(?:[./](\\d{2,4}))?${E}`, 'i'), (m) => {
     if (out.date) return false;
+    if (UNIT_NEXT.test(s.slice(m.index + m[0].length).trimStart())) return false;
     const day = +m[1];
     const mon = +m[2] - 1;
     if (mon < 0 || mon > 11 || day < 1 || day > 31) return false;
@@ -243,21 +251,23 @@ export function parseTask(input: string, now = new Date()): ParsedTask {
   take(/(?<=^|\s)#([\p{L}\p{N}_\-/]+)/u, (m) => {
     if (!out.tags.includes(m[1])) out.tags.push(m[1]);
   });
-  take(/(?<=^|\s)[~^]([\p{L}\p{N}_\-]+)/u, (m) => {
+  take(/(?<=^|\s)[~^]([\p{L}\p{N}_-]+)/u, (m) => {
     out.list = m[1];
   });
 
-  // время без даты — сегодня (или завтра, если время уже прошло)
-  if (out.time && !out.date) {
-    const passed = minutesOf(out.time) <= now.getHours() * 60 + now.getMinutes();
-    out.date = passed && !out.repeat ? addDaysYmd(today, 1) : today;
-  }
-  // повтор без даты — первая подходящая дата начиная с сегодня
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const passedToday = !!out.time && minutesOf(out.time) <= nowMin;
+  // повтор без даты — первый подходящий день (сегодняшний, только если время ещё не прошло)
   if (out.repeat && !out.date) {
     if (out.repeat.freq === 'weekly' && out.repeat.weekdays?.length) {
-      const cands = out.repeat.weekdays.map((w) => nextWeekday(today, w));
-      out.date = cands.sort()[0];
-    } else out.date = today;
+      const cands = out.repeat.weekdays.map((w) => nextWeekday(today, w)).sort();
+      out.date = cands.find((d) => d !== today || !passedToday) ?? addDaysYmd(cands[0], 7);
+    } else out.date = passedToday && out.repeat.freq === 'daily' ? addDaysYmd(today, 1) : today;
+  }
+  // время без даты — сегодня (или завтра, если время уже прошло); вызывающий может подставить выбранный день
+  if (out.time && !out.date) {
+    out.date = passedToday ? addDaysYmd(today, 1) : today;
+    out.dateImplicit = true;
   }
 
   out.title = s.replace(/\s+/g, ' ').trim();

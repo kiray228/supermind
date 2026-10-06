@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import type { Habit, PlannerData, PlannerDay } from '../types';
 import { useTasks, ensureTasks, addTask } from '../tasks/store';
-import { compareTasks, occurrences } from '../tasks/model';
+import { compareTasks, occurrences, parsedReminder } from '../tasks/model';
 import { parseTask } from '../tasks/parse';
 import { askNotifyIfNeeded, syncSoon } from '../tasks/sync';
 import { TaskRow } from '../tasks/ui/TaskRow';
@@ -113,6 +113,18 @@ export default function Planner() {
     };
   }, []);
 
+  // привычку отметили из уведомления — перечитать ежедневник
+  useEffect(() => {
+    const reload = () =>
+      void loadPlanner().then((p) => {
+        const n: PlannerData = { days: p.days ?? {}, habits: p.habits ?? [] };
+        dataRef.current = n;
+        setData(n);
+      });
+    window.addEventListener('sm-planner-changed', reload);
+    return () => window.removeEventListener('sm-planner-changed', reload);
+  }, []);
+
   const commit = useCallback((p: PlannerData) => {
     dataRef.current = p;
     setData(p);
@@ -181,21 +193,24 @@ export default function Planner() {
     const list = p.list ? tasksDataState?.lists.find((l) => l.name.toLowerCase().startsWith(p.list!.toLowerCase())) : undefined;
     const t = addTask({
       title: p.title,
-      date: p.date ?? date,
+      date: p.dateImplicit || !p.date ? date : p.date,
       time: p.time,
       duration: p.duration,
       repeat: p.repeat,
       priority: p.priority ?? 0,
       tags: p.tags,
       listId: list?.id,
-      ...(p.reminder !== undefined ? { reminders: [p.reminder] } : {}),
+      ...(p.reminder !== undefined ? { reminders: [parsedReminder(p.reminder, !!p.time)] } : {}),
     });
     if (t?.reminders.length) void askNotifyIfNeeded();
   };
 
   // ----- задачи из карт -----
-  const dueMaps = mapTasks.filter((t) => t.task.due === date);
-  const overdueMaps = date === today ? mapTasks.filter((t) => t.task.due && t.task.due < today && t.task.status !== 'done') : [];
+  // темы карт, у которых уже есть задача с напоминанием, показываются как задача — без дубля
+  const linked = new Set((tasksDataState?.tasks ?? []).filter((t) => t.source && !t.deleted).map((t) => t.source!.topicId));
+  const unlinked = mapTasks.filter((t) => !linked.has(t.topicId));
+  const dueMaps = unlinked.filter((t) => t.task.due === date);
+  const overdueMaps = date === today ? unlinked.filter((t) => t.task.due && t.task.due < today && t.task.status !== 'done') : [];
   const toggleMap = async (t: MapTask) => {
     const done = t.task.status !== 'done';
     const patch = done ? { status: 'done' as const, progress: 100 } : { status: 'todo' as const };
@@ -318,7 +333,7 @@ export default function Planner() {
                   )}
                   <div className="pl-tasks">
                     {tasks.map((t) => (
-                      <TaskRow key={t.id} task={t} list={tasksDataState?.lists.find((l) => l.id === t.listId)} showDate={false} tagColors={tasksDataState?.tagColors} />
+                      <TaskRow key={t.id} task={t} occurrence={date} list={tasksDataState?.lists.find((l) => l.id === t.listId)} timeOnly tagColors={tasksDataState?.tagColors} />
                     ))}
                   </div>
                   <AddTaskInput key={date} onAdd={addDayTask} />

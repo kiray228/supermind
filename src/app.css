@@ -67,3 +67,10 @@
   .nav-desk { display: none; }
   .nav-more { display: flex; }
 }
+
+/* уведомление с кнопкой «Отменить» */
+.toast { width: max-content; max-width: calc(100vw - 32px); }
+.toast.has-action { display: flex; align-items: center; gap: 12px; padding: 6px 6px 6px 18px; }
+.toast.has-action > span { flex: 1; min-width: 0; }
+.toast-btn { border: none; background: rgba(255, 255, 255, 0.14); color: #ffb4a3; font-weight: 700; height: 32px; padding: 0 14px; border-radius: 999px; white-space: nowrap; }
+@media (max-width: 760px) { .toast { bottom: calc(100px + var(--safe-bottom)); } }

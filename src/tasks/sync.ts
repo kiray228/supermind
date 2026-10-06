@@ -8,7 +8,7 @@ import { todayYmd, toYmd, addDaysYmd, fromYmd } from '../utils/mapTasks';
 import { isIOS, downloadText } from '../io/download';
 import { minutesOf, reminderFires, startAt, timeOf, whenLabel, type TaskItem } from './model';
 import { buildIcs, taskDescription, toRRule } from './ics';
-import { getTask, openTask, snoozeTask, tasksData, toggleDone, useTasks } from './store';
+import { completeOccurrence, getTask, openTask, tasksData, useTasks } from './store';
 
 // ================= Нативные модули Android =================
 
@@ -54,6 +54,8 @@ export interface InAppReminder {
   key: string;
   taskId?: string;
   habitId?: string;
+  /** дата повтора, о котором напоминание */
+  date?: string;
   title: string;
   body: string;
 }
@@ -140,8 +142,9 @@ function hash(s: string): number {
   return 1_000_000 + ((h >>> 0) % 2_000_000_000);
 }
 
-function reminderBody(t: TaskItem, date: string): string {
-  const w = whenLabel({ date, time: t.time, duration: t.duration });
+function reminderBody(t: TaskItem, date: string, at = Date.now()): string {
+  // «Сегодня/Завтра» — относительно момента, когда уведомление покажется
+  const w = whenLabel({ date, time: t.time, duration: t.duration }, toYmd(new Date(at)));
   const list = tasksData()?.lists.find((l) => l.id === t.listId);
   const extra = t.checklist.length ? ` · ${t.checklist.filter((c) => c.done).length}/${t.checklist.length}` : '';
   return [w, list && list.id !== 'inbox' ? list.name : '', t.notes?.split('\n')[0]?.slice(0, 80) ?? ''].filter(Boolean).join(' · ') + extra;
@@ -153,12 +156,12 @@ async function plan(fromMs: number, toMs: number): Promise<Planned[]> {
   const out: Planned[] = [];
   for (const f of reminderFires(d.tasks, fromMs, toMs)) {
     const base = { taskId: f.task.id, date: f.date, sm: 1 };
-    out.push({ id: hash(`${f.task.id}|${f.date}|${f.offset}`), at: f.at, title: f.task.title || 'Задача', body: reminderBody(f.task, f.date), extra: base });
+    out.push({ id: hash(`${f.task.id}|${f.date}|${f.offset}`), at: f.at, title: f.task.title || 'Задача', body: reminderBody(f.task, f.date, f.at), extra: base });
     // «настойчивое» напоминание — ещё 3 раза, пока задача не выполнена
     if (d.prefs.nag > 0 && f.offset === Math.max(...f.task.reminders))
       for (let k = 1; k <= 3; k++) {
         const at = f.at + k * d.prefs.nag * 60000;
-        if (at <= toMs) out.push({ id: hash(`${f.task.id}|${f.date}|nag${k}`), at, title: '⏰ ' + (f.task.title || 'Задача'), body: 'Ещё не выполнено · ' + reminderBody(f.task, f.date), extra: base });
+        if (at <= toMs) out.push({ id: hash(`${f.task.id}|${f.date}|nag${k}`), at, title: '⏰ ' + (f.task.title || 'Задача'), body: 'Ещё не выполнено · ' + reminderBody(f.task, f.date, at), extra: base });
       }
   }
   // привычки с напоминанием
@@ -224,6 +227,7 @@ async function handleAction(action: string, ex: Record<string, string>) {
         const day = (p.days[ex.date] ??= { journal: '', tasks: [] });
         day.habits = [...new Set([...(day.habits ?? []), ex.habitId])];
         await set('planner', p);
+        window.dispatchEvent(new Event('sm-planner-changed'));
         toast('Привычка отмечена');
       }
     } else useApp.getState().go('planner');
@@ -232,7 +236,7 @@ async function handleAction(action: string, ex: Record<string, string>) {
   const t = ex.taskId ? getTask(ex.taskId) : undefined;
   if (!t) return;
   if (action === 'done') {
-    if (!t.done && (!ex.date || t.date === ex.date)) toggleDone(t.id);
+    if (!completeOccurrence(t.id, ex.date || undefined)) toast('Эта задача уже выполнена');
   } else if (action === 'snooze10' || action === 'snooze60' || action === 'snooze') {
     await snoozeOne(t, action === 'snooze60' ? 60 : 10);
   } else {
@@ -246,10 +250,12 @@ async function snoozeOne(t: TaskItem, minutes: number) {
   const at = Date.now() + minutes * 60000;
   if (isNative()) {
     const { LocalNotifications: LN } = await notifications();
+    if (t.date) await LN.cancel({ notifications: [1, 2, 3].map((k) => ({ id: hash(`${t.id}|${t.date}|nag${k}`) })) }).catch(() => {});
     await LN.schedule({
       notifications: [
         {
-          id: Math.floor(Math.random() * 900_000) + 1,
+          // 1..700000: не пересекается с напоминаниями (от 1 000 000) и таймером фокуса (777001)
+          id: Math.floor(Math.random() * 700_000) + 1,
           title: t.title || 'Задача',
           body: 'Отложено · ' + reminderBody(t, t.date ?? todayYmd()),
           schedule: { at: new Date(at), allowWhileIdle: true },
@@ -319,7 +325,7 @@ function saveWebSnoozes() {
 async function showWeb(title: string, body: string, data: Record<string, string>) {
   const key = `${data.taskId ?? data.habitId}|${data.date ?? ''}|${Date.now()}`;
   if (document.visibilityState === 'visible') {
-    useReminders.setState((s) => ({ items: [...s.items.filter((i) => i.taskId !== data.taskId || !data.taskId), { key, taskId: data.taskId, habitId: data.habitId, title, body }] }));
+    useReminders.setState((s) => ({ items: [...s.items.filter((i) => i.taskId !== data.taskId || !data.taskId), { key, taskId: data.taskId, habitId: data.habitId, date: data.date || undefined, title, body }] }));
     playChime();
   }
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
@@ -405,14 +411,14 @@ function playChime() {
 // ================= Календарь телефона (Android) =================
 
 const CAL_INDEX = 'calsync';
-type CalIndex = Record<string, { id: string; sig: string }>;
+type CalIndex = Record<string, { id: string; sig: string; cal?: string }>;
 
 function eventFor(t: TaskItem) {
   const date = t.date!;
   const allDay = !t.time;
   const start = allDay ? Date.UTC(fromYmd(date).getFullYear(), fromYmd(date).getMonth(), fromYmd(date).getDate()) : startAt(t, date).getTime();
   const end = allDay ? start + 86400000 : start + (t.duration || 30) * 60000;
-  const rrule = t.repeat && !t.done ? toRRule(t.repeat, date) ?? undefined : undefined;
+  const rrule = t.repeat && !t.done ? toRRule(t.repeat, date, { allDay, done: t.repeatDone }) ?? undefined : undefined;
   return { title: (t.done ? '✓ ' : '') + (t.title || 'Задача'), description: taskDescription(t), start, end, allDay, rrule };
 }
 
@@ -433,15 +439,18 @@ export async function syncCalendar(): Promise<void> {
     const enabled = d.prefs.calendarSync && (await SmCalendar.checkAccess().catch(() => ({ granted: false }))).granted;
     if (!enabled && !Object.keys(idx).length) return;
     const byId = new Map(d.tasks.map((t) => [t.id, t]));
-    const remove: string[] = [];
+    const remove: [string, string][] = [];
     for (const [taskId, e] of Object.entries(idx)) {
       const t = byId.get(taskId);
-      if (!enabled || !t || t.deleted || !t.date || t.wontDo) {
-        remove.push(e.id);
-        delete idx[taskId];
-      }
+      // событие в другом календаре (сменили календарь) — удалить и создать заново
+      const moved = enabled && (e.cal ?? '') !== (d.prefs.calendarId ?? '');
+      if (!enabled || !t || t.deleted || !t.date || t.wontDo || moved) remove.push([taskId, e.id]);
     }
-    if (remove.length) await SmCalendar.deleteEvents({ ids: remove }).catch(() => {});
+    if (remove.length) {
+      const ok = await SmCalendar.deleteEvents({ ids: remove.map((r) => r[1]) }).then(() => true).catch(() => false);
+      // при ошибке оставляем в индексе — попробуем удалить в следующий раз
+      if (ok) for (const [taskId] of remove) delete idx[taskId];
+    }
     if (enabled) {
       // старые выполненные задачи в календарь не пишем
       const since = addDaysYmd(todayYmd(), -60);
@@ -453,7 +462,7 @@ export async function syncCalendar(): Promise<void> {
         if (cur?.sig === sig) continue;
         try {
           const r = await SmCalendar.upsertEvent({ ...ev, id: cur?.id, calendarId: d.prefs.calendarId });
-          idx[t.id] = { id: r.id, sig };
+          idx[t.id] = { id: r.id, sig, cal: d.prefs.calendarId ?? '' };
         } catch {
           /* календарь недоступен — попробуем позже */
         }
@@ -623,7 +632,9 @@ export function reminderAction(r: InAppReminder, action: 'done' | 'snooze' | 'op
   if (!r.taskId) return;
   const t = getTask(r.taskId);
   if (!t) return;
-  if (action === 'done') !t.done && toggleDone(t.id);
+  if (action === 'done') {
+    if (!completeOccurrence(t.id, r.date)) toast('Эта задача уже выполнена');
+  }
   else if (action === 'snooze') void snoozeOne(t, 10);
   else {
     useApp.getState().go('tasks');
@@ -631,4 +642,4 @@ export function reminderAction(r: InAppReminder, action: 'done' | 'snooze' | 'op
   }
 }
 
-export { snoozeTask, timeOf };
+export { timeOf };

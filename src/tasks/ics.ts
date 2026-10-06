@@ -5,7 +5,7 @@ import { startAt } from './model';
 const WD = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
 
 /** RRULE (без префикса «RRULE:») для правила повтора */
-export function toRRule(r: RepeatRule, date: string): string | null {
+export function toRRule(r: RepeatRule, date: string, opts: { allDay?: boolean; done?: number } = {}): string | null {
   if (r.fromCompletion) return null;
   const parts = [`FREQ=${r.freq.toUpperCase()}`];
   if (r.interval > 1) parts.push(`INTERVAL=${r.interval}`);
@@ -13,9 +13,14 @@ export function toRRule(r: RepeatRule, date: string): string | null {
   if (r.freq === 'monthly') {
     if (r.monthWeek) parts.push(`BYDAY=${r.monthWeek.n}${WD[r.monthWeek.wd]}`);
     else if (r.lastDay) parts.push('BYMONTHDAY=-1');
+    else {
+      // «31-го числа» в коротких месяцах — последний день (как в приложении), а не пропуск месяца
+      const day = r.day ?? fromYmd(date).getDate();
+      if (day > 28) parts.push(`BYMONTHDAY=${Array.from({ length: day - 27 }, (_, i) => 28 + i).join(',')};BYSETPOS=-1`);
+    }
   }
-  if (r.count) parts.push(`COUNT=${r.count}`);
-  else if (r.until) parts.push(`UNTIL=${r.until.replace(/-/g, '')}T235959Z`);
+  if (r.count) parts.push(`COUNT=${Math.max(1, r.count - (opts.done ?? 0))}`);
+  else if (r.until) parts.push(`UNTIL=${r.until.replace(/-/g, '')}${opts.allDay ? '' : 'T235959Z'}`);
   return parts.join(';');
 }
 
@@ -80,7 +85,7 @@ export function buildIcs(tasks: TaskItem[], name = 'SuperMind'): string {
     } else {
       L.push(`DTSTART;VALUE=DATE:${t.date.replace(/-/g, '')}`, `DTEND;VALUE=DATE:${addDaysYmd(t.date, 1).replace(/-/g, '')}`);
     }
-    const rr = t.repeat && !t.done ? toRRule(t.repeat, t.date) : null;
+    const rr = t.repeat && !t.done ? toRRule(t.repeat, t.date, { allDay: !t.time, done: t.repeatDone }) : null;
     if (rr) L.push(`RRULE:${rr}`);
     L.push(`DESCRIPTION:${esc(taskDescription(t))}`);
     if (t.priority) L.push(`PRIORITY:${t.priority === 1 ? 1 : t.priority === 2 ? 5 : 9}`);

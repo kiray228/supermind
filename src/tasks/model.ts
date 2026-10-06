@@ -24,6 +24,10 @@ export interface RepeatRule {
   count?: number;
   /** следующий срок считается от даты выполнения, а не от прошлого срока */
   fromCompletion?: boolean;
+  /** закреплённый день месяца (monthly/yearly): 31-е не «съезжает» на 28-е после февраля */
+  day?: number;
+  /** закреплённый месяц 0..11 (yearly) */
+  month?: number;
 }
 
 export interface ChecklistItem {
@@ -236,6 +240,22 @@ function nthWeekdayOfMonth(y: number, m: number, n: number, wd: number): string 
   return d.getMonth() === m ? toYmd(d) : null;
 }
 
+/**
+ * Закрепить в правиле день недели / число / месяц по дате задачи.
+ * После этого перенос задачи на другой день не меняет расписание повторов.
+ */
+export function pinRule(rule: RepeatRule, date: string): RepeatRule {
+  const d = fromYmd(date);
+  const r = { ...rule };
+  if (r.freq === 'weekly' && !r.weekdays?.length) r.weekdays = [d.getDay()];
+  if (r.freq === 'monthly' && !r.monthWeek && !r.lastDay && !r.day) r.day = d.getDate();
+  if (r.freq === 'yearly') {
+    r.day ??= d.getDate();
+    r.month ??= d.getMonth();
+  }
+  return r;
+}
+
 /** Следующая дата повторения строго после `from` (с учётом правила; без проверки until/count) */
 export function nextOccurrence(rule: RepeatRule, from: string, anchor = from): string {
   const iv = Math.max(1, rule.interval || 1);
@@ -265,15 +285,21 @@ export function nextOccurrence(rule: RepeatRule, from: string, anchor = from): s
         return addMonthsClamped(from, iv);
       }
       if (rule.lastDay) return addMonthsClamped(from, iv, 31);
-      return addMonthsClamped(from, iv, fromYmd(anchor).getDate());
+      return addMonthsClamped(from, iv, rule.day ?? fromYmd(anchor).getDate());
     }
     case 'yearly': {
       const a = fromYmd(anchor);
       const f = fromYmd(from);
-      const t = new Date(f.getFullYear() + iv, a.getMonth(), 1);
-      const last = new Date(t.getFullYear(), t.getMonth() + 1, 0).getDate();
-      t.setDate(Math.min(a.getDate(), last));
-      return toYmd(t);
+      const month = rule.month ?? a.getMonth();
+      const day = rule.day ?? a.getDate();
+      // ближайший год, в котором дата повторения позже `from`
+      for (let k = 0; k <= iv * 2; k += iv) {
+        const t = new Date(f.getFullYear() + k, month, 1);
+        const last = new Date(t.getFullYear(), t.getMonth() + 1, 0).getDate();
+        t.setDate(Math.min(day, last));
+        if (toYmd(t) > from) return toYmd(t);
+      }
+      return toYmd(new Date(f.getFullYear() + iv, month, Math.min(day, 28)));
     }
   }
 }
@@ -308,9 +334,9 @@ export function advanceRepeat(task: TaskItem, completedOn = todayYmd()): string 
   const rule = task.repeat;
   const base = rule.fromCompletion ? completedOn : task.date;
   let next = nextOccurrence(rule, base, rule.fromCompletion ? completedOn : task.date);
-  // пропущенные повторы в прошлом не нужны: «каждый день» после недели простоя — сразу на сегодня/завтра
-  if (!rule.fromCompletion && rule.freq === 'daily' && next < completedOn) {
-    for (let i = 0; i < 4000 && next < completedOn; i++) next = nextOccurrence(rule, next, task.date);
+  // пропущенные повторы не копятся: просроченная задача после выполнения переносится на ближайший день после сегодня
+  if (!rule.fromCompletion) {
+    for (let i = 0; i < 5000 && next <= completedOn; i++) next = nextOccurrence(rule, next, task.date);
   }
   if (!withinRule(rule, next, (task.repeatDone ?? 0) + 1)) return null;
   return next;
@@ -328,10 +354,12 @@ export interface ReminderFire {
 /** Все срабатывания напоминаний в интервале времени [fromMs, toMs] */
 export function reminderFires(tasks: TaskItem[], fromMs: number, toMs: number): ReminderFire[] {
   const out: ReminderFire[] = [];
-  const fromDay = toYmd(new Date(fromMs - 8 * 86400000));
-  const toDay = toYmd(new Date(toMs + 8 * 86400000));
+  const fromDay = toYmd(new Date(fromMs - 2 * 86400000));
   for (const t of tasks) {
     if (t.done || t.deleted || t.wontDo || !t.date || !t.reminders.length) continue;
+    // напоминание «за 2 недели» срабатывает задолго до самой задачи — расширяем окно поиска
+    const ahead = Math.max(2 * 1440, ...t.reminders.map((r) => -r + 1440));
+    const toDay = toYmd(new Date(toMs + ahead * 60000));
     for (const d of occurrences(t, fromDay, toDay, 120)) {
       const base = startAt(t, d).getTime();
       for (const off of t.reminders) {
@@ -389,6 +417,12 @@ export function reminderLabel(off: number, timed: boolean): string {
   const days = Math.ceil(-off / 1440);
   const t = timeOf(off + days * 1440);
   return days <= 0 ? `В день срока (${t})` : `За ${days} ${plural(days, 'день', 'дня', 'дней')} (${t})`;
+}
+
+/** «напомнить за N …» из текста: для задачи без времени — за нужное число дней в 09:00 */
+export function parsedReminder(offset: number, timed: boolean): number {
+  if (timed) return offset;
+  return allDayOffset(Math.floor(-offset / 1440), '09:00');
 }
 
 /** Для задачи на весь день: напоминание «за N дней в HH:MM» */

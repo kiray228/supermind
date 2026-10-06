@@ -26,7 +26,7 @@ import {
   CalendarX2,
   Layers,
 } from 'lucide-react';
-import { useApp } from '../store/appStore';
+import { useApp, toast } from '../store/appStore';
 import { loadAllDocs } from '../store/db';
 import { addDaysYmd, collectMapTasks, fromYmd, todayYmd, updateMapTask, PRIORITY_META, type MapTask } from '../utils/mapTasks';
 import { uid } from '../utils/tree';
@@ -172,7 +172,7 @@ function groupTasks(tasks: TaskItem[], by: GroupBy, d: TasksData, today: string,
   }
   const g: Group[] = [
     { key: 'overdue', title: 'Просрочено', color: 'var(--danger)', tasks: [] },
-    { key: 'today', title: 'Сегодня', color: 'var(--accent)', tasks: [], drop: { date: today } },
+    { key: 'today', title: 'Сегодня', color: '#3b82f6', tasks: [], drop: { date: today } },
     { key: 'tomorrow', title: 'Завтра', tasks: [], drop: { date: addDaysYmd(today, 1) } },
   ];
   if (perDay) for (let i = 2; i < 7; i++) g.push({ key: 'd' + i, title: `${dayLabel(addDaysYmd(today, i), today)} · ${longDate(addDaysYmd(today, i)).split(', ')[1]}`, tasks: [], drop: { date: addDaysYmd(today, i) } });
@@ -248,7 +248,8 @@ export default function Tasks() {
     for (const l of data.lists) c['list:' + l.id] = data.tasks.filter((t) => isActive(t) && t.listId === l.id).length;
     for (const f of data.filters) c['filter:' + f.id] = data.tasks.filter((t) => isActive(t) && applyFilter(t, f, today)).length;
     for (const g of allTags(data)) c['tag:' + g] = data.tasks.filter((t) => isActive(t) && t.tags.includes(g)).length;
-    c['smart:maps'] += mapTasks.filter((m) => m.task.status !== 'done').length;
+    const linkedIds = new Set(data.tasks.filter((t) => t.source && !t.deleted).map((t) => t.source!.topicId));
+    c['smart:maps'] += mapTasks.filter((m) => m.task.status !== 'done' && !linkedIds.has(m.topicId)).length;
     return c;
   }, [data, today, mapTasks]);
 
@@ -304,13 +305,15 @@ export default function Tasks() {
               ? { date: today }
               : {};
 
-  const effectiveGroup: GroupBy = sel.k === 'smart' && (sel.id === 'today' || sel.id === 'tomorrow' || sel.id === 'nodate') && groupBy === 'date' ? 'none' : groupBy;
+  const effectiveGroup: GroupBy = sel.k === 'smart' && (sel.id === 'tomorrow' || sel.id === 'nodate') && groupBy === 'date' ? 'none' : groupBy;
   const groups = groupTasks(active, effectiveGroup, data, today, sel.k === 'smart' && sel.id === 'week').filter((g) => g.tasks.length || (mode === 'kanban' && g.drop));
+  // темы карт, у которых уже есть задача с напоминанием, не дублируются в «Из карт»
+  const linkedTopics = new Set(data.tasks.filter((t) => t.source && !t.deleted).map((t) => t.source!.topicId));
   const mapList =
     q || sel.k !== 'smart'
       ? []
       : mapTasks.filter((m) => {
-          if (m.task.status === 'done') return false;
+          if (m.task.status === 'done' || linkedTopics.has(m.topicId)) return false;
           if (sel.id === 'maps' || sel.id === 'all') return true;
           if (sel.id === 'today') return !!m.task.due && m.task.due <= today;
           if (sel.id === 'tomorrow') return m.task.due === addDaysYmd(today, 1);
@@ -413,7 +416,28 @@ export default function Tasks() {
         ) : (
           <div className="tk-groups">
             {groups.map((g) => (
-              <Collapsible key={g.key} title={g.title} color={g.color} count={g.tasks.length} onDrop={g.drop ? (id) => onDrop(g, id) : undefined} hideHead={groups.length === 1 && effectiveGroup === 'none'}>
+              <Collapsible
+                key={g.key}
+                title={g.title}
+                color={g.color}
+                count={g.tasks.length}
+                onDrop={g.drop ? (id) => onDrop(g, id) : undefined}
+                hideHead={groups.length === 1 && effectiveGroup === 'none'}
+                action={
+                  g.key === 'overdue' ? (
+                    <button
+                      className="tk-group-act"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        for (const t of g.tasks) updateTask(t.id, { date: today });
+                        toast(`Перенесено на сегодня: ${g.tasks.length}`);
+                      }}
+                    >
+                      Перенести на сегодня
+                    </button>
+                  ) : undefined
+                }
+              >
                 {renderRows(g.tasks)}
               </Collapsible>
             ))}
@@ -666,7 +690,9 @@ function Collapsible({
   children,
   onDrop,
   hideHead,
+  action,
 }: {
+  action?: ReactNode;
   title: string;
   color?: string;
   count: number;
@@ -678,11 +704,14 @@ function Collapsible({
   return (
     <DropZone className="tk-group" onDrop={onDrop} enabled={!!onDrop}>
       {!hideHead && (
-        <button className="tk-group-head tk-toggle" onClick={() => setOpen(!open)} style={color ? ({ '--gc': color } as CSSProperties) : undefined}>
-          {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-          <span className="tk-group-title">{title}</span>
-          <span className="tk-group-count">{count}</span>
-        </button>
+        <div className="tk-group-head" style={color ? ({ '--gc': color } as CSSProperties) : undefined}>
+          <button className="tk-toggle tk-group-toggle" onClick={() => setOpen(!open)} aria-expanded={open}>
+            {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+            <span className="tk-group-title">{title}</span>
+            <span className="tk-group-count">{count}</span>
+          </button>
+          {action}
+        </div>
       )}
       {open && children}
     </DropZone>

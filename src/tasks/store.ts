@@ -7,6 +7,8 @@ import { toast } from '../store/appStore';
 import { focusQuickInput } from '../ui/keyboard';
 import {
   advanceRepeat,
+  pinRule,
+  type ChecklistItem,
   DEFAULT_PREFS,
   dayLabel,
   emptyTasksData,
@@ -42,7 +44,14 @@ function normalize(raw: Partial<TasksData> | undefined): TasksData {
     ...base,
     ...raw,
     lists: raw.lists?.length ? raw.lists : base.lists,
-    tasks: (raw.tasks ?? []).map((t) => ({ ...t, tags: t.tags ?? [], reminders: t.reminders ?? [], checklist: t.checklist ?? [], priority: t.priority ?? 0 })),
+    tasks: (raw.tasks ?? []).map((t) => ({
+      ...t,
+      tags: t.tags ?? [],
+      reminders: t.reminders ?? [],
+      checklist: t.checklist ?? [],
+      priority: t.priority ?? 0,
+      ...(t.repeat && t.date ? { repeat: pinRule(t.repeat, t.date) } : {}),
+    })),
     filters: raw.filters ?? [],
     tagColors: raw.tagColors ?? {},
     log: raw.log ?? [],
@@ -63,7 +72,11 @@ export function ensureTasks(): Promise<TasksData> {
       await absorbPlanner(d);
       useTasks.setState({ data: d });
       return d;
-    })();
+    })().catch((e) => {
+      // следующая попытка загрузки начнётся заново
+      loading = null;
+      throw e;
+    });
   }
   return loading;
 }
@@ -107,7 +120,9 @@ async function absorbPlanner(d: TasksData) {
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 export function flushTasks(): Promise<void> {
-  if (saveTimer) clearTimeout(saveTimer);
+  // сохраняем только несохранённые изменения: иначе вкладка со старыми данными перезапишет свежие
+  if (!saveTimer) return Promise.resolve();
+  clearTimeout(saveTimer);
   saveTimer = null;
   const d = useTasks.getState().data;
   return d ? set(KEY, d).catch(() => toast('Не удалось сохранить задачи')) : Promise.resolve();
@@ -156,6 +171,7 @@ export function addTask(p: Partial<TaskItem>): TaskItem | null {
   if (!d) return null;
   const t = makeTask(d, p);
   t.listId = p.listId && d.lists.some((l) => l.id === p.listId) ? p.listId : INBOX;
+  if (t.repeat && t.date) t.repeat = pinRule(t.repeat, t.date);
   mutateTasks((x) => void x.tasks.unshift(t));
   return t;
 }
@@ -171,6 +187,8 @@ export function updateTask(id: ID, patch: Partial<TaskItem>) {
       if (!old.date || !!old.time !== !!next.time) next.reminders = defaultReminders(d, !!next.time);
     }
     if (!next.time) delete next.duration;
+    // новое правило повтора закрепляем по дате; перенос задачи расписание не меняет
+    if ('repeat' in patch && next.repeat && next.date) next.repeat = pinRule(next.repeat, next.date);
     for (const k of Object.keys(next) as (keyof TaskItem)[]) if (next[k] === undefined) delete next[k];
     d.tasks[i] = next;
   });
@@ -180,25 +198,55 @@ export function getTask(id: ID): TaskItem | undefined {
   return useTasks.getState().data?.tasks.find((t) => t.id === id);
 }
 
-/** Отметить выполненной / снять отметку. Для повторяющихся — перенос на следующий повтор */
+type Snapshot = Pick<TaskItem, 'date' | 'repeatDone' | 'checklist' | 'done' | 'completedAt' | 'wontDo'> & { logged: boolean };
+
+function snapshotOf(t: TaskItem, logged: boolean): Snapshot {
+  return { date: t.date, repeatDone: t.repeatDone, checklist: t.checklist, done: t.done, completedAt: t.completedAt, wontDo: t.wontDo, logged };
+}
+
+/** Вернуть задачу в состояние до выполнения (кнопка «Отменить») */
+function restore(id: ID, snap: Snapshot) {
+  mutateTasks((d) => {
+    const x = d.tasks.find((y) => y.id === id);
+    if (!x) return;
+    x.date = snap.date;
+    x.repeatDone = snap.repeatDone;
+    x.checklist = snap.checklist;
+    x.done = snap.done;
+    x.completedAt = snap.completedAt;
+    x.wontDo = snap.wontDo;
+    for (const k of ['date', 'repeatDone', 'completedAt', 'wontDo'] as const) if (x[k] === undefined) delete x[k];
+    x.updatedAt = Date.now();
+    if (snap.logged) {
+      const li = d.log.map((l) => l.taskId).lastIndexOf(id);
+      if (li >= 0) d.log.splice(li, 1);
+    }
+  });
+}
+
+/** Отметить выполненной / снять отметку. Для повторяющихся — перенос на следующий повтор (с кнопкой «Отменить») */
 export function toggleDone(id: ID) {
   const t = getTask(id);
   if (!t) return;
   if (t.done || t.wontDo) {
+    const wasDone = t.done;
     mutateTasks((d) => {
       const x = d.tasks.find((y) => y.id === id)!;
       x.done = false;
       delete x.wontDo;
       delete x.completedAt;
       x.updatedAt = Date.now();
-      const li = d.log.map((l) => l.taskId).lastIndexOf(id);
-      if (li >= 0) d.log.splice(li, 1);
+      // запись в статистике есть только у выполненных (не у «Не буду делать»)
+      if (wasDone) {
+        const li = d.log.map((l) => l.taskId).lastIndexOf(id);
+        if (li >= 0) d.log.splice(li, 1);
+      }
     });
     if (t.source) void updateMapTask(t.source.docId, t.source.topicId, { status: 'todo' }).catch(() => {});
     return;
   }
-  const today = todayYmd();
-  const next = t.repeat ? advanceRepeat(t, today) : null;
+  const snap = snapshotOf(t, true);
+  const next = t.repeat ? advanceRepeat(t, todayYmd()) : null;
   mutateTasks((d) => {
     const x = d.tasks.find((y) => y.id === id)!;
     d.log.push({ taskId: x.id, title: x.title, listId: x.listId, at: Date.now(), date: x.date });
@@ -213,16 +261,56 @@ export function toggleDone(id: ID) {
     }
     x.updatedAt = Date.now();
   });
-  if (next) toast(`Следующий повтор: ${dayLabel(next)}`);
+  const undo = {
+    label: 'Отменить',
+    run: () => {
+      restore(id, snap);
+      if (t.source && !next) void updateMapTask(t.source.docId, t.source.topicId, { status: 'todo' }).catch(() => {});
+    },
+  };
+  toast(next ? `Готово! Следующий — ${dayLabel(next).toLowerCase()}` : 'Задача выполнена', undo);
   if (t.source && !next) void updateMapTask(t.source.docId, t.source.topicId, { status: 'done', progress: 100 }).catch(() => {});
 }
 
+/**
+ * Выполнить конкретный повтор (из уведомления). false — если этот повтор уже выполнен.
+ */
+export function completeOccurrence(id: ID, date?: string): boolean {
+  const t = getTask(id);
+  if (!t || t.done || t.wontDo || t.deleted) return false;
+  if (t.repeat && date && t.date && date < t.date) return false;
+  toggleDone(id);
+  return true;
+}
+
+/** «Не буду делать»: у повторяющейся задачи пропускается только этот повтор */
 export function setWontDo(id: ID) {
+  const t = getTask(id);
+  if (!t) return;
+  const snap = snapshotOf(t, false);
+  const next = t.repeat ? advanceRepeat(t, todayYmd()) : null;
   mutateTasks((d) => {
     const x = d.tasks.find((y) => y.id === id);
     if (!x) return;
-    x.wontDo = true;
-    x.completedAt = Date.now();
+    if (next) {
+      x.date = next;
+      x.repeatDone = (x.repeatDone ?? 0) + 1;
+      x.checklist = x.checklist.map((c) => ({ ...c, done: false }));
+    } else {
+      x.wontDo = true;
+      x.completedAt = Date.now();
+    }
+    x.updatedAt = Date.now();
+  });
+  toast(next ? `Пропущено. Следующий — ${dayLabel(next).toLowerCase()}` : 'Отмечено «Не буду делать»', { label: 'Отменить', run: () => restore(id, snap) });
+}
+
+/** Изменить подзадачи по самому свежему состоянию задачи (правки подряд не перетирают друг друга) */
+export function updateChecklist(id: ID, fn: (c: ChecklistItem[]) => ChecklistItem[]) {
+  mutateTasks((d) => {
+    const x = d.tasks.find((y) => y.id === id);
+    if (!x) return;
+    x.checklist = fn(x.checklist);
     x.updatedAt = Date.now();
   });
 }
@@ -252,19 +340,6 @@ export function duplicateTask(id: ID): TaskItem | null {
   delete copy.completedAt;
   copy.checklist = (copy.checklist ?? []).map((c) => ({ ...c, id: uid() }));
   return addTask(copy);
-}
-
-/** Отложить задачу (snooze) на N минут: время начала сдвигается */
-export function snoozeTask(id: ID, minutes: number) {
-  const t = getTask(id);
-  if (!t) return;
-  const at = new Date(Date.now() + minutes * 60000);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  updateTask(id, {
-    date: `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`,
-    time: `${pad(at.getHours())}:${pad(at.getMinutes())}`,
-    reminders: t.time ? t.reminders : [0],
-  });
 }
 
 // ---------- Списки, фильтры, теги ----------
