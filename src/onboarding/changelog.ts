@@ -16,6 +16,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.12',
+    title: 'Восстановление пароля',
+    items: [
+      { icon: ShieldCheck, title: 'Забыли пароль?', text: 'На экране входа — «Забыли пароль?»: пришлём код на почту, введите его и задайте новый пароль.' },
+    ],
+  },
+  {
     version: '1.11',
     title: 'Новый логотип и вход в аккаунт',
     items: [

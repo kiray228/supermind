@@ -2,6 +2,7 @@
  * API SuperMind: аккаунты, синхронизация данных между устройствами и push-напоминания.
  *
  *   POST /auth/register, /auth/login, /auth/logout, /auth/password · GET /auth/me · DELETE /account
+ *   POST /auth/forgot (код на почту) · POST /auth/reset (код + новый пароль → вход)
  *   GET /sync?since=N · POST /sync
  *   GET /snapshots · GET /snapshots/:id · POST /snapshots — облачные копии данных (каждый час при изменениях — сами)
  *   GET /push/key · POST /devices · PUT /devices/:id/schedule · POST /devices/:id/test · DELETE /devices/:id
@@ -11,6 +12,8 @@ import { hashPassword, newToken, tokenHash, verifyPassword } from './crypto.ts';
 import { ensureSchema, type Row, type Sql } from './sql.ts';
 import { generateVapidKeys, sendPush, type PushResult, type PushSubscription, type VapidKeys } from './webpush.ts';
 import type { NextDueStore } from './objectStore.ts';
+import { envMailer, resetMail, type Mailer } from './mail.ts';
+import { randomInt } from 'node:crypto';
 
 export interface Deps {
   sql: Sql;
@@ -19,6 +22,8 @@ export interface Deps {
   now?: () => number;
   /** Время ближайшего напоминания вне базы: проверка раз в минуту не будит базу зря */
   nextDue?: NextDueStore | null;
+  /** Отправка писем; null — почта не настроена */
+  mail?: Mailer | null;
 }
 
 const VAPID_SUBJECT = 'https://kiray228.github.io/2mind/';
@@ -63,6 +68,7 @@ export function createApp(deps: Deps) {
   const now = deps.now ?? Date.now;
   const push = deps.push ?? ((sub, payload, keys) => sendPush(sub, payload, keys, VAPID_SUBJECT));
   const nextDue = deps.nextDue ?? null;
+  const mail = deps.mail === undefined ? envMailer() : deps.mail;
 
   /** Записать время ближайшего неотправленного напоминания */
   async function refreshNextDue() {
@@ -162,6 +168,65 @@ export function createApp(deps: Deps) {
     }
     await sql.query(`DELETE FROM auth_failures WHERE email = $1`, [email]);
     return json({ token: await createSession(user[0], request), user: { id: user[0], email, name: user[1] } });
+  }
+
+  // ---------- Восстановление пароля: 6-значный код на почту ----------
+
+  async function forgot(request: Request) {
+    const b = await body<{ email?: string }>(request);
+    const email = (b.email ?? '').trim().toLowerCase();
+    if (!EMAIL.test(email)) throw new HttpError(400, 'Проверьте email');
+    if (!mail) throw new HttpError(503, 'Восстановление по почте пока не настроено — напишите в поддержку');
+    // не чаще 3 писем за 15 минут на адрес
+    const recent = await sql.query(`SELECT count(*) FROM password_resets WHERE email = $1 AND created_at > now() - interval '15 minutes'`, [email]);
+    if (Number(recent[0]?.[0] ?? 0) >= 3) throw new HttpError(429, 'Код уже отправлен — проверьте почту (и «Спам») или подождите 15 минут');
+    const rows = await sql.query(`SELECT name FROM users WHERE email = $1`, [email]);
+    // ответ одинаковый, есть аккаунт или нет — чтобы нельзя было перебирать адреса
+    if (rows[0]) {
+      const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
+      await sql.query(`INSERT INTO password_resets (email, code_hash, expires_at) VALUES ($1, $2, now() + interval '15 minutes')`, [
+        email,
+        tokenHash(`${email}|${code}`),
+      ]);
+      try {
+        await mail(resetMail(email, rows[0][0] ?? '', code));
+      } catch (e) {
+        console.error('mail', e);
+        throw new HttpError(502, 'Не удалось отправить письмо — попробуйте позже');
+      }
+    } else {
+      await sql.query(`INSERT INTO password_resets (email, code_hash, expires_at, used) VALUES ($1, '', now(), true)`, [email]);
+    }
+    return json({ ok: true });
+  }
+
+  async function reset(request: Request) {
+    const b = await body<{ email?: string; code?: string; password?: string }>(request);
+    const email = (b.email ?? '').trim().toLowerCase();
+    const code = (b.code ?? '').replace(/\D/g, '');
+    const password = b.password ?? '';
+    if (password.length < 8) throw new HttpError(400, 'Пароль — минимум 8 символов');
+    if (password.length > 200) throw new HttpError(400, 'Слишком длинный пароль');
+    const rows = await sql.query(
+      `SELECT ctid, code_hash, attempts FROM password_resets
+       WHERE email = $1 AND NOT used AND expires_at > now() ORDER BY created_at DESC LIMIT 1`,
+      [email],
+    );
+    const r = rows[0];
+    if (!r) throw new HttpError(400, 'Код устарел — запросите новый');
+    if (Number(r[2]) >= 5) throw new HttpError(429, 'Слишком много попыток — запросите новый код');
+    if (code.length !== 6 || tokenHash(`${email}|${code}`) !== r[1]) {
+      await sql.query(`UPDATE password_resets SET attempts = attempts + 1 WHERE ctid = $1::tid`, [r[0]]);
+      throw new HttpError(400, 'Неверный код');
+    }
+    await sql.query(`UPDATE password_resets SET used = true WHERE email = $1`, [email]);
+    const u = await sql.query(`UPDATE users SET pass_hash = $2 WHERE email = $1 RETURNING id, name`, [email, await hashPassword(password)]);
+    if (!u[0]) throw new HttpError(400, 'Код устарел — запросите новый');
+    const [id, name] = u[0] as string[];
+    // все устройства выходят: пароль сменён
+    await sql.query(`DELETE FROM sessions WHERE user_id = $1`, [id]);
+    await sql.query(`DELETE FROM auth_failures WHERE email = $1`, [email]);
+    return json({ token: await createSession(id, request), user: { id, email, name } });
   }
 
   async function logout(request: Request) {
@@ -449,6 +514,7 @@ export function createApp(deps: Deps) {
     // уборка: старые отправленные и просроченные
     await sql.query(`DELETE FROM push_queue WHERE fire_at < now() - interval '2 days'`);
     await sql.query(`DELETE FROM auth_failures WHERE at < now() - interval '1 day'`);
+    await sql.query(`DELETE FROM password_resets WHERE created_at < now() - interval '1 day'`);
     await refreshNextDue();
     console.log(`cron: наступило ${due.length}, отправлено ${sent}`);
     return json({ due: due.length, sent, removedDevices: gone.size });
@@ -473,6 +539,8 @@ export function createApp(deps: Deps) {
     if (m === 'POST' && path === '/auth/register') return register(request);
     if (m === 'POST' && path === '/auth/login') return login(request);
     if (m === 'POST' && path === '/auth/logout') return logout(request);
+    if (m === 'POST' && path === '/auth/forgot') return forgot(request);
+    if (m === 'POST' && path === '/auth/reset') return reset(request);
     if (m === 'POST' && path === '/auth/password') return changePassword(request);
     if (m === 'GET' && path === '/auth/me') return json({ user: await userOf(request) });
     if (m === 'DELETE' && path === '/account') return deleteAccount(request);

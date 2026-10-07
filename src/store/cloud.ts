@@ -146,6 +146,17 @@ export async function login(email: string, password: string) {
   await startSession(r);
 }
 
+/** Восстановление пароля: код на почту */
+export async function requestReset(email: string) {
+  await api('/auth/forgot', { method: 'POST', body: JSON.stringify({ email }) });
+}
+
+/** Код из письма + новый пароль → сразу вход */
+export async function resetPassword(email: string, code: string, password: string) {
+  const r = await api<Account>('/auth/reset', { method: 'POST', body: JSON.stringify({ email, code, password }) });
+  await startSession(r);
+}
+
 /** Выйти: данные остаются на устройстве */
 export async function logout() {
   // сначала отправить несохранённое — иначе оно останется только на этом устройстве

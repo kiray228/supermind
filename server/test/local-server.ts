@@ -13,6 +13,8 @@ const sql = new PgliteSql();
 const counted = { query: (q: string, p?: unknown[]) => (dbCalls++, sql.query(q, p)) };
 const app = createApp({
   sql: counted,
+  // письма — в журнал (код восстановления виден в консоли сервера)
+  mail: async (m) => void console.log('MAIL →', m.to, '|', m.subject),
   nextDue: { get: async () => next, set: async (v) => void (next = v) },
   push: async (sub, payload) => {
     sent.push({ endpoint: sub.endpoint, payload });

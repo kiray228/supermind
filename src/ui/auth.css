@@ -61,3 +61,9 @@
 /* окна (например, вопрос о данных другого аккаунта) — поверх экрана входа */
 body:has(.auth-gate) .modal-backdrop { z-index: 1100; }
 body:has(.auth-gate) .toast { z-index: 1200; }
+
+.auth-step { font-size: 20px; font-weight: 700; margin: 0 0 14px; align-self: stretch; text-align: center; }
+.auth-code { font-size: 24px !important; letter-spacing: 0.3em; text-align: center; font-variant-numeric: tabular-nums; }
+.auth-code::placeholder { letter-spacing: normal; font-size: 17px; }
+.auth-link { margin-top: 14px; background: none; border: 0; color: var(--accent); font: inherit; font-size: 16px; min-height: 44px; padding: 0 12px; cursor: pointer; }
+.auth-link + .auth-link { margin-top: 0; }

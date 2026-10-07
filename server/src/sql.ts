@@ -60,6 +60,15 @@ export const SCHEMA = [
     at timestamptz NOT NULL DEFAULT now()
   )`,
   `CREATE INDEX IF NOT EXISTS auth_failures_email ON auth_failures (email, at)`,
+  `CREATE TABLE IF NOT EXISTS password_resets (
+    email text NOT NULL,
+    code_hash text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    expires_at timestamptz NOT NULL,
+    attempts integer NOT NULL DEFAULT 0,
+    used boolean NOT NULL DEFAULT false
+  )`,
+  `CREATE INDEX IF NOT EXISTS password_resets_email ON password_resets (email, created_at DESC)`,
   `CREATE SEQUENCE IF NOT EXISTS kv_seq`,
   `CREATE TABLE IF NOT EXISTS kv (
     user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,

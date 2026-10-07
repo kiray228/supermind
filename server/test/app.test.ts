@@ -5,7 +5,8 @@ import { createApp } from '../src/app.ts';
 import { PgliteSql } from './pglite.ts';
 
 const sql = new PgliteSql();
-const app = createApp({ sql, push: async () => ({ status: 201, gone: false }) });
+const mails: { to: string; subject: string; text: string }[] = [];
+const app = createApp({ mail: async (m) => void mails.push(m), sql, push: async () => ({ status: 201, gone: false }) });
 
 async function call<T = Record<string, unknown>>(method: string, path: string, body?: unknown, token?: string) {
   const r = await app.fetch(
@@ -89,4 +90,31 @@ test('номера изменений по пользователю растут
   assert.equal(c.data.results[0].ok, false);
   const pulled = await call<{ items: { key: string; seq: number }[] }>('GET', '/sync?since=2', undefined, t);
   assert.deepEqual(pulled.data.items.map((x) => x.key), ['k2', 'k3', 'k4']);
+});
+
+test('восстановление пароля: код на почту, новый пароль, старые сессии закрыты', async () => {
+  const reg = await call<{ token: string }>('POST', '/auth/register', { name: 'Аня', email: 'reset@b.cd', password: 'oldpass11' });
+  const oldToken = reg.data.token;
+  // неизвестный адрес — тот же ответ, письма нет
+  assert.equal((await call('POST', '/auth/forgot', { email: 'nobody@b.cd' })).status, 200);
+  assert.equal(mails.length, 0);
+  assert.equal((await call('POST', '/auth/forgot', { email: 'Reset@B.cd' })).status, 200);
+  assert.equal(mails.length, 1);
+  const code = /(\d{6})/.exec(mails[0].text)![1];
+  assert.match(mails[0].subject, new RegExp(code));
+  // неверный код
+  assert.equal((await call('POST', '/auth/reset', { email: 'reset@b.cd', code: '000000' === code ? '111111' : '000000', password: 'newpass22' })).status, 400);
+  const ok = await call<{ token: string; user: { email: string } }>('POST', '/auth/reset', { email: 'reset@b.cd', code, password: 'newpass22' });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.data.user.email, 'reset@b.cd');
+  // код одноразовый
+  assert.equal((await call('POST', '/auth/reset', { email: 'reset@b.cd', code, password: 'other333' })).status, 400);
+  // старая сессия закрыта, новый пароль работает, старый — нет
+  assert.equal((await call('GET', '/auth/me', undefined, oldToken)).status, 401);
+  assert.equal((await call('POST', '/auth/login', { email: 'reset@b.cd', password: 'newpass22' })).status, 200);
+  assert.equal((await call('POST', '/auth/login', { email: 'reset@b.cd', password: 'oldpass11' })).status, 401);
+  // не больше 3 писем за 15 минут
+  await call('POST', '/auth/forgot', { email: 'reset@b.cd' });
+  await call('POST', '/auth/forgot', { email: 'reset@b.cd' });
+  assert.equal((await call('POST', '/auth/forgot', { email: 'reset@b.cd' })).status, 429);
 });
