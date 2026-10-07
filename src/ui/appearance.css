@@ -1,0 +1,145 @@
+/* ================= Внешний вид: акцент, фон, Liquid Glass ================= */
+
+/* мягкий оттенок акцента — под любой выбранный цвет */
+:root[data-accent] { --accent-soft: color-mix(in srgb, var(--accent) 12%, #ffffff); }
+:root[data-accent][data-theme='dark'] { --accent-soft: color-mix(in srgb, var(--accent) 22%, #17191e); }
+:root { --accent-2: #ff9a3d; }
+
+/* ---------- Фон ---------- */
+:root[data-backdrop='plain'] body { background: var(--bg); }
+:root[data-backdrop='gradient'] body {
+  background:
+    radial-gradient(900px 600px at 0% 0%, color-mix(in srgb, var(--accent) 11%, transparent), transparent 60%),
+    radial-gradient(800px 600px at 100% 10%, color-mix(in srgb, var(--accent-2) 10%, transparent), transparent 60%),
+    radial-gradient(900px 700px at 50% 100%, rgba(14, 165, 233, 0.08), transparent 60%),
+    var(--bg);
+  background-attachment: fixed;
+}
+:root[data-backdrop='aurora'] body { background: var(--bg); }
+:root[data-backdrop='aurora'] body::before {
+  content: ''; position: fixed; inset: -25%; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(38% 34% at 22% 24%, color-mix(in srgb, var(--accent) 34%, transparent), transparent 70%),
+    radial-gradient(34% 30% at 78% 18%, color-mix(in srgb, var(--accent-2) 30%, transparent), transparent 70%),
+    radial-gradient(40% 36% at 64% 82%, rgba(139, 92, 246, 0.22), transparent 70%),
+    radial-gradient(30% 28% at 18% 86%, rgba(14, 165, 233, 0.18), transparent 70%);
+  filter: blur(40px);
+  will-change: transform;
+  animation: sm-aurora 28s ease-in-out infinite alternate;
+}
+:root[data-backdrop='aurora'][data-theme='dark'] body::before { opacity: 0.75; }
+@keyframes sm-aurora {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(3%, -2%, 0) scale(1.06) rotate(2deg); }
+  100% { transform: translate3d(-3%, 2%, 0) scale(1.03) rotate(-2deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-backdrop='aurora'] body::before { animation: none; }
+}
+
+/* ---------- Liquid Glass: прозрачнее, глубже, с бликом ---------- */
+:root[data-glass='liquid'] {
+  --lg-blur: blur(28px) saturate(2.1) brightness(1.04);
+  --lg-solid: rgba(255, 255, 255, 0.64);
+  --lg-bg: linear-gradient(150deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.46));
+  --lg-border: rgba(255, 255, 255, 0.78);
+  --lg-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 0 rgba(255, 255, 255, 0.35), inset 0 0 0 0.5px rgba(255, 255, 255, 0.45);
+  --lg-shadow: 0 12px 36px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06);
+  --lg-sheen: linear-gradient(155deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.12) 32%, rgba(255, 255, 255, 0) 55%);
+}
+:root[data-glass='liquid'][data-theme='dark'] {
+  --lg-solid: rgba(34, 37, 46, 0.6);
+  --lg-bg: linear-gradient(150deg, rgba(60, 64, 76, 0.66), rgba(24, 26, 32, 0.52));
+  --lg-border: rgba(255, 255, 255, 0.14);
+  --lg-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 -1px 0 rgba(255, 255, 255, 0.04), inset 0 0 0 0.5px rgba(255, 255, 255, 0.08);
+  --lg-shadow: 0 14px 40px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
+  --lg-sheen: linear-gradient(155deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.03) 30%, rgba(255, 255, 255, 0) 55%);
+}
+
+/* карточки, окна и меню: стекло с бликом сверху-слева */
+:root[data-glass='liquid'] :is(.card, .modal, .menu, .td-pop) {
+  background: var(--lg-sheen), var(--lg-solid);
+  border-color: var(--lg-border);
+  box-shadow: var(--lg-highlight), 0 0 0 0.5px var(--lg-edge), var(--lg-shadow);
+}
+:root[data-glass='liquid'] .modal { border-radius: 26px; }
+:root[data-glass='liquid'] .card { border-radius: 18px; }
+
+/* нижнее меню на телефоне — парящая «капля» */
+@media (max-width: 760px) {
+  :root[data-glass='liquid'] .sidebar {
+    background: var(--lg-sheen), var(--lg-bg);
+    border-radius: 30px;
+    box-shadow: var(--lg-highlight), 0 0 0 0.5px var(--lg-edge), 0 16px 40px rgba(15, 23, 42, 0.22);
+  }
+  :root[data-glass='liquid'] .nav-item.active {
+    background: color-mix(in srgb, var(--accent) 14%, var(--lg-solid));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 4px 14px color-mix(in srgb, var(--accent) 25%, transparent);
+  }
+}
+:root[data-glass='liquid'] .nav-item.active { color: var(--accent); }
+
+/* кнопки */
+:root[data-glass='liquid'] .btn:not(.btn-primary):not(.btn-ghost):not(.ai-grad) {
+  background: var(--lg-sheen), var(--lg-solid);
+  -webkit-backdrop-filter: blur(12px) saturate(1.6);
+  backdrop-filter: blur(12px) saturate(1.6);
+  border-color: color-mix(in srgb, var(--border) 85%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+:root[data-glass='liquid'][data-theme='dark'] .btn:not(.btn-primary):not(.btn-ghost):not(.ai-grad) {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+:root[data-glass='liquid'] .btn-primary,
+:root[data-glass='liquid'] .tk-fab,
+:root[data-glass='liquid'] .qa-send {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 92%, #fff), var(--accent) 55%, color-mix(in srgb, var(--accent) 70%, var(--accent-2)));
+  border-color: transparent;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), inset 0 -2px 6px rgba(0, 0, 0, 0.12), 0 6px 18px color-mix(in srgb, var(--accent) 38%, transparent);
+}
+
+/* сегменты: «капля» под выбранным пунктом */
+:root[data-glass='liquid'] .segmented { background: color-mix(in srgb, var(--surface-2) 55%, transparent); border-radius: 13px; }
+:root[data-glass='liquid'] .segmented button.active {
+  background: var(--lg-sheen), var(--lg-solid);
+  box-shadow: var(--lg-highlight), 0 3px 10px rgba(15, 23, 42, 0.12);
+  border-radius: 10px;
+}
+
+/* поля ввода — матовое стекло */
+:root[data-glass='liquid'] :is(.input, .select, .textarea) {
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  border-color: color-mix(in srgb, var(--border) 80%, transparent);
+}
+
+/* строки задач — лёгкое стекло */
+:root[data-glass='liquid'] .tk-row { background: var(--lg-sheen), var(--lg-solid); }
+
+/* шапки разделов */
+:root[data-glass='liquid'] .page-header { background: color-mix(in srgb, var(--surface) 42%, transparent); }
+
+/* ---------- Выбор акцента в настройках ---------- */
+.ap-accents { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.ap-accent {
+  display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 4px; border-radius: 14px;
+  border: 1px solid var(--border); background: var(--surface); font-size: 12px; font-weight: 600; color: var(--text-2);
+}
+.ap-accent i {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--a1), var(--a2));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 4px 10px color-mix(in srgb, var(--a1) 40%, transparent);
+}
+.ap-accent.active { border-color: var(--a1); color: var(--text); box-shadow: 0 0 0 2px color-mix(in srgb, var(--a1) 35%, transparent); }
+
+/* окна и меню лежат поверх затемнения с размытием — их собственное размытие там не работает,
+   поэтому они плотнее карточек (текст под окном не просвечивает) */
+:root[data-glass='liquid'] :is(.modal, .menu, .td-pop, .menu-sheet, .rm-card) {
+  background: var(--lg-sheen), rgba(255, 255, 255, 0.9);
+}
+:root[data-glass='liquid'][data-theme='dark'] :is(.modal, .menu, .td-pop, .menu-sheet, .rm-card) {
+  background: var(--lg-sheen), rgba(30, 32, 40, 0.94);
+}
+:root[data-glass='liquid'] .ai-grad {
+  background: linear-gradient(135deg, var(--accent), #a855f7);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 6px 18px color-mix(in srgb, #a855f7 30%, transparent);
+}

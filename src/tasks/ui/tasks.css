@@ -346,3 +346,6 @@
 .qa-help-body p { margin: 6px 0 0; color: var(--text-2); }
 .qa-help-body i { font-style: normal; color: var(--accent); font-weight: 600; }
 .tk-check-future { opacity: .4; display: inline-flex; }
+.rm-card { background: var(--lg-solid); }
+:root:not([data-glass='liquid']) .rm-card { background: rgba(255, 255, 255, 0.95); }
+:root:not([data-glass='liquid'])[data-theme='dark'] .rm-card { background: rgba(30, 32, 40, 0.96); }

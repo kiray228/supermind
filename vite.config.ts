@@ -1,5 +1,6 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig, type Plugin } from 'vite'
+import pkg from './package.json' with { type: 'json' }
 
 /** Генерирует sw.js со списком всех файлов сборки — приложение работает офлайн */
 function serviceWorker(): Plugin {
@@ -73,6 +74,7 @@ export default defineConfig({
   // IPv4: эмулятор Android подключается через adb reverse к 127.0.0.1
   server: { host: '127.0.0.1' },
   plugins: [react(), serviceWorker()],
+  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   build: {
     chunkSizeWarningLimit: 1500,
   },

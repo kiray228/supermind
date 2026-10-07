@@ -226,4 +226,10 @@ export interface Settings {
   model: string;
   theme: 'system' | 'light' | 'dark';
   language: 'ru';
+  /** цвет акцента (ACCENTS в ui/appearance.ts) */
+  accent?: string;
+  /** «soft» — лёгкое стекло, «liquid» — Liquid Glass */
+  glass?: 'soft' | 'liquid';
+  /** фон приложения */
+  backdrop?: 'gradient' | 'aurora' | 'plain';
 }

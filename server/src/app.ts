@@ -3,6 +3,7 @@
  *
  *   POST /auth/register, /auth/login, /auth/logout, /auth/password · GET /auth/me · DELETE /account
  *   GET /sync?since=N · POST /sync
+ *   GET /snapshots · GET /snapshots/:id · POST /snapshots — облачные копии данных (раз в сутки — сами)
  *   GET /push/key · POST /devices · PUT /devices/:id/schedule · POST /devices/:id/test · DELETE /devices/:id
  *   POST /cron — Neon Function Trigger раз в минуту: рассылает наступившие напоминания
  */
@@ -24,6 +25,8 @@ const VAPID_SUBJECT = 'https://kiray228.github.io/2mind/';
 const MAX_ITEM_BYTES = 8 * 1024 * 1024;
 const MAX_SCHEDULE = 500;
 const PULL_LIMIT = 300;
+/** Сколько облачных копий хранить на пользователя */
+const KEEP_SNAPSHOTS = 14;
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -218,6 +221,9 @@ export function createApp(deps: Deps) {
     const b = await body<{ items?: { key: string; value: unknown; updatedAt: number; deleted?: boolean; baseSeq?: number }[] }>(
       request,
     );
+    // перед первым за сутки изменением уже сохранённого — копия того, что было (защита от ошибочной синхронизации);
+    // новые ключи ничего не затирают — для них копия не нужна
+    if ((b.items ?? []).some((i) => Number(i.baseSeq) > 0)) await autoSnapshot(user.id);
     const results: { key: string; ok: boolean; seq?: number }[] = [];
     for (const item of (b.items ?? []).slice(0, 200)) {
       if (typeof item.key !== 'string' || !item.key || item.key.length > 300) continue;
@@ -236,6 +242,64 @@ export function createApp(deps: Deps) {
       results.push(rows[0] ? { key: item.key, ok: true, seq: Number(rows[0][0]) } : { key: item.key, ok: false });
     }
     return json({ results });
+  }
+
+  // ---------- Облачные копии ----------
+
+  /** Копия всех данных пользователя целиком внутри базы (без передачи по сети) */
+  async function snapshot(userId: string, reason: string) {
+    const rows = await sql.query(
+      `INSERT INTO snapshots (user_id, reason, keys, bytes, data)
+       SELECT $1, $2, count(*), coalesce(sum(length(value::text)), 0), jsonb_object_agg(key, value)
+       FROM kv WHERE user_id = $1 AND NOT deleted
+       HAVING count(*) > 0
+       RETURNING id`,
+      [userId, reason],
+    );
+    await sql.query(
+      `DELETE FROM snapshots WHERE user_id = $1 AND id NOT IN (
+         SELECT id FROM snapshots WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2)`,
+      [userId, KEEP_SNAPSHOTS],
+    );
+    return rows[0]?.[0] ?? null;
+  }
+
+  async function autoSnapshot(userId: string) {
+    const rows = await sql.query(
+      `SELECT 1 FROM snapshots WHERE user_id = $1 AND reason = 'auto' AND created_at > now() - interval '20 hours' LIMIT 1`,
+      [userId],
+    );
+    if (!rows[0]) await snapshot(userId, 'auto');
+  }
+
+  async function listSnapshots(request: Request) {
+    const user = await userOf(request);
+    const rows = await sql.query(
+      `SELECT id, (extract(epoch FROM created_at) * 1000)::bigint, reason, keys, bytes
+       FROM snapshots WHERE user_id = $1 ORDER BY created_at DESC`,
+      [user.id],
+    );
+    return json({
+      snapshots: rows.map(([id, at, reason, keys, bytes]) => ({ id, at: Number(at), reason, keys: Number(keys), bytes: Number(bytes) })),
+    });
+  }
+
+  async function getSnapshot(request: Request, id: string) {
+    const user = await userOf(request);
+    if (!/^\d+$/.test(id)) throw new HttpError(404, 'Копия не найдена');
+    const rows = await sql.query(`SELECT data, (extract(epoch FROM created_at) * 1000)::bigint FROM snapshots WHERE id = $1 AND user_id = $2`, [
+      id,
+      user.id,
+    ]);
+    if (!rows[0]) throw new HttpError(404, 'Копия не найдена');
+    return json({ id, at: Number(rows[0][1]), data: JSON.parse(rows[0][0]!) });
+  }
+
+  async function manualSnapshot(request: Request) {
+    const user = await userOf(request);
+    const id = await snapshot(user.id, 'manual');
+    if (!id) throw new HttpError(400, 'В облаке пока нет данных — дождитесь синхронизации');
+    return json({ id });
   }
 
   // ---------- Устройства и push ----------
@@ -395,6 +459,10 @@ export function createApp(deps: Deps) {
     if (m === 'DELETE' && path === '/account') return deleteAccount(request);
     if (m === 'GET' && path === '/sync') return pull(request, url);
     if (m === 'POST' && path === '/sync') return pushItems(request);
+    if (m === 'GET' && path === '/snapshots') return listSnapshots(request);
+    if (m === 'POST' && path === '/snapshots') return manualSnapshot(request);
+    const snap = /^\/snapshots\/([^/]+)$/.exec(path);
+    if (snap && m === 'GET') return getSnapshot(request, snap[1]);
     if (m === 'GET' && path === '/push/key') return json({ publicKey: (await vapidKeys()).publicKey });
     if (m === 'POST' && path === '/devices') return registerDevice(request);
     const dev = /^\/devices\/([^/]+)(\/schedule|\/test)?$/.exec(path);

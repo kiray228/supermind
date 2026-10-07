@@ -91,6 +91,16 @@ export const SCHEMA = [
     PRIMARY KEY (device_id, item_id)
   )`,
   `CREATE INDEX IF NOT EXISTS push_queue_due ON push_queue (fire_at) WHERE sent_at IS NULL`,
+  `CREATE TABLE IF NOT EXISTS snapshots (
+    id bigserial PRIMARY KEY,
+    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    reason text NOT NULL DEFAULT 'auto',
+    keys integer NOT NULL DEFAULT 0,
+    bytes integer NOT NULL DEFAULT 0,
+    data jsonb NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS snapshots_user ON snapshots (user_id, created_at DESC)`,
   `CREATE TABLE IF NOT EXISTS meta (
     key text PRIMARY KEY,
     value jsonb NOT NULL

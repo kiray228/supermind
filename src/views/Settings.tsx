@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Sparkles, Sun, Moon, Monitor, Download, Upload, Trash2, Smartphone, Eye, EyeOff, CheckCircle2, Info, BellRing, CalendarPlus } from 'lucide-react';
+import { Sparkles, Sun, Moon, Monitor, Smartphone, Eye, EyeOff, CheckCircle2, Info, BellRing, CalendarPlus } from 'lucide-react';
 import { isNative } from '../platform';
 import { AccountCard, PushCard } from '../ui/AccountCard';
+import { DataCard } from '../ui/DataCard';
+import { ACCENTS } from '../ui/appearance';
 import { isIOS } from '../io/download';
-import { ensureTasks, reloadTasks, setPrefs, useTasks } from '../tasks/store';
+import { ensureTasks, setPrefs, useTasks } from '../tasks/store';
 import { ALLDAY_REMINDER_OPTIONS, TIMED_REMINDER_OPTIONS } from '../tasks/model';
 import {
   enableCalendarSync,
@@ -17,11 +19,8 @@ import {
   type NotifyPermission,
   type PhoneCalendar,
 } from '../tasks/sync';
-import { get, set, keys, clear } from '../store/kv';
 import { useApp, toast } from '../store/appStore';
 import { AI_MODELS, streamText, AIError } from '../ai/claude';
-import { downloadBlob, pickFile } from '../io/download';
-import { confirmDialog } from '../ui/dialogs';
 
 export default function Settings() {
   const settings = useApp((s) => s.settings);
@@ -46,43 +45,6 @@ export default function Settings() {
     } finally {
       setTesting(false);
     }
-  };
-
-  const backup = async () => {
-    const all: Record<string, unknown> = {};
-    // API-ключ в копию не попадает
-    for (const k of await keys()) if (String(k) !== 'settings') all[String(k)] = await get(k);
-    const blob = new Blob([JSON.stringify({ format: 'supermind-backup', version: 1, createdAt: Date.now(), data: all })], { type: 'application/json' });
-    const d = new Date();
-    await downloadBlob(blob, `supermind-backup-${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}.json`);
-  };
-
-  const restore = async () => {
-    const f = await pickFile('.json,application/json');
-    if (!f) return;
-    try {
-      const j = JSON.parse(await f.text());
-      if ((j.format !== 'supermind-backup' && j.format !== '2mind-backup') || !j.data) throw new Error('Это не резервная копия SuperMind');
-      if (!(await confirmDialog('Восстановить из копии?', 'Карты из копии будут добавлены, совпадающие — заменены. Ежедневник и доска будут заменены.', { okText: 'Восстановить' }))) return;
-      const cur = ((await get('docs:index')) ?? []) as { id: string }[];
-      for (const [k, v] of Object.entries(j.data)) {
-        if (k === 'docs:index' || k === 'settings') continue;
-        await set(k, v);
-      }
-      const incoming = (j.data['docs:index'] ?? []) as { id: string }[];
-      const merged = [...incoming, ...cur.filter((c) => !incoming.some((i) => i.id === c.id))];
-      await set('docs:index', merged);
-      await reloadTasks();
-      toast('Восстановлено карт: ' + incoming.length);
-    } catch (e) {
-      toast('Ошибка: ' + (e instanceof Error ? e.message : String(e)));
-    }
-  };
-
-  const wipe = async () => {
-    if (!(await confirmDialog('Удалить все данные?', 'Все карты, ежедневник, доска задач и настройки будут удалены с этого устройства. Сначала сделайте резервную копию!', { danger: true, okText: 'Удалить всё' }))) return;
-    await clear();
-    location.reload();
   };
 
   return (
@@ -120,17 +82,35 @@ export default function Settings() {
               <button className={settings.theme === 'light' ? 'active' : ''} onClick={() => setSettings({ theme: 'light' })}><Sun size={14} /> Светлая</button>
               <button className={settings.theme === 'dark' ? 'active' : ''} onClick={() => setSettings({ theme: 'dark' })}><Moon size={14} /> Тёмная</button>
             </div>
-          </section>
-
-          <section className="card set-card">
-            <h3>Данные</h3>
-            <p className="muted small">Все данные хранятся локально на устройстве (IndexedDB) и работают без интернета. Делайте резервные копии, чтобы перенести карты на другое устройство.</p>
-            <div className="row" style={{ flexWrap: 'wrap' }}>
-              <button className="btn" onClick={backup}><Download size={16} /> Резервная копия</button>
-              <button className="btn" onClick={restore}><Upload size={16} /> Восстановить</button>
-              <button className="btn btn-danger" onClick={wipe}><Trash2 size={16} /> Удалить всё</button>
+            <label className="label">Цвет акцента</label>
+            <div className="ap-accents">
+              {ACCENTS.map((a) => (
+                <button
+                  key={a.id}
+                  className={`ap-accent${(settings.accent ?? 'flame') === a.id ? ' active' : ''}`}
+                  style={{ '--a1': a.color, '--a2': a.color2 } as React.CSSProperties}
+                  onClick={() => setSettings({ accent: a.id })}
+                  aria-label={a.name}
+                >
+                  <i />
+                  <span>{a.name}</span>
+                </button>
+              ))}
+            </div>
+            <label className="label">Стекло</label>
+            <div className="segmented">
+              <button className={(settings.glass ?? 'liquid') === 'liquid' ? 'active' : ''} onClick={() => setSettings({ glass: 'liquid' })}>Liquid Glass</button>
+              <button className={settings.glass === 'soft' ? 'active' : ''} onClick={() => setSettings({ glass: 'soft' })}>Спокойное</button>
+            </div>
+            <label className="label">Фон</label>
+            <div className="segmented">
+              <button className={(settings.backdrop ?? 'aurora') === 'aurora' ? 'active' : ''} onClick={() => setSettings({ backdrop: 'aurora' })}>Аврора</button>
+              <button className={settings.backdrop === 'gradient' ? 'active' : ''} onClick={() => setSettings({ backdrop: 'gradient' })}>Мягкий</button>
+              <button className={settings.backdrop === 'plain' ? 'active' : ''} onClick={() => setSettings({ backdrop: 'plain' })}>Однотонный</button>
             </div>
           </section>
+
+          <DataCard />
 
           <section className="card set-card">
             <h3><Smartphone size={18} /> Установка на телефон</h3>
@@ -140,7 +120,7 @@ export default function Settings() {
 
           <section className="card set-card">
             <h3><Info size={18} /> О приложении</h3>
-            <p className="small muted" style={{ margin: 0 }}>SuperMind 1.6 — бесплатные интеллект-карты, задачи с напоминаниями, календарь, фокус, ежедневник и доска задач. Все функции открыты, без подписок.</p>
+            <p className="small muted" style={{ margin: 0 }}>SuperMind 1.7 — бесплатные интеллект-карты, задачи с напоминаниями, календарь, заметки, цели, финансы, фокус, ежедневник и доска задач. Все функции открыты, без подписок.</p>
           </section>
         </div>
       </div>

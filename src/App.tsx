@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { Network, KanbanSquare, Settings as SettingsIcon, CheckSquare, CalendarRange, Timer, Menu as MenuIcon, NotebookPen } from 'lucide-react';
+import { Network, KanbanSquare, Settings as SettingsIcon, CheckSquare, CalendarRange, Timer, Menu as MenuIcon, NotebookPen, StickyNote, Target, Wallet } from 'lucide-react';
 import { useApp, type View } from './store/appStore';
 import { listDocs, loadSettings, saveDoc } from './store/db';
 import { get as idbGet, set as idbSet } from './store/kv';
@@ -14,6 +14,8 @@ import { todayYmd } from './utils/mapTasks';
 import { TaskDetailHost } from './tasks/ui/TaskDetail';
 import { QuickAddHost } from './tasks/ui/QuickAdd';
 import { ReminderStack } from './tasks/ui/Reminders';
+import { applyAppearance } from './ui/appearance';
+import './ui/appearance.css';
 import './app.css';
 
 const Editor = lazy(() => import('./editor/Editor'));
@@ -23,6 +25,9 @@ const Settings = lazy(() => import('./views/Settings'));
 const Tasks = lazy(() => import('./views/Tasks'));
 const Calendar = lazy(() => import('./views/Calendar'));
 const Focus = lazy(() => import('./views/Focus'));
+const Notes = lazy(() => import('./views/Notes'));
+const Goals = lazy(() => import('./views/Goals'));
+const Finance = lazy(() => import('./views/Finance'));
 
 /** phone: false — на телефоне пункт в меню «Ещё» */
 const NAV: { id: View; label: string; icon: typeof Network; phone: boolean }[] = [
@@ -30,6 +35,9 @@ const NAV: { id: View; label: string; icon: typeof Network; phone: boolean }[] =
   { id: 'tasks', label: 'Задачи', icon: CheckSquare, phone: true },
   { id: 'calendar', label: 'Календарь', icon: CalendarRange, phone: true },
   { id: 'planner', label: 'Ежедневник', icon: NotebookPen, phone: true },
+  { id: 'notes', label: 'Заметки', icon: StickyNote, phone: false },
+  { id: 'goals', label: 'Цели', icon: Target, phone: false },
+  { id: 'finance', label: 'Финансы', icon: Wallet, phone: false },
   { id: 'focus', label: 'Фокус', icon: Timer, phone: false },
   { id: 'board', label: 'Доска', icon: KanbanSquare, phone: false },
   { id: 'settings', label: 'Настройки', icon: SettingsIcon, phone: false },
@@ -41,6 +49,10 @@ export default function App() {
   const view = useApp((s) => s.view);
   const go = useApp((s) => s.go);
   const theme = useApp((s) => s.settings.theme);
+  const accent = useApp((s) => s.settings.accent);
+  const glass = useApp((s) => s.settings.glass);
+  const backdrop = useApp((s) => s.settings.backdrop);
+  useEffect(() => applyAppearance({ accent, glass, backdrop }), [accent, glass, backdrop]);
   const toastMsg = useApp((s) => s.toast);
   const toastAction = useApp((s) => s.toastAction);
   const [more, setMore] = useState(false);
@@ -84,6 +96,8 @@ export default function App() {
     const save = () => {
       void flushSave();
       void flushTasks();
+      void import('./finance/store').then((m) => m.flushFinance()).catch(() => {});
+      void import('./goals/store').then((m) => m.flushGoals()).catch(() => {});
     };
     window.addEventListener('pagehide', save);
     document.addEventListener('visibilitychange', save);
@@ -147,6 +161,9 @@ export default function App() {
           {view === 'tasks' && <Tasks />}
           {view === 'calendar' && <Calendar />}
           {view === 'focus' && <Focus />}
+          {view === 'notes' && <Notes />}
+          {view === 'goals' && <Goals />}
+          {view === 'finance' && <Finance />}
         </Suspense>
       </main>
       {more && (

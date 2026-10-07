@@ -99,6 +99,8 @@ function wire() {
 }
 
 async function startSession(a: Account) {
+  // данные устройства сольются с облачными — сначала копия на всякий случай
+  await (await import('./safety')).takeSnapshot('login');
   // другой аккаунт, чем в прошлый раз, — начинаем синхронизацию с нуля
   if (meta.userId !== a.user.id) meta = { cursor: 0, seqs: {}, userId: a.user.id };
   account = a;
@@ -140,6 +142,30 @@ export async function deleteAccount(password: string) {
   await delFromSync(ACCOUNT_KEY);
   await saveMeta();
   useCloud.setState({ account: null, status: 'idle' });
+}
+
+// ================= Облачные копии =================
+
+export interface CloudSnapshot {
+  id: string;
+  at: number;
+  reason: string;
+  keys: number;
+  bytes: number;
+}
+
+export async function listCloudSnapshots(): Promise<CloudSnapshot[]> {
+  return (await api<{ snapshots: CloudSnapshot[] }>('/snapshots')).snapshots;
+}
+
+export async function cloudSnapshotData(id: string): Promise<Record<string, unknown>> {
+  return (await api<{ data: Record<string, unknown> }>(`/snapshots/${id}`)).data;
+}
+
+/** Копия в облаке прямо сейчас (сначала отправим всё несохранённое) */
+export async function makeCloudSnapshot() {
+  await syncNow();
+  await api('/snapshots', { method: 'POST', body: '{}' });
 }
 
 // ================= Синхронизация =================

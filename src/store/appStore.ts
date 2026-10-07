@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { Settings } from '../types';
 import { DEFAULT_SETTINGS, saveSettings } from './db';
 
-export type View = 'home' | 'editor' | 'board' | 'planner' | 'settings' | 'tasks' | 'calendar' | 'focus';
+export type View = 'home' | 'editor' | 'board' | 'planner' | 'settings' | 'tasks' | 'calendar' | 'focus' | 'notes' | 'goals' | 'finance';
 
 interface AppState {
   view: View;
@@ -18,7 +18,7 @@ interface AppState {
 }
 
 /** последний открытый раздел — приложение открывается там, где закончили */
-const RESTORABLE: View[] = ['home', 'tasks', 'calendar', 'planner', 'board', 'focus', 'settings'];
+const RESTORABLE: View[] = ['home', 'tasks', 'calendar', 'planner', 'board', 'focus', 'settings', 'notes', 'goals', 'finance'];
 function initialView(): View {
   try {
     const v = localStorage.getItem('sm-view') as View | null;

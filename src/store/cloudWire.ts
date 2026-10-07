@@ -12,6 +12,9 @@ export async function setupCloud() {
 
   onBeforeSync(async () => (await import('./docStore')).flushSave());
   onBeforeSync(async () => (await import('../tasks/store')).flushTasks());
+  onBeforeSync(async () => (await import('../finance/store')).flushFinance());
+  onBeforeSync(async () => (await import('../goals/store')).flushGoals());
+  onBeforeSync(async () => (await import('../notes/store')).flushNotes());
 
   onRemoteChange(
     (k) => k === 'tasks',
@@ -43,6 +46,18 @@ export async function setupCloud() {
   );
 
   onRemoteChange(
+    (k) => k === 'finance',
+    async () => (await import('../finance/store')).reloadFinance(),
+  );
+  onRemoteChange(
+    (k) => k === 'goals',
+    async () => (await import('../goals/store')).reloadGoals(),
+  );
+  onRemoteChange(
+    (k) => k === 'notes' || k.startsWith('note:'),
+    async () => (await import('../notes/store')).reloadNotes(),
+  );
+  onRemoteChange(
     (k) => k === 'planner',
     () => void window.dispatchEvent(new Event('sm-planner-changed')),
   );
@@ -51,5 +66,7 @@ export async function setupCloud() {
     () => void window.dispatchEvent(new Event('sm-board-changed')),
   );
 
+  // копия до первой синхронизации — если что-то пойдёт не так, будет из чего вернуть
+  await (await import('./safety')).startupSafety();
   await initCloud();
 }

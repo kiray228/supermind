@@ -7,7 +7,7 @@ import { pushActive, uploadSchedule } from '../store/push';
 import { useApp, toast } from '../store/appStore';
 import { todayYmd, toYmd, addDaysYmd, fromYmd } from '../utils/mapTasks';
 import { isIOS, downloadText } from '../io/download';
-import { minutesOf, reminderFires, startAt, timeOf, whenLabel, type TaskItem } from './model';
+import { dayLabel, minutesOf, reminderFires, startAt, timeOf, whenLabel, type TaskItem } from './model';
 import { buildIcs, taskDescription, toRRule } from './ics';
 import { completeOccurrence, getTask, openTask, tasksData, useTasks } from './store';
 
@@ -175,6 +175,26 @@ async function plan(fromMs: number, toMs: number): Promise<Planned[]> {
         if (at <= toMs) out.push({ id: hash(`${f.task.id}|${f.date}|nag${k}`), at, title: '⏰ ' + (f.task.title || 'Задача'), body: 'Ещё не выполнено · ' + reminderBody(f.task, f.date, at), extra: base });
       }
   }
+  // платежи по подпискам (раздел «Финансы»): напоминание в 09:00 за указанное число дней
+  const fin = await get<import('../finance/model').FinanceData>('finance').catch(() => undefined);
+  if (fin?.subscriptions?.length) {
+    const { upcomingPayments } = await import('../finance/model');
+    const fromDay = toYmd(new Date(fromMs));
+    for (const pay of upcomingPayments(fin, fromDay, toYmd(new Date(toMs + 31 * 86400000)))) {
+      if (pay.remindDays < 0) continue;
+      const day = addDaysYmd(pay.date, -pay.remindDays);
+      const at = fromYmd(day).getTime() + 9 * 3600000;
+      if (at < fromMs || at > toMs) continue;
+      const amount = new Intl.NumberFormat('ru-RU', { style: 'currency', currency: pay.currency, maximumFractionDigits: 2 }).format(pay.amount);
+      out.push({
+        id: hash(`pay|${pay.id}`),
+        at,
+        title: `💳 ${pay.title}`,
+        body: `${pay.remindDays === 0 ? 'Платёж сегодня' : `Платёж ${dayLabel(pay.date, day).toLowerCase()}`} · ${amount}`,
+        extra: { payId: pay.id, date: pay.date, sm: 1 },
+      });
+    }
+  }
   // привычки с напоминанием
   const p = await get<PlannerData>('planner').catch(() => undefined);
   for (const h of p?.habits ?? []) {
@@ -242,6 +262,10 @@ async function handleAction(action: string, ex: Record<string, string>) {
         toast('Привычка отмечена');
       }
     } else useApp.getState().go('planner');
+    return;
+  }
+  if (ex.payId) {
+    useApp.getState().go('finance');
     return;
   }
   const t = ex.taskId ? getTask(ex.taskId) : undefined;
@@ -313,7 +337,7 @@ async function syncNative() {
         largeBody: w.body,
         schedule: { at: new Date(w.at), allowWhileIdle: true },
         channelId: 'sm-reminders',
-        actionTypeId: w.extra.habitId ? 'sm-habit' : 'sm-task',
+        actionTypeId: w.extra.habitId ? 'sm-habit' : w.extra.payId ? undefined : 'sm-task',
         autoCancel: true,
         extra: { ...w.extra, sig: sig(w) },
       })),

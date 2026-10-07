@@ -15,6 +15,7 @@ import { IMPORT_ACCEPT, importFile, exportNative } from '../io/index';
 import { PROMPTS, streamText, AIError } from '../ai/claude';
 import { uid } from '../utils/tree';
 import { STRUCTURES } from '../editor/Inspector';
+import { AccountNudge } from '../ui/AccountNudge';
 import './home.css';
 
 type Tab = 'recent' | 'starred' | 'trash';
@@ -123,6 +124,7 @@ export default function Home() {
         <button className="btn btn-primary" onClick={() => createAndOpen(docFromTemplate(TEMPLATES[0]))}><Plus size={16} /> <span className="hide-xs">Новая</span></button>
       </div>
       <div className="page-body">
+        <AccountNudge />
         <section className="home-section">
           <div className="row" style={{ marginBottom: 10 }}>
             <h2 className="home-h2">Создать</h2>
