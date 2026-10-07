@@ -13,7 +13,7 @@ import {
   Plus,
   Settings2,
   Smile,
-  Trash2,
+  Sparkles,
   X,
 } from 'lucide-react';
 import type { Habit, PlannerData, PlannerDay } from '../types';
@@ -26,10 +26,11 @@ import '../tasks/ui/tasks.css';
 import { loadAllDocs, loadPlanner, savePlanner } from '../store/db';
 import { addDaysYmd, collectMapTasks, fromYmd, PRIORITY_META, todayYmd, toYmd, updateMapTask } from '../utils/mapTasks';
 import type { MapTask } from '../utils/mapTasks';
-import { uid } from '../utils/tree';
 import { openDoc } from '../actions';
 import { confirmDialog } from '../ui/dialogs';
 import { toast } from '../store/appStore';
+import { activeHabits, cleanHabit, countOn, doneOn, dueOn, isCounter, reminderTimeOf, withCount, withDone, withoutHabit } from '../habits/model';
+import { HabitDetail, HabitEditor, HabitsManager, HabitsToday } from '../habits/ui';
 import './views.css';
 
 // ---------- Константы ----------
@@ -50,10 +51,10 @@ const MOOD_NAMES: Record<string, string> = {
   '🤩': 'Восторг',
   '😴': 'Усталость',
 };
-const HABIT_COLORS = ['#22c55e', '#14b8a6', '#3b82f6', '#6366f1', '#a855f7', '#ec4899', '#ef4444', '#f97316', '#f59e0b', '#64748b'];
 
 const emptyDay = (): PlannerDay => ({ journal: '', tasks: [] });
-const isEmptyDay = (d: PlannerDay) => !d.journal.trim() && !d.mood && !d.tasks?.length && !d.habits?.length;
+const isEmptyDay = (d: PlannerDay) =>
+  !d.journal.trim() && !d.mood && !d.tasks?.length && !d.habits?.length && !Object.keys(d.habitCounts ?? {}).length;
 
 /** Понедельник недели, в которую входит дата */
 function mondayOf(ymd: string): string {
@@ -92,7 +93,12 @@ export default function Planner() {
   const [date, setDate] = useState(todayYmd);
   const [mapTasks, setMapTasks] = useState<MapTask[]>([]);
   const [calOpen, setCalOpen] = useState(false);
-  const [habitsOpen, setHabitsOpen] = useState(false);
+  /** окно «Привычки»: свои / библиотека */
+  const [habitsOpen, setHabitsOpen] = useState<false | 'mine' | 'library'>(false);
+  /** карточка привычки со статистикой */
+  const [detailId, setDetailId] = useState<string | null>(null);
+  /** редактор: привычка или новая */
+  const [editing, setEditing] = useState<Habit | 'new' | null>(null);
   const tasksDataState = useTasks((s) => s.data);
   const today = todayYmd();
 
@@ -223,49 +229,80 @@ export default function Planner() {
   };
 
   // ----- привычки -----
-  const habitDone = (ymd: string, id: string) => !!data.days[ymd]?.habits?.includes(id);
-  const toggleHabit = (id: string) =>
-    updateDay(date, (d) => {
-      const hs = d.habits ?? [];
-      return { ...d, habits: hs.includes(id) ? hs.filter((x) => x !== id) : [...hs, id] };
-    });
-  const streakOf = (id: string) => {
-    let d = habitDone(date, id) ? date : addDaysYmd(date, -1);
-    let n = 0;
-    while (habitDone(d, id) && n < 10000) {
-      n++;
-      d = addDaysYmd(d, -1);
+  const habits = activeHabits(data.habits);
+  const dueHabits = habits.filter((h) => dueOn(data.days, h, date));
+  const dueIds = new Set(dueHabits.map((h) => h.id));
+  const habitsDoneToday = dueHabits.filter((h) => doneOn(data.days, h, date)).length;
+
+  /** нажатие на кружок: отметка или +1 (выполненный счётчик — −1) */
+  const tapHabit = (h: Habit, delta?: -1) => {
+    if (date > today) {
+      toast('Отметить привычку заранее нельзя');
+      return;
     }
-    return n;
+    const before = dataRef.current!;
+    let nowDone = false;
+    updateDay(date, (d) => {
+      const on = doneOn({ [date]: d }, h, date);
+      const next = isCounter(h) ? withCount(d, h, countOn(d, h) + (delta ?? (on ? -1 : 1))) : withDone(d, h, !on);
+      nowDone = !on && doneOn({ [date]: next }, h, date);
+      return next;
+    });
+    if (date === today) syncSoon(1500);
+    if (nowDone) navigator.vibrate?.(10);
+    // все привычки дня выполнены — маленький праздник
+    const after = dataRef.current!;
+    const allNow = dueHabits.length > 0 && dueHabits.every((x) => doneOn(after.days, x, date));
+    const allBefore = dueHabits.every((x) => doneOn(before.days, x, date));
+    if (nowDone && allNow && !allBefore) toast('🎉 Все привычки на сегодня выполнены!');
   };
-  const setHabitRemind = (h: Habit, remind: string | undefined) => {
+  /** отметка дня из карточки привычки (тепловая карта) */
+  const toggleHabitDay = (h: Habit, ymd: string) => {
+    if (ymd > today) return;
+    updateDay(ymd, (d) => withDone(d, h, !doneOn({ [ymd]: d }, h, ymd)));
+    if (ymd === today) syncSoon(1500);
+  };
+  const saveHabit = (h: Habit) => {
     const p = dataRef.current!;
-    commit({ ...p, habits: p.habits.map((x) => (x.id === h.id ? { ...x, remind } : x)) });
-    if (remind) void askNotifyIfNeeded();
+    const exists = p.habits.some((x) => x.id === h.id);
+    commit({ ...p, habits: exists ? p.habits.map((x) => (x.id === h.id ? h : x)) : [...p.habits, h] });
+    if (reminderTimeOf(h) && !h.archived) void askNotifyIfNeeded();
     syncSoon(300);
   };
-  const addHabit = (name: string, color: string) => {
-    const p = dataRef.current!;
-    commit({ ...p, habits: [...p.habits, { id: uid(), name, color }] });
+  const addPreset = (h: Habit) => {
+    saveHabit(h);
+    toast(`${h.icon ?? ''} «${h.name}» добавлена`.trim());
+  };
+  const archiveHabit = (h: Habit, archived: boolean) => {
+    saveHabit(cleanHabit({ ...h, archived }));
+    toast(archived ? 'Привычка в архиве — история сохранена' : 'Привычка снова активна');
+    if (archived) setDetailId(null);
   };
   const deleteHabit = async (h: Habit) => {
-    const ok = await confirmDialog(`Удалить привычку «${h.name}»?`, 'История отметок этой привычки тоже будет удалена.', { okText: 'Удалить', danger: true });
+    const ok = await confirmDialog(`Удалить привычку «${h.name}»?`, 'История отметок этой привычки тоже будет удалена. Чтобы сохранить историю, отправьте привычку в архив.', {
+      okText: 'Удалить',
+      danger: true,
+    });
     if (!ok) return;
     const p = dataRef.current!;
     const days: Record<string, PlannerDay> = {};
     for (const [k, d] of Object.entries(p.days)) {
-      const nd = d.habits?.includes(h.id) ? { ...d, habits: d.habits.filter((x) => x !== h.id) } : d;
+      const nd = withoutHabit(d, h.id);
       if (!isEmptyDay(nd)) days[k] = nd;
     }
-    commit({ habits: p.habits.filter((x) => x.id !== h.id), days });
+    // отметка об удалении остаётся в списке — чтобы привычка не вернулась при синхронизации с другого устройства
+    const tomb: Habit = { id: h.id, name: h.name, color: h.color, deleted: true, archived: true, updatedAt: Date.now() };
+    commit({ habits: p.habits.map((x) => (x.id === h.id ? tomb : x)), days });
+    setDetailId(null);
+    setEditing(null);
+    syncSoon(300);
   };
+  const detail = detailId ? data.habits.find((h) => h.id === detailId && !h.deleted) : undefined;
 
   const pick = (ymd: string) => {
     setDate(ymd);
     setCalOpen(false);
   };
-
-  const habitsDoneToday = data.habits.filter((h) => habitDone(date, h.id)).length;
 
   return (
     <div className="page pl-page">
@@ -392,54 +429,47 @@ export default function Planner() {
                     <Flame size={18} className="pl-sec-icon" />
                     <h3>Привычки</h3>
                     <div className="grow" />
-                    {data.habits.length > 0 && (
+                    {dueHabits.length > 0 && (
                       <span className="pl-sec-meta">
-                        {habitsDoneToday} из {data.habits.length}
+                        {habitsDoneToday} из {dueHabits.length}
                       </span>
                     )}
-                    <button className="icon-btn pl-sec-btn" onClick={() => setHabitsOpen(true)} title="Настроить привычки">
+                    <button className="icon-btn pl-sec-btn" onClick={() => setHabitsOpen('library')} title="Библиотека привычек">
+                      <Sparkles />
+                    </button>
+                    <button className="icon-btn pl-sec-btn" onClick={() => setHabitsOpen('mine')} title="Мои привычки">
                       <Settings2 />
                     </button>
                   </header>
-                  {data.habits.length === 0 ? (
-                    <div className="pl-empty-line">
-                      <button className="btn btn-sm" onClick={() => setHabitsOpen(true)}>
-                        <Plus size={15} /> Добавить привычку
-                      </button>
+                  {habits.length === 0 ? (
+                    <div className="pl-habit-empty">
+                      <div className="small muted">Полезные привычки — по шагу каждый день. Отмечайте и следите за сериями.</div>
+                      <div className="row">
+                        <button className="btn btn-sm btn-primary" onClick={() => setEditing('new')}>
+                          <Plus size={15} /> Своя привычка
+                        </button>
+                        <button className="btn btn-sm" onClick={() => setHabitsOpen('library')}>
+                          <Sparkles size={15} /> Из библиотеки
+                        </button>
+                      </div>
                     </div>
                   ) : (
-                    <div className="pl-habits">
-                      {data.habits.map((h) => {
-                        const on = habitDone(date, h.id);
-                        const streak = streakOf(h.id);
-                        return (
-                          <div key={h.id} className={`pl-habit${on ? ' on' : ''}`} style={{ ['--hc' as string]: h.color }}>
-                            <button className="pl-habit-toggle" onClick={() => toggleHabit(h.id)} aria-pressed={on} aria-label={h.name}>
-                              {on ? <Check size={16} strokeWidth={3} /> : h.icon ?? null}
-                            </button>
-                            <div className="grow pl-habit-body" onClick={() => toggleHabit(h.id)}>
-                              <div className="pl-habit-name ellipsis">{h.name}</div>
-                              <div className="pl-habit-week">
-                                {Array.from({ length: 7 }, (_, i) => {
-                                  const d = addDaysYmd(date, i - 6);
-                                  return (
-                                    <span
-                                      key={d}
-                                      className={`pl-habit-cell${habitDone(d, h.id) ? ' on' : ''}${d === date ? ' cur' : ''}`}
-                                      title={`${fromYmd(d).getDate()} ${MONTHS_GEN[fromYmd(d).getMonth()]}`}
-                                    />
-                                  );
-                                })}
-                              </div>
-                            </div>
-                            <span className={`pl-streak${streak > 0 ? ' active' : ''}`} title="Серия дней подряд">
-                              <Flame size={14} />
-                              {streak}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
+                    <>
+                      {dueHabits.length > 0 && (
+                        <div className={`pl-progress${habitsDoneToday === dueHabits.length ? ' is-full' : ''}`}>
+                          <span style={{ width: `${(habitsDoneToday / dueHabits.length) * 100}%` }} />
+                        </div>
+                      )}
+                      <HabitsToday
+                        habits={habits}
+                        days={data.days}
+                        date={date}
+                        dueIds={dueIds}
+                        onTap={(h) => tapHabit(h)}
+                        onMinus={(h) => tapHabit(h, -1)}
+                        onOpen={(h) => setDetailId(h.id)}
+                      />
+                    </>
                   )}
                 </section>
 
@@ -477,7 +507,44 @@ export default function Planner() {
         </div>
       )}
 
-      {habitsOpen && <HabitsModal habits={data.habits} onAdd={addHabit} onRemind={setHabitRemind} onDelete={deleteHabit} onClose={() => setHabitsOpen(false)} />}
+      {habitsOpen && (
+        <HabitsManager
+          key={habitsOpen}
+          habits={data.habits}
+          initialTab={habitsOpen}
+          onEdit={(h) => setDetailId(h.id)}
+          onCreate={() => setEditing('new')}
+          onAddPreset={addPreset}
+          onRestore={(h) => archiveHabit(h, false)}
+          onClose={() => setHabitsOpen(false)}
+        />
+      )}
+      {detail && (
+        <HabitDetail
+          h={detail}
+          days={data.days}
+          today={today}
+          onClose={() => setDetailId(null)}
+          onEdit={() => setEditing(detail)}
+          onArchive={(a) => archiveHabit(detail, a)}
+          onDelete={() => void deleteHabit(detail)}
+          onToggleDay={(ymd) => toggleHabitDay(detail, ymd)}
+        />
+      )}
+      {editing && (
+        <HabitEditor
+          key={editing === 'new' ? 'new' : editing.id}
+          habit={editing === 'new' ? undefined : editing}
+          colorIndex={data.habits.length}
+          onSave={(h) => {
+            saveHabit(h);
+            setEditing(null);
+            if (editing === 'new') toast(`Привычка «${h.name}» добавлена`);
+          }}
+          onDelete={editing === 'new' ? undefined : () => void deleteHabit(editing)}
+          onClose={() => setEditing(null)}
+        />
+      )}
     </div>
   );
 }
@@ -736,92 +803,6 @@ function Journal({ date, initial, onSave }: { date: string; initial: string; onS
         onChange={(e) => change(e.target.value)}
       />
       {words > 0 && <div className="tiny faint pl-journal-count">{words} сл.</div>}
-    </div>
-  );
-}
-
-// ---------- Управление привычками ----------
-
-function HabitsModal({
-  habits,
-  onAdd,
-  onRemind,
-  onDelete,
-  onClose,
-}: {
-  habits: Habit[];
-  onAdd: (name: string, color: string) => void;
-  onRemind: (h: Habit, time: string | undefined) => void;
-  onDelete: (h: Habit) => void;
-  onClose: () => void;
-}) {
-  const [name, setName] = useState('');
-  const [color, setColor] = useState(HABIT_COLORS[habits.length % HABIT_COLORS.length]);
-  const submit = () => {
-    const v = name.trim();
-    if (!v) return;
-    onAdd(v, color);
-    setName('');
-    setColor(HABIT_COLORS[(habits.length + 1) % HABIT_COLORS.length]);
-  };
-  return (
-    <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal" onKeyDown={(e) => e.key === 'Escape' && onClose()}>
-        <div className="row">
-          <h2 className="grow">Привычки</h2>
-          <button className="icon-btn" onClick={onClose} aria-label="Закрыть">
-            <X />
-          </button>
-        </div>
-        <p className="muted small" style={{ margin: '2px 0 10px' }}>
-          Отмечайте привычки каждый день и следите за сериями. Укажите время — придёт ежедневное напоминание.
-        </p>
-        {habits.length > 0 && (
-          <div className="pl-habit-list">
-            {habits.map((h) => (
-              <div key={h.id} className="pl-habit-item">
-                <span className="pl-habit-swatch" style={{ background: h.color }} />
-                <span className="grow ellipsis">{h.name}</span>
-                <input
-                  type="time"
-                  className="pl-time"
-                  title="Напоминать каждый день"
-                  aria-label="Время напоминания"
-                  value={h.remind ?? ''}
-                  onChange={(e) => onRemind(h, e.target.value || undefined)}
-                />
-                <button className="icon-btn" onClick={() => onDelete(h)} aria-label="Удалить привычку">
-                  <Trash2 />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-        <label className="label">Новая привычка</label>
-        <div className="row">
-          <input
-            className="input"
-            placeholder="Напр. «Зарядка», «Читать 20 минут»"
-            value={name}
-            autoFocus
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && submit()}
-          />
-          <button className="btn btn-primary" onClick={submit} disabled={!name.trim()}>
-            <Plus size={16} /> Добавить
-          </button>
-        </div>
-        <div className="pl-colors">
-          {HABIT_COLORS.map((c) => (
-            <button key={c} className={`kb-swatch${c === color ? ' active' : ''}`} style={{ background: c }} onClick={() => setColor(c)} aria-label={c} />
-          ))}
-        </div>
-        <div className="modal-actions">
-          <button className="btn" onClick={onClose}>
-            Готово
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

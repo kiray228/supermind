@@ -1,0 +1,19 @@
+/* ---------- Кольцо уровня и значок уровня ---------- */
+.lvl-ring { position: relative; display: inline-grid; place-items: center; flex: none; }
+.lvl-ring svg { position: absolute; inset: 0; overflow: visible; }
+.lvl-ring-track { color: color-mix(in srgb, var(--text-3) 22%, transparent); }
+.lvl-ring-bar { transition: stroke-dasharray .8s cubic-bezier(.2, .8, .2, 1); }
+.lvl-ring-inner { position: relative; display: grid; place-items: center; text-align: center; line-height: 1; }
+
+.lvl-badge {
+  display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 12px 0 5px;
+  border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  font: inherit; cursor: pointer; box-shadow: var(--shadow); max-width: 100%;
+}
+.lvl-badge:hover { background: var(--surface-2); }
+.lvl-badge:active { transform: scale(.97); }
+.lvl-badge.compact { height: 32px; padding: 0 4px; gap: 0; }
+.lvl-badge .lvl-ring-inner b { font-size: 11px; font-weight: 800; color: var(--accent); }
+.lvl-badge-text { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; line-height: 1.1; }
+.lvl-badge-title { font-size: 12.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
+.lvl-badge-xp { font-size: 10.5px; color: var(--text-3); font-variant-numeric: tabular-nums; white-space: nowrap; }

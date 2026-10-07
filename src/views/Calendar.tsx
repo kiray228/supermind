@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, MouseEvent as RMouseEvent, PointerEvent as RPointerEvent, RefObject, TouchEvent as RTouchEvent } from 'react';
-import { CalendarDays, Check, ChevronLeft, ChevronRight, Download, MoreHorizontal, Network, Plus } from 'lucide-react';
+import { CalendarDays, Check, ChevronLeft, ChevronRight, Download, MoreHorizontal, Network, Plus, Repeat } from 'lucide-react';
 import { ensureTasks, openQuickAdd, openTask, toggleDone, updateTask, useTasks } from '../tasks/store';
 import { dayLabel, isActive, isOverdue, longDate, minutesOf, mondayOf, MONTHS, occurrences, pad2, timeOf, WD_SHORT } from '../tasks/model';
 import type { TasksData, TaskItem } from '../tasks/model';
@@ -8,9 +8,13 @@ import { exportTasksIcs, phoneEvents } from '../tasks/sync';
 import type { PhoneEvent } from '../tasks/sync';
 import { addDaysYmd, collectMapTasks, fromYmd, PRIORITY_META, todayYmd, toYmd } from '../utils/mapTasks';
 import type { MapTask } from '../utils/mapTasks';
-import { loadAllDocs } from '../store/db';
+import { loadAllDocs, loadPlanner } from '../store/db';
 import { openDoc } from '../actions';
-import { toast } from '../store/appStore';
+import { toast, useApp } from '../store/appStore';
+import type { Habit, PlannerData } from '../types';
+import type { GoalDue, GoalsData } from '../goals/model';
+import { activeHabits, doneOn, dueOn, isCounter } from '../habits/model';
+import { toggleHabitOn } from '../habits/store';
 import './calendar.css';
 
 // ---------- Константы ----------
@@ -65,10 +69,10 @@ const utcYmd = (ms: number) => {
 
 // ---------- Элементы календаря ----------
 
-/** Одна запись в календаре: задача (или её повтор), событие телефона или задача из карты */
+/** Одна запись в календаре: задача (или её повтор), событие телефона, задача из карты, привычка или срок цели */
 interface Item {
   key: string;
-  kind: 'task' | 'phone' | 'map';
+  kind: 'task' | 'phone' | 'map' | 'habit' | 'goal';
   date: string;
   title: string;
   /** минуты от полуночи; нет — на весь день */
@@ -85,11 +89,30 @@ interface Item {
   task?: TaskItem;
   ev?: PhoneEvent;
   map?: MapTask;
+  habit?: Habit;
+  goal?: GoalDue;
 }
 
 type ByDay = Record<string, Item[]>;
 
-function buildItems(data: TasksData, maps: MapTask[], events: PhoneEvent[], from: string, to: string, today: string, now: number): ByDay {
+type GoalsDueFn = (data: GoalsData, from: string, to: string) => GoalDue[];
+
+const minutes = (t: string) => {
+  const [h, m] = t.split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+};
+
+function buildItems(
+  data: TasksData,
+  maps: MapTask[],
+  events: PhoneEvent[],
+  from: string,
+  to: string,
+  today: string,
+  now: number,
+  planner: PlannerData | null,
+  goals: GoalDue[],
+): ByDay {
   const by: ByDay = {};
   const push = (it: Item) => (by[it.date] ??= []).push(it);
   const listColor = new Map(data.lists.map((l) => [l.id, l.color]));
@@ -161,6 +184,51 @@ function buildItems(data: TasksData, maps: MapTask[], events: PhoneEvent[], from
     }
   }
 
+  // привычки со временем — в запланированные дни (N раз в неделю — пока цель недели не набрана)
+  if (planner) {
+    const pdays = planner.days ?? {};
+    for (const h of activeHabits(planner.habits)) {
+      if (!h.time) continue;
+      const born = h.createdAt ? toYmd(new Date(h.createdAt)) : '';
+      for (let d = from; d <= to; d = addDaysYmd(d, 1)) {
+        const done = doneOn(pdays, h, d);
+        if (!done && (d < born || !dueOn(pdays, h, d))) continue;
+        push({
+          key: `h:${h.id}:${d}`,
+          kind: 'habit',
+          date: d,
+          title: `${h.icon ? `${h.icon} ` : ''}${h.name}`,
+          start: minutes(h.time),
+          dur: h.duration || 15,
+          color: h.color,
+          done,
+          overdue: false,
+          base: true,
+          movable: false,
+          habit: h,
+        });
+      }
+    }
+  }
+
+  // сроки целей и этапов — на весь день
+  for (const g of goals) {
+    if (g.date < from || g.date > to) continue;
+    push({
+      key: `g:${g.id}`,
+      kind: 'goal',
+      date: g.date,
+      title: `${g.kind === 'goal' ? '🎯' : '🚩'} ${g.title}`,
+      dur: 0,
+      color: '#a855f7',
+      done: false,
+      overdue: g.date < today,
+      base: true,
+      movable: false,
+      goal: g,
+    });
+  }
+
   for (const k of Object.keys(by)) {
     by[k].sort((a, b) => (a.start ?? -1) - (b.start ?? -1) || Number(a.done) - Number(b.done) || a.title.localeCompare(b.title, 'ru'));
   }
@@ -196,20 +264,56 @@ function periodTitle(view: CalView, days: string[], cursor: string): string {
 }
 
 function timeLabel(it: Item): string {
+  if (it.goal) return it.goal.kind === 'goal' ? 'Срок цели' : 'Срок этапа';
   if (it.start == null) return 'Весь день';
   if (it.task && !it.task.duration) return timeOf(it.start);
+  if (it.habit && !it.habit.duration) return timeOf(it.start);
   return `${timeOf(it.start)}–${timeOf(it.start + it.dur)}`;
+}
+
+/** Привычка: отметить / снять отметку (будущие дни и счётчики — открыть Ежедневник) */
+async function tapHabit(it: Item) {
+  const h = it.habit!;
+  const today = todayYmd();
+  if (it.date > today) {
+    toast(`${it.title} — ${dayLabel(it.date, today).toLowerCase()} в ${timeOf(it.start ?? 0)}`);
+    return;
+  }
+  if (isCounter(h)) {
+    useApp.getState().go('planner');
+    return;
+  }
+  try {
+    const done = await toggleHabitOn(h, it.date);
+    toast(done ? `✓ ${h.name} — выполнено` : `${h.name} — отметка снята`);
+  } catch {
+    toast('Не удалось отметить привычку');
+  }
+}
+
+/** Цель: открыть раздел «Цели» и карточку цели */
+function openGoalDue(g: GoalDue) {
+  useApp.getState().go('goals');
+  // карточку открываем, когда раздел уже показан (при первом показе раздел сбрасывает открытую цель)
+  void import('../goals/store')
+    .then((m) => setTimeout(() => m.openGoal(g.goalId), 300))
+    .catch(() => undefined);
 }
 
 /** Нажатие на запись: задача — карточка, карта — тема, событие телефона — подсказка */
 function activate(it: Item) {
-  if (it.task) openTask(it.task.id);
+  if (it.habit) void tapHabit(it);
+  else if (it.goal) openGoalDue(it.goal);
+  else if (it.task) openTask(it.task.id);
   else if (it.map) void openDoc(it.map.docId, it.map.topicId);
   else if (it.ev) toast(`${it.title} · ${dayLabel(it.date)}, ${timeLabel(it).toLowerCase()} · ${it.ev.calendar || 'Календарь телефона'}`);
 }
 
 const kindIcon = (it: Item, size = 11) =>
-  it.kind === 'phone' ? <CalendarDays size={size} /> : it.kind === 'map' ? <Network size={size} /> : null;
+  it.kind === 'phone' ? <CalendarDays size={size} /> : it.kind === 'map' ? <Network size={size} /> : it.kind === 'habit' ? <Repeat size={size} /> : null;
+
+/** Привычки в месяце и списке не показываются (каждый день — слишком много); только в днях/неделе */
+const noHabits = (list: Item[] | undefined) => (list ?? []).filter((it) => it.kind !== 'habit');
 
 // ---------- Календарь ----------
 
@@ -219,6 +323,9 @@ export default function Calendar() {
   const [cursor, setCursor] = useState(todayYmd);
   const [maps, setMaps] = useState<MapTask[]>([]);
   const [events, setEvents] = useState<PhoneEvent[]>([]);
+  const [planner, setPlanner] = useState<PlannerData | null>(null);
+  /** цели (только чтение): данные и функция выборки сроков из модуля целей */
+  const [goalsSrc, setGoalsSrc] = useState<{ data: GoalsData | null; due: GoalsDueFn } | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [menu, setMenu] = useState<DOMRect | null>(null);
   const narrow = useNarrow();
@@ -234,9 +341,28 @@ export default function Calendar() {
       .then((docs) => alive && setMaps(collectMapTasks(docs)))
       .catch(() => undefined);
     const timer = setInterval(() => setNow(Date.now()), 60000);
+    // привычки (ежедневник) — и перечитать, когда их отметили здесь, из уведомления или на другом устройстве
+    const reloadPlanner = () =>
+      void loadPlanner()
+        .then((p) => alive && setPlanner(p))
+        .catch(() => undefined);
+    reloadPlanner();
+    window.addEventListener('sm-planner-changed', reloadPlanner);
+    // цели — только чтение сроков
+    let unsub: (() => void) | undefined;
+    import('../goals/store')
+      .then(async (m) => {
+        const d = await m.ensureGoals();
+        if (!alive) return;
+        setGoalsSrc({ data: d, due: m.goalsDueBetween });
+        unsub = m.useGoals.subscribe((st) => setGoalsSrc({ data: st.data, due: m.goalsDueBetween }));
+      })
+      .catch(() => undefined);
     return () => {
       alive = false;
       clearInterval(timer);
+      window.removeEventListener('sm-planner-changed', reloadPlanner);
+      unsub?.();
     };
   }, []);
 
@@ -256,7 +382,11 @@ export default function Calendar() {
     };
   }, [from, to, showPhone]);
 
-  const items = useMemo(() => (data ? buildItems(data, maps, events, from, to, today, now) : {}), [data, maps, events, from, to, today, now]);
+  const goals = useMemo(() => (goalsSrc?.data ? goalsSrc.due(goalsSrc.data, from, to) : []), [goalsSrc, from, to]);
+  const items = useMemo(
+    () => (data ? buildItems(data, maps, events, from, to, today, now, planner, goals) : {}),
+    [data, maps, events, from, to, today, now, planner, goals],
+  );
 
   const setView = (v: CalView) => {
     setViewState(v);
@@ -383,9 +513,23 @@ function Chip({ it, onDown, onOpen }: { it: Item; onDown?: (e: RPointerEvent, it
 /** Строка списка: флажок, название, цвет списка, время */
 function Row({ it }: { it: Item }) {
   const t = it.task;
+  // строка привычки открывает Ежедневник (отметка — кружком)
+  const open = () => (it.habit ? useApp.getState().go('planner') : activate(it));
   return (
-    <div className={`cv-row cv-row-${it.kind}${it.done ? ' done' : ''}${it.overdue ? ' overdue' : ''}`} onClick={() => activate(it)}>
-      {t ? (
+    <div className={`cv-row cv-row-${it.kind}${it.done ? ' done' : ''}${it.overdue ? ' overdue' : ''}`} onClick={open}>
+      {it.habit ? (
+        <button
+          className={`cv-check cv-check-habit${it.done ? ' on' : ''}`}
+          style={{ '--c': it.color } as CSSProperties}
+          onClick={(e) => {
+            e.stopPropagation();
+            void tapHabit(it);
+          }}
+          aria-label={it.done ? 'Снять отметку' : 'Отметить привычку'}
+        >
+          {it.done && <Check size={13} strokeWidth={3} />}
+        </button>
+      ) : t ? (
         <button
           className={`cv-check${it.done ? ' on' : ''}`}
           style={{ '--c': t.priority ? it.color : 'var(--text-3)' } as CSSProperties}
@@ -492,7 +636,7 @@ function MonthView({
           </div>
         ))}
         {days.map((d) => {
-          const list = items[d] ?? [];
+          const list = noHabits(items[d]);
           const cls = `cv-cell${fromYmd(d).getMonth() !== month ? ' out' : ''}${d === today ? ' today' : ''}${d === cursor ? ' sel' : ''}${
             drag?.over === d ? ' over' : ''
           }`;
@@ -551,7 +695,7 @@ function MonthView({
 // ---------- Список (повестка) ----------
 
 function Agenda({ days, items, today }: { days: string[]; items: ByDay; today: string }) {
-  const filled = days.filter((d) => items[d]?.length);
+  const filled = days.filter((d) => noHabits(items[d]).length);
   if (!filled.length) {
     return (
       <div className="empty cv-agenda-empty">
@@ -567,7 +711,7 @@ function Agenda({ days, items, today }: { days: string[]; items: ByDay; today: s
         <section key={d} className="cv-ag-day">
           <DayHead date={d} today={today} />
           <div className="card cv-list">
-            {items[d].map((it) => (
+            {noHabits(items[d]).map((it) => (
               <Row key={it.key} it={it} />
             ))}
           </div>
@@ -780,7 +924,7 @@ function TimeGrid({
         onContextMenu={(e) => e.preventDefault()}
       >
         <div className="cv-block-title ellipsis">
-          {kindIcon(it)}
+          {it.habit && it.done ? <Check size={11} strokeWidth={3} /> : kindIcon(it)}
           {!tall && <span className="cv-block-time">{timeOf(start)}</span>}
           {it.title}
         </div>

@@ -113,7 +113,7 @@ async function absorbPlanner(d: TasksData) {
   }
   if (!moved) return;
   await set(KEY, d);
-  await set('planner', p);
+  await (await import('../store/db')).savePlanner(p);
 }
 
 // ---------- Сохранение ----------

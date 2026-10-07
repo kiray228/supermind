@@ -1,5 +1,5 @@
 import { get, set, del } from './kv';
-import type { BoardData, DocMeta, LockedDoc, MindDoc, PlannerData, Settings } from '../types';
+import type { BoardData, DocMeta, LockedDoc, MindDoc, PlannerData, PlannerDay, Settings } from '../types';
 import { countTopics } from '../utils/tree';
 import { getTheme } from '../themes';
 
@@ -91,8 +91,24 @@ export async function loadAllDocs(): Promise<MindDoc[]> {
 export async function loadPlanner(): Promise<PlannerData> {
   return (await get<PlannerData>('planner')) ?? { days: {}, habits: [] };
 }
+/**
+ * Сохранить ежедневник. Изменённые дни получают отметку времени — при синхронизации побеждает
+ * более свежая версия дня (иначе снятая отметка привычки вернулась бы с другого устройства).
+ * Удалённый день остаётся пустой записью с отметкой — по той же причине.
+ */
 export async function savePlanner(p: PlannerData) {
-  await set('planner', p);
+  const old = (await get<PlannerData>('planner'))?.days ?? {};
+  const now = Date.now();
+  const days: PlannerData['days'] = {};
+  const strip = (d: PlannerDay | undefined) => (d ? JSON.stringify({ ...d, updatedAt: 0 }) : '');
+  for (const [k, d] of Object.entries(p.days ?? {})) days[k] = strip(d) === strip(old[k]) ? (old[k]?.updatedAt ? { ...d, updatedAt: old[k].updatedAt } : d) : { ...d, updatedAt: now };
+  for (const [k, d] of Object.entries(old)) {
+    if (days[k]) continue;
+    const had = !!(d.journal || d.mood || d.tasks?.length || d.habits?.length || (d.habitCounts && Object.keys(d.habitCounts).length));
+    if (had) days[k] = { journal: '', tasks: [], updatedAt: now };
+    else if (d.updatedAt && d.updatedAt > now - 90 * 86400000) days[k] = { journal: '', tasks: [], updatedAt: d.updatedAt };
+  }
+  await set('planner', { ...p, days });
 }
 
 export const DEFAULT_BOARD: BoardData = {

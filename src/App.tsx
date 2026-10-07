@@ -30,6 +30,7 @@ const Goals = lazy(() => import('./views/Goals'));
 const Finance = lazy(() => import('./views/Finance'));
 const Assistant = lazy(() => import('./views/Assistant'));
 const Progress = lazy(() => import('./views/Progress'));
+const LevelBadge = lazy(() => import('./progress/LevelBadge').then((m) => ({ default: m.LevelBadge })));
 
 /** phone: false — на телефоне пункт в меню «Ещё» */
 const NAV: { id: View; label: string; icon: typeof Network; phone: boolean }[] = [
@@ -138,6 +139,9 @@ export default function App() {
             <img src="./icon.svg" alt="" width={30} height={30} />
             <span>SuperMind</span>
           </div>
+          <Suspense fallback={null}>
+            <LevelBadge className="nav-level" />
+          </Suspense>
           {NAV.map((n) => (
             <button key={n.id} className={`nav-item ${view === n.id ? 'active' : ''}${n.phone ? '' : ' nav-desk'}`} onClick={() => go(n.id)}>
               <span className="nav-ico">
@@ -175,6 +179,9 @@ export default function App() {
       {more && (
         <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && setMore(false)}>
           <div className="modal nav-more-sheet">
+            <Suspense fallback={null}>
+              <LevelBadge className="nav-sheet-level" onClick={() => (setMore(false), go('progress'))} />
+            </Suspense>
             {NAV.filter((n) => !n.phone).map((n) => (
               <button
                 key={n.id}

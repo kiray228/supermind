@@ -120,7 +120,7 @@ export default function Settings() {
 
           <section className="card set-card">
             <h3><Info size={18} /> О приложении</h3>
-            <p className="small muted" style={{ margin: 0 }}>SuperMind 1.7 — бесплатные интеллект-карты, задачи с напоминаниями, календарь, заметки, цели, финансы, фокус, ежедневник и доска задач. Все функции открыты, без подписок.</p>
+            <p className="small muted" style={{ margin: 0 }}>SuperMind 1.8 — бесплатные интеллект-карты, задачи с напоминаниями, календарь, привычки, ИИ-ассистент, заметки, цели, финансы, прогресс, фокус, ежедневник и доска задач. Все функции открыты, без подписок.</p>
           </section>
         </div>
       </div>
@@ -215,6 +215,16 @@ function TaskSettings() {
         {[5, 10, 15, 30].map((n) => (
           <option key={n} value={n}>
             Повторять каждые {n} мин (3 раза), пока не выполнено
+          </option>
+        ))}
+      </select>
+
+      <label className="label">Утренний брифинг</label>
+      <select className="select" value={p.briefing ?? '08:00'} onChange={(e) => setPrefs({ briefing: e.target.value })}>
+        <option value="">Выключен</option>
+        {['06:00', '06:30', '07:00', '07:30', '08:00', '08:30', '09:00', '09:30', '10:00'].map((t) => (
+          <option key={t} value={t}>
+            Каждый день в {t} — план на день в уведомлении
           </option>
         ))}
       </select>

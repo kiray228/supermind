@@ -185,6 +185,17 @@
   .cv-block-resize::after { opacity: .8; }
 }
 
+/* ---------- Привычки и цели ---------- */
+.cv-block.cv-habit { background: color-mix(in srgb, var(--c) 11%, var(--surface)); border-left-style: dotted; border-left-width: 3px; }
+.cv-block.cv-habit:hover { background: color-mix(in srgb, var(--c) 20%, var(--surface)); }
+.cv-block.cv-habit.done { opacity: .55; background: color-mix(in srgb, var(--c) 22%, var(--surface)); border-left-style: solid; }
+.cv-block.cv-habit.done .cv-block-title { text-decoration: none; }
+.cv-block.cv-habit .cv-block-title svg { color: var(--c); }
+.cv-chip.cv-goal, .cv-block.cv-goal { font-weight: 650; }
+.cv-chip.cv-goal.overdue { color: var(--danger); }
+.cv-check-habit { border-radius: 50%; }
+.cv-row-habit.done .cv-row-title { text-decoration: none; }
+
 /* ---------- Телефон ---------- */
 @media (max-width: 760px) {
   .cv-h1, .cv-spacer { display: none; }

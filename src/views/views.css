@@ -352,33 +352,7 @@
   transform: scale(1.08); filter: none;
 }
 
-/* Привычки */
-.pl-habits { display: flex; flex-direction: column; gap: 8px; }
-.pl-habit { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 14px; background: var(--surface-2); transition: background .15s; }
-.pl-habit.on { background: color-mix(in srgb, var(--hc) 12%, var(--surface-2)); }
-.pl-habit-toggle {
-  width: 34px; height: 34px; flex-shrink: 0; border-radius: 50%; padding: 0;
-  border: 2.5px solid var(--hc); background: transparent; color: #fff; font-size: 16px;
-  display: inline-flex; align-items: center; justify-content: center; transition: background .15s, transform .1s;
-}
-.pl-habit-toggle:active { transform: scale(.92); }
-.pl-habit.on .pl-habit-toggle { background: var(--hc); }
-.pl-habit-body { cursor: pointer; display: flex; flex-direction: column; gap: 5px; }
-.pl-habit-name { font-weight: 600; font-size: 14.5px; }
-.pl-habit-week { display: flex; gap: 4px; }
-.pl-habit-cell { width: 14px; height: 6px; border-radius: 3px; background: var(--surface-3); }
-.pl-habit-cell.on { background: var(--hc); }
-.pl-habit-cell.cur { outline: 1.5px solid color-mix(in srgb, var(--hc) 60%, transparent); outline-offset: 1px; }
-.pl-streak {
-  display: inline-flex; align-items: center; gap: 3px; flex-shrink: 0; padding: 4px 8px; border-radius: 999px;
-  font-size: 13px; font-weight: 700; color: var(--text-3); background: var(--surface); font-variant-numeric: tabular-nums;
-}
-.pl-streak.active { color: #f97316; }
-.pl-habit-list { display: flex; flex-direction: column; gap: 2px; margin-bottom: 4px; }
-.pl-habit-item { display: flex; align-items: center; gap: 10px; padding: 4px 0 4px 4px; border-bottom: 1px solid var(--border); }
-.pl-habit-item .icon-btn { color: var(--text-3); }
-.pl-habit-item .icon-btn svg { width: 18px; height: 18px; }
-.pl-habit-swatch { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+/* Привычки — стили в habits.css */
 .pl-colors { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 
 /* Дневник */

@@ -141,6 +141,8 @@ export interface TaskPrefs {
   sortBy: 'date' | 'priority' | 'title' | 'created';
   /** «настойчивое» напоминание — повторяется каждые N минут, пока не отметите (0 — выкл) */
   nag: number;
+  /** утренний брифинг: время HH:MM, '' — выключен (по умолчанию 08:00) */
+  briefing?: string;
 }
 
 export interface TasksData {

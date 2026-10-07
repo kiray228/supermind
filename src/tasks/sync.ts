@@ -7,9 +7,10 @@ import { pushActive, uploadSchedule } from '../store/push';
 import { useApp, toast } from '../store/appStore';
 import { todayYmd, toYmd, addDaysYmd, fromYmd } from '../utils/mapTasks';
 import { isIOS, downloadText } from '../io/download';
-import { dayLabel, minutesOf, reminderFires, startAt, timeOf, whenLabel, type TaskItem } from './model';
+import { dayLabel, isActive, minutesOf, reminderFires, startAt, timeOf, whenLabel, type TaskItem } from './model';
 import { buildIcs, taskDescription, toRRule } from './ics';
 import { completeOccurrence, getTask, openTask, tasksData, useTasks } from './store';
+import * as hm from '../habits/model';
 
 // ================= Нативные модули Android =================
 
@@ -59,6 +60,9 @@ export interface InAppReminder {
   date?: string;
   title: string;
   body: string;
+  /** платёж или утренний брифинг — только «Открыть» */
+  payId?: string;
+  briefing?: boolean;
 }
 export const useReminders = create<{ items: InAppReminder[] }>(() => ({ items: [] }));
 export const dismissReminder = (key: string) => useReminders.setState((s) => ({ items: s.items.filter((i) => i.key !== key) }));
@@ -195,19 +199,59 @@ async function plan(fromMs: number, toMs: number): Promise<Planned[]> {
       });
     }
   }
-  // привычки с напоминанием
   const p = await get<PlannerData>('planner').catch(() => undefined);
-  for (const h of p?.habits ?? []) {
-    if (!h.remind) continue;
+  // утренний брифинг: что на сегодня (пересчитывается при каждом изменении задач)
+  const brief = d.prefs.briefing ?? '08:00';
+  if (brief) {
     for (let i = 0; i <= HORIZON_DAYS; i++) {
       const day = addDaysYmd(toYmd(new Date(fromMs)), i);
-      if (p?.days[day]?.habits?.includes(h.id)) continue;
-      const at = fromYmd(day).getTime() + minutesOf(h.remind) * 60000;
+      const at = fromYmd(day).getTime() + minutesOf(brief) * 60000;
       if (at < fromMs || at > toMs) continue;
-      out.push({ id: hash(`habit|${h.id}|${day}`), at, title: `${h.icon ?? '🔥'} ${h.name}`, body: 'Привычка на сегодня — отметьте выполнение', extra: { habitId: h.id, date: day, sm: 1 } });
+      out.push({ id: hash(`brief|${day}`), at, ...briefingFor(d.tasks, p, day), extra: { briefing: 1, date: day, sm: 1 } });
+    }
+  }
+  // привычки с напоминанием: только в запланированные дни и пока не выполнены
+  if (p?.habits?.length) {
+    const pdays = p.days ?? {};
+    for (const h of hm.activeHabits(p.habits)) {
+      const time = hm.reminderTimeOf(h);
+      if (!time) continue;
+      for (let i = 0; i <= HORIZON_DAYS; i++) {
+        const day = addDaysYmd(toYmd(new Date(fromMs)), i);
+        if (hm.doneOn(pdays, h, day) || !hm.dueOn(pdays, h, day)) continue;
+        const at = fromYmd(day).getTime() + minutesOf(time) * 60000;
+        if (at < fromMs || at > toMs) continue;
+        const t = hm.targetOf(h);
+        const left = hm.freqOf(h) === 'weekly' ? hm.perWeekOf(h) - hm.weekCount(pdays, h, day, day) : 0;
+        const body =
+          t > 1
+            ? `Цель на сегодня: ${h.unit ? `${h.unit} ` : ''}×${t}${h.duration ? ` · ${hm.durationLabel(h.duration)}` : ''}`
+            : left > 0
+              ? `Ещё ${left} ${hm.plural(left, ['раз', 'раза', 'раз'])} на этой неделе — отметьте выполнение`
+              : `Привычка на сегодня${h.duration ? ` · ${hm.durationLabel(h.duration)}` : ''} — отметьте выполнение`;
+        out.push({ id: hash(`habit|${h.id}|${day}`), at, title: `${h.icon ?? '🔥'} ${h.name}`, body, extra: { habitId: h.id, date: day, sm: 1 } });
+      }
     }
   }
   return out.sort((a, b) => a.at - b.at);
+}
+
+/** Текст утреннего уведомления на день */
+function briefingFor(tasks: TaskItem[], p: PlannerData | undefined, day: string): { title: string; body: string } {
+  const active = tasks.filter((t) => isActive(t) && t.date);
+  const today = active.filter((t) => t.date === day).sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0) || (a.time ?? '99').localeCompare(b.time ?? '99'));
+  const overdue = active.filter((t) => t.date! < day && day <= addDaysYmd(toYmd(new Date()), 1)).length;
+  const habits = p ? hm.activeHabits(p.habits ?? []).filter((h) => hm.dueOn(p.days ?? {}, h, day)).length : 0;
+  const parts: string[] = [];
+  parts.push(today.length ? `Задач на сегодня: ${today.length}` : 'Задач на сегодня нет');
+  if (overdue) parts.push(`просрочено: ${overdue}`);
+  if (habits) parts.push(`привычек: ${habits}`);
+  let body = parts.join(' · ');
+  if (today[0]) {
+    const t = today[0].time;
+    body += `. Главное: ${today[0].title || 'Задача'}${t ? ` в ${t}` : ''}`;
+  }
+  return { title: '☀️ Доброе утро! План на день', body: body.length > 180 ? body.slice(0, 177) + '…' : body };
 }
 
 let nativeReady: Promise<void> | null = null;
@@ -255,9 +299,13 @@ async function handleAction(action: string, ex: Record<string, string>) {
     if (action === 'habit-done') {
       const p = await get<PlannerData>('planner');
       if (p) {
+        const h = p.habits?.find((x) => x.id === ex.habitId);
         const day = (p.days[ex.date] ??= { journal: '', tasks: [] });
-        day.habits = [...new Set([...(day.habits ?? []), ex.habitId])];
-        await set('planner', p);
+        if (h) {
+          // счётчик — сразу до цели дня
+          p.days[ex.date] = hm.withDone(day, h, true);
+        } else day.habits = [...new Set([...(day.habits ?? []), ex.habitId])];
+        await (await import('../store/db')).savePlanner(p);
         window.dispatchEvent(new Event('sm-planner-changed'));
         toast('Привычка отмечена');
       }
@@ -266,6 +314,10 @@ async function handleAction(action: string, ex: Record<string, string>) {
   }
   if (ex.payId) {
     useApp.getState().go('finance');
+    return;
+  }
+  if (ex.briefing) {
+    useApp.getState().go('assistant');
     return;
   }
   const t = ex.taskId ? getTask(ex.taskId) : undefined;
@@ -337,7 +389,7 @@ async function syncNative() {
         largeBody: w.body,
         schedule: { at: new Date(w.at), allowWhileIdle: true },
         channelId: 'sm-reminders',
-        actionTypeId: w.extra.habitId ? 'sm-habit' : w.extra.payId ? undefined : 'sm-task',
+        actionTypeId: w.extra.habitId ? 'sm-habit' : w.extra.payId || w.extra.briefing ? undefined : 'sm-task',
         autoCancel: true,
         extra: { ...w.extra, sig: sig(w) },
       })),
@@ -359,9 +411,9 @@ function saveWebSnoozes() {
 }
 
 async function showWeb(title: string, body: string, data: Record<string, string>) {
-  const key = `${data.taskId ?? data.habitId}|${data.date ?? ''}|${Date.now()}`;
+  const key = `${data.taskId ?? data.habitId ?? data.payId ?? 'brief'}|${data.date ?? ''}|${Date.now()}`;
   if (document.visibilityState === 'visible') {
-    useReminders.setState((s) => ({ items: [...s.items.filter((i) => i.taskId !== data.taskId || !data.taskId), { key, taskId: data.taskId, habitId: data.habitId, date: data.date || undefined, title, body }] }));
+    useReminders.setState((s) => ({ items: [...s.items.filter((i) => i.taskId !== data.taskId || !data.taskId), { key, taskId: data.taskId, habitId: data.habitId, payId: data.payId, briefing: !!data.briefing, date: data.date || undefined, title, body }] }));
     playChime();
   }
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
@@ -369,7 +421,7 @@ async function showWeb(title: string, body: string, data: Record<string, string>
   if (pushActive()) return;
   const opts: NotificationOptions & { actions?: { action: string; title: string }[]; requireInteraction?: boolean } = {
     body,
-    tag: `${data.taskId ?? data.habitId}|${data.date ?? ''}`,
+    tag: `${data.taskId ?? data.habitId ?? data.payId ?? 'brief'}|${data.date ?? ''}`,
     icon: './icon-192.png',
     badge: './icon-192.png',
     data,
@@ -650,9 +702,11 @@ export function initTaskSync() {
       if (m?.type === 'sm-notify' && m.data) void handleAction(m.action || 'open', m.data);
     });
     const q = new URLSearchParams(location.search);
-    if (q.get('task')) {
+    if (q.get('task') || q.get('sm')) {
       const action = q.get('action') || 'open';
-      const data = { taskId: q.get('task')!, date: q.get('date') ?? '' };
+      const data: Record<string, string> = Object.fromEntries([...q].filter(([k, v]) => k !== 'action' && k !== 'task' && v));
+      if (q.get('task')) data.taskId = q.get('task')!;
+      data.date ??= '';
       history.replaceState(history.state, '', location.pathname);
       setTimeout(() => void handleAction(action, data), 500);
     }
@@ -663,6 +717,10 @@ export function initTaskSync() {
 /** Действия из всплывающего напоминания внутри приложения */
 export function reminderAction(r: InAppReminder, action: 'done' | 'snooze' | 'open') {
   dismissReminder(r.key);
+  if (r.payId || r.briefing) {
+    if (action === 'open') useApp.getState().go(r.payId ? 'finance' : 'assistant');
+    return;
+  }
   if (r.habitId) {
     void handleAction(action === 'done' ? 'habit-done' : 'open', { habitId: r.habitId, date: todayYmd() });
     return;

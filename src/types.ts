@@ -179,15 +179,51 @@ export interface PlannerDay {
   tasks: PlannerTask[];
   /** id привычек, выполненных в этот день */
   habits?: ID[];
+  /** счётчики привычек с целью на день (id → сколько раз), напр. «стакан воды ×8» */
+  habitCounts?: Record<ID, number>;
+  /** когда день меняли (для синхронизации: свежая версия дня побеждает) */
+  updatedAt?: number;
 }
+
+/** Часть дня, в которой показывается привычка */
+export type HabitPart = 'morning' | 'day' | 'evening' | 'any';
+
+/** Как часто: каждый день, по дням недели или N раз в неделю */
+export type HabitFreq = 'daily' | 'weekdays' | 'weekly';
 
 export interface Habit {
   id: ID;
   name: string;
   color: string;
+  /** эмодзи */
   icon?: string;
-  /** время ежедневного напоминания HH:MM */
+  /** время напоминания HH:MM (если не задано — напоминание во время привычки `time`) */
   remind?: string;
+  /** не напоминать, даже если указано время привычки */
+  remindOff?: boolean;
+  /** частота; нет — каждый день */
+  freq?: HabitFreq;
+  /** для freq = 'weekdays': дни недели 0..6 (0 — воскресенье) */
+  days?: number[];
+  /** для freq = 'weekly': сколько раз в неделю */
+  perWeek?: number;
+  /** время привычки HH:MM */
+  time?: string;
+  /** длительность, минут */
+  duration?: number;
+  /** часть дня; нет — по времени или «любое время» */
+  part?: HabitPart;
+  /** цель на день (раз), для привычек-счётчиков; нет или 1 — простая отметка */
+  target?: number;
+  /** единица счёта, напр. «стакан» */
+  unit?: string;
+  /** в архиве: не показывается, история сохранена */
+  archived?: boolean;
+  /** удалена (отметка для синхронизации, чтобы привычка не вернулась с другого устройства) */
+  deleted?: boolean;
+  createdAt?: number;
+  /** время изменения — при синхронизации побеждает свежее */
+  updatedAt?: number;
 }
 
 export interface PlannerData {

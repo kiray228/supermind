@@ -345,7 +345,10 @@ function mergeValues(key: string, local: unknown, remote: unknown): unknown {
     const days: Obj = { ...(remote.days as Obj) };
     for (const [d, v] of Object.entries((local.days as Obj) ?? {})) {
       const r = days[d];
-      days[d] = isObj(r) && isObj(v) ? { ...r, ...v, habits: [...new Set([...((r.habits as string[]) ?? []), ...((v.habits as string[]) ?? [])])] } : v;
+      if (!isObj(r) || !isObj(v)) days[d] = v;
+      // день с отметкой времени: побеждает свежая версия целиком (снятые отметки не возвращаются)
+      else if (r.updatedAt || v.updatedAt) days[d] = (Number(r.updatedAt) || 0) > (Number(v.updatedAt) || 0) ? r : v;
+      else days[d] = { ...r, ...v, habits: [...new Set([...((r.habits as string[]) ?? []), ...((v.habits as string[]) ?? [])])] };
     }
     return { ...remote, ...local, days, habits: mergeArray((local.habits as Obj[]) ?? [], (remote.habits as Obj[]) ?? [], {}, 'habit') };
   }

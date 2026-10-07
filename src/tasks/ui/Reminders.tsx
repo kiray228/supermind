@@ -31,9 +31,11 @@ export function ReminderStack() {
             <button className="btn btn-sm" onClick={() => reminderAction(r, 'open')}>
               Открыть
             </button>
-            <button className="btn btn-sm btn-primary" onClick={() => reminderAction(r, 'done')}>
-              {r.habitId ? 'Отметить' : 'Выполнено'}
-            </button>
+            {(r.taskId || r.habitId) && (
+              <button className="btn btn-sm btn-primary" onClick={() => reminderAction(r, 'done')}>
+                {r.habitId ? 'Отметить' : 'Выполнено'}
+              </button>
+            )}
           </div>
         </div>
       ))}

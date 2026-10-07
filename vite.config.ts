@@ -58,7 +58,7 @@ self.addEventListener('notificationclick', (e) => {
       c.postMessage({ type: 'sm-notify', action, data });
       return action === 'open' && c.focus ? c.focus() : undefined;
     }
-    const q = new URLSearchParams({ task: data.taskId || '', date: data.date || '', action });
+    const q = new URLSearchParams(Object.assign({}, ...Object.keys(data).map((k) => ({ [k]: String(data[k]) })), { task: data.taskId || '', sm: '1', action }));
     return self.clients.openWindow('./?' + q.toString());
   }));
 });
