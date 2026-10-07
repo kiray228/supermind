@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { Settings } from '../types';
 import { DEFAULT_SETTINGS, saveSettings } from './db';
 
-export type View = 'home' | 'editor' | 'board' | 'planner' | 'settings' | 'tasks' | 'calendar' | 'focus' | 'notes' | 'goals' | 'finance' | 'assistant' | 'progress';
+export type View = 'home' | 'editor' | 'board' | 'planner' | 'settings' | 'tasks' | 'calendar' | 'focus' | 'notes' | 'goals' | 'finance' | 'assistant' | 'progress' | 'habits';
 
 interface AppState {
   view: View;
@@ -18,10 +18,11 @@ interface AppState {
 }
 
 /** последний открытый раздел — приложение открывается там, где закончили */
-const RESTORABLE: View[] = ['home', 'tasks', 'calendar', 'planner', 'board', 'focus', 'settings', 'notes', 'goals', 'finance', 'assistant', 'progress'];
+const RESTORABLE: View[] = ['home', 'tasks', 'calendar', 'planner', 'board', 'focus', 'settings', 'notes', 'goals', 'finance', 'assistant', 'progress', 'habits'];
 function initialView(): View {
   try {
     const v = localStorage.getItem('sm-view') as View | null;
+    if (v === 'planner') return 'habits';
     return v && RESTORABLE.includes(v) ? v : 'home';
   } catch {
     return 'home';
@@ -37,6 +38,8 @@ export const useApp = create<AppState>((set, get) => ({
   toastAction: null,
   docsVersion: 0,
   go(view) {
+    // Ежедневник заменён разделом «Привычки» (дневник и настроение — там же)
+    if (view === 'planner') view = 'habits';
     set({ view });
     try {
       if (RESTORABLE.includes(view)) localStorage.setItem('sm-view', view);

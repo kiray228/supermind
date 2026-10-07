@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { Network, KanbanSquare, Settings as SettingsIcon, CheckSquare, CalendarRange, Timer, Menu as MenuIcon, NotebookPen, StickyNote, Target, Wallet, Bot, Trophy } from 'lucide-react';
+import { Network, KanbanSquare, Settings as SettingsIcon, CheckSquare, CalendarRange, Timer, Menu as MenuIcon, StickyNote, Target, Wallet, Bot, Trophy, Repeat } from 'lucide-react';
 import { useApp, type View } from './store/appStore';
 import { listDocs, loadSettings, saveDoc } from './store/db';
 import { get as idbGet, set as idbSet } from './store/kv';
@@ -22,6 +22,7 @@ import './app.css';
 const Editor = lazy(() => import('./editor/Editor'));
 const Board = lazy(() => import('./views/Board'));
 const Planner = lazy(() => import('./views/Planner'));
+const Habits = lazy(() => import('./views/Habits'));
 const Settings = lazy(() => import('./views/Settings'));
 const Tasks = lazy(() => import('./views/Tasks'));
 const Calendar = lazy(() => import('./views/Calendar'));
@@ -39,7 +40,7 @@ const NAV: { id: View; label: string; icon: typeof Network; phone: boolean }[] =
   { id: 'home', label: 'Карты', icon: Network, phone: true },
   { id: 'tasks', label: 'Задачи', icon: CheckSquare, phone: true },
   { id: 'calendar', label: 'Календарь', icon: CalendarRange, phone: true },
-  { id: 'planner', label: 'Ежедневник', icon: NotebookPen, phone: true },
+  { id: 'habits', label: 'Привычки', icon: Repeat, phone: true },
   { id: 'assistant', label: 'Ассистент', icon: Bot, phone: false },
   { id: 'notes', label: 'Заметки', icon: StickyNote, phone: false },
   { id: 'goals', label: 'Цели', icon: Target, phone: false },
@@ -174,6 +175,7 @@ export default function App() {
           {view === 'editor' && <Editor />}
           {view === 'board' && <Board />}
           {view === 'planner' && <Planner />}
+          {view === 'habits' && <Habits />}
           {view === 'settings' && <Settings />}
           {view === 'tasks' && <Tasks />}
           {view === 'calendar' && <Calendar />}
