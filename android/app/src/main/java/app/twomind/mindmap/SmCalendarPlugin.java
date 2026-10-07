@@ -122,7 +122,7 @@ public class SmCalendarPlugin extends Plugin {
         v.put(CalendarContract.Calendars.ACCOUNT_TYPE, CalendarContract.ACCOUNT_TYPE_LOCAL);
         v.put(CalendarContract.Calendars.NAME, "SuperMind");
         v.put(CalendarContract.Calendars.CALENDAR_DISPLAY_NAME, "SuperMind");
-        v.put(CalendarContract.Calendars.CALENDAR_COLOR, 0xFFFF4A2B);
+        v.put(CalendarContract.Calendars.CALENDAR_COLOR, 0xFF10B981);
         v.put(CalendarContract.Calendars.CALENDAR_ACCESS_LEVEL, CalendarContract.Calendars.CAL_ACCESS_OWNER);
         v.put(CalendarContract.Calendars.OWNER_ACCOUNT, "SuperMind");
         v.put(CalendarContract.Calendars.VISIBLE, 1);

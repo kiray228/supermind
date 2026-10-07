@@ -20,7 +20,6 @@ import {
   StickyNote,
   Sunrise,
   Target,
-  UserPlus,
   Wallet,
 } from 'lucide-react';
 import { useApp } from '../store/appStore';
@@ -325,8 +324,8 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
                   <Laptop size={26} />
                 </div>
               </div>
-              <h1 className="ob-title">Сохраните данные</h1>
-              <p className="ob-text">Всё хранится на устройстве и работает без интернета. С аккаунтом данные не потеряются.</p>
+              <h1 className="ob-title">Данные в безопасности</h1>
+              <p className="ob-text">Вы вошли в аккаунт: всё сохраняется в облаке и одинаково на всех устройствах. Без интернета приложение тоже работает.</p>
               <ul className="ob-list">
                 <li>
                   <Cloud size={18} /> Синхронизация телефона и компьютера
@@ -339,8 +338,8 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
                 </li>
               </ul>
               <div className="ob-action">
-                <button className="ob-cta" onClick={() => void finish('settings')}>
-                  <UserPlus size={18} /> Создать аккаунт
+                <button className="ob-cta" onClick={() => void finish('home')}>
+                  <Check size={18} /> Начать
                 </button>
               </div>
             </section>

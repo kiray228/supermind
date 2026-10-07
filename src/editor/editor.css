@@ -124,7 +124,7 @@
 .mk-prog { width: 20px; height: 20px; border-radius: 50%; border: 2px solid #16a34a; }
 
 /* ---------- ИИ ---------- */
-.ai-badge { width: 32px; height: 32px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #fff; background: linear-gradient(135deg, #ff4a2b, #a855f7); }
+.ai-badge { width: 32px; height: 32px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #fff; background: linear-gradient(135deg, var(--accent), #6366f1); }
 .ai-target { background: var(--surface-2); border-radius: 10px; padding: 8px 10px; margin-top: 8px; }
 .ai-action {
   display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 12px; border: var(--hairline) solid var(--separator); background: var(--surface); text-align: left;

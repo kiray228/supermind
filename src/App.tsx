@@ -4,6 +4,7 @@ import { listDocs, loadSettings, saveDoc } from './store/db';
 import { get as idbGet, set as idbSet } from './store/kv';
 import { welcomeDoc } from './templates';
 import { DialogHost, closeTopOverlay } from './ui/dialogs';
+import { AuthGate } from './ui/AuthGate';
 import Home from './views/Home';
 import { flushSave } from './store/docStore';
 import { ensureTasks, flushTasks, useTasks } from './tasks/store';
@@ -217,6 +218,7 @@ export default function App() {
       <QuickAddHost />
       <SearchHost />
       <ReminderStack />
+      <AuthGate />
       <DialogHost />
       <Suspense fallback={null}>
         <OnboardingHost />

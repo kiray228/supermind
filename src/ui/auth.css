@@ -1,0 +1,63 @@
+/* Экран входа: поверх всего приложения, непрозрачный, в стиле iOS */
+.auth-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: var(--bg);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  justify-content: center;
+  padding: calc(env(safe-area-inset-top, 0px) + 48px) 20px calc(env(safe-area-inset-bottom, 0px) + 32px);
+}
+.auth-gate::before {
+  content: '';
+  position: fixed;
+  inset: -20% -20% auto;
+  height: 60%;
+  pointer-events: none;
+  background: radial-gradient(50% 60% at 50% 30%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%);
+}
+.auth-loading { align-items: center; }
+.auth-loading .auth-logo { animation: auth-pulse 1.6s ease-in-out infinite; }
+@keyframes auth-pulse { 50% { transform: scale(0.94); opacity: 0.8; } }
+
+.auth-inner { position: relative; width: 100%; max-width: 400px; display: flex; flex-direction: column; align-items: center; }
+.auth-logo { width: 88px; height: 88px; border-radius: 22px; box-shadow: 0 14px 40px color-mix(in srgb, var(--accent) 35%, transparent); }
+.auth-title { font-size: 34px; font-weight: 800; letter-spacing: -0.02em; margin: 18px 0 6px; }
+.auth-sub { color: var(--text-2); text-align: center; font-size: 16px; line-height: 1.45; margin: 0 0 22px; max-width: 340px; }
+.auth-seg { width: 100%; margin-bottom: 16px; }
+.auth-seg button { flex: 1; }
+
+.auth-form { width: 100%; display: flex; flex-direction: column; gap: 14px; }
+.auth-group { background: var(--surface); border-radius: 14px; overflow: hidden; }
+.auth-field {
+  width: 100%;
+  min-height: 52px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 17px;
+  padding: 0 16px;
+}
+.auth-group > * + * { border-top: 0.5px solid var(--border); }
+.auth-field::placeholder { color: var(--text-3, var(--text-2)); }
+.auth-pass { position: relative; display: flex; }
+.auth-pass .auth-field { padding-right: 52px; }
+.auth-eye { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; border: 0; background: none; color: var(--text-2); display: grid; place-items: center; cursor: pointer; }
+.auth-error { margin: 0; color: var(--danger, #ff3b30); font-size: 14px; text-align: center; }
+.auth-submit { width: 100%; min-height: 52px; font-size: 17px; border-radius: 14px; }
+
+.auth-perks { list-style: none; padding: 0; margin: 26px 0 0; display: flex; flex-direction: column; gap: 12px; color: var(--text-2); font-size: 15px; }
+.auth-perks li { display: flex; align-items: center; gap: 10px; }
+.auth-perks svg { color: var(--accent); flex-shrink: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-loading .auth-logo { animation: none; }
+}
+
+/* окна (например, вопрос о данных другого аккаунта) — поверх экрана входа */
+body:has(.auth-gate) .modal-backdrop { z-index: 1100; }
+body:has(.auth-gate) .toast { z-index: 1200; }

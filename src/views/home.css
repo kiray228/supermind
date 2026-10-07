@@ -24,9 +24,9 @@
 .doc-star { right: 8px; color: #f59e0b; }
 .doc-info { display: flex; align-items: center; gap: 4px; padding: 10px 6px 10px 12px; }
 
-.ai-grad { background: linear-gradient(135deg, #ff4a2b, #a855f7); color: #fff; border: none; }
-.ai-grad:hover { filter: brightness(1.08); background: linear-gradient(135deg, #ff4a2b, #a855f7); }
-.ai-badge-lg { width: 36px; height: 36px; border-radius: 11px; display: flex; align-items: center; justify-content: center; color: #fff; background: linear-gradient(135deg, #ff4a2b, #a855f7); }
+.ai-grad { background: linear-gradient(135deg, var(--accent), #6366f1); color: #fff; border: none; }
+.ai-grad:hover { filter: brightness(1.08); background: linear-gradient(135deg, var(--accent), #6366f1); }
+.ai-badge-lg { width: 36px; height: 36px; border-radius: 11px; display: flex; align-items: center; justify-content: center; color: #fff; background: linear-gradient(135deg, var(--accent), #6366f1); }
 .ai-preview { white-space: pre-wrap; font-family: inherit; font-size: 13.5px; background: var(--surface-2); padding: 12px; border-radius: 12px; max-height: 240px; overflow: auto; margin: 12px 0 0; }
 .ai-err { margin-top: 10px; color: var(--danger); font-weight: 550; }
 

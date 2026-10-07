@@ -83,7 +83,7 @@ public class MapWidgetConfigure extends AppCompatActivity {
         JSONObject data = SmWidgets.data(this);
         JSONArray maps = MapWidget.maps(data);
 
-        list.addView(row("✨", 0xFFFF4A2B, "Последняя изменённая", "Всегда карта, с которой вы работали последней", "".equals(current), text, text2, ""));
+        list.addView(row("✨", 0xFF10B981, "Последняя изменённая", "Всегда карта, с которой вы работали последней", "".equals(current), text, text2, ""));
         for (int i = 0; i < maps.length(); i++) {
             JSONObject m = maps.optJSONObject(i);
             if (m == null) continue;
@@ -158,7 +158,7 @@ public class MapWidgetConfigure extends AppCompatActivity {
             TextView check = new TextView(this);
             check.setText("✓");
             check.setTextSize(18);
-            check.setTextColor(0xFFFF4A2B);
+            check.setTextColor(0xFF10B981);
             r.addView(check);
         }
         r.setOnClickListener(v -> done(id));

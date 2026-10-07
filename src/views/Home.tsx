@@ -15,7 +15,6 @@ import { IMPORT_ACCEPT, importFile, exportNative } from '../io/index';
 import { PROMPTS, streamText, AIError } from '../ai/claude';
 import { uid } from '../utils/tree';
 import { STRUCTURES } from '../editor/Inspector';
-import { AccountNudge } from '../ui/AccountNudge';
 import './home.css';
 import { IconTile } from '../ui/icons';
 import { PlusCircle } from '@phosphor-icons/react';
@@ -127,7 +126,6 @@ export default function Home() {
         <button className="btn btn-primary" onClick={() => createAndOpen(docFromTemplate(TEMPLATES[0]))}><Plus size={16} /> <span className="hide-xs">Новая</span></button>
       </div>
       <div className="page-body">
-        <AccountNudge />
         <section className="home-section">
           <div className="row" style={{ marginBottom: 10 }}>
             <IconTile icon={PlusCircle} tone="accent" size="sm" />

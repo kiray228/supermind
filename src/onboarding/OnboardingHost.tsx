@@ -6,6 +6,7 @@
  */
 import { useEffect, useState } from 'react';
 import { APP_VERSION } from '../store/safety';
+import { useCloud } from '../store/cloud';
 import { get } from '../store/kv';
 import { useWhatsNew, lsGet, lsSet, ONBOARDED_KEY, WHATSNEW_KEY } from './state';
 import { entriesFor, isRealVersion } from './changelog';
@@ -45,9 +46,11 @@ let decided = false;
 export default function OnboardingHost() {
   const [onboarding, setOnboarding] = useState(false);
   const wn = useWhatsNew((s) => s.open);
+  // сначала вход в аккаунт (обязателен), знакомство — после
+  const signedIn = useCloud((s) => !!s.account);
 
   useEffect(() => {
-    if (decided) return;
+    if (decided || !signedIn) return;
     const t = setTimeout(async () => {
       if (decided) return;
       decided = true;
@@ -70,7 +73,7 @@ export default function OnboardingHost() {
       else lsSet(WHATSNEW_KEY, APP_VERSION);
     }, 900);
     return () => clearTimeout(t);
-  }, []);
+  }, [signedIn]);
 
   const doneOnboarding = () => {
     lsSet(ONBOARDED_KEY, String(Date.now()));
@@ -82,6 +85,7 @@ export default function OnboardingHost() {
     useWhatsNew.setState({ open: null, since: null });
   };
 
+  if (!signedIn) return null;
   return (
     <>
       {onboarding && <Onboarding onDone={doneOnboarding} />}

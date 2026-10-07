@@ -801,7 +801,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
             </g>
           )}
           {drag?.kind === 'select' && (
-            <rect className="no-export" x={Math.min(drag.sx, drag.x)} y={Math.min(drag.sy, drag.y)} width={Math.abs(drag.x - drag.sx)} height={Math.abs(drag.y - drag.sy)} fill="rgba(255,74,43,.08)" stroke="#ff4a2b" strokeDasharray="4 3" />
+            <rect className="no-export" x={Math.min(drag.sx, drag.x)} y={Math.min(drag.sy, drag.y)} width={Math.abs(drag.x - drag.sx)} height={Math.abs(drag.y - drag.sy)} fill="rgba(16,185,129,.08)" stroke="#10b981" strokeDasharray="4 3" />
           )}
         </g>
         <defs>
