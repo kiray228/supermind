@@ -69,6 +69,7 @@ import { exportTasksIcs } from '../tasks/sync';
 import { TaskCheck, TaskRow } from '../tasks/ui/TaskRow';
 import { SmartInput } from '../tasks/ui/QuickAdd';
 import '../tasks/ui/tasks.css';
+import { IconTile } from '../ui/icons';
 
 type Sel = { k: 'smart'; id: SmartId } | { k: 'list'; id: string } | { k: 'tag'; id: string } | { k: 'filter'; id: string } | { k: 'matrix' };
 type GroupBy = 'date' | 'priority' | 'list' | 'none';
@@ -257,6 +258,7 @@ export default function Tasks() {
     return (
       <div className="page">
         <div className="page-header">
+          <IconTile section="tasks" size="sm" className="ph-tile" />
           <h1>Задачи</h1>
         </div>
         <div className="loading">
@@ -470,6 +472,7 @@ export default function Tasks() {
   return (
     <div className="page tk-page">
       <div className="page-header tk-header">
+        <IconTile section="tasks" size="sm" className="ph-tile" />
         <button className="tk-title-btn" onClick={() => setDrawer(true)}>
           <h1 className="ellipsis">{q ? 'Поиск' : title}</h1>
           <ChevronDown size={18} className="tk-mobile-only" />

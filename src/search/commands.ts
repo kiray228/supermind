@@ -15,7 +15,7 @@ const GO: { view: Exclude<View, 'editor'>; label: string; emoji: string; alias: 
   { view: 'home', label: 'Карты', emoji: '🧠', alias: 'интеллект карты главная mind map' },
   { view: 'tasks', label: 'Задачи', emoji: '✅', alias: 'дела todo список' },
   { view: 'calendar', label: 'Календарь', emoji: '📅', alias: 'расписание неделя месяц' },
-  { view: 'planner', label: 'Ежедневник', emoji: '📓', alias: 'дневник привычки день журнал' },
+  { view: 'habits', label: 'Привычки', emoji: '🔥', alias: 'привычки дневник день журнал настроение ежедневник' },
   { view: 'assistant', label: 'Ассистент', emoji: '🤖', alias: 'ии ai чат брифинг' },
   { view: 'notes', label: 'Заметки', emoji: '📝', alias: 'записи' },
   { view: 'goals', label: 'Цели', emoji: '🎯', alias: 'колесо баланса сферы' },

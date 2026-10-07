@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Схематичная карта для превью виджета «Карта» -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="300dp" android:height="120dp" android:viewportWidth="300" android:viewportHeight="120">
+    <path android:strokeColor="#EF4444" android:strokeWidth="2.2" android:strokeLineCap="round" android:pathData="M180,60 C200,60 200,30 220,30" />
+    <path android:strokeColor="#3B82F6" android:strokeWidth="2.2" android:strokeLineCap="round" android:pathData="M180,60 C200,60 200,90 220,90" />
+    <path android:strokeColor="#22C55E" android:strokeWidth="2.2" android:strokeLineCap="round" android:pathData="M120,60 C100,60 100,30 80,30" />
+    <path android:strokeColor="#A855F7" android:strokeWidth="2.2" android:strokeLineCap="round" android:pathData="M120,60 C100,60 100,90 80,90" />
+    <path android:fillColor="#6366F1" android:pathData="M117,42h66a12,12 0,0 1,12 12v12a12,12 0,0 1,-12 12h-66a12,12 0,0 1,-12 -12v-12a12,12 0,0 1,12 -12z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M125,57h50a3,3 0,0 1,0 6h-50a3,3 0,0 1,0 -6z" />
+    <path android:fillColor="#EF4444" android:pathData="M233,17h44a13,13 0,0 1,0 26h-44a13,13 0,0 1,0 -26z" />
+    <path android:fillColor="#3B82F6" android:pathData="M233,77h52a13,13 0,0 1,0 26h-52a13,13 0,0 1,0 -26z" />
+    <path android:fillColor="#22C55E" android:pathData="M23,17h44a13,13 0,0 1,0 26h-44a13,13 0,0 1,0 -26z" />
+    <path android:fillColor="#A855F7" android:pathData="M31,77h36a13,13 0,0 1,0 26h-36a13,13 0,0 1,0 -26z" />
+</vector>

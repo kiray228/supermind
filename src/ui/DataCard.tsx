@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Cloud, Download, HardDrive, History, RotateCcw, ShieldCheck, ShieldAlert, Trash2, Upload } from 'lucide-react';
+import { ClockCounterClockwise, Cloud, DownloadSimple, HardDrives, ShieldCheck, ShieldWarning, Trash, UploadSimple } from '@phosphor-icons/react';
 import { cloudSnapshotData, listCloudSnapshots, makeCloudSnapshot, useCloud, type CloudSnapshot } from '../store/cloud';
 import { clear } from '../store/kv';
 import { toast } from '../store/appStore';
@@ -19,6 +19,8 @@ import {
 import { downloadBlob, pickFile } from '../io/download';
 import { confirmDialog } from './dialogs';
 import { isNative } from '../platform';
+import { IconTile } from './icons';
+import { ListRow, ListSection } from './list';
 
 const when = (ms: number) =>
   new Date(ms).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -110,129 +112,104 @@ export function DataCard() {
   const shown = all ? local : local.slice(0, 3);
   const newest = local[0];
 
+  const restoreBtn = (onClick: () => void) => (
+    <button className="btn btn-sm btn-tinted" disabled={busy} onClick={onClick}>
+      Вернуть
+    </button>
+  );
+
   return (
-    <section className="card set-card dc-card">
-      <h3>
-        <History size={18} color="var(--accent)" /> Данные и копии
-      </h3>
-
-      <div className={`dc-status ${account ? 'ok' : 'warn'}`}>
-        {account ? <ShieldCheck size={18} /> : <ShieldAlert size={18} />}
-        <div className="grow small">
-          {account ? (
-            <>
-              <b>Данные в безопасности.</b> Всё сохраняется в облаке аккаунта {account.user.email}; переустановка, обновление или новый телефон ничего не сотрут — просто войдите.
-            </>
-          ) : (
-            <>
-              <b>Данные только на этом устройстве.</b> Создайте аккаунт выше — тогда карты и задачи не потеряются при удалении приложения, очистке Safari или смене телефона.
-            </>
-          )}
-        </div>
-      </div>
-
-      {!isNative() && persisted === false && (
-        <button
-          className="btn btn-sm dc-persist"
-          onClick={async () => {
-            const ok = await requestPersistence();
-            setPersisted(ok);
-            toast(ok ? 'Браузер больше не будет очищать данные SuperMind' : 'Браузер не разрешил — установите SuperMind на экран «Домой» или создайте аккаунт');
-          }}
-        >
-          <HardDrive size={15} /> Запретить браузеру очищать данные
-        </button>
-      )}
-
-      <div className="dc-head">
-        <b>Автокопии на устройстве</b>
-        <span className="tiny muted">{newest ? `последняя ${when(newest.at)}` : 'ещё нет'}</span>
-      </div>
-      <p className="tiny muted dc-note">Делаются сами: каждые 3 часа, перед обновлением приложения, перед входом в аккаунт и перед восстановлением. Хранятся свежие, а за прошлые дни — первая и последняя копия каждого дня (2 недели).</p>
-      <div className="dc-list">
-        {shown.map((s) => (
-          <div key={s.id} className="dc-row">
-            <div className="grow">
-              <div className="small bold">
-                {when(s.at)} <span className="dc-tag">{REASON_LABEL[s.reason as SnapshotReason] ?? s.reason}</span>
-              </div>
-              <div className="tiny muted ellipsis">
-                {s.summary} · {size(s.bytes)} · v{s.version}
-              </div>
-            </div>
-            <button className="btn btn-sm" disabled={busy} onClick={() => restoreFrom(`Копия от ${when(s.at)}`, () => snapshotData(s.id))}>
-              <RotateCcw size={14} /> Вернуть
-            </button>
-          </div>
-        ))}
-        {local.length > 3 && (
-          <button className="btn btn-ghost btn-sm" onClick={() => setAll(!all)}>
-            {all ? 'Свернуть' : `Все копии (${local.length})`}
-          </button>
+    <>
+      <ListSection header="Данные и копии">
+        <ListRow
+          icon={<IconTile icon={account ? ShieldCheck : ShieldWarning} tone={account ? 'green' : 'orange'} size="list" />}
+          title={account ? 'Данные в безопасности' : 'Данные только на этом устройстве'}
+          subtitle={
+            account
+              ? `Всё сохраняется в облаке аккаунта ${account.user.email}; переустановка, обновление или новый телефон ничего не сотрут — просто войдите.`
+              : 'Создайте аккаунт выше — тогда карты и задачи не потеряются при удалении приложения, очистке Safari или смене телефона.'
+          }
+        />
+        {!isNative() && persisted === false && (
+          <ListRow
+            icon={<IconTile icon={HardDrives} tone="gray" size="list" />}
+            title="Запретить браузеру очищать данные"
+            tone="accent"
+            onClick={async () => {
+              const ok = await requestPersistence();
+              setPersisted(ok);
+              toast(ok ? 'Браузер больше не будет очищать данные SuperMind' : 'Браузер не разрешил — установите SuperMind на экран «Домой» или создайте аккаунт');
+            }}
+          />
         )}
-        <button className="btn btn-sm" disabled={busy} onClick={() => run(async () => void ((await takeSnapshot('manual')) ? toast('Копия сохранена на устройстве') : toast('Пока нечего копировать')))}>
-          <History size={14} /> Сделать копию сейчас
-        </button>
-      </div>
+      </ListSection>
+
+      <ListSection
+        header="Автокопии на устройстве"
+        footer={`${newest ? `Последняя — ${when(newest.at)}. ` : ''}Делаются сами: каждые 3 часа, перед обновлением приложения, перед входом в аккаунт и перед восстановлением. Хранятся свежие, а за прошлые дни — первая и последняя копия каждого дня (2 недели).`}
+      >
+        {shown.map((s) => (
+          <ListRow
+            key={s.id}
+            title={
+              <>
+                {when(s.at)} <span className="dc-tag">{REASON_LABEL[s.reason as SnapshotReason] ?? s.reason}</span>
+              </>
+            }
+            subtitle={`${s.summary} · ${size(s.bytes)} · v${s.version}`}
+            trailing={restoreBtn(() => void restoreFrom(`Копия от ${when(s.at)}`, () => snapshotData(s.id)))}
+          />
+        ))}
+        {local.length > 3 && <ListRow title={all ? 'Свернуть' : `Все копии (${local.length})`} tone="accent" onClick={() => setAll(!all)} />}
+        <ListRow
+          icon={<IconTile icon={ClockCounterClockwise} tone="teal" size="list" />}
+          title="Сделать копию сейчас"
+          tone="accent"
+          disabled={busy}
+          onClick={() => void run(async () => void ((await takeSnapshot('manual')) ? toast('Копия сохранена на устройстве') : toast('Пока нечего копировать')))}
+        />
+      </ListSection>
 
       {account && (
-        <>
-          <div className="dc-head">
-            <b>
-              <Cloud size={14} /> Копии в облаке
-            </b>
-            <span className="tiny muted">{cloud?.[0] ? `последняя ${when(cloud[0].at)}` : ''}</span>
-          </div>
-          <p className="tiny muted dc-note">Сервер сам сохраняет копию каждый час, когда вы что-то меняете: все за последние сутки, а за прошлые дни — первая и последняя копия каждого дня (30 дней) — даже если данные испортятся на всех устройствах.</p>
-          <div className="dc-list">
-            {cloudErr && <p className="tiny muted">{cloudErr}</p>}
-            {cloud?.length === 0 && <p className="tiny muted">Первая копия появится при следующем изменении или нажмите «Копия в облако».</p>}
-            {(cloud ?? []).slice(0, all ? 60 : 3).map((s) => (
-              <div key={s.id} className="dc-row">
-                <div className="grow">
-                  <div className="small bold">
-                    {when(s.at)} <span className="dc-tag">{CLOUD_REASON[s.reason] ?? s.reason}</span>
-                  </div>
-                  <div className="tiny muted">
-                    записей: {s.keys} · {size(s.bytes)}
-                  </div>
-                </div>
-                <button className="btn btn-sm" disabled={busy} onClick={() => restoreFrom(`Облачная копия от ${when(s.at)}`, () => cloudSnapshotData(s.id))}>
-                  <RotateCcw size={14} /> Вернуть
-                </button>
-              </div>
-            ))}
-            <button
-              className="btn btn-sm"
-              disabled={busy}
-              onClick={() =>
-                run(async () => {
-                  await makeCloudSnapshot();
-                  setCloud(await listCloudSnapshots());
-                  toast('Копия сохранена в облаке');
-                })
+        <ListSection
+          header="Копии в облаке"
+          footer={`${cloud?.[0] ? `Последняя — ${when(cloud[0].at)}. ` : ''}Сервер сам сохраняет копию каждый час, когда вы что-то меняете: все за последние сутки, а за прошлые дни — первая и последняя копия каждого дня (30 дней) — даже если данные испортятся на всех устройствах.`}
+        >
+          {cloudErr && <ListRow title="Не удалось загрузить" subtitle={cloudErr} />}
+          {cloud?.length === 0 && <ListRow title="Копий пока нет" subtitle="Первая копия появится при следующем изменении." />}
+          {(cloud ?? []).slice(0, all ? 60 : 3).map((s) => (
+            <ListRow
+              key={s.id}
+              title={
+                <>
+                  {when(s.at)} <span className="dc-tag">{CLOUD_REASON[s.reason] ?? s.reason}</span>
+                </>
               }
-            >
-              <Cloud size={14} /> Копия в облако
-            </button>
-          </div>
-        </>
+              subtitle={`записей: ${s.keys} · ${size(s.bytes)}`}
+              trailing={restoreBtn(() => void restoreFrom(`Облачная копия от ${when(s.at)}`, () => cloudSnapshotData(s.id)))}
+            />
+          ))}
+          <ListRow
+            icon={<IconTile icon={Cloud} tone="blue" size="list" />}
+            title="Копия в облако"
+            tone="accent"
+            disabled={busy}
+            onClick={() =>
+              void run(async () => {
+                await makeCloudSnapshot();
+                setCloud(await listCloudSnapshots());
+                toast('Копия сохранена в облаке');
+              })
+            }
+          />
+        </ListSection>
       )}
 
-      <div className="dc-head">
-        <b>Файл</b>
-      </div>
-      <div className="row" style={{ flexWrap: 'wrap' }}>
-        <button className="btn" disabled={busy} onClick={backupFile}>
-          <Download size={16} /> Скачать копию
-        </button>
-        <button className="btn" disabled={busy} onClick={restoreFile}>
-          <Upload size={16} /> Восстановить из файла
-        </button>
-        <button className="btn btn-danger" onClick={wipe}>
-          <Trash2 size={16} /> Удалить всё
-        </button>
-      </div>
-    </section>
+      <ListSection header="Файл" footer="Файл-копию можно хранить где угодно и восстановить на любом устройстве.">
+        <ListRow icon={<IconTile icon={DownloadSimple} tone="blue" size="list" />} title="Скачать копию" tone="accent" disabled={busy} onClick={() => void backupFile()} />
+        <ListRow icon={<IconTile icon={UploadSimple} tone="indigo" size="list" />} title="Восстановить из файла" tone="accent" disabled={busy} onClick={() => void restoreFile()} />
+        <ListRow icon={<IconTile icon={Trash} tone="red" size="list" />} title="Удалить всё" tone="danger" onClick={() => void wipe()} />
+      </ListSection>
+    </>
   );
 }

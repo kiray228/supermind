@@ -42,7 +42,7 @@
 .cv-month { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: auto; padding: 12px 16px 16px; }
 .cv-mgrid {
   flex: 1; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-template-rows: auto repeat(6, minmax(92px, 1fr));
-  gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+  gap: 1px; background: var(--border); border: var(--hairline) solid var(--separator); border-radius: var(--radius); overflow: hidden;
 }
 .cv-wd { background: var(--surface); text-align: center; font-size: 11.5px; font-weight: 650; color: var(--text-3); padding: 6px 0; text-transform: uppercase; }
 .cv-wd.we { color: color-mix(in srgb, var(--accent) 60%, var(--text-3)); }
@@ -118,7 +118,7 @@
 }
 .cv-tg-row { display: grid; grid-template-columns: var(--cols); }
 .cv-tg-sticky {
-  position: sticky; top: 0; z-index: 6; border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 6; border-bottom: var(--hairline) solid var(--separator);
   background: var(--lg-solid); -webkit-backdrop-filter: var(--lg-blur); backdrop-filter: var(--lg-blur);
 }
 .cv-tg-head {
@@ -134,9 +134,9 @@
 }
 .cv-tg-head.today .cv-tg-wd { color: var(--accent); }
 .cv-tg-head.today .cv-tg-date { background: var(--accent); color: #fff; }
-.cv-tg-allday { border-top: 1px solid var(--border); max-height: 96px; overflow-y: auto; }
+.cv-tg-allday { border-top: var(--hairline) solid var(--separator); max-height: 96px; overflow-y: auto; }
 .cv-tg-gut { padding: 6px 6px 0 0; font-size: 10.5px; line-height: 1.15; color: var(--text-3); text-align: right; }
-.cv-tg-adcell { display: flex; flex-direction: column; gap: 2px; min-width: 0; min-height: 30px; padding: 3px 2px; border-left: 1px solid var(--border); cursor: pointer; }
+.cv-tg-adcell { display: flex; flex-direction: column; gap: 2px; min-width: 0; min-height: 30px; padding: 3px 2px; border-left: var(--hairline) solid var(--separator); cursor: pointer; }
 .cv-tg-body { position: relative; }
 .cv-tg-hours { position: relative; }
 .cv-tg-hours span {
@@ -144,7 +144,7 @@
   font-variant-numeric: tabular-nums; pointer-events: none;
 }
 .cv-tg-col {
-  position: relative; min-width: 0; border-left: 1px solid var(--border); cursor: pointer;
+  position: relative; min-width: 0; border-left: var(--hairline) solid var(--separator); cursor: pointer;
   background-image: linear-gradient(to bottom, var(--border) 1px, transparent 1px);
   background-size: 100% var(--cv-hour);
 }
@@ -224,4 +224,51 @@
 @media (max-width: 760px) {
   .cv-tg-body { margin-bottom: calc(120px + var(--safe-bottom)); }
   .cv-month, .cv-agenda { padding-bottom: calc(180px + var(--safe-bottom)); }
+}
+
+/* ================= iOS: месяц как в «Календаре» iPhone ================= */
+.cv-period { font-size: 20px; font-weight: 700; letter-spacing: -0.024em; font-family: var(--font-display); }
+.cv-fab {
+  background: var(--lg-sheen), var(--accent);
+  box-shadow: inset 0 1px 0.5px rgba(255, 255, 255, .45), inset 0 0 0 0.5px rgba(255, 255, 255, .2), 0 8px 24px color-mix(in srgb, var(--accent) 40%, transparent);
+  transition: transform .25s cubic-bezier(.3, 1.6, .5, 1);
+}
+.cv-fab:active { transform: scale(.88); }
+.cv-mgrid { border: none; border-radius: var(--radius-group); background: var(--separator); }
+.cv-wd { font-weight: 600; font-size: 11px; color: var(--text-2); }
+.cv-wd.we { color: var(--text-3); }
+.cv-cell.out { background: var(--surface); }
+.cv-cell.out .cv-num { color: var(--text-3); font-weight: 400; }
+.cv-num { font-weight: 500; font-size: 14px; }
+.cv-cell.today .cv-num { background: none; color: var(--accent); font-weight: 700; }
+.cv-cell.sel .cv-num { background: var(--text); color: var(--bg); }
+.cv-cell.today.sel .cv-num { background: var(--accent); color: #fff; }
+.cv-cell.sel { box-shadow: none; }
+.cv-chip { border-radius: 4px; }
+.cv-month.narrow .cv-mgrid { gap: 0; background: var(--surface); }
+.cv-month.narrow .cv-wd { background: transparent; padding: 10px 0 8px; }
+.cv-month.narrow .cv-cell { background: transparent; box-shadow: inset 0 var(--hairline) 0 var(--separator); }
+.cv-month.narrow .cv-cell.out { opacity: .55; }
+.cv-month.narrow .cv-num { width: 32px; height: 32px; font-size: 18px; font-weight: 400; letter-spacing: -0.02em; }
+.cv-month.narrow .cv-cell.today .cv-num { background: none; color: var(--accent); font-weight: 600; }
+.cv-month.narrow .cv-cell.sel .cv-num { background: var(--text); color: var(--bg); font-weight: 600; }
+.cv-month.narrow .cv-cell.today.sel .cv-num { background: var(--accent); color: #fff; }
+.cv-month.narrow .cv-cell { padding: 4px 2px; gap: 2px; }
+.cv-month.narrow .cv-mgrid { grid-template-rows: auto repeat(6, 52px); }
+.cv-list { padding: 0; border-radius: var(--radius-group); overflow: hidden; }
+.cv-row { border-radius: 0; padding: 8px 16px; min-height: 48px; gap: 12px; position: relative; }
+.cv-row + .cv-row::before { content: ''; position: absolute; top: 0; left: 48px; right: 0; height: var(--hairline); background: var(--separator); }
+@media (hover: hover) { .cv-row:hover { background: var(--fill-4); } }
+.cv-row:active { background: var(--fill-3); }
+.cv-row-title { font-size: 16px; letter-spacing: -0.02em; }
+.cv-row-time { font-size: 14px; }
+.cv-check { width: 22px; height: 22px; border-radius: 50%; border-width: 1.5px; }
+.cv-check.on { box-shadow: inset 0 0 0 2.5px var(--surface); }
+.cv-check.on svg { display: none; }
+.cv-list-head b { font-size: 17px; font-weight: 600; letter-spacing: -0.02em; }
+.cv-none { border: none; background: var(--surface); border-radius: var(--radius-group); color: var(--text-2); font-size: 15px; }
+@media (max-width: 760px) {
+  .cv-header .cv-nav .icon-btn { width: 36px; height: 36px; }
+  .cv-period { font-size: 19px; padding: 0 2px; }
+  .cv-header { padding-left: 12px; padding-right: 12px; column-gap: 6px; }
 }

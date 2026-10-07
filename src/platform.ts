@@ -80,7 +80,7 @@ export function setupPlatform() {
       const apply = () => {
         const dark = document.documentElement.dataset.theme === 'dark';
         StatusBar.setStyle({ style: dark ? Style.Dark : Style.Light }).catch(() => {});
-        StatusBar.setBackgroundColor({ color: dark ? '#17191e' : '#ffffff' }).catch(() => {});
+        StatusBar.setBackgroundColor({ color: dark ? '#000000' : '#f2f2f7' }).catch(() => {});
       };
       apply();
       new MutationObserver(apply).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });

@@ -7,7 +7,7 @@
 
 .pg-card { padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .pg-card-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.pg-card-head h3 { margin: 0; font-size: 16px; letter-spacing: -.01em; }
+.pg-card-head h3 { margin: 0; font-size: var(--fs-card); letter-spacing: -.01em; }
 .pg-count { font-size: 13px; font-weight: 700; color: var(--accent); margin-left: 4px; }
 
 /* ---------- Герой ---------- */
@@ -169,7 +169,7 @@
 }
 .pg-ach-lock {
   position: absolute; right: -4px; bottom: -4px; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center;
-  background: var(--surface); color: var(--text-3); border: 1px solid var(--border);
+  background: var(--surface); color: var(--text-3); border: var(--hairline) solid var(--separator);
 }
 .pg-ach-title { font-weight: 700; font-size: 13.5px; line-height: 1.2; }
 .pg-ach:not(.done) .pg-ach-title { color: var(--text-2); }
@@ -191,7 +191,7 @@
 .pg-howto-head {
   display: flex; align-items: center; gap: 8px; width: 100%; border: none; background: none; padding: 0; color: inherit; font: inherit; cursor: pointer; text-align: left;
 }
-.pg-howto-head h3 { margin: 0; font-size: 16px; }
+.pg-howto-head h3 { margin: 0; font-size: var(--fs-card); }
 .pg-howto-chev { color: var(--text-3); transition: transform .2s; }
 .pg-howto.open .pg-howto-chev { transform: rotate(180deg); }
 .pg-howto-body { display: flex; flex-direction: column; gap: 12px; margin-top: 10px; }

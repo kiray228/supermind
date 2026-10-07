@@ -9,6 +9,7 @@ import { LevelRing } from '../progress/LevelBadge';
 import { AREA_IDS, LEVEL_TITLES, XP, xpForLevel, type AreaId, type ProgressStats } from '../progress/model';
 import { achievementColor, achievementStates, AREAS, type AchievementState } from '../progress/achievements';
 import './progress.css';
+import { IconTile } from '../ui/icons';
 
 const fmt = (n: number) => Math.round(n).toLocaleString('ru-RU');
 const WD = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
@@ -74,6 +75,7 @@ export default function Progress() {
   return (
     <div className="page pg-page">
       <div className="page-header">
+        <IconTile section="progress" size="sm" className="ph-tile" />
         <h1 className="grow">Прогресс</h1>
         {p && (
           <span className="pg-total-chip" title="Весь опыт">

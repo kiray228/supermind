@@ -20,9 +20,11 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -37,6 +39,7 @@ public class TodayWidget extends AppWidgetProvider {
     private static final String KEY_DATA = "data";
     private static final String KEY_PENDING = "pending";
     private static final String KEY_RECENT = "recentDone";
+    private static final String KEY_RECENT_HABITS = "recentHabits";
     static final String ACTION_COMPLETE = "app.twomind.mindmap.widget.COMPLETE";
     static final String EXTRA_ACTION = "sm_action";
     private static final int MAX_ROWS = 6;
@@ -50,7 +53,7 @@ public class TodayWidget extends AppWidgetProvider {
 
     static synchronized void saveData(Context ctx, String json) {
         // свежие данные приложения уже учитывают применённые выполнения
-        prefs(ctx).edit().putString(KEY_DATA, json).remove(KEY_RECENT).commit();
+        prefs(ctx).edit().putString(KEY_DATA, json).remove(KEY_RECENT).remove(KEY_RECENT_HABITS).commit();
     }
 
     static synchronized void queue(Context ctx, JSONObject action) {
@@ -76,8 +79,36 @@ public class TodayWidget extends AppWidgetProvider {
         }
         Set<String> recent = new HashSet<>(p.getStringSet(KEY_RECENT, Collections.<String>emptySet()));
         recent.addAll(completedIds(list));
-        p.edit().putString(KEY_PENDING, "[]").putStringSet(KEY_RECENT, recent).commit();
+        // отметки привычек тоже видны до следующего update — виджет не «откатывается»
+        JSONArray habits;
+        try {
+            habits = new JSONArray(p.getString(KEY_RECENT_HABITS, "[]"));
+        } catch (JSONException e) {
+            habits = new JSONArray();
+        }
+        for (int i = 0; i < list.length(); i++) {
+            JSONObject o = list.optJSONObject(i);
+            if (o != null && "habit".equals(o.optString("type"))) habits.put(o);
+        }
+        p.edit().putString(KEY_PENDING, "[]").putStringSet(KEY_RECENT, recent).putString(KEY_RECENT_HABITS, habits.toString()).commit();
         return list;
+    }
+
+    /** Отметки привычек, ещё не учтённые в данных приложения: «дата|id» → новое значение счётчика */
+    static synchronized Map<String, Integer> habitOverrides(Context ctx) {
+        SharedPreferences p = prefs(ctx);
+        Map<String, Integer> out = new HashMap<>();
+        for (String key : new String[] { KEY_RECENT_HABITS, KEY_PENDING }) {
+            try {
+                JSONArray list = new JSONArray(p.getString(key, "[]"));
+                for (int i = 0; i < list.length(); i++) {
+                    JSONObject o = list.optJSONObject(i);
+                    if (o != null && "habit".equals(o.optString("type"))) out.put(o.optString("date") + "|" + o.optString("id"), o.optInt("n"));
+                }
+            } catch (JSONException ignored) {
+            }
+        }
+        return out;
     }
 
     private static Set<String> completedIds(JSONArray list) {
@@ -89,7 +120,7 @@ public class TodayWidget extends AppWidgetProvider {
         return ids;
     }
 
-    private static synchronized Set<String> hiddenIds(Context ctx) {
+    static synchronized Set<String> hiddenIds(Context ctx) {
         SharedPreferences p = prefs(ctx);
         Set<String> ids = new HashSet<>(p.getStringSet(KEY_RECENT, Collections.<String>emptySet()));
         try {
@@ -124,6 +155,8 @@ public class TodayWidget extends AppWidgetProvider {
             if (id != null) o.put("id", id);
             String view = intent.getStringExtra("sm_view");
             if (view != null) o.put("view", view);
+            String date = intent.getStringExtra("sm_date");
+            if (date != null) o.put("date", date);
             queue(ctx, o);
             intent.removeExtra(EXTRA_ACTION);
         } catch (JSONException ignored) {
@@ -157,8 +190,13 @@ public class TodayWidget extends AppWidgetProvider {
                 } catch (JSONException ignored) {
                 }
                 refreshAll(ctx);
+                CalendarWidget.refreshAll(ctx);
                 WidgetBridgePlugin.notifyPending();
             }
+            return;
+        }
+        if (SmWidgets.ACTION_TICK.equals(intent.getAction())) {
+            SmWidgets.refreshAll(ctx);
             return;
         }
         super.onReceive(ctx, intent);
@@ -250,11 +288,17 @@ public class TodayWidget extends AppWidgetProvider {
 
         // привычки за сегодня
         int hDone = 0, hTotal = 0;
-        JSONObject habits = data != null ? data.optJSONObject("habits") : null;
-        JSONArray h = habits != null ? habits.optJSONArray(today) : null;
-        if (h != null && h.length() >= 2) {
-            hDone = h.optInt(0);
-            hTotal = h.optInt(1);
+        int[] hp = HabitsWidget.progress(ctx, data, today);
+        if (hp != null) {
+            hDone = hp[0];
+            hTotal = hp[1];
+        } else {
+            JSONObject habits = data != null ? data.optJSONObject("habits") : null;
+            JSONArray h = habits != null ? habits.optJSONArray(today) : null;
+            if (h != null && h.length() >= 2) {
+                hDone = h.optInt(0);
+                hTotal = h.optInt(1);
+            }
         }
         boolean showHabits = hTotal > 0;
         rv.setViewVisibility(R.id.w_habits, showHabits ? View.VISIBLE : View.GONE);
@@ -282,7 +326,7 @@ public class TodayWidget extends AppWidgetProvider {
             } else label = r.time;
             row.setTextViewText(R.id.w_row_time, label);
             row.setViewVisibility(R.id.w_row_time, label.isEmpty() ? View.GONE : View.VISIBLE);
-            row.setTextColor(R.id.w_row_time, ctx.getColor(r.overdue ? R.color.widget_danger : R.color.widget_text2));
+            SmWidgets.textColor(ctx, row, R.id.w_row_time, r.overdue ? R.color.widget_danger : R.color.widget_text2);
             if (r.priority >= 1 && r.priority <= 3) {
                 int[] colors = { 0, 0xFFEF4444, 0xFFF59E0B, 0xFF3B82F6 };
                 row.setInt(R.id.w_row_check, "setColorFilter", colors[r.priority]);
@@ -306,7 +350,7 @@ public class TodayWidget extends AppWidgetProvider {
         rv.setOnClickPendingIntent(R.id.w_header, activityIntent(ctx, 2, "open_view", null, "tasks"));
         rv.setOnClickPendingIntent(R.id.w_more, activityIntent(ctx, 2, "open_view", null, "tasks"));
         rv.setOnClickPendingIntent(R.id.w_empty, activityIntent(ctx, 2, "open_view", null, "tasks"));
-        rv.setOnClickPendingIntent(R.id.w_habits, activityIntent(ctx, 3, "open_view", null, "planner"));
+        rv.setOnClickPendingIntent(R.id.w_habits, activityIntent(ctx, 3, "open_view", null, "habits"));
 
         m.updateAppWidget(wid, rv);
     }

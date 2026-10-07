@@ -1,5 +1,4 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { Network, KanbanSquare, Settings as SettingsIcon, CheckSquare, CalendarRange, Timer, Menu as MenuIcon, StickyNote, Target, Wallet, Bot, Trophy, Repeat } from 'lucide-react';
 import { useApp, type View } from './store/appStore';
 import { listDocs, loadSettings, saveDoc } from './store/db';
 import { get as idbGet, set as idbSet } from './store/kv';
@@ -16,6 +15,8 @@ import { QuickAddHost } from './tasks/ui/QuickAdd';
 import { SearchHost, SearchNavButton, SearchSheetButton } from './search/SearchHost';
 import { ReminderStack } from './tasks/ui/Reminders';
 import { applyAppearance } from './ui/appearance';
+import { initLargeTitles } from './ui/navbar';
+import { IconTile, SectionIcon, type SectionId } from './ui/icons';
 import './ui/appearance.css';
 import './app.css';
 
@@ -36,19 +37,19 @@ const LevelBadge = lazy(() => import('./progress/LevelBadge').then((m) => ({ def
 const OnboardingHost = lazy(() => import('./onboarding/OnboardingHost'));
 
 /** phone: false — на телефоне пункт в меню «Ещё» */
-const NAV: { id: View; label: string; icon: typeof Network; phone: boolean }[] = [
-  { id: 'home', label: 'Карты', icon: Network, phone: true },
-  { id: 'tasks', label: 'Задачи', icon: CheckSquare, phone: true },
-  { id: 'calendar', label: 'Календарь', icon: CalendarRange, phone: true },
-  { id: 'habits', label: 'Привычки', icon: Repeat, phone: true },
-  { id: 'assistant', label: 'Ассистент', icon: Bot, phone: false },
-  { id: 'notes', label: 'Заметки', icon: StickyNote, phone: false },
-  { id: 'goals', label: 'Цели', icon: Target, phone: false },
-  { id: 'finance', label: 'Финансы', icon: Wallet, phone: false },
-  { id: 'progress', label: 'Прогресс', icon: Trophy, phone: false },
-  { id: 'focus', label: 'Фокус', icon: Timer, phone: false },
-  { id: 'board', label: 'Доска', icon: KanbanSquare, phone: false },
-  { id: 'settings', label: 'Настройки', icon: SettingsIcon, phone: false },
+const NAV: { id: Extract<View, SectionId>; label: string; phone: boolean }[] = [
+  { id: 'home', label: 'Карты', phone: true },
+  { id: 'tasks', label: 'Задачи', phone: true },
+  { id: 'calendar', label: 'Календарь', phone: true },
+  { id: 'habits', label: 'Привычки', phone: true },
+  { id: 'assistant', label: 'Ассистент', phone: false },
+  { id: 'notes', label: 'Заметки', phone: false },
+  { id: 'goals', label: 'Цели', phone: false },
+  { id: 'finance', label: 'Финансы', phone: false },
+  { id: 'progress', label: 'Прогресс', phone: false },
+  { id: 'focus', label: 'Фокус', phone: false },
+  { id: 'board', label: 'Доска', phone: false },
+  { id: 'settings', label: 'Настройки', phone: false },
 ];
 
 let welcomeStarted = false;
@@ -64,12 +65,14 @@ export default function App() {
   const toastMsg = useApp((s) => s.toast);
   const toastAction = useApp((s) => s.toastAction);
   const [more, setMore] = useState(false);
+  const moreActive = NAV.some((n) => !n.phone && n.id === view);
   const todayCount = useTasks((s) => {
     const t = todayYmd();
     return s.data ? s.data.tasks.filter((x) => isActive(x) && !!x.date && x.date <= t).length : 0;
   });
 
   useEffect(() => {
+    initLargeTitles();
     loadSettings().then((s) => useApp.setState({ settings: s }));
     // задачи: загрузка, напоминания, календарь телефона, таймер фокуса
     void ensureTasks().then(() => initTaskSync());
@@ -127,7 +130,7 @@ export default function App() {
     const apply = () => {
       const dark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
       document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-      document.querySelector('meta[name=theme-color]')?.setAttribute('content', dark ? '#17191e' : '#ffffff');
+      document.querySelector('meta[name=theme-color]')?.setAttribute('content', dark ? '#000000' : '#f2f2f7');
     };
     apply();
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
@@ -155,15 +158,15 @@ export default function App() {
           {NAV.map((n) => (
             <button key={n.id} className={`nav-item ${view === n.id ? 'active' : ''}${n.phone ? '' : ' nav-desk'}`} onClick={() => go(n.id)}>
               <span className="nav-ico">
-                <n.icon size={20} />
+                <SectionIcon section={n.id} size={24} weight={view === n.id ? 'fill' : 'regular'} />
                 {n.id === 'tasks' && todayCount > 0 && <i className="nav-badge">{todayCount > 99 ? '99+' : todayCount}</i>}
               </span>
               <span>{n.label}</span>
             </button>
           ))}
-          <button className={`nav-item nav-more ${NAV.some((n) => !n.phone && n.id === view) ? 'active' : ''}`} onClick={() => setMore(true)}>
+          <button className={`nav-item nav-more ${moreActive ? 'active' : ''}`} onClick={() => setMore(true)}>
             <span className="nav-ico">
-              <MenuIcon size={20} />
+              <SectionIcon section="more" size={24} weight={moreActive ? 'fill' : 'regular'} />
             </span>
             <span>Ещё</span>
           </button>
@@ -189,7 +192,7 @@ export default function App() {
       </main>
       {more && (
         <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && setMore(false)}>
-          <div className="modal nav-more-sheet">
+          <div className="modal nav-more-sheet" role="dialog" aria-label="Все разделы">
             <SearchSheetButton onPick={() => setMore(false)} />
             <Suspense fallback={null}>
               <LevelBadge className="nav-sheet-level" onClick={() => (setMore(false), go('progress'))} />
@@ -203,7 +206,7 @@ export default function App() {
                   go(n.id);
                 }}
               >
-                <n.icon size={22} />
+                <IconTile section={n.id} size="lg" />
                 <span>{n.label}</span>
               </button>
             ))}

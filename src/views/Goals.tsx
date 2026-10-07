@@ -24,6 +24,7 @@ import { Celebration } from '../goals/ui/Celebration';
 import { WheelTab } from '../goals/ui/Wheel';
 import { areaOf, useTaskLookup } from '../goals/ui/parts';
 import './goals.css';
+import { IconTile } from '../ui/icons';
 
 type Tab = 'goals' | 'wheel';
 const TAB_KEY = 'sm-goals-tab';
@@ -66,6 +67,7 @@ export default function Goals() {
   return (
     <div className="page gl-page">
       <div className="page-header">
+        <IconTile section="goals" size="sm" className="ph-tile" />
         <h1>Цели</h1>
         <div className="grow" />
         <div className="segmented gl-tabs">
@@ -180,7 +182,7 @@ function GoalsList({ data, onNew, onWheel }: { data: GoalsData; onNew: (p?: Part
 
       {groups.length === 0 && (
         <div className="empty">
-          <div style={{ fontSize: 44 }}>{view === 'done' ? '🏆' : '🎯'}</div>
+          {view === 'done' ? <IconTile section="progress" size="lg" /> : <IconTile section="goals" size="lg" />}
           <div>{view === 'done' ? 'Здесь появятся достигнутые цели' : 'Поставьте первую цель — разбейте её на этапы и двигайтесь шаг за шагом'}</div>
           {view !== 'done' && (
             <button className="btn btn-primary" onClick={() => onNew()}>

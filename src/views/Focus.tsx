@@ -48,6 +48,8 @@ import { uid } from '../utils/tree';
 import { toast } from '../store/appStore';
 import { confirmDialog } from '../ui/dialogs';
 import './focus.css';
+import { IconTile } from '../ui/icons';
+import { Hourglass } from '@phosphor-icons/react';
 
 type Tab = 'pomo' | 'stats' | 'countdown';
 const TAB_KEY = 'sm-focus-tab';
@@ -98,6 +100,7 @@ export default function Focus() {
   return (
     <div className="page fx-page">
       <div className="page-header">
+        <IconTile section="focus" size="sm" className="ph-tile" />
         <h1>Фокус</h1>
         <div className="grow" />
         <div className="segmented fx-tabs">
@@ -643,7 +646,7 @@ function CountdownsTab({ data }: { data: TasksData }) {
       </div>
       {items.length === 0 ? (
         <div className="empty">
-          <div style={{ fontSize: 40 }}>⏳</div>
+          <IconTile icon={Hourglass} tone="indigo" size="lg" />
           <div>Добавьте событие, чтобы видеть, сколько дней до него осталось</div>
         </div>
       ) : (

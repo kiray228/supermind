@@ -16,6 +16,7 @@ import type { GoalDue, GoalsData } from '../goals/model';
 import { activeHabits, doneOn, dueOn, isCounter } from '../habits/model';
 import { toggleHabitOn } from '../habits/store';
 import './calendar.css';
+import { IconTile } from '../ui/icons';
 
 // ---------- Константы ----------
 
@@ -430,6 +431,7 @@ export default function Calendar() {
   return (
     <div className="page cv-page">
       <div className="page-header cv-header">
+        <IconTile section="calendar" size="sm" className="ph-tile cv-h1" />
         <h1 className="cv-h1">Календарь</h1>
         <div className="cv-nav">
           <button className="icon-btn" onClick={() => shift(-1)} aria-label="Назад">

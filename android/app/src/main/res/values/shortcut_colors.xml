@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="sc_task_bg">#FF5A36</color>
+    <color name="sc_habits_bg">#22C55E</color>
+    <color name="sc_search_bg">#3B82F6</color>
+    <color name="sc_note_bg">#F59E0B</color>
+</resources>

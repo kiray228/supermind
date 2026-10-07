@@ -52,7 +52,7 @@ export const GROUPS: Record<GroupId, { label: string; icon: ComponentType<{ size
   note: { label: 'Заметки', icon: StickyNote },
   goal: { label: 'Цели', icon: Target },
   habit: { label: 'Привычки', icon: Repeat },
-  journal: { label: 'Ежедневник', icon: NotebookPen },
+  journal: { label: 'Дневник', icon: NotebookPen },
   tx: { label: 'Финансы', icon: Wallet },
 };
 

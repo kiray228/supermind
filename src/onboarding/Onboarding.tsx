@@ -13,7 +13,7 @@ import {
   HardDrive,
   Laptop,
   Network,
-  NotebookPen,
+  CalendarDays,
   Repeat,
   ShieldCheck,
   Smartphone,
@@ -24,7 +24,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { useApp } from '../store/appStore';
-import { ACCENTS } from '../ui/appearance';
+import { ACCENTS, DEFAULT_ACCENT } from '../ui/appearance';
 import { HABIT_LIBRARY, habitFromPreset, type HabitPreset } from '../habits/library';
 import { loadPlanner, savePlanner } from '../store/db';
 import { notifyPermission, requestNotifyPermission, syncSoon, type NotifyPermission } from '../tasks/sync';
@@ -36,7 +36,7 @@ const STARTERS: HabitPreset[] = STARTER_NAMES.map((n) => HABIT_LIBRARY.find((p) 
 const MODULES: { icon: typeof Network; label: string }[] = [
   { icon: Network, label: 'Карты' },
   { icon: CheckSquare, label: 'Задачи' },
-  { icon: NotebookPen, label: 'Ежедневник' },
+  { icon: CalendarDays, label: 'Календарь' },
   { icon: Repeat, label: 'Привычки' },
   { icon: Target, label: 'Цели' },
   { icon: Wallet, label: 'Финансы' },
@@ -65,7 +65,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
   const [dx, setDx] = useState(0);
   const [picked, setPicked] = useState<Set<string>>(() => new Set(['Пить воду', 'Чтение']));
   const [perm, setPerm] = useState<NotifyPermission | null>(null);
-  const accent = useApp((s) => s.settings.accent) ?? ACCENTS[0].id;
+  const accent = useApp((s) => s.settings.accent) ?? DEFAULT_ACCENT;
   const drag = useRef<{ x: number; y: number; id: number; active: boolean } | null>(null);
   const busy = useRef(false);
 
@@ -267,7 +267,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
                   );
                 })}
               </div>
-              <p className="ob-hint">Ещё больше — в библиотеке Ежедневника.</p>
+              <p className="ob-hint">Ещё больше — в библиотеке раздела «Привычки».</p>
             </section>
 
             {/* 4. Напоминания и брифинг */}

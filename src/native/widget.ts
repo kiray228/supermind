@@ -1,20 +1,25 @@
 /**
- * Виджет «SuperMind — Сегодня» (Android) и «Поделиться → SuperMind» (Android и PWA share_target).
- * Приложение отдаёт виджету задачи на ближайшую неделю и прогресс привычек по дням — виджет сам
- * выбирает «сегодня», поэтому остаётся верным после полуночи. Действия из виджета (выполнить,
- * открыть задачу, быстрое добавление) и присланный текст приходят очередью через consumePending.
+ * Виджеты Android («Сегодня», «Календарь», «Привычки», «Карта»), ярлыки значка приложения
+ * и «Поделиться → SuperMind» (Android и PWA share_target).
+ * Приложение отдаёт виджетам задачи, повестку на 2 недели, привычки по дням и наброски карт —
+ * виджет сам выбирает «сегодня», поэтому остаётся верным после полуночи. Действия из виджетов
+ * (выполнить, отметить привычку, открыть…), ярлыков и присланный текст приходят очередью через consumePending.
  */
 import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor/core';
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { isNative } from '../platform';
 import { get, onDirty } from '../store/kv';
-import { useApp, type View } from '../store/appStore';
+import type { View } from '../store/appStore';
 import type { PlannerData } from '../types';
 import { addDaysYmd, todayYmd } from '../utils/mapTasks';
 import { completeOccurrence, ensureTasks, flushTasks, openQuickAdd, openTask, useTasks } from '../tasks/store';
 import { isActive } from '../tasks/model';
-import { activeHabits, doneOn, dueOn } from '../habits/model';
+import { activeHabits, countOn, doneOn, dueOn } from '../habits/model';
+import { bumpHabitOn } from '../habits/store';
+import { loadPlanner } from '../store/db';
+import { ensureGoals, openGoal } from '../goals/store';
+import { buildAgenda, buildHabits, buildMaps, invalidatePhoneEvents, subscribeGoals } from './widgetData';
 import { joinShared, type SharedText } from './share';
 
 type PendingAction =
@@ -22,7 +27,13 @@ type PendingAction =
   | { type: 'open_task'; id: string }
   | { type: 'quick_add' }
   | { type: 'open_view'; view: string }
-  | { type: 'share'; text: string; title?: string };
+  | { type: 'share'; text: string; title?: string }
+  /** привычка из виджета: n — новое значение счётчика за день (0/1 для простой отметки) */
+  | { type: 'habit'; id: string; date: string; n: number }
+  | { type: 'open_map'; id: string }
+  | { type: 'open_goal'; id: string }
+  | { type: 'search' }
+  | { type: 'new_note' };
 
 interface WidgetBridgePlugin {
   update(o: { json: string }): Promise<void>;
@@ -56,7 +67,13 @@ async function buildPayload(): Promise<string> {
       if (due.length) habits[d] = [due.filter((h) => doneOn(days, h, d)).length, due.length];
     }
   }
-  return JSON.stringify({ v: 1, at: Date.now(), tasks, habits });
+  await ensureGoals().catch(() => undefined);
+  const [agenda, hab, maps] = await Promise.all([
+    buildAgenda(today).catch(() => []),
+    buildHabits(today).catch(() => ({ list: [], days: {} })),
+    buildMaps().catch(() => []),
+  ]);
+  return JSON.stringify({ v: 2, at: Date.now(), tasks, habits, agenda, hab, maps });
 }
 
 let lastSent = '';
@@ -84,7 +101,34 @@ function pushSoon(ms = 800) {
 let applying = false;
 let again = false;
 
-const VIEWS: View[] = ['home', 'tasks', 'calendar', 'planner', 'notes', 'goals', 'finance', 'assistant', 'progress', 'focus', 'board', 'settings'];
+const VIEWS: View[] = ['home', 'tasks', 'calendar', 'planner', 'habits', 'notes', 'goals', 'finance', 'assistant', 'progress', 'focus', 'board', 'settings'];
+
+/** Перейти в раздел (из редактора карты — с сохранением) */
+async function goView(view: Exclude<View, 'editor'>) {
+  const { nav } = await import('../search/sources');
+  await nav(view);
+}
+
+/** Отметка привычки из виджета: привести счётчик дня к значению, которое видел пользователь */
+async function applyHabit(id: string, date: string, n: number): Promise<boolean> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+  const p = await loadPlanner();
+  const h = p.habits?.find((x) => x.id === id);
+  if (!h) return false;
+  const delta = Math.max(0, n) - countOn(p.days?.[date], h);
+  if (!delta) return false;
+  await bumpHabitOn(h, date, delta);
+  return true;
+}
+
+async function newNote() {
+  const { ensureNotes, createNote, openNote } = await import('../notes/store');
+  await ensureNotes();
+  const m = createNote();
+  if (!m) return;
+  await openNote(m.id);
+  await goView('notes');
+}
 
 /** Забрать и выполнить действия из виджета и «Поделиться» */
 async function applyPending() {
@@ -100,6 +144,11 @@ async function applyPending() {
     if (!actions?.length) return;
     let completed = 0;
     for (const a of actions) {
+      // переход из виджета/ярлыка — открытый поиск не должен его заслонять
+      if (a.type !== 'search' && a.type !== 'complete' && a.type !== 'habit') {
+        const { closeSearch } = await import('../search/state');
+        closeSearch();
+      }
       switch (a.type) {
         case 'complete':
           if (completeOccurrence(a.id, a.date)) completed++;
@@ -112,7 +161,27 @@ async function applyPending() {
           setTimeout(() => openQuickAdd({ date: todayYmd() }), 150);
           break;
         case 'open_view':
-          if (VIEWS.includes(a.view as View)) useApp.getState().go(a.view as View);
+          if (VIEWS.includes(a.view as View)) await goView(a.view as Exclude<View, 'editor'>);
+          break;
+        case 'habit':
+          await applyHabit(a.id, a.date, a.n).catch(() => false);
+          break;
+        case 'open_map': {
+          const { openDoc } = await import('../actions');
+          await openDoc(a.id);
+          break;
+        }
+        case 'open_goal':
+          await goView('goals');
+          openGoal(a.id);
+          break;
+        case 'search': {
+          const { openSearch } = await import('../search/state');
+          setTimeout(() => openSearch(), 150);
+          break;
+        }
+        case 'new_note':
+          await newNote();
           break;
         case 'share':
           openShare({ text: a.text, title: a.title });
@@ -168,10 +237,12 @@ export function initWidget() {
     if (s.data !== prev.data) pushSoon();
   });
   window.addEventListener('sm-planner-changed', () => pushSoon());
+  subscribeGoals(() => pushSoon());
   onDirty(() => pushSoon(1500));
   void WidgetBridge.addListener('pending', () => void applyPending()).catch(() => {});
   void import('@capacitor/app').then(({ App }) => {
     void App.addListener('resume', () => {
+      invalidatePhoneEvents();
       void applyPending();
       pushSoon(300);
     });

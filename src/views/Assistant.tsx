@@ -10,6 +10,7 @@ import { buildContext, systemPrompt } from '../assistant/context';
 import { describeAction, parseActions, toItems } from '../assistant/actions';
 import { addMessage, clearChat, ensureChat, removeMessage, setChatBusy, useChat, type ChatMessage } from '../assistant/history';
 import './assistant.css';
+import { IconTile } from '../ui/icons';
 
 interface Suggestion {
   label: string;
@@ -195,6 +196,7 @@ export default function Assistant() {
   return (
     <div className={`page as-page${kb ? ' kb-open' : ''}${hasKey ? '' : ' no-composer'}`}>
       <div className="page-header">
+        <IconTile section="assistant" size="sm" className="ph-tile" />
         <h1>Ассистент</h1>
         <span className="grow" />
         {hasKey && messages.length > 0 && (
@@ -206,6 +208,7 @@ export default function Assistant() {
 
       <div
         className="as-scroll"
+        data-navscroll=""
         ref={scrollRef}
         onScroll={() => {
           stickRef.current = nearBottom();

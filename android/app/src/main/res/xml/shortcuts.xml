@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ярлыки значка приложения (долгое нажатие). Ведут в ShortcutActivity: она передаёт действие
+     в уже открытое приложение без перезапуска. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_sc_task"
+        android:shortcutId="new_task"
+        android:shortcutLongLabel="@string/sc_task_long"
+        android:shortcutShortLabel="@string/sc_task_short">
+        <intent
+            android:action="app.twomind.mindmap.shortcut.quick_add"
+            android:targetClass="app.twomind.mindmap.ShortcutActivity"
+            android:targetPackage="app.twomind.mindmap">
+            <extra android:name="sm_action" android:value="quick_add" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_sc_habits"
+        android:shortcutId="habits"
+        android:shortcutLongLabel="@string/sc_habits_long"
+        android:shortcutShortLabel="@string/sc_habits_short">
+        <intent
+            android:action="app.twomind.mindmap.shortcut.open_view"
+            android:targetClass="app.twomind.mindmap.ShortcutActivity"
+            android:targetPackage="app.twomind.mindmap">
+            <extra android:name="sm_action" android:value="open_view" />
+            <extra android:name="sm_view" android:value="habits" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_sc_search"
+        android:shortcutId="search"
+        android:shortcutLongLabel="@string/sc_search_long"
+        android:shortcutShortLabel="@string/sc_search_short">
+        <intent
+            android:action="app.twomind.mindmap.shortcut.search"
+            android:targetClass="app.twomind.mindmap.ShortcutActivity"
+            android:targetPackage="app.twomind.mindmap">
+            <extra android:name="sm_action" android:value="search" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_sc_note"
+        android:shortcutId="new_note"
+        android:shortcutLongLabel="@string/sc_note_long"
+        android:shortcutShortLabel="@string/sc_note_short">
+        <intent
+            android:action="app.twomind.mindmap.shortcut.new_note"
+            android:targetClass="app.twomind.mindmap.ShortcutActivity"
+            android:targetPackage="app.twomind.mindmap">
+            <extra android:name="sm_action" android:value="new_note" />
+        </intent>
+    </shortcut>
+</shortcuts>

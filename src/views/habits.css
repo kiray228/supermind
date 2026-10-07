@@ -56,7 +56,7 @@
 .pl-habit-cell.on { background: var(--hc); box-shadow: none; }
 .pl-habit-cell.cur { outline: 1.5px solid color-mix(in srgb, var(--hc) 60%, transparent); outline-offset: 1px; }
 .pl-habit-minus {
-  width: 30px; height: 30px; flex-shrink: 0; border-radius: 50%; border: 1px solid var(--border); background: var(--surface);
+  width: 30px; height: 30px; flex-shrink: 0; border-radius: 50%; border: var(--hairline) solid var(--separator); background: var(--surface);
   display: inline-flex; align-items: center; justify-content: center; color: var(--text-2); padding: 0;
 }
 .pl-habit-minus:active { transform: scale(.92); }
@@ -133,7 +133,7 @@ button.hb-cell:hover { transform: scale(1.12); }
 /* Редактор */
 .hb-name-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
 .hb-emoji-btn {
-  width: 44px; height: 44px; flex-shrink: 0; border-radius: 12px; border: 1px solid var(--border); padding: 0;
+  width: 44px; height: 44px; flex-shrink: 0; border-radius: 12px; border: var(--hairline) solid var(--separator); padding: 0;
   font-size: 22px; background: color-mix(in srgb, var(--hc) 14%, var(--surface-2));
 }
 .hb-emoji-btn.open { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }
@@ -151,7 +151,7 @@ button.hb-cell:hover { transform: scale(1.12); }
 .hb-colors { margin-top: 10px; }
 .hb-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-top: 8px; }
 .hb-day {
-  height: 36px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); padding: 0;
+  height: 36px; border-radius: 10px; border: var(--hairline) solid var(--separator); background: var(--surface); padding: 0;
   font-size: 13px; font-weight: 650; color: var(--text-2);
 }
 .hb-day.we { color: color-mix(in srgb, var(--accent) 60%, var(--text-3)); }
@@ -195,7 +195,7 @@ button.hb-item:hover, .hb-preset:hover { background: var(--surface-2); }
 .hb-item-meta.faint { color: var(--text-3); }
 .hb-item-arch { opacity: .8; }
 .hb-new { margin-top: 10px; }
-.hb-arch { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 8px; }
+.hb-arch { margin-top: 12px; border-top: var(--hairline) solid var(--separator); padding-top: 8px; }
 .hb-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 20px 10px 10px; text-align: center; }
 .hb-empty-ic { font-size: 34px; }
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Plus, Sparkles, Upload, Search, Star, Trash2, MoreHorizontal, Lock, Copy, Pencil, RotateCcw, Download, Network, Clock, X, Square,
+  Plus, Sparkles, Upload, Search, Star, Trash2, MoreHorizontal, Lock, Copy, Pencil, RotateCcw, Download, Clock, X, Square,
 } from 'lucide-react';
 import type { DocMeta, StructureType } from '../types';
 import { deleteDoc, listDocs, loadDoc, saveDoc, saveLocked, updateMeta } from '../store/db';
@@ -17,6 +17,8 @@ import { uid } from '../utils/tree';
 import { STRUCTURES } from '../editor/Inspector';
 import { AccountNudge } from '../ui/AccountNudge';
 import './home.css';
+import { IconTile } from '../ui/icons';
+import { PlusCircle } from '@phosphor-icons/react';
 
 type Tab = 'recent' | 'starred' | 'trash';
 
@@ -117,6 +119,7 @@ export default function Home() {
   return (
     <div className="page">
       <div className="page-header">
+        <IconTile section="home" size="sm" className="ph-tile" />
         <h1>Мои карты</h1>
         <div className="grow" />
         <button className="btn" onClick={doImport} title="Импорт файла (.xmind, .md, .opml)"><Upload size={16} /> <span className="hide-xs">Импорт</span></button>
@@ -127,6 +130,7 @@ export default function Home() {
         <AccountNudge />
         <section className="home-section">
           <div className="row" style={{ marginBottom: 10 }}>
+            <IconTile icon={PlusCircle} tone="accent" size="sm" />
             <h2 className="home-h2">Создать</h2>
             <div className="grow" />
             <button className="btn btn-sm btn-ghost" onClick={() => setTplOpen(true)}>Все шаблоны</button>
@@ -163,7 +167,7 @@ export default function Home() {
 
           {shown.length === 0 ? (
             <div className="empty">
-              <Network size={44} />
+              <IconTile section="home" size="lg" />
               <div className="bold">{tab === 'trash' ? 'Корзина пуста' : tab === 'starred' ? 'Нет избранных карт' : q ? 'Ничего не найдено' : 'Пока нет карт'}</div>
               {tab === 'recent' && !q && <div className="small">Создайте первую карту из шаблона или с помощью ИИ</div>}
             </div>

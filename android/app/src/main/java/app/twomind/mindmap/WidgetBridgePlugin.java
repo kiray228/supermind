@@ -13,8 +13,8 @@ import org.json.JSONException;
 import java.lang.ref.WeakReference;
 
 /**
- * Мост между приложением и виджетом «SuperMind — Сегодня»:
- * update — данные для виджета; consumePending — действия из виджета и «Поделиться».
+ * Мост между приложением и виджетами SuperMind («Сегодня», «Календарь», «Привычки», «Карта»):
+ * update — данные для виджетов; consumePending — действия из виджетов, ярлыков и «Поделиться».
  */
 @CapacitorPlugin(name = "WidgetBridge")
 public class WidgetBridgePlugin extends Plugin {
@@ -34,7 +34,7 @@ public class WidgetBridgePlugin extends Plugin {
             return;
         }
         TodayWidget.saveData(getContext(), json);
-        TodayWidget.refreshAll(getContext());
+        SmWidgets.refreshAll(getContext());
         call.resolve();
     }
 

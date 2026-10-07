@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, Check, ChevronDown, Copy, FolderInput, FolderPlus, MoreHorizontal, NotebookPen, Pencil, Pin, PinOff, Plus, RotateCcw, Search, StickyNote, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, ChevronDown, Copy, FolderInput, FolderPlus, MoreHorizontal, Pencil, Pin, PinOff, Plus, RotateCcw, Search, StickyNote, Trash2, X } from 'lucide-react';
 import type { ID } from '../types';
 import { confirmDialog } from '../ui/dialogs';
 import { isBodyEmpty, type NoteMeta, type NotesSort } from '../notes/model';
@@ -24,6 +24,7 @@ import { NoteEditor } from '../notes/ui/NoteEditor';
 import { FolderDialog, NoteCard } from '../notes/ui/ListParts';
 import { MenuItem, MenuLabel, MenuSep, NtMenu, type MenuAnchor } from '../notes/ui/Menu';
 import './notes.css';
+import { IconTile } from '../ui/icons';
 
 type Sel = { k: 'all' } | { k: 'pinned' } | { k: 'trash' } | { k: 'folder'; id: ID };
 type MenuState = { kind: 'note' | 'move'; id: ID; anchor: MenuAnchor } | { kind: 'page'; anchor: MenuAnchor } | { kind: 'folder'; id: ID; anchor: MenuAnchor } | null;
@@ -147,6 +148,7 @@ export default function Notes() {
     return (
       <div className="page">
         <div className="page-header">
+          <IconTile section="notes" size="sm" className="ph-tile" />
           <h1>Заметки</h1>
         </div>
         <div className="loading">
@@ -243,6 +245,7 @@ export default function Notes() {
   return (
     <div className="page nt-page">
       <div className="page-header nt-header">
+        <IconTile section="notes" size="sm" className="ph-tile" />
         <button className="nt-title-btn" onClick={() => setDrawer(true)}>
           <h1 className="ellipsis">{title}</h1>
           <ChevronDown size={18} className="nt-mobile-only" />
@@ -273,7 +276,7 @@ export default function Notes() {
             {isTrash && list.length > 0 && <div className="nt-trash-hint small faint">Заметки в корзине удаляются навсегда через {TRASH_DAYS} дней.</div>}
             {list.length === 0 ? (
               <div className="empty">
-                {isTrash ? <Trash2 size={36} /> : q ? <Search size={36} /> : <NotebookPen size={36} />}
+                {isTrash ? <Trash2 size={40} /> : q ? <Search size={40} /> : <IconTile section="notes" size="lg" />}
                 <div>{isTrash ? 'Корзина пуста' : q ? (found ? 'Ничего не найдено' : 'Ищу…') : sel.k === 'pinned' ? 'Закрепите важные заметки — они будут здесь' : 'Здесь пока нет заметок. Нажмите «+», чтобы создать первую'}</div>
                 {!isTrash && !q && (
                   <button className="btn btn-primary" onClick={create}>

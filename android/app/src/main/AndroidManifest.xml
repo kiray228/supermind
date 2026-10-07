@@ -24,6 +24,29 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
             </intent-filter>
+            <!-- Ярлыки значка: «Новая задача», «Привычки», «Поиск», «Новая заметка» -->
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+        </activity>
+
+        <!-- Невидимый «переходник» для ярлыков: передаёт действие без перезапуска приложения -->
+        <activity
+            android:name=".ShortcutActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:noHistory="true"
+            android:taskAffinity="app.twomind.mindmap.shortcut"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <!-- Выбор карты для виджета «Карта» -->
+        <activity
+            android:name=".MapWidgetConfigure"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:taskAffinity="app.twomind.mindmap.widgetconfig"
+            android:theme="@style/WidgetConfigTheme">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
         </activity>
 
         <!-- Виджет «SuperMind — Сегодня» -->
@@ -35,6 +58,43 @@
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_today_info" />
+        </receiver>
+
+        <!-- Виджет «SuperMind — Календарь» -->
+        <receiver
+            android:name=".CalendarWidget"
+            android:label="@string/widget_calendar_label"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_calendar_info" />
+        </receiver>
+        <service
+            android:name=".CalendarWidgetService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
+
+        <!-- Виджет «SuperMind — Привычки» -->
+        <receiver
+            android:name=".HabitsWidget"
+            android:label="@string/widget_habits_label"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_habits_info" />
+        </receiver>
+
+        <!-- Виджет «SuperMind — Карта» -->
+        <receiver
+            android:name=".MapWidget"
+            android:label="@string/widget_map_label"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_map_info" />
         </receiver>
 
         <provider

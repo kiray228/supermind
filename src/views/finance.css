@@ -20,7 +20,7 @@
 .fn-danger { color: var(--danger); }
 .fn-warn-text { color: var(--warn); }
 .fn-money { font-variant-numeric: tabular-nums; white-space: nowrap; }
-.fn-h3 { margin: 0; font-size: 15px; }
+.fn-h3 { margin: 0; font-size: var(--fs-card); letter-spacing: -0.01em; }
 .fn-link {
   display: inline-flex; align-items: center; gap: 2px; padding: 0; border: none; background: none;
   color: var(--accent); font-weight: 600; text-align: left;
@@ -44,7 +44,7 @@
 /* ---------- Панели ---------- */
 .fn-panel { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; box-shadow: none; min-width: 0; }
 .fn-panel-head { display: flex; align-items: center; gap: 8px; min-height: 28px; }
-.fn-panel-head h3 { margin: 0; font-size: 15px; flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 6px; }
+.fn-panel-head h3 { margin: 0; font-size: var(--fs-card); letter-spacing: -0.01em; flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 6px; }
 .fn-panel-head h3 svg { color: var(--accent); }
 
 /* ---------- Обзор ---------- */
@@ -64,7 +64,7 @@
 .fn-acc-scroll::-webkit-scrollbar { display: none; }
 .fn-acc-card {
   --c: var(--accent); flex: 0 0 auto; min-width: 128px; max-width: 190px; display: flex; flex-direction: column; gap: 4px; padding: 10px 12px;
-  border-radius: 12px; border: 1px solid var(--border); background: var(--surface); text-align: left; color: var(--text);
+  border-radius: 12px; border: var(--hairline) solid var(--separator); background: var(--surface); text-align: left; color: var(--text);
   box-shadow: inset 3px 0 0 var(--c); scroll-snap-align: start;
 }
 .fn-acc-card:hover { border-color: color-mix(in srgb, var(--c) 45%, var(--border)); }
@@ -83,7 +83,7 @@
 .fn-budget-line { flex-wrap: wrap; font-weight: 650; }
 .fn-mini-budget { display: flex; flex-direction: column; gap: 5px; }
 .fn-upcoming { display: flex; align-items: center; gap: 10px; padding: 8px 2px; min-width: 0; }
-.fn-upcoming + .fn-upcoming { border-top: 1px solid var(--border); }
+.fn-upcoming + .fn-upcoming { border-top: var(--hairline) solid var(--separator); }
 .fn-upcoming > svg { flex-shrink: 0; }
 .fn-empty-inline { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
 
@@ -102,7 +102,7 @@
   text-align: left; color: var(--text); min-width: 0;
 }
 .fn-tx:hover { background: var(--surface-2); }
-.fn-tx + .fn-tx { border-top: 1px solid var(--border); }
+.fn-tx + .fn-tx { border-top: var(--hairline) solid var(--separator); }
 .fn-panel .fn-tx { padding-left: 2px; padding-right: 2px; border-radius: 0; }
 .fn-tx-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
 .fn-tx-title { font-size: 14.5px; font-weight: 600; }
@@ -201,10 +201,10 @@
 .fn-cat-budget {
   display: flex; align-items: center; gap: 11px; width: 100%; padding: 8px 2px; border: none; background: none; text-align: left; color: var(--text);
 }
-.fn-cat-budget + .fn-cat-budget { border-top: 1px solid var(--border); }
+.fn-cat-budget + .fn-cat-budget { border-top: var(--hairline) solid var(--separator); }
 .fn-cat-budget-main { display: flex; flex-direction: column; gap: 5px; }
 .fn-nolimit { display: flex; align-items: center; gap: 10px; min-height: 40px; }
-.fn-nolimit + .fn-nolimit { border-top: 1px solid var(--border); }
+.fn-nolimit + .fn-nolimit { border-top: var(--hairline) solid var(--separator); }
 
 /* ---------- Аналитика ---------- */
 .fn-period { display: flex; flex-direction: column; gap: 8px; }
@@ -274,7 +274,7 @@
   text-align: left; color: var(--text);
 }
 .fn-menu-row:hover { background: var(--surface-2); }
-.fn-menu-row + .fn-menu-row { border-top: 1px solid var(--border); }
+.fn-menu-row + .fn-menu-row { border-top: var(--hairline) solid var(--separator); }
 .fn-menu-ic {
   width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
   background: var(--accent-soft); color: var(--accent);
@@ -282,7 +282,7 @@
 .fn-menu-ic svg { width: 19px; height: 19px; }
 
 .fn-item { display: flex; align-items: center; gap: 4px; padding-right: 6px; min-width: 0; }
-.fn-item + .fn-item { border-top: 1px solid var(--border); }
+.fn-item + .fn-item { border-top: var(--hairline) solid var(--separator); }
 .fn-item.is-archived { opacity: .6; }
 .fn-item-main {
   flex: 1; min-width: 0; display: flex; align-items: center; gap: 11px; min-height: 56px; padding: 8px 6px 8px 12px;
@@ -312,7 +312,7 @@
   display: flex; align-items: center; gap: 11px; width: 100%; padding: 10px 12px; border: none; background: none; text-align: left; color: var(--text);
 }
 .fn-debt:hover { background: var(--surface-2); }
-.fn-debt + .fn-debt { border-top: 1px solid var(--border); }
+.fn-debt + .fn-debt { border-top: var(--hairline) solid var(--separator); }
 .fn-debt .fn-tx-main { gap: 3px; }
 .fn-debt-ic { width: 36px; height: 36px; flex-shrink: 0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
 .fn-debt-ic.is-owe { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }

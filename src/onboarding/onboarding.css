@@ -22,7 +22,7 @@
   .ob-card {
     --ob-bg: var(--surface);
     width: 460px; height: min(760px, calc(100vh - 48px));
-    background: var(--surface); border: 1px solid var(--border); border-radius: 28px;
+    background: var(--surface); border: var(--hairline) solid var(--separator); border-radius: 28px;
     box-shadow: var(--shadow-lg); padding: 14px 0 18px; overflow: hidden;
     animation: pop .25s ease;
   }
@@ -59,14 +59,14 @@
 }
 .ob-hero-logo {
   position: relative; width: 108px; height: 108px; border-radius: 32px; display: grid; place-items: center;
-  background: var(--surface); border: 1px solid var(--border);
+  background: var(--surface); border: var(--hairline) solid var(--separator);
   box-shadow: 0 14px 36px color-mix(in srgb, var(--accent) 35%, transparent);
   animation: ob-float 5s ease-in-out infinite;
 }
 .ob-modules { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; width: 100%; max-width: 380px; }
 .ob-module {
   display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 2px 10px;
-  border-radius: 14px; border: 1px solid var(--border);
+  border-radius: 14px; border: var(--hairline) solid var(--separator);
   background: color-mix(in srgb, var(--accent) 6%, var(--surface));
   font-size: 11.5px; font-weight: 600; color: var(--text-2);
   animation: ob-rise .45s ease both;
@@ -77,7 +77,7 @@
 .ob-flow { display: flex; align-items: center; gap: 0; padding: 18px 0 4px; }
 .ob-flow-node {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
-  width: 78px; height: 78px; border-radius: 22px; background: var(--surface); border: 1px solid var(--border);
+  width: 78px; height: 78px; border-radius: 22px; background: var(--surface); border: var(--hairline) solid var(--separator);
   box-shadow: var(--shadow); color: var(--accent); font-size: 12px; font-weight: 650;
 }
 .ob-flow-node span { color: var(--text-2); }
@@ -94,7 +94,7 @@
 .ob-list { list-style: none; padding: 0; margin: 2px 0 0; display: grid; gap: 8px; width: 100%; max-width: 380px; text-align: left; }
 .ob-list li {
   display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 14px;
-  background: color-mix(in srgb, var(--surface-2) 80%, transparent); border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface-2) 80%, transparent); border: var(--hairline) solid var(--separator);
   font-size: 14px; line-height: 1.35;
 }
 .ob-list svg { flex-shrink: 0; color: var(--accent); }
@@ -133,7 +133,7 @@
 .ob-notifs { display: grid; gap: 10px; width: 100%; max-width: 320px; padding-top: 8px; }
 .ob-notif {
   display: flex; align-items: center; gap: 12px; padding: 12px 14px; text-align: left;
-  border-radius: 18px; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow);
+  border-radius: 18px; background: var(--surface); border: var(--hairline) solid var(--separator); box-shadow: var(--shadow);
   animation: ob-rise .5s ease both;
 }
 .ob-notif + .ob-notif { transform: scale(.95); opacity: .85; animation-delay: .12s; }
@@ -160,7 +160,7 @@
 .ob-cloud { display: flex; align-items: center; gap: 14px; padding: 14px 0 4px; }
 .ob-dev {
   width: 54px; height: 54px; border-radius: 16px; display: grid; place-items: center;
-  background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow); color: var(--text-2);
+  background: var(--surface); border: var(--hairline) solid var(--separator); box-shadow: var(--shadow); color: var(--text-2);
 }
 .ob-cloud-main {
   position: relative; width: 112px; height: 112px; border-radius: 50%; display: grid; place-items: center; color: #fff;
@@ -207,7 +207,7 @@
 .wn-sheet {
   position: relative; display: flex; flex-direction: column;
   width: min(480px, 100%); max-height: min(84vh, 760px); padding: 22px 20px 18px;
-  background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 24px;
+  background: var(--surface); color: var(--text); border: var(--hairline) solid var(--separator); border-radius: 24px;
   box-shadow: var(--shadow-lg); animation: pop .2s ease;
 }
 @media (max-width: 640px) {
@@ -236,14 +236,14 @@
 .wn-items-sm .wn-ico { width: 28px; height: 28px; border-radius: 8px; }
 .wn-items-sm b { font-size: 13.5px; }
 .wn-items-sm small { font-size: 12.5px; }
-.wn-older { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+.wn-older { margin-top: 14px; padding-top: 12px; border-top: var(--hairline) solid var(--separator); }
 .wn-older summary { cursor: pointer; font-size: 14px; font-weight: 600; color: var(--text-2); display: flex; align-items: center; gap: 8px; list-style: none; }
 .wn-older summary::-webkit-details-marker { display: none; }
 .wn-older summary::after { content: '›'; margin-left: auto; font-size: 18px; transition: transform .15s; }
 .wn-older[open] summary::after { transform: rotate(90deg); }
 .wn-ver {
   font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
-  background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
+  background: var(--surface-2); color: var(--text); border: var(--hairline) solid var(--separator);
 }
 .wn-ok { height: 44px; flex-shrink: 0; }
 

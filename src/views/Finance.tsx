@@ -10,6 +10,7 @@ import { TxSheet } from '../finance/ui/TxSheet';
 import { openTxSheet, setFinTab, useFinUi, type FinTab } from '../finance/ui/state';
 import { toast } from '../store/appStore';
 import './finance.css';
+import { IconTile } from '../ui/icons';
 
 const TABS: [FinTab, string][] = [
   ['overview', 'Обзор'],
@@ -31,6 +32,7 @@ export default function Finance() {
   return (
     <div className="page fn-page">
       <div className="page-header fn-header">
+        <IconTile section="finance" size="sm" className="ph-tile" />
         <h1>Финансы</h1>
         <div className="grow" />
         <div className="segmented fn-tabs" role="tablist">

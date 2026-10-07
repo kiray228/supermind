@@ -26,6 +26,7 @@ import { openDoc } from '../actions';
 import { askText, confirmDialog } from '../ui/dialogs';
 import { toast } from '../store/appStore';
 import './views.css';
+import { IconTile } from '../ui/icons';
 
 // ---------- Типы и константы ----------
 
@@ -576,6 +577,7 @@ export default function Board() {
     return (
       <div className="page kb-page">
         <div className="page-header">
+          <IconTile section="board" size="sm" className="ph-tile" />
           <h1>Доска задач</h1>
         </div>
         <div className="page-body">
@@ -605,6 +607,7 @@ export default function Board() {
   return (
     <div className="page kb-page">
       <div className="page-header">
+        <IconTile section="board" size="sm" className="ph-tile" />
         <h1>Доска задач</h1>
         <div className="grow" />
         <div className="row">

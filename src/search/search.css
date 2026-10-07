@@ -6,12 +6,12 @@
 }
 .sr-panel {
   width: min(660px, 100%); max-height: min(calc(var(--vvh, 100vh) * 0.78), 680px); display: flex; flex-direction: column;
-  background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 18px;
+  background: var(--surface); color: var(--text); border: var(--hairline) solid var(--separator); border-radius: 18px;
   box-shadow: var(--shadow-lg); overflow: hidden; animation: pop .14s ease;
 }
 :root[data-glass='liquid'] .sr-panel { border-radius: 22px; }
 
-.sr-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px 10px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.sr-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px 10px 16px; border-bottom: var(--hairline) solid var(--separator); flex-shrink: 0; }
 .sr-head-ico { color: var(--text-3); flex-shrink: 0; }
 .sr-input {
   flex: 1; min-width: 0; height: 40px; border: none; outline: none; background: transparent; color: var(--text);
@@ -28,7 +28,7 @@
 
 .sr-kbd {
   display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 6px;
-  border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2); font: 600 11px/1 inherit; font-family: inherit;
+  border: var(--hairline) solid var(--separator); background: var(--surface-2); color: var(--text-2); font: 600 11px/1 inherit; font-family: inherit;
 }
 .sr-esc { flex-shrink: 0; }
 
@@ -67,7 +67,7 @@
 .sr-sub { font-size: 12.5px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sr-sub-pre { color: var(--text-3); }
 .sr-mark { background: color-mix(in srgb, var(--accent) 22%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; margin: 0 -1px; }
-.sr-tag { flex-shrink: 0; font-size: 11px; font-weight: 600; color: var(--text-3); border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px; }
+.sr-tag { flex-shrink: 0; font-size: 11px; font-weight: 600; color: var(--text-3); border: var(--hairline) solid var(--separator); border-radius: 999px; padding: 1px 7px; }
 .sr-enter { color: var(--accent); flex-shrink: 0; }
 .sr-more .sr-ico { background: none; }
 .sr-more .sr-title { font-weight: 600; color: var(--accent); font-size: 13.5px; }
@@ -83,7 +83,7 @@
 .sr-empty-hint b, .sr-tip b { color: var(--text-2); }
 
 .sr-foot {
-  display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-top: 1px solid var(--border); flex-shrink: 0;
+  display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-top: var(--hairline) solid var(--separator); flex-shrink: 0;
   font-size: 12px; color: var(--text-3); background: var(--surface);
 }
 .sr-keys { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
@@ -94,13 +94,13 @@
 
 /* пункт «Поиск» в боковой панели (компьютер) */
 .sr-nav-kbd {
-  margin-left: auto; font: 600 11px/1 inherit; font-family: inherit; color: var(--text-3); border: 1px solid var(--border);
+  margin-left: auto; font: 600 11px/1 inherit; font-family: inherit; color: var(--text-3); border: var(--hairline) solid var(--separator);
   border-radius: 6px; padding: 3px 5px; background: var(--surface);
 }
 /* строка поиска в меню «Ещё» (телефон) */
 .sr-sheet-btn {
   grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; height: 46px; padding: 0 14px; border-radius: 14px;
-  border: 1px solid var(--border); background: var(--surface-2); color: var(--text-3); font-size: 15px; font-weight: 500; text-align: left;
+  border: var(--hairline) solid var(--separator); background: var(--surface-2); color: var(--text-3); font-size: 15px; font-weight: 500; text-align: left;
 }
 
 /* сенсорные экраны: без подсказок клавиш, строки крупнее */
@@ -126,3 +126,38 @@
   .sr-title { font-size: 15px; }
 }
 @keyframes sr-in { from { opacity: 0; transform: translateY(12px); } }
+
+/* ================= iOS: поиск как в Spotlight / «Настройках» ================= */
+.sr-panel { border: none; border-radius: 22px; background: var(--lg-sheet); }
+:root[data-theme='dark'] .sr-panel { background: #1c1c1e; }
+.sr-head { border-bottom: var(--hairline) solid var(--separator); padding: 10px 12px; }
+.sr-head-ico { color: var(--text-2); }
+.sr-sec-head { font-size: 13px; font-weight: 600; letter-spacing: -0.01em; text-transform: none; color: var(--text-2); padding: 12px 10px 6px; }
+.sr-count { background: var(--fill-3); color: var(--text-2); font-weight: 600; }
+.sr-row { border-radius: 12px; min-height: 50px; }
+.sr-row.active, .sr-row:active { background: var(--fill-3); }
+.sr-ico { width: 30px; height: 30px; border-radius: 8px; background: var(--fill-3); }
+.sr-row.active .sr-ico { background: var(--fill-2); }
+.sr-title { font-size: 16px; font-weight: 500; letter-spacing: -0.02em; }
+.sr-sub { font-size: 13px; }
+.sr-tag { border: none; background: var(--fill-3); color: var(--text-2); }
+.sr-clear { background: var(--fill); color: var(--surface); width: 20px; height: 20px; }
+.sr-kbd, .sr-nav-kbd { border: none; background: var(--fill-3); color: var(--text-2); }
+.sr-foot { border-top: var(--hairline) solid var(--separator); background: transparent; }
+/* строка поиска в «Ещё» — поле поиска iOS */
+.sr-sheet-btn { border: none; height: 40px; border-radius: 12px; background: var(--fill-3); color: var(--text-2); font-size: 17px; font-weight: 400; letter-spacing: -0.02em; padding: 0 10px; gap: 7px; }
+@media (max-width: 640px) {
+  .modal-backdrop.sr-backdrop { background: var(--bg); }
+  .sr-panel { border-radius: 0; background: var(--bg); }
+  :root[data-theme='dark'] .sr-panel { background: var(--bg); }
+  .sr-head { border-bottom: none; padding: 8px 12px 6px 16px; }
+  /* поле — серая капсула, «Отменить» справа, как в iOS */
+  .sr-head { gap: 10px; }
+  .sr-head-ico { position: relative; z-index: 1; margin-right: -38px; margin-left: 9px; pointer-events: none; }
+  .sr-input { height: 40px; border-radius: 12px; background: var(--fill-3); padding: 0 34px 0 36px; font-size: 17px; }
+  .sr-clear { position: relative; z-index: 1; margin-left: -40px; margin-right: 8px; }
+  .sr-list { padding: 4px 16px calc(12px + var(--safe-bottom)); }
+  .sr-sec { background: var(--surface); border-radius: var(--radius-group); padding: 0 0 4px; margin-bottom: 18px; }
+  .sr-sec-head { padding: 12px 16px 6px; }
+  .sr-row { border-radius: 0; padding: 6px 16px; }
+}

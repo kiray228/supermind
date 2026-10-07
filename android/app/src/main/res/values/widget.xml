@@ -2,6 +2,20 @@
 <resources>
     <string name="widget_today_label">SuperMind — Сегодня</string>
     <string name="widget_today_description">Задачи на сегодня, прогресс привычек и быстрое добавление</string>
+    <string name="widget_calendar_label">SuperMind — Календарь</string>
+    <string name="widget_calendar_description">Неделя и планы на две недели: задачи, сроки целей и события календаря</string>
+    <string name="widget_habits_label">SuperMind — Привычки</string>
+    <string name="widget_habits_description">Привычки на сегодня: отмечайте прямо с главного экрана</string>
+    <string name="widget_map_label">SuperMind — Карта</string>
+    <string name="widget_map_description">Набросок выбранной интеллект-карты: центральная тема и основные ветви</string>
+    <string name="sc_task_short">Новая задача</string>
+    <string name="sc_task_long">Новая задача</string>
+    <string name="sc_habits_short">Привычки</string>
+    <string name="sc_habits_long">Отметить привычки</string>
+    <string name="sc_search_short">Поиск</string>
+    <string name="sc_search_long">Поиск по SuperMind</string>
+    <string name="sc_note_short">Новая заметка</string>
+    <string name="sc_note_long">Новая заметка</string>
     <dimen name="widget_radius">24dp</dimen>
     <dimen name="widget_inner_radius">14dp</dimen>
     <color name="widget_bg">#F7FFFFFF</color>
@@ -12,4 +26,9 @@
     <color name="widget_chip">#F1F2F5</color>
     <color name="widget_track">#E2E4EA</color>
     <color name="widget_danger">#E5484D</color>
+    <!-- Окно выбора карты для виджета -->
+    <style name="WidgetConfigTheme" parent="Theme.AppCompat.DayNight.Dialog">
+        <item name="windowNoTitle">true</item>
+        <item name="android:windowCloseOnTouchOutside">true</item>
+    </style>
 </resources>
