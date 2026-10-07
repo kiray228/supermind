@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { BellOff, Plus, Target, Trash2 } from 'lucide-react';
+import { BellSlash, ChartPieSlice, Plus, Target, Trash } from '@phosphor-icons/react';
+import { IconTile } from '../../ui/icons';
 import { toast } from '../../store/appStore';
 import { confirmDialog } from '../../ui/dialogs';
 import { daysBetween, plural } from '../../tasks/model';
@@ -92,7 +93,7 @@ export function WheelTab({ data, onNewGoal }: { data: GoalsData; onNewGoal: (are
   if (!areas.length)
     return (
       <div className="empty">
-        <div style={{ fontSize: 40 }}>🎡</div>
+        <IconTile icon={ChartPieSlice} tone="violet" size="lg" />
         <div>Добавьте сферы жизни, чтобы оценить баланс</div>
       </div>
     );
@@ -100,8 +101,8 @@ export function WheelTab({ data, onNewGoal }: { data: GoalsData; onNewGoal: (are
   return (
     <div className="gl-wheel-page">
       {due && (
-        <div className="card gl-banner">
-          <span className="gl-banner-ic">🎡</span>
+        <div className="gl-banner-card">
+          <IconTile icon={ChartPieSlice} tone="violet" size="md" />
           <div className="grow">
             <div className="bold">{snaps.length ? 'Пора обновить колесо баланса' : 'Оцените баланс жизни'}</div>
             <div className="tiny muted">
@@ -114,14 +115,14 @@ export function WheelTab({ data, onNewGoal }: { data: GoalsData; onNewGoal: (are
             </button>
             {snaps.length > 0 && (
               <button className="icon-btn" onClick={() => setGoalsPrefs({ wheelSnooze: today.slice(0, 7) })} aria-label="Не напоминать в этом месяце" title="Не напоминать в этом месяце">
-                <BellOff size={17} />
+                <BellSlash size={19} />
               </button>
             )}
           </div>
         </div>
       )}
 
-      <div className="card gl-wheel-card">
+      <div className="gl-wheel-card">
         <div className="gl-wheel-head">
           <div className="grow">
             <h3>{!cur ? 'Колесо баланса' : idx === 0 ? 'Текущий баланс' : 'Оценка из истории'}</h3>
@@ -130,8 +131,8 @@ export function WheelTab({ data, onNewGoal }: { data: GoalsData; onNewGoal: (are
               {prev ? ` · пунктир — ${fullDate(prev.date)}` : ''}
             </div>
           </div>
-          <button className="btn btn-sm btn-primary" onClick={() => setRate(true)}>
-            <Plus size={15} /> Оценить
+          <button className="btn btn-sm btn-tinted" onClick={() => setRate(true)}>
+            <Plus size={15} weight="bold" /> Оценить
           </button>
         </div>
         <div className="gl-wheel-body">
@@ -175,7 +176,7 @@ export function WheelTab({ data, onNewGoal }: { data: GoalsData; onNewGoal: (are
                 <div className="gl-attention-list">
                   {weak.map((a) => (
                     <button key={a.id} className="chip gl-area-chip active" style={{ '--c': a.color } as CSSProperties} onClick={() => onNewGoal(a.id)} title="Поставить цель в этой сфере">
-                      {a.emoji} {a.name} <Target size={12} />
+                      {a.emoji} {a.name} <Target size={13} weight="bold" />
                     </button>
                   ))}
                 </div>
@@ -205,7 +206,7 @@ export function WheelTab({ data, onNewGoal }: { data: GoalsData; onNewGoal: (are
                     </span>
                   </button>
                   <button className="icon-btn gl-mini-btn" onClick={() => void remove(s)} aria-label="Удалить оценку">
-                    <Trash2 size={15} />
+                    <Trash size={17} />
                   </button>
                 </div>
               );

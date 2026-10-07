@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { CalendarDays, PiggyBank, Sparkles, TrendingDown, TrendingUp } from 'lucide-react';
+import { CalendarDots, PiggyBank, Sparkle, TrendDown, TrendUp } from '@phosphor-icons/react';
 import { addDaysYmd, fromYmd } from '../../utils/mapTasks';
 import { toast } from '../../store/appStore';
 import { AIError } from '../../ai/claude';
@@ -25,6 +25,7 @@ import {
   type Range,
 } from '../model';
 import { runFinanceAi } from '../ai';
+import { IconTile } from '../../ui/icons';
 import { dayTitle, Money, Sheet, Stepper, TxRow, useToday } from './common';
 import { openTxSheet, showOps } from './state';
 
@@ -90,12 +91,12 @@ export function Analytics({ data }: { data: FinanceData }) {
         )}
       </div>
 
-      <div className="fn-stats">
-        <Stat icon={<TrendingDown size={16} />} label="Расходы" tone="expense" value={fmtMoney(s.expense, main, { compact: true })} />
-        <Stat icon={<TrendingUp size={16} />} label="Доходы" tone="income" value={fmtMoney(s.income, main, { compact: true })} />
-        <Stat icon={<CalendarDays size={16} />} label="В среднем в день" value={fmtMoney(s.expense / days, main, { compact: true })} />
+      <div className="card fn-stats">
+        <Stat icon={<TrendDown size={15} weight="bold" />} label="Расходы" tone="expense" value={fmtMoney(s.expense, main, { compact: true })} />
+        <Stat icon={<TrendUp size={15} weight="bold" />} label="Доходы" tone="income" value={fmtMoney(s.income, main, { compact: true })} />
+        <Stat icon={<CalendarDots size={15} weight="bold" />} label="В среднем в день" value={fmtMoney(s.expense / days, main, { compact: true })} />
         <Stat
-          icon={<PiggyBank size={16} />}
+          icon={<PiggyBank size={15} weight="bold" />}
           label="Норма сбережений"
           tone={savings !== null && savings < 0 ? 'expense' : undefined}
           value={savings === null ? '—' : `${savings}%`}
@@ -140,10 +141,13 @@ export function Analytics({ data }: { data: FinanceData }) {
 
       <section className="card fn-panel fn-ai-card">
         <div className="row">
-          <Sparkles size={18} className="fn-accent" />
-          <span className="grow small">Claude разберёт траты за {monthTitle(heatMonth).toLowerCase()} и подскажет, где сэкономить.</span>
-          <button className="btn btn-sm btn-primary" onClick={() => setAi(true)}>
-            ИИ-разбор месяца
+          <IconTile icon={Sparkle} section="assistant" size="sm" />
+          <span className="grow fn-ai-card-text">
+            <span className="fn-ai-card-title">ИИ-разбор месяца</span>
+            <span className="fn-ai-card-sub">Claude разберёт траты за {monthTitle(heatMonth).toLowerCase()} и подскажет, где сэкономить.</span>
+          </span>
+          <button className="btn btn-sm btn-tinted" onClick={() => setAi(true)}>
+            Разобрать
           </button>
         </div>
       </section>
@@ -154,10 +158,12 @@ export function Analytics({ data }: { data: FinanceData }) {
 
 function Stat({ icon, label, value, tone }: { icon: ReactNode; label: string; value: string; tone?: 'income' | 'expense' }) {
   return (
-    <div className={'card fn-stat' + (tone ? ` is-${tone}` : '')}>
-      <span className="fn-stat-ic">{icon}</span>
+    <div className={'fn-stat' + (tone ? ` is-${tone}` : '')}>
+      <span className="fn-stat-label">
+        <span className="fn-stat-ic">{icon}</span>
+        {label}
+      </span>
       <span className="fn-stat-val">{value}</span>
-      <span className="fn-stat-label">{label}</span>
     </div>
   );
 }
@@ -241,15 +247,18 @@ function MonthBars({ data, endMonth }: { data: FinanceData; endMonth: string }) 
         </div>
       </div>
       <svg className="fn-bars" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label="Доходы и расходы по месяцам">
+        {[0.25, 0.5, 0.75, 1].map((f) => (
+          <line key={f} x1="0" x2={W} y1={H - bottom - (H - top - bottom) * f} y2={H - bottom - (H - top - bottom) * f} className="fn-grid" />
+        ))}
         <line x1="0" x2={W} y1={H - bottom} y2={H - bottom} className="fn-axis" />
         {months.map((x, i) => {
           const cx = colW * i + colW / 2;
           return (
             <g key={x.m}>
-              <rect x={cx - bw - 1} y={H - bottom - h(x.inc)} width={bw} height={h(x.inc)} rx="3" className="fn-bar-inc">
+              <rect x={cx - bw - 1} y={H - bottom - h(x.inc)} width={bw} height={h(x.inc)} rx="4" ry="4" className="fn-bar-inc">
                 <title>{`${monthTitle(x.m)}: доходы ${fmtMoney(x.inc, main)}`}</title>
               </rect>
-              <rect x={cx + 1} y={H - bottom - h(x.exp)} width={bw} height={h(x.exp)} rx="3" className="fn-bar-exp">
+              <rect x={cx + 1} y={H - bottom - h(x.exp)} width={bw} height={h(x.exp)} rx="4" ry="4" className="fn-bar-exp">
                 <title>{`${monthTitle(x.m)}: расходы ${fmtMoney(x.exp, main)}`}</title>
               </rect>
             </g>

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowDown, ArrowUp, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Trash } from '@phosphor-icons/react';
 import { confirmDialog } from '../../ui/dialogs';
 import { AREA_COLORS, sortedAreas, type GoalsData, type LifeArea } from '../model';
 import { addArea, deleteArea, moveArea, updateArea } from '../store';
@@ -43,7 +43,7 @@ export function AreasModal({ data, onClose }: { data: GoalsData; onClose: () => 
                 <ArrowDown size={15} />
               </button>
               <button className="icon-btn gl-mini-btn gl-danger" onClick={() => void remove(a)} aria-label="Удалить сферу">
-                <Trash2 size={15} />
+                <Trash size={15} />
               </button>
             </div>
             {colorFor === a.id && (

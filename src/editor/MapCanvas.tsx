@@ -1,11 +1,23 @@
-import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, forwardRef } from 'react';
-import type { ID, Sheet } from '../types';
+import { memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, forwardRef } from 'react';
+import { createPortal } from 'react-dom';
+import { ArrowElbowDownRight, Check, Plus } from '@phosphor-icons/react';
+import type { ID, Sheet, Topic } from '../types';
 import { layoutSheet, subtreeBounds, type LayoutResult, type LNode } from '../layout/layout';
 import { useDoc } from '../store/docStore';
 import { AddHandle, BoundaryView, NodeView, RelationshipView, SummaryView, Toggle } from './render';
-import { fontString, FONT_FAMILY } from '../layout/measure';
-import { findInSheet, isAncestor } from '../utils/tree';
+import { FONT_FAMILY } from '../layout/measure';
+import { findInSheet } from '../utils/tree';
 import { primeKeyboard } from '../ui/keyboard';
+import { haptic, isTouchUI, keyboardInset, useKeyboardInset, visibleViewport } from './touch';
+
+const viewTransform = (v: View) => `translate(${v.x},${v.y}) scale(${v.k})`;
+
+/** Нижний край верхней стеклянной панели относительно карты (чтобы не прятать под ней тему) */
+function topChrome(el: HTMLElement): number {
+  const top = el.closest('.editor')?.querySelector('.ed-top');
+  if (!top) return 12;
+  return Math.max(12, top.getBoundingClientRect().bottom - el.getBoundingClientRect().top + 8);
+}
 
 export interface View {
   x: number;
@@ -58,9 +70,31 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+  const gRef = useRef<SVGGElement>(null);
   const [view, setView] = useState<View>({ x: 0, y: 0, k: 1 });
+  /** актуальный вид — всегда самый свежий; состояние `view` догоняет его раз в кадр */
   const viewRef = useRef(view);
-  viewRef.current = view;
+  const viewRaf = useRef(0);
+  /**
+   * Сдвиг/масштаб карты: трансформация пишется в SVG сразу (без React), а перерисовка
+   * зависящих от масштаба мелочей (кнопки, поле ввода, бейдж) — не чаще раза в кадр.
+   */
+  const applyView = (nv: View) => {
+    viewRef.current = nv;
+    gRef.current?.setAttribute('transform', viewTransform(nv));
+    if (!viewRaf.current)
+      viewRaf.current = requestAnimationFrame(() => {
+        viewRaf.current = 0;
+        setView(viewRef.current);
+      });
+  };
+  useEffect(
+    () => () => {
+      cancelAnimationFrame(viewRaf.current);
+      viewRaf.current = 0;
+    },
+    [],
+  );
   const [animating, setAnimating] = useState(false);
   const [hover, setHover] = useState<ID | null>(null);
   const [drag, setDragState] = useState<Drag | null>(null);
@@ -69,7 +103,17 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
     dragRef.current = d;
     setDragState(d);
   };
-  const [dropTarget, setDropTarget] = useState<{ id: ID; zone: 'child' | 'before' | 'after' } | null>(null);
+  const [dropTarget, setDropTargetState] = useState<{ id: ID; zone: 'child' | 'before' | 'after' } | null>(null);
+  const dropRef = useRef(dropTarget);
+  /** цель переноса меняется редко — не перерисовывать карту на каждом движении пальца */
+  const setDropTarget = (t: { id: ID; zone: 'child' | 'before' | 'after' } | null) => {
+    const p = dropRef.current;
+    if (p === t || (p && t && p.id === t.id && p.zone === t.zone)) return;
+    dropRef.current = t;
+    setDropTargetState(t);
+  };
+  /** перетаскиваемая ветвь (нельзя бросить тему внутрь самой себя) */
+  const dragExclude = useRef<Set<ID> | null>(null);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const lastTap = useRef<{ id: string; t: number }>({ id: '', t: 0 });
   const pendingAdd = useRef<{ id: string; side?: 'left' | 'right' } | null>(null);
@@ -94,7 +138,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
   };
 
   useEffect(() => {
-    onViewChange?.(view);
+    onViewChange?.(viewRef.current);
   }, [view, onViewChange]);
 
   const rect = () => wrapRef.current!.getBoundingClientRect();
@@ -104,14 +148,26 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
     return { x: (cx - r.left - v.x) / v.k, y: (cy - r.top - v.y) / v.k };
   }, []);
 
+  const animTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const animateTo = (v: View, animate = true, mark = true) => {
-    viewRef.current = v;
     if (mark) interacted.current = true;
     if (animate) {
+      // плавный переход: CSS-анимация трансформации, включается до её смены
+      if (gRef.current) gRef.current.style.transition = 'transform .4s cubic-bezier(.2,.8,.2,1)';
       setAnimating(true);
-      setTimeout(() => setAnimating(false), 420);
+      if (animTimer.current) clearTimeout(animTimer.current);
+      animTimer.current = setTimeout(() => {
+        if (gRef.current) gRef.current.style.transition = '';
+        setAnimating(false);
+      }, 420);
     }
-    setView(v);
+    applyView(v);
+  };
+  const stopAnimation = () => {
+    if (animTimer.current) clearTimeout(animTimer.current);
+    animTimer.current = null;
+    if (gRef.current) gRef.current.style.transition = '';
+    setAnimating(false);
   };
 
   const fitBounds = useCallback((b: { x: number; y: number; w: number; h: number }, animate = true, maxK = 1.15) => {
@@ -183,8 +239,8 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
           const k = Math.max(0.1, Math.min(1, fitsK));
           return { k, x: el.clientWidth / 2 - (b.x + b.w / 2) * k, y: el.clientHeight / 2 - (b.y + b.h / 2) * k };
         })();
-    viewRef.current = v;
-    setView(v);
+    applyView(v);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lay, sheet.root.id]);
   useEffect(() => {
     if (didFit.current === sheet.id) return;
@@ -217,8 +273,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
           const sw = n.w * nv.k;
           if (sx < 8 || sx + sw > w - 8) nv = { ...nv, x: nv.x + (w / 2 - (sx + sw / 2)) };
         }
-        viewRef.current = nv;
-        setView(nv);
+        applyView(nv);
       }
       last = { w, h };
     });
@@ -227,31 +282,55 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
   }, [initialFit]);
 
   // на телефоне редактируемая тема поднимается в верхнюю часть экрана (над клавиатурой)
+  // клавиатура открывается/закрывается с анимацией — место пересчитывается по visualViewport
   useEffect(() => {
-    if (!editingId || !window.matchMedia('(pointer: coarse)').matches) return;
+    if (!editingId || !isTouchUI()) return;
+    let lastY = NaN;
     const place = () => {
-      const n = lay.nodes.get(editingId);
+      const n = layRef.current.nodes.get(editingId);
       const el = wrapRef.current;
       if (!n || !el) return;
       const v = viewRef.current;
       const k = v.k < 0.55 ? 0.75 : v.k;
-      const targetY = el.clientHeight * 0.28;
+      const r = el.getBoundingClientRect();
+      const top = topChrome(el);
+      const vis = visibleViewport();
+      // видимая часть карты над клавиатурой и панелью над ней
+      const bottom = Math.min(el.clientHeight, vis.top + vis.height - r.top) - (keyboardInset() > 60 ? 64 : 0);
+      const targetY = keyboardInset() > 60
+        ? top + Math.max(24, (bottom - top) * 0.42)
+        : Math.max(top + 30, el.clientHeight * 0.28);
       const cx = n.x + n.w / 2;
       const sxOld = cx * v.k + v.x;
       const halfW = (n.w * k) / 2;
       const keepX = sxOld - halfW > 8 && sxOld + halfW < el.clientWidth - 8;
       const nx = keepX ? sxOld - cx * k : el.clientWidth / 2 - cx * k;
-      animateTo({ k, x: nx, y: targetY - (n.y + n.h / 2) * k }, true, false);
+      const ny = targetY - (n.y + n.h / 2) * k;
+      if (Math.abs(ny - lastY) < 2 && k === v.k) return;
+      lastY = ny;
+      animateTo({ k, x: nx, y: ny }, true, false);
     };
     place();
     const t = setTimeout(place, 450);
-    return () => clearTimeout(t);
+    const vv = window.visualViewport;
+    let t2: ReturnType<typeof setTimeout> | undefined;
+    const onVV = () => {
+      clearTimeout(t2);
+      t2 = setTimeout(place, 80);
+    };
+    vv?.addEventListener('resize', onVV);
+    return () => {
+      clearTimeout(t);
+      clearTimeout(t2);
+      vv?.removeEventListener('resize', onVV);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingId]);
 
   // запрос фокуса на теме
   useEffect(() => {
-    if (focusReq) setTimeout(() => centerOn(focusReq.id), 30);
+    // найденную тему показываем читаемо: из мелкого масштаба — приблизить
+    if (focusReq) setTimeout(() => centerOn(focusReq.id, viewRef.current.k < 0.6 ? 0.9 : undefined), 30);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusReq?.n]);
 
@@ -295,7 +374,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
         zoomAt(Math.exp(-e.deltaY * 0.01), e.clientX - r.left, e.clientY - r.top);
       } else {
         const v = viewRef.current;
-        setView({ ...v, x: v.x - e.deltaX, y: v.y - e.deltaY });
+        applyView({ ...v, x: v.x - e.deltaX, y: v.y - e.deltaY });
       }
     };
     // Safari: щипок не должен масштабировать страницу — только карту
@@ -320,10 +399,10 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
   }, []);
 
   // ---------- поиск цели под курсором ----------
-  const hitTopic = (wx: number, wy: number, exclude?: ID): LNode | null => {
+  const hitTopic = (wx: number, wy: number, exclude?: Set<ID> | null): LNode | null => {
     for (let i = lay.order.length - 1; i >= 0; i--) {
       const n = lay.order[i];
-      if (exclude && (n.id === exclude || isAncestor(sheet, exclude, n.id))) continue;
+      if (exclude?.has(n.id)) continue;
       if (wx >= n.x - 6 && wx <= n.x + n.w + 6 && wy >= n.y - 6 && wy <= n.y + n.h + 6) return n;
     }
     return null;
@@ -348,7 +427,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
     interacted.current = true;
     lastPointerType.current = e.pointerType;
     stopInertia();
-    if (animating) setAnimating(false);
+    if (animating) stopAnimation();
     samples.current = [{ x: e.clientX, y: e.clientY, t: performance.now() }];
     if ((e.target as HTMLElement).closest('textarea')) return;
     if (e.button === 2) return;
@@ -524,9 +603,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
       const cy = (a.y + b.y) / 2 - r.top;
       const wx = (d.cx - d.vx) / d.k0;
       const wy = (d.cy - d.vy) / d.k0;
-      const nv = { k, x: cx - wx * k, y: cy - wy * k };
-      viewRef.current = nv;
-      setView(nv);
+      applyView({ k, x: cx - wx * k, y: cy - wy * k });
       flashZoom();
       return;
     }
@@ -538,9 +615,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
         clearLongPress();
       }
       if (d.moved) {
-        const nv = { ...viewRef.current, x: d.vx + dx, y: d.vy + dy };
-        viewRef.current = nv;
-        setView(nv);
+        applyView({ ...viewRef.current, x: d.vx + dx, y: d.vy + dy });
         const now = performance.now();
         samples.current.push({ x: e.clientX, y: e.clientY, t: now });
         while (samples.current.length > 2 && now - samples.current[0].t > 100) samples.current.shift();
@@ -557,13 +632,22 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
       if (!d.active && dist > (d.armed ? 4 : 6)) {
         d.active = true;
         clearLongPress();
+        // ветвь, которую несём: внутрь неё бросить нельзя
+        const ex = new Set<ID>();
+        const rec = (t: Topic) => {
+          ex.add(t.id);
+          t.children.forEach(rec);
+        };
+        const dn = lay.nodes.get(d.id);
+        if (dn) rec(dn.topic);
+        dragExclude.current = ex;
         useDoc.getState().setEditing(null);
         setDrag({ ...d });
       }
       if (d.active) {
         const w = toWorld(e.clientX, e.clientY);
         setDragWorld(w);
-        const t = hitTopic(w.x, w.y, d.id);
+        const t = hitTopic(w.x, w.y, dragExclude.current);
         setDropTarget(t ? { id: t.id, zone: zoneFor(t, w.x, w.y) } : null);
         // автопрокрутка у краёв
         const r = rect();
@@ -574,7 +658,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
         else if (r.right - e.clientX < m) dx = -8;
         if (e.clientY - r.top < m) dy = 8;
         else if (r.bottom - e.clientY < m) dy = -8;
-        if (dx || dy) setView({ ...v, x: v.x + dx, y: v.y + dy });
+        if (dx || dy) applyView({ ...v, x: v.x + dx, y: v.y + dy });
       }
     }
   };
@@ -588,6 +672,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
       pendingAdd.current = null;
       primeKeyboard();
       useDoc.getState().addChild(id, undefined, side);
+      haptic();
       return;
     }
     const d = dragRef.current;
@@ -617,9 +702,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
             const ms = Math.min(32, now - last);
             last = now;
             const v = viewRef.current;
-            const nv = { ...v, x: v.x + vx * ms, y: v.y + vy * ms };
-            viewRef.current = nv;
-            setView(nv);
+            applyView({ ...v, x: v.x + vx * ms, y: v.y + vy * ms });
             const f = Math.pow(0.94, ms / 16);
             vx *= f;
             vy *= f;
@@ -649,7 +732,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
       onContextMenu({ x: d.cx ?? e.clientX, y: d.cy ?? e.clientY, topicId: d.id, worldX: d.wx, worldY: d.wy });
     } else if (d.kind === 'topic' && d.active) {
       const w = toWorld(e.clientX, e.clientY);
-      const dt = dropTarget;
+      const dt = dropRef.current;
       if (dt) {
         const tn = lay.nodes.get(dt.id)!;
         if (dt.zone === 'child') st.move(d.id, dt.id, tn.topic.children.length);
@@ -685,6 +768,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
     setDrag(null);
     setDropTarget(null);
     setDragWorld(null);
+    dragExclude.current = null;
   };
 
   const onContext = (e: React.MouseEvent) => {
@@ -729,6 +813,11 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
   const draggingId = drag?.kind === 'topic' && drag.active ? drag.id : null;
   const dragNode = draggingId ? lay.nodes.get(draggingId) : null;
   const vertical = sheet.structure === 'org' || sheet.structure === 'tree';
+  const v = viewRef.current;
+  const touchUI = isTouchUI();
+  const selNode = selection.length === 1 ? lay.nodes.get(selection[0]) : undefined;
+  const moving = !!drag && (drag.kind === 'pinch' || (drag.kind === 'pan' && drag.moved) || (drag.kind === 'topic' && drag.active));
+  const showAdd = !readOnly && !relMode && !!selNode && !editingId && !(drag?.kind === 'topic' && drag.active);
 
   return (
     <div
@@ -747,54 +836,23 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
       onDoubleClick={onDoubleClick}
     >
       <svg ref={svgRef} width="100%" height="100%" style={{ display: 'block', touchAction: 'none', userSelect: 'none' }}>
-        <g
-          data-export-root
-          transform={`translate(${view.x},${view.y}) scale(${view.k})`}
-          style={{ transition: animating ? 'transform .4s cubic-bezier(.2,.8,.2,1)' : undefined }}
-          fontFamily={FONT_FAMILY}
-        >
-          {sheet.boundaries.map((b) => (
-            <BoundaryView key={b.id} lay={lay} b={b} />
-          ))}
-          {lay.extras.map((x, i) => (
-            <path key={'x' + i} d={x.d} fill={x.filled ? x.color : 'none'} stroke={x.filled ? 'none' : x.color} strokeWidth={x.width} strokeLinecap="round" markerEnd={x.arrow ? 'url(#arrow-spine)' : undefined} opacity={dimSet ? 0.25 : 1} />
-          ))}
-          {lay.edges.map((ed) => (
-            <path
-              key={ed.from + '-' + ed.to}
-              d={ed.d}
-              fill={ed.filled ? ed.color : 'none'}
-              stroke={ed.filled ? 'none' : ed.color}
-              strokeWidth={ed.filled ? 0 : ed.width}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              opacity={dimSet && !dimSet.has(ed.to) ? 0.12 : draggingId === ed.to ? 0.3 : 1}
-              style={{ transition: 'opacity .3s' }}
-            />
-          ))}
-          {sheet.summaries.map((s) => (
-            <SummaryView key={s.id} lay={lay} s={s} vertical={vertical} />
-          ))}
-          {lay.order.map((n) => (
-            <NodeView
-              key={n.id}
-              n={n}
-              selected={selSet.has(n.id)}
-              editing={editingId === n.id}
-              dim={dimSet ? !dimSet.has(n.id) : draggingId === n.id}
-              dropHint={dropTarget?.id === n.id ? dropTarget.zone : null}
-              highlight={searchHits?.has(n.id)}
-            />
-          ))}
-          {lay.order.map((n) => (
-            <Toggle key={'t' + n.id} k={view.k} n={n} visible={!readOnly && (hover === n.id || selSet.has(n.id))} />
-          ))}
-          {!readOnly && !relMode && selection.length === 1 && !editingId && !(drag?.kind === 'topic' && drag.active) && lay.nodes.get(selection[0]) && (
-            <AddHandle k={view.k} n={lay.nodes.get(selection[0])!} structure={lay.nodes.get(selection[0])!.level === 'floating' || lay.nodes.get(lay.nodes.get(selection[0])!.rootId)?.level === 'floating' ? 'logic-right' : sheet.structure} />
+        <g ref={gRef} data-export-root transform={viewTransform(v)} fontFamily={FONT_FAMILY}>
+          <Scene
+            lay={lay}
+            sheet={sheet}
+            selSet={selSet}
+            editingId={editingId}
+            dimSet={dimSet}
+            draggingId={draggingId}
+            dropTarget={dropTarget}
+            searchHits={searchHits}
+            vertical={vertical}
+          />
+          <Toggles order={lay.order} k={Math.round(v.k * 40) / 40} hover={hover} selSet={selSet} readOnly={!!readOnly} />
+          {showAdd && !touchUI && (
+            <AddHandle k={v.k} n={selNode} structure={selNode.level === 'floating' || lay.nodes.get(selNode.rootId)?.level === 'floating' ? 'logic-right' : sheet.structure} />
           )}
-          {sheet.relationships.map((r) => (
-            <RelationshipView key={r.id} lay={lay} r={r} selected={selectedRel === r.id} color={theme.relColor} />
-          ))}
+          <Relations lay={lay} rels={sheet.relationships} selectedRel={selectedRel} color={theme.relColor} />
           {dragNode && dragWorld && drag?.kind === 'topic' && (
             <g className="no-export" transform={`translate(${dragWorld.x - drag.offX - dragNode.x},${dragWorld.y - drag.offY - dragNode.y})`} opacity={0.75} pointerEvents="none">
               <NodeView n={dragNode} selected editing={false} />
@@ -810,15 +868,150 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
           </marker>
         </defs>
       </svg>
-      {zoomBadge && <div className="zoom-badge">{Math.round(view.k * 100)}%</div>}
-      {editingId && lay.nodes.get(editingId) && <InlineEditor key={editingId} n={lay.nodes.get(editingId)!} view={view} />}
+      {zoomBadge && <div className="zoom-badge">{Math.round(v.k * 100)}%</div>}
+      {showAdd && touchUI && !moving && !animating && !searchHits?.size && wrapRef.current && (
+        <QuickAdd
+          n={selNode}
+          view={v}
+          isRoot={!lay.nodes.get(selNode.id)?.parentId}
+          wrap={wrapRef.current}
+          onAdd={(kind) => {
+            primeKeyboard();
+            const st = useDoc.getState();
+            if (kind === 'child') st.addChild(selNode.id);
+            else st.addSibling(selNode.id);
+            haptic();
+          }}
+        />
+      )}
+      {editingId && lay.nodes.get(editingId) && <InlineEditor key={editingId} n={lay.nodes.get(editingId)!} view={v} animating={animating} />}
     </div>
   );
 });
 
+// ---------- Слои карты (не перерисовываются при сдвиге и масштабе) ----------
+
+interface SceneProps {
+  lay: LayoutResult;
+  sheet: Sheet;
+  selSet: Set<ID>;
+  editingId: ID | null;
+  dimSet: Set<ID> | null;
+  draggingId: ID | null;
+  dropTarget: { id: ID; zone: 'child' | 'before' | 'after' } | null;
+  searchHits?: Set<ID>;
+  vertical: boolean;
+}
+
+const Scene = memo(function Scene({ lay, sheet, selSet, editingId, dimSet, draggingId, dropTarget, searchHits, vertical }: SceneProps) {
+  return (
+    <>
+      {sheet.boundaries.map((b) => (
+        <BoundaryView key={b.id} lay={lay} b={b} />
+      ))}
+      {lay.extras.map((x, i) => (
+        <path key={'x' + i} d={x.d} fill={x.filled ? x.color : 'none'} stroke={x.filled ? 'none' : x.color} strokeWidth={x.width} strokeLinecap="round" markerEnd={x.arrow ? 'url(#arrow-spine)' : undefined} opacity={dimSet ? 0.25 : 1} />
+      ))}
+      {lay.edges.map((ed) => (
+        <path
+          key={ed.from + '-' + ed.to}
+          d={ed.d}
+          fill={ed.filled ? ed.color : 'none'}
+          stroke={ed.filled ? 'none' : ed.color}
+          strokeWidth={ed.filled ? 0 : ed.width}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          opacity={dimSet && !dimSet.has(ed.to) ? 0.12 : draggingId === ed.to ? 0.3 : 1}
+          className="ed-edge"
+        />
+      ))}
+      {sheet.summaries.map((s) => (
+        <SummaryView key={s.id} lay={lay} s={s} vertical={vertical} />
+      ))}
+      {lay.order.map((n) => (
+        <NodeView
+          key={n.id}
+          n={n}
+          selected={selSet.has(n.id)}
+          editing={editingId === n.id}
+          dim={dimSet ? !dimSet.has(n.id) : draggingId === n.id}
+          dropHint={dropTarget?.id === n.id ? dropTarget.zone : null}
+          highlight={searchHits?.has(n.id)}
+        />
+      ))}
+    </>
+  );
+});
+
+const Toggles = memo(function Toggles({ order, k, hover, selSet, readOnly }: { order: LNode[]; k: number; hover: ID | null; selSet: Set<ID>; readOnly: boolean }) {
+  return (
+    <>
+      {order.map((n) =>
+        n.toggle ? <Toggle key={'t' + n.id} k={k} n={n} visible={!readOnly && (hover === n.id || selSet.has(n.id))} /> : null,
+      )}
+    </>
+  );
+});
+
+const Relations = memo(function Relations({ lay, rels, selectedRel, color }: { lay: LayoutResult; rels: Sheet['relationships']; selectedRel: ID | null; color: string }) {
+  return (
+    <>
+      {rels.map((r) => (
+        <RelationshipView key={r.id} lay={lay} r={r} selected={selectedRel === r.id} color={color} />
+      ))}
+    </>
+  );
+});
+
+// ---------- «+» у выбранной темы на телефоне ----------
+
+/** Плавающая стеклянная панель над выбранной темой (как контекстная панель во Freeform): подтема / тема рядом */
+function QuickAdd({ n, view, isRoot, wrap, onAdd }: { n: LNode; view: View; isRoot: boolean; wrap: HTMLElement; onAdd(kind: 'child' | 'sibling'): void }) {
+  const W = wrap.clientWidth;
+  const H = wrap.clientHeight;
+  const sx = n.x * view.k + view.x;
+  const sy = n.y * view.k + view.y;
+  const sw = n.w * view.k;
+  const sh = n.h * view.k;
+  const top = topChrome(wrap);
+  const bottomBar = 92; // нижняя панель инструментов
+  const capW = isRoot ? 132 : 232;
+  const capH = 44;
+  const gap = 12;
+  // тема за пределами экрана — панель не нужна
+  if (sx + sw < 0 || sx > W || sy + sh < top || sy > H - bottomBar) return null;
+  let y = sy - gap - capH;
+  if (y < top) y = sy + sh + gap;
+  if (y + capH > H - bottomBar) return null;
+  const x = Math.max(8, Math.min(W - capW - 8, sx + sw / 2 - capW / 2));
+  return (
+    <div
+      className="quick-add glass"
+      style={{ left: x, top: y, width: capW }}
+      onPointerDown={(e) => e.stopPropagation()}
+      onPointerUp={(e) => e.stopPropagation()}
+      onContextMenu={(e) => e.stopPropagation()}
+    >
+      <button onClick={() => onAdd('child')} aria-label="Добавить подтему">
+        <ArrowElbowDownRight weight="bold" />
+        <span>Подтема</span>
+      </button>
+      {!isRoot && (
+        <>
+          <span className="quick-add-sep" />
+          <button onClick={() => onAdd('sibling')} aria-label="Добавить тему рядом">
+            <Plus weight="bold" />
+            <span>Рядом</span>
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ---------- Редактор текста поверх темы ----------
 
-function InlineEditor({ n, view }: { n: LNode; view: View }) {
+function InlineEditor({ n, view, animating }: { n: LNode; view: View; animating?: boolean }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const initial = useRef(useDoc.getState().pendingText ?? n.topic.text);
   const [text, setText] = useState(initial.current);
@@ -841,7 +1034,8 @@ function InlineEditor({ n, view }: { n: LNode; view: View }) {
 
   useEffect(() => {
     const el = ref.current!;
-    el.focus();
+    // без прокрутки страницы: iOS иначе сдвигает всё окно к полю ввода
+    el.focus({ preventScroll: true });
     if (useDoc.getState().pendingText != null) {
       el.setSelectionRange(el.value.length, el.value.length);
       useDoc.setState({ pendingText: null });
@@ -862,10 +1056,10 @@ function InlineEditor({ n, view }: { n: LNode; view: View }) {
   const s = n.style;
   const k = view.k;
   const fs = s.fontSize * k;
-  const font = fontString(s.fontSize, s.bold, s.italic);
-  void font;
   const minW = Math.max(n.w * k, 80);
   return (
+    <>
+    {isTouchUI() && <EditAccessory isRoot={!n.parentId} onAction={commit} />}
     <textarea
       ref={ref}
       className="inline-editor"
@@ -900,10 +1094,54 @@ function InlineEditor({ n, view }: { n: LNode; view: View }) {
         padding: `${(n.h * k - fs * 1.32 * Math.max(1, text.split('\n').length)) / 2}px ${10 * k}px`,
         lineHeight: 1.32,
         borderRadius: Math.min(10, (n.h * k) / 2.6),
+        // карта доезжает до места плавно — поле ввода едет вместе с ней
+        transition: animating ? 'left .4s cubic-bezier(.2,.8,.2,1), top .4s cubic-bezier(.2,.8,.2,1), font-size .4s cubic-bezier(.2,.8,.2,1), min-width .4s, min-height .4s, padding .4s' : undefined,
       }}
       spellCheck
       placeholder="Введите текст"
     />
+    </>
+  );
+}
+
+/**
+ * Панель над клавиатурой (как accessory view в iOS): на экранной клавиатуре нет Tab,
+ * поэтому подтему/тему рядом/«Готово» — отсюда. Касание не забирает фокус у поля.
+ */
+function EditAccessory({ isRoot, onAction }: { isRoot: boolean; onAction(after?: 'child' | 'sibling'): void }) {
+  const { inset } = useKeyboardInset();
+  const keep = (e: React.PointerEvent | React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  const act = (after?: 'child' | 'sibling') => {
+    if (after) haptic();
+    onAction(after);
+  };
+  return createPortal(
+    <div
+      className={`edit-accessory glass${inset > 0 ? ' kb' : ''}`}
+      style={{ bottom: inset > 0 ? inset + 8 : undefined }}
+      onPointerDown={keep}
+      onMouseDown={keep}
+    >
+      <button onClick={() => act('child')}>
+        <ArrowElbowDownRight weight="bold" />
+        Подтема
+      </button>
+      {!isRoot && (
+        <button onClick={() => act('sibling')}>
+          <Plus weight="bold" />
+          Рядом
+        </button>
+      )}
+      <span className="grow" />
+      <button className="done" onClick={() => act()}>
+        <Check weight="bold" />
+        Готово
+      </button>
+    </div>,
+    document.body,
   );
 }
 

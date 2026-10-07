@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
-import { ArrowLeftRight, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { ArrowsLeftRight, CaretLeft, CaretRight, X } from '@phosphor-icons/react';
 import { addDaysYmd, fromYmd, todayYmd } from '../../utils/mapTasks';
 import {
   budgetLevel,
@@ -75,7 +75,7 @@ export function TxRow(props: { tx: Transaction; accs: Map<string, Account>; cats
     return (
       <button className="fn-tx" onClick={onClick}>
         <span className="fn-cat-ic fn-transfer-ic">
-          <ArrowLeftRight size={17} />
+          <ArrowsLeftRight size={17} />
         </span>
         <span className="fn-tx-main">
           <span className="fn-tx-title ellipsis">{tx.note || 'Перевод'}</span>
@@ -167,13 +167,13 @@ export function Stepper({ label, onPrev, onNext, onLabel }: { label: ReactNode; 
   return (
     <div className="fn-stepper">
       <button className="icon-btn" onClick={onPrev} aria-label="Назад">
-        <ChevronLeft />
+        <CaretLeft />
       </button>
       <button className="fn-stepper-label" onClick={onLabel} disabled={!onLabel}>
         {label}
       </button>
       <button className="icon-btn" onClick={onNext} aria-label="Вперёд">
-        <ChevronRight />
+        <CaretRight />
       </button>
     </div>
   );

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  Bold, Italic, Strikethrough, Image as ImageIcon, Trash2, Link2, X, Plus, CheckSquare, StickyNote, Tag, Palette, Map as MapIcon, Shapes, Bell,
-} from 'lucide-react';
+  TextB, TextItalic, TextStrikethrough, Image as ImageIcon, Trash, Link, X, Plus, CheckSquare, Note, Tag, Palette, MapTrifold as MapIcon, Shapes, Bell,
+} from '@phosphor-icons/react';
 import type { LineStyle, ShapeType, StructureType, TaskStatus, Topic } from '../types';
 import { useDoc, beginBatch, endBatch } from '../store/docStore';
 import { findInSheet } from '../utils/tree';
@@ -110,17 +110,17 @@ export function Inspector({ tab, setTab, onClose }: { tab: InspectorTab; setTab(
       <div className="inspector-head">
         <div className="segmented">
           <button className={tab === 'topic' ? 'active' : ''} onClick={() => setTab('topic')}>
-            <StickyNote size={14} /> Тема
+            <Note size={15} weight={tab === 'topic' ? 'fill' : 'regular'} /> Тема
           </button>
           <button className={tab === 'style' ? 'active' : ''} onClick={() => setTab('style')}>
-            <Palette size={14} /> Стиль
+            <Palette size={15} weight={tab === 'style' ? 'fill' : 'regular'} /> Стиль
           </button>
           <button className={tab === 'map' ? 'active' : ''} onClick={() => setTab('map')}>
-            <MapIcon size={14} /> Карта
+            <MapIcon size={15} weight={tab === 'map' ? 'fill' : 'regular'} /> Карта
           </button>
         </div>
-        <button className="icon-btn" onClick={onClose} title="Закрыть">
-          <X />
+        <button className="icon-btn" onClick={onClose} title="Закрыть" aria-label="Закрыть">
+          <X weight="bold" />
         </button>
       </div>
       <div className="inspector-body scroll">
@@ -130,7 +130,7 @@ export function Inspector({ tab, setTab, onClose }: { tab: InspectorTab; setTab(
           <MapPanel />
         ) : !t ? (
           <div className="empty">
-            <Shapes size={32} />
+            <Shapes size={34} weight="duotone" />
             Выберите тему на карте
           </div>
         ) : tab === 'topic' ? (
@@ -286,10 +286,10 @@ function TopicPanel({ t, ids }: { t: Topic; ids: string[] }) {
         }}
       />
 
-      <label className="label"><StickyNote size={12} /> Заметка</label>
+      <label className="label"><Note size={12} /> Заметка</label>
       <textarea className="textarea" rows={5} placeholder="Подробности, мысли, ссылки…" value={note} onChange={(e) => saveNote(e.target.value)} />
 
-      <label className="label"><Link2 size={12} /> Ссылка</label>
+      <label className="label"><Link size={12} /> Ссылка</label>
       <div className="row">
         <input
           className="input"
@@ -307,7 +307,7 @@ function TopicPanel({ t, ids }: { t: Topic; ids: string[] }) {
         />
         {t.link && (
           <a className="icon-btn" href={t.link} target="_blank" rel="noreferrer" title="Открыть">
-            <Link2 size={18} />
+            <Link size={18} />
           </a>
         )}
       </div>
@@ -317,7 +317,7 @@ function TopicPanel({ t, ids }: { t: Topic; ids: string[] }) {
         <div className="col">
           <img src={t.image.src} alt="" style={{ maxWidth: '100%', borderRadius: 10, border: '1px solid var(--border)' }} />
           <button className="btn btn-sm btn-ghost btn-danger" onClick={() => st.updateTopic(t.id, { image: undefined })}>
-            <Trash2 size={14} /> Удалить изображение
+            <Trash size={14} /> Удалить изображение
           </button>
         </div>
       ) : (
@@ -378,9 +378,9 @@ function StylePanel({ t, ids }: { t: Topic; ids: string[] }) {
             <option key={n} value={n}>{n}</option>
           ))}
         </select>
-        <button className={`icon-btn ${s.bold ? 'active' : ''}`} onClick={() => set({ bold: s.bold ? undefined : true })} title="Жирный"><Bold /></button>
-        <button className={`icon-btn ${s.italic ? 'active' : ''}`} onClick={() => set({ italic: s.italic ? undefined : true })} title="Курсив"><Italic /></button>
-        <button className={`icon-btn ${s.strike ? 'active' : ''}`} onClick={() => set({ strike: s.strike ? undefined : true })} title="Зачёркнутый"><Strikethrough /></button>
+        <button className={`icon-btn ${s.bold ? 'active' : ''}`} onClick={() => set({ bold: s.bold ? undefined : true })} title="Жирный"><TextB /></button>
+        <button className={`icon-btn ${s.italic ? 'active' : ''}`} onClick={() => set({ italic: s.italic ? undefined : true })} title="Курсив"><TextItalic /></button>
+        <button className={`icon-btn ${s.strike ? 'active' : ''}`} onClick={() => set({ strike: s.strike ? undefined : true })} title="Зачёркнутый"><TextStrikethrough /></button>
       </div>
       <label className="label">Цвет текста</label>
       <Swatches value={s.textColor} onChange={(v) => set({ textColor: v })} />
@@ -497,7 +497,7 @@ function RelationshipPanel({ id }: { id: string }) {
       <label className="label">Изгиб</label>
       <Range min={-250} max={250} step={5} value={r.bend ?? 0} onChange={(e) => st.updateRelationship(id, { bend: Number(e.target.value) })} />
       <button className="btn btn-sm btn-danger" style={{ marginTop: 14 }} onClick={() => st.removeRelationship(id)}>
-        <Trash2 size={14} /> Удалить связь
+        <Trash size={14} /> Удалить связь
       </button>
     </div>
   );

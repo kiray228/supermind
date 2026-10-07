@@ -199,6 +199,23 @@ async function plan(fromMs: number, toMs: number): Promise<Planned[]> {
       });
     }
   }
+  // долги (раздел «Финансы»): напоминание в 09:00 в день «вернуть до»
+  for (const x of fin?.debts ?? []) {
+    if (x.closed || !x.dueDate || x.remind === false) continue;
+    const at = fromYmd(x.dueDate).getTime() + 9 * 3600000;
+    if (at < fromMs || at > toMs) continue;
+    const paid = (x.payments ?? []).reduce((a, q) => a + q.amount, 0);
+    const left = Math.max(0, x.amount - paid);
+    if (!(left > 0)) continue;
+    const amount = new Intl.NumberFormat('ru-RU', { style: 'currency', currency: x.currency, maximumFractionDigits: 2 }).format(left);
+    out.push({
+      id: hash(`debt|${x.id}|${x.dueDate}`),
+      at,
+      title: x.kind === 'owe' ? `🤝 Вернуть долг: ${x.person}` : `🤝 ${x.person}: пора вернуть долг`,
+      body: x.kind === 'owe' ? `Сегодня срок — верните ${amount}` : `Сегодня срок — вам должны вернуть ${amount}`,
+      extra: { payId: `debt:${x.id}`, date: x.dueDate, sm: 1 },
+    });
+  }
   const p = await get<PlannerData>('planner').catch(() => undefined);
   // утренний брифинг: что на сегодня (пересчитывается при каждом изменении задач)
   const brief = d.prefs.briefing ?? '08:00';

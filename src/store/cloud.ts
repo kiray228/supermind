@@ -5,6 +5,7 @@
  */
 import { create } from 'zustand';
 import { isObj, mergeValues } from './merge';
+import { mark } from '../perf';
 import { clearAllDirty, dirtyAt, clearDirty, dirtyKeys, get, isSynced, keys, markDirty, onDirty, set, setFromSync, delFromSync, META_KEY } from './kv';
 
 const PROD_API = 'https://br-soft-term-b1xn6yim-supermind.compute.c-5.eu-central-1.aws.neon.tech';
@@ -64,7 +65,7 @@ class ApiError extends Error {
   }
 }
 
-async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   let res: Response;
   try {
     res = await fetch(API + path, { ...init, headers: { 'Content-Type': 'application/json', ...authHeader(), ...(init.headers ?? {}) } });
@@ -82,11 +83,22 @@ async function saveMeta() {
 
 // ================= Аккаунт =================
 
-/** Загрузить сохранённый вход при запуске */
-export async function initCloud() {
+/**
+ * Синхронизация не начнётся, пока не готово это обещание (копия данных при запуске):
+ * экран приложения открывается сразу, а данные меняются синхронизацией только после копии.
+ */
+let syncGate: Promise<unknown> = Promise.resolve();
+
+/**
+ * Загрузить сохранённый вход при запуске. Приложение готово сразу после чтения аккаунта;
+ * before — что должно закончиться до первой синхронизации (копия данных на устройстве).
+ */
+export async function initCloud(before?: Promise<unknown>) {
+  if (before) syncGate = before.catch(() => {});
   account = ((await get<Account>(ACCOUNT_KEY)) ?? null) as Account | null;
   meta = ((await get<SyncMeta>(META_KEY)) ?? { cursor: 0, seqs: {} }) as SyncMeta;
   useCloud.setState({ account, ready: true, lastSync: meta.lastSync, localOnly: Object.keys(meta.localOnly ?? {}).length });
+  mark('cloud-ready');
   if (!account) return;
   wire();
   syncSoon(800);
@@ -241,6 +253,8 @@ export function syncNow(): Promise<void> {
     useCloud.setState({ status: 'syncing' });
     const changed = new Set<string>();
     try {
+      // копия данных при запуске ещё делается — синхронизация её дождётся
+      await syncGate;
       for (const f of flushers) await f();
       for (let round = 0; round < 4; round++) {
         await pull(changed);

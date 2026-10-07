@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState, useSyncExternalStore } from 'react';
 import { useApp, type View } from './store/appStore';
 import { listDocs, loadSettings, saveDoc } from './store/db';
 import { get as idbGet, set as idbSet } from './store/kv';
@@ -8,18 +8,15 @@ import { AuthGate } from './ui/AuthGate';
 import Home from './views/Home';
 import { flushSave } from './store/docStore';
 import { ensureTasks, flushTasks, useTasks } from './tasks/store';
-import { initTaskSync } from './tasks/sync';
 import { isActive } from './tasks/model';
 import { todayYmd } from './utils/mapTasks';
-import { TaskDetailHost } from './tasks/ui/TaskDetail';
-import { QuickAddHost } from './tasks/ui/QuickAdd';
 import { SearchHost, SearchNavButton, SearchSheetButton } from './search/SearchHost';
-import { ReminderStack } from './tasks/ui/Reminders';
 import { applyAppearance } from './ui/appearance';
 import { initLargeTitles } from './ui/navbar';
 import { IconTile, SectionIcon, type SectionId } from './ui/icons';
 import './ui/appearance.css';
 import './app.css';
+import { mark, whenIdle } from './perf';
 
 const Editor = lazy(() => import('./editor/Editor'));
 const Board = lazy(() => import('./views/Board'));
@@ -36,6 +33,19 @@ const Assistant = lazy(() => import('./views/Assistant'));
 const Progress = lazy(() => import('./views/Progress'));
 const LevelBadge = lazy(() => import('./progress/LevelBadge').then((m) => ({ default: m.LevelBadge })));
 const OnboardingHost = lazy(() => import('./onboarding/OnboardingHost'));
+// окна задач и напоминаний — отдельными модулями: при запуске не нужны
+const TaskDetailHost = lazy(() => import('./tasks/ui/TaskDetail').then((m) => ({ default: m.TaskDetailHost })));
+const QuickAddHost = lazy(() => import('./tasks/ui/QuickAdd').then((m) => ({ default: m.QuickAddHost })));
+const ReminderStack = lazy(() => import('./tasks/ui/Reminders').then((m) => ({ default: m.ReminderStack })));
+
+/** Широкий экран (боковая панель видна целиком) */
+const WIDE = '(min-width: 761px)';
+const subscribeWide = (cb: () => void) => {
+  const mq = window.matchMedia(WIDE);
+  mq.addEventListener('change', cb);
+  return () => mq.removeEventListener('change', cb);
+};
+const isWide = () => window.matchMedia(WIDE).matches;
 
 /** phone: false — на телефоне пункт в меню «Ещё» */
 const NAV: { id: Extract<View, SectionId>; label: string; phone: boolean }[] = [
@@ -54,6 +64,8 @@ const NAV: { id: Extract<View, SectionId>; label: string; phone: boolean }[] = [
 ];
 
 let welcomeStarted = false;
+/** Второстепенное (напоминания, виджеты, push, таймер фокуса, окна задач) уже запущено — после первой отрисовки */
+let deferredStarted = false;
 
 export default function App() {
   const view = useApp((s) => s.view);
@@ -66,6 +78,10 @@ export default function App() {
   const toastMsg = useApp((s) => s.toast);
   const toastAction = useApp((s) => s.toastAction);
   const [more, setMore] = useState(false);
+  const [deferred, setDeferred] = useState(deferredStarted);
+  const wide = useSyncExternalStore(subscribeWide, isWide);
+  const taskOpen = useTasks((s) => !!s.openTaskId);
+  const quickAdd = useTasks((s) => !!s.quickAdd);
   const moreActive = NAV.some((n) => !n.phone && n.id === view);
   const todayCount = useTasks((s) => {
     const t = todayYmd();
@@ -73,15 +89,28 @@ export default function App() {
   });
 
   useEffect(() => {
+    mark('app-mounted');
     initLargeTitles();
     loadSettings().then((s) => useApp.setState({ settings: s }));
-    // задачи: загрузка, напоминания, календарь телефона, таймер фокуса
-    void ensureTasks().then(() => initTaskSync());
-    // аккаунт и синхронизация между устройствами; push-напоминания (iPhone/веб)
+    // задачи (счётчик на вкладке «Задачи»)
+    void ensureTasks();
+    // аккаунт и синхронизация между устройствами (экран входа ждёт только чтения аккаунта)
     void import('./store/cloudWire').then((m) => m.setupCloud()).catch(() => {});
-    void import('./store/push').then((m) => m.ensurePush()).catch(() => {});
-    void import('./tasks/focusTimer').then((m) => m.initFocusTimer()).catch(() => {});
-    void import('./native/widget').then((m) => m.initWidget()).catch(() => {});
+    // остальное — когда первый экран уже отрисован: не мешает запуску
+    whenIdle(() => {
+      if (deferredStarted) return;
+      deferredStarted = true;
+      mark('deferred');
+      setDeferred(true);
+      // напоминания, календарь телефона; push-напоминания (iPhone/веб); таймер фокуса; виджеты и «Поделиться»
+      void ensureTasks()
+        .then(() => import('./tasks/sync'))
+        .then((m) => m.initTaskSync())
+        .catch(() => {});
+      void import('./store/push').then((m) => m.ensurePush()).catch(() => {});
+      void import('./tasks/focusTimer').then((m) => m.initFocusTimer()).catch(() => {});
+      void import('./native/widget').then((m) => m.initWidget()).catch(() => {});
+    }, 1500);
     // первая карта-подсказка при первом запуске
     if (!welcomeStarted) {
       welcomeStarted = true;
@@ -95,14 +124,15 @@ export default function App() {
         await idbSet('welcomed', true);
       })();
     }
-    // заранее подгружаем редактор и разделы, чтобы карта открывалась мгновенно
+    // заранее подгружаем редактор и разделы, чтобы карта открывалась мгновенно (после запуска)
     const preload = setTimeout(() => {
       import('./editor/Editor');
       import('./views/Board');
       import('./views/Planner');
       import('./views/Tasks');
       import('./views/Calendar');
-    }, 800);
+      import('./views/Habits');
+    }, 2500);
     // Escape закрывает верхнее окно или меню
     const onEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && closeTopOverlay()) {
@@ -152,9 +182,12 @@ export default function App() {
             <img src="./icon.svg" alt="" width={30} height={30} />
             <span>SuperMind</span>
           </div>
-          <Suspense fallback={null}>
-            <LevelBadge className="nav-level" />
-          </Suspense>
+          {/* значок уровня считает опыт по всем разделам — только на широком экране (на телефоне скрыт) и после запуска */}
+          {wide && deferred && (
+            <Suspense fallback={null}>
+              <LevelBadge className="nav-level" />
+            </Suspense>
+          )}
           <SearchNavButton />
           {NAV.map((n) => (
             <button key={n.id} className={`nav-item ${view === n.id ? 'active' : ''}${n.phone ? '' : ' nav-desk'}`} onClick={() => go(n.id)}>
@@ -214,15 +247,30 @@ export default function App() {
           </div>
         </div>
       )}
-      <TaskDetailHost />
-      <QuickAddHost />
+      {taskOpen && (
+        <Suspense fallback={null}>
+          <TaskDetailHost />
+        </Suspense>
+      )}
+      {/* окно быстрого добавления всегда в DOM (фокус на iPhone) — но после первой отрисовки */}
+      {(deferred || quickAdd) && (
+        <Suspense fallback={null}>
+          <QuickAddHost />
+        </Suspense>
+      )}
+      {deferred && (
+        <Suspense fallback={null}>
+          <ReminderStack />
+        </Suspense>
+      )}
       <SearchHost />
-      <ReminderStack />
       <AuthGate />
       <DialogHost />
-      <Suspense fallback={null}>
-        <OnboardingHost />
-      </Suspense>
+      {deferred && (
+        <Suspense fallback={null}>
+          <OnboardingHost />
+        </Suspense>
+      )}
       {toastMsg && (
         <div className={`toast${toastAction ? ' has-action' : ''}`}>
           <span>{toastMsg}</span>

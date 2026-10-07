@@ -1,5 +1,5 @@
 import { useMemo, useState, type CSSProperties } from 'react';
-import { ArrowDown, ArrowUp, Plus } from 'lucide-react';
+import { ArrowDown, ArrowUp, Plus } from '@phosphor-icons/react';
 import { uid } from '../../utils/tree';
 import { toast } from '../../store/appStore';
 import { confirmDialog } from '../../ui/dialogs';

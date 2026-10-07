@@ -1,5 +1,5 @@
 import { useMemo, useState, type CSSProperties } from 'react';
-import { Trash2 } from 'lucide-react';
+import { Trash } from '@phosphor-icons/react';
 import { addDaysYmd, todayYmd } from '../../utils/mapTasks';
 import { toast } from '../../store/appStore';
 import { confirmDialog } from '../../ui/dialogs';
@@ -112,7 +112,7 @@ function TxForm({ data }: { data: FinanceData }) {
       head={
         edit && (
           <button className="icon-btn fn-danger" onClick={() => void remove()} aria-label="Удалить" title="Удалить">
-            <Trash2 />
+            <Trash />
           </button>
         )
       }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { ChevronRight, Plus, Settings2 } from 'lucide-react';
+import { ChartPieSlice, Plus, SlidersHorizontal } from '@phosphor-icons/react';
 import { ensureTasks } from '../tasks/store';
 import { todayYmd } from '../utils/mapTasks';
 import {
@@ -22,7 +22,8 @@ import { GoalEditor } from '../goals/ui/GoalEditor';
 import { AreasModal } from '../goals/ui/AreasModal';
 import { Celebration } from '../goals/ui/Celebration';
 import { WheelTab } from '../goals/ui/Wheel';
-import { areaOf, useTaskLookup } from '../goals/ui/parts';
+import { areaOf, ProgressRing, useTaskLookup } from '../goals/ui/parts';
+import { ListRow } from '../ui/list';
 import './goals.css';
 import { IconTile } from '../ui/icons';
 
@@ -70,36 +71,30 @@ export default function Goals() {
         <IconTile section="goals" size="sm" className="ph-tile" />
         <h1>Цели</h1>
         <div className="grow" />
-        <div className="segmented gl-tabs">
-          <button className={tab === 'goals' ? 'active' : ''} onClick={() => setTab('goals')}>
-            Цели
-          </button>
-          <button className={tab === 'wheel' ? 'active' : ''} onClick={() => setTab('wheel')}>
-            <span className="gl-long">Колесо баланса</span>
-            <span className="gl-short">Колесо</span>
-          </button>
-        </div>
         <button className="icon-btn" onClick={() => setAreasOpen(true)} aria-label="Сферы жизни" title="Сферы жизни">
-          <Settings2 />
+          <SlidersHorizontal weight="bold" />
         </button>
       </div>
       <div className="page-body">
         {!data ? (
           <div className="empty">Загрузка…</div>
         ) : tab === 'goals' ? (
-          <GoalsList data={data} onNew={newGoal} onWheel={() => setTab('wheel')} />
+          <GoalsList data={data} onNew={newGoal} onWheel={() => setTab('wheel')} onTab={setTab} />
         ) : (
-          <WheelTab
-            data={data}
-            onNewGoal={(areaId) => {
-              newGoal({ areaId });
-            }}
-          />
+          <div className="gl-list-page">
+            <ViewTabs view={null} saved={data.prefs.view ?? 'active'} onTab={setTab} />
+            <WheelTab
+              data={data}
+              onNewGoal={(areaId) => {
+                newGoal({ areaId });
+              }}
+            />
+          </div>
         )}
       </div>
       {tab === 'goals' && data && (
         <button className="gl-fab" onClick={() => newGoal()} aria-label="Новая цель">
-          <Plus size={26} />
+          <Plus size={26} weight="bold" />
         </button>
       )}
       {data && opened && <GoalDetail data={data} goal={opened} onClose={() => openGoal(null)} onEdit={() => setEditor({ goal: opened })} />}
@@ -121,7 +116,7 @@ interface Group {
   areaId?: string;
 }
 
-function GoalsList({ data, onNew, onWheel }: { data: GoalsData; onNew: (p?: Partial<Goal>) => void; onWheel: () => void }) {
+function GoalsList({ data, onNew, onWheel, onTab }: { data: GoalsData; onNew: (p?: Partial<Goal>) => void; onWheel: () => void; onTab: (t: Tab) => void }) {
   const look = useTaskLookup();
   const today = todayYmd();
   const view: GoalsView = data.prefs.view ?? 'active';
@@ -153,31 +148,20 @@ function GoalsList({ data, onNew, onWheel }: { data: GoalsData; onNew: (p?: Part
 
   return (
     <div className="gl-list-page">
-      <div className="segmented gl-view-seg">
-        {(
-          [
-            ['active', 'Активные'],
-            ['areas', 'По сферам'],
-            ['done', 'Выполненные'],
-          ] as [GoalsView, string][]
-        ).map(([v, l]) => (
-          <button key={v} className={view === v ? 'active' : ''} onClick={() => setGoalsPrefs({ view: v })}>
-            {l}
-          </button>
-        ))}
-      </div>
+      <ViewTabs view={view} saved={view} onTab={onTab} />
 
       {view === 'active' && <Summary data={data} look={look} today={today} />}
 
       {view === 'active' && wheelDue(data, today) && (
-        <button className="card gl-banner gl-banner-btn" onClick={onWheel}>
-          <span className="gl-banner-ic">🎡</span>
-          <span className="grow">
-            <span className="bold small">Колесо баланса</span>
-            <span className="tiny muted gl-block">{data.wheel.length ? 'Прошёл месяц — оцените сферы жизни снова' : 'Оцените сферы жизни, чтобы понять, куда направить силы'}</span>
-          </span>
-          <ChevronRight size={18} className="faint" />
-        </button>
+        <div className="ls-group gl-banner">
+          <ListRow
+            icon={<IconTile icon={ChartPieSlice} tone="violet" size="list" />}
+            title="Колесо баланса"
+            subtitle={data.wheel.length ? 'Прошёл месяц — оцените сферы жизни снова' : 'Оцените сферы жизни, чтобы понять, куда направить силы'}
+            chevron
+            onClick={onWheel}
+          />
+        </div>
       )}
 
       {groups.length === 0 && (
@@ -186,7 +170,7 @@ function GoalsList({ data, onNew, onWheel }: { data: GoalsData; onNew: (p?: Part
           <div>{view === 'done' ? 'Здесь появятся достигнутые цели' : 'Поставьте первую цель — разбейте её на этапы и двигайтесь шаг за шагом'}</div>
           {view !== 'done' && (
             <button className="btn btn-primary" onClick={() => onNew()}>
-              <Plus size={16} /> Новая цель
+              <Plus size={16} weight="bold" /> Новая цель
             </button>
           )}
         </div>
@@ -197,27 +181,61 @@ function GoalsList({ data, onNew, onWheel }: { data: GoalsData; onNew: (p?: Part
           <div className="gl-group-head">
             {gr.emoji && <span className="gl-group-emoji">{gr.emoji}</span>}
             <h2 className="grow ellipsis">{gr.title}</h2>
-            {gr.goals.length > 0 && view === 'areas' && <span className="tiny faint">средний прогресс {Math.round(gr.goals.reduce((s, g) => s + goalProgress(g, look), 0) / gr.goals.length)}%</span>}
-            <span className="badge">{gr.goals.length}</span>
+            {gr.goals.length > 0 && view === 'areas' && (
+              <span className="gl-group-avg">{Math.round(gr.goals.reduce((s, g) => s + goalProgress(g, look), 0) / gr.goals.length)}%</span>
+            )}
+            {view !== 'areas' && <span className="gl-group-count">{gr.goals.length}</span>}
             {view === 'areas' && gr.areaId && (
-              <button className="icon-btn gl-mini-btn" onClick={() => onNew({ areaId: gr.areaId })} aria-label={`Новая цель: ${gr.title}`}>
-                <Plus size={17} />
+              <button className="icon-btn gl-mini-btn gl-group-add" onClick={() => onNew({ areaId: gr.areaId })} aria-label={`Новая цель: ${gr.title}`}>
+                <Plus size={18} weight="bold" />
               </button>
             )}
           </div>
-          {gr.goals.length === 0 ? (
-            <button className="gl-group-empty small faint" onClick={() => onNew({ areaId: gr.areaId })}>
-              Нет целей — добавить
-            </button>
-          ) : (
-            <div className="gl-grid">
-              {gr.goals.map((g) => (
-                <GoalCard key={g.id} goal={g} area={areaOf(data, g.areaId)} look={look} today={today} />
-              ))}
-            </div>
-          )}
+          <div className="gl-grid">
+            {gr.goals.length === 0 ? (
+              <button className="gl-group-empty" onClick={() => onNew({ areaId: gr.areaId })}>
+                <Plus size={17} weight="bold" /> Добавить цель
+              </button>
+            ) : (
+              gr.goals.map((g) => <GoalCard key={g.id} goal={g} area={areaOf(data, g.areaId)} look={look} today={today} hidePeriod={view === 'active'} />)
+            )}
+          </div>
         </section>
       ))}
+    </div>
+  );
+}
+
+/** Переключатель: списки целей и колесо баланса — один ряд, как в приложениях Apple */
+function ViewTabs({ view, saved, onTab }: { view: GoalsView | null; saved: GoalsView; onTab: (t: Tab) => void }) {
+  const items: [GoalsView | 'wheel', string, string][] = [
+    ['active', 'Активные', 'Активные'],
+    ['areas', 'По сферам', 'Сферы'],
+    ['done', 'Выполненные', 'Готово'],
+    ['wheel', 'Колесо баланса', 'Колесо'],
+  ];
+  return (
+    <div className="segmented gl-view-seg" role="tablist">
+      {items.map(([v, long, short]) => {
+        const on = v === 'wheel' ? view === null : view === v;
+        return (
+          <button
+            key={v}
+            role="tab"
+            aria-selected={on}
+            className={on ? 'active' : ''}
+            onClick={() => {
+              if (v === 'wheel') return onTab('wheel');
+              onTab('goals');
+              // сохраняем выбор, только если он действительно изменился
+              if (saved !== v) setGoalsPrefs({ view: v });
+            }}
+          >
+            <span className="gl-long">{long}</span>
+            <span className="gl-short">{short}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -231,21 +249,30 @@ function Summary({ data, look, today }: { data: GoalsData; look: TaskLookup; tod
   const doneYear = data.goals.filter((g) => g.status === 'done' && g.completedAt && new Date(g.completedAt).getFullYear() === Number(year)).length;
   return (
     <div className="gl-summary">
-      <div className="gl-sum">
-        <b>{active.length}</b>
-        <span className="tiny muted">в работе</span>
+      <div className="gl-sum-top">
+        <ProgressRing pct={avg} size={68} stroke={8} className="gl-sum-ring">
+          <span className="gl-sum-pct">{avg}%</span>
+        </ProgressRing>
+        <div className="gl-sum-text">
+          <div className="gl-sum-label">Средний прогресс</div>
+          <div className="gl-sum-sub">
+            {avg >= 70 ? 'Отличный темп — финиш близко' : avg >= 35 ? 'Хороший темп — продолжайте' : 'Начало пути — маленькие шаги каждый день'}
+          </div>
+        </div>
       </div>
-      <div className="gl-sum">
-        <b>{avg}%</b>
-        <span className="tiny muted">средний прогресс</span>
-      </div>
-      <div className={'gl-sum' + (overdue ? ' is-danger' : '')}>
-        <b>{overdue}</b>
-        <span className="tiny muted">просрочено</span>
-      </div>
-      <div className="gl-sum">
-        <b>{doneYear}</b>
-        <span className="tiny muted">достигнуто в {year}</span>
+      <div className="gl-sum-stats">
+        <div className="gl-sum">
+          <b>{active.length}</b>
+          <span>в работе</span>
+        </div>
+        <div className={'gl-sum' + (overdue ? ' is-danger' : '')}>
+          <b>{overdue}</b>
+          <span>просрочено</span>
+        </div>
+        <div className="gl-sum">
+          <b>{doneYear}</b>
+          <span>за {year} год</span>
+        </div>
       </div>
     </div>
   );

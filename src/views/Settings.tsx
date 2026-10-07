@@ -22,6 +22,8 @@ import {
 import { useApp, toast } from '../store/appStore';
 import { AI_MODELS, streamText, AIError } from '../ai/claude';
 import { openWhatsNew } from '../onboarding/state';
+import { openSupport, SupportHost } from '../ui/Support';
+import { Bug, Lightbulb } from '@phosphor-icons/react';
 import { APP_VERSION } from '../store/safety';
 import { IconTile } from '../ui/icons';
 import { ListCell, ListRow, ListSection, SelectRow, SwitchRow } from '../ui/list';
@@ -202,9 +204,15 @@ export default function Settings() {
             />
           </ListSection>
 
+          <ListSection header="Поддержка" footer="Нашли ошибку или есть идея? Напишите — ответим на почту аккаунта.">
+            <ListRow icon={<IconTile icon={Bug} tone="red" size="list" />} title="Сообщить о проблеме" chevron onClick={() => openSupport('problem')} />
+            <ListRow icon={<IconTile icon={Lightbulb} tone="yellow" size="list" />} title="Предложить идею" chevron onClick={() => openSupport('idea')} />
+          </ListSection>
+          <SupportHost />
+
           <ListSection
             header="О приложении"
-            footer="SuperMind — бесплатные интеллект-карты, задачи с напоминаниями, календарь, привычки, ИИ-ассистент, заметки, цели, финансы, прогресс, фокус, ежедневник и доска задач. Все функции открыты, без подписок."
+            footer="SuperMind — бесплатные интеллект-карты, задачи с напоминаниями, календарь, привычки, ИИ-ассистент, заметки, цели, финансы, прогресс, фокус, и доска задач. Все функции открыты, без подписок."
           >
             <ListRow icon={<IconTile icon={InfoIcon} tone="gray" size="list" />} title="Версия" value={APP_VERSION} />
             <ListRow icon={<IconTile icon={Sparkle} tone="accent" size="list" />} title="Что нового" chevron onClick={openWhatsNew} />

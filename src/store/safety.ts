@@ -3,8 +3,8 @@
  * перед входом в аккаунт и перед восстановлением), запрет браузеру очищать хранилище
  * и восстановление из любой копии — локальной, облачной или файла.
  */
-import { createStore, get as sget, set as sset, del as sdel, keys as skeys } from 'idb-keyval';
-import { get, keys, set } from './kv';
+import { createStore, entries, get as sget, set as sset, del as sdel, keys as skeys } from 'idb-keyval';
+import { get, set } from './kv';
 
 declare const __APP_VERSION__: string;
 export const APP_VERSION = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : 'dev';
@@ -42,9 +42,10 @@ interface Snapshot extends SnapshotInfo {
 /** Что попадает в копию: всё, кроме настроек (там API-ключ) и служебного */
 const inBackup = (k: string) => k !== 'settings' && !k.startsWith('sync:');
 
+/** Всё содержимое базы — одним чтением (getAll), а не по ключу: на телефоне в разы быстрее */
 export async function collectData(): Promise<Record<string, unknown>> {
   const all: Record<string, unknown> = {};
-  for (const k of await keys()) if (typeof k === 'string' && inBackup(k)) all[k] = await get(k);
+  for (const [k, v] of await entries()) if (typeof k === 'string' && inBackup(k)) all[k] = v;
   return all;
 }
 

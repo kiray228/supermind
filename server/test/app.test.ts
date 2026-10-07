@@ -6,7 +6,7 @@ import { PgliteSql } from './pglite.ts';
 
 const sql = new PgliteSql();
 const mails: { to: string; subject: string; text: string }[] = [];
-const app = createApp({ mail: async (m) => void mails.push(m), sql, push: async () => ({ status: 201, gone: false }) });
+const app = createApp({ mail: async (m) => void mails.push(m), supportEmail: 'owner@b.cd', sql, push: async () => ({ status: 201, gone: false }) });
 
 async function call<T = Record<string, unknown>>(method: string, path: string, body?: unknown, token?: string) {
   const r = await app.fetch(
@@ -117,4 +117,21 @@ test('восстановление пароля: код на почту, нов�
   await call('POST', '/auth/forgot', { email: 'reset@b.cd' });
   await call('POST', '/auth/forgot', { email: 'reset@b.cd' });
   assert.equal((await call('POST', '/auth/forgot', { email: 'reset@b.cd' })).status, 429);
+});
+
+test('поддержка: обращение сохраняется, письмо владельцу с ответом пользователю', async () => {
+  const reg = await call<{ token: string }>('POST', '/auth/register', { name: 'Олжас', email: 'fb@b.cd', password: '12345678' });
+  const t = reg.data.token;
+  assert.equal((await call('POST', '/feedback', { kind: 'idea', text: 'ок' }, t)).status, 400);
+  assert.equal((await call('POST', '/feedback', { kind: 'idea', text: 'Добавьте тёмную тему для карт' })).status, 401);
+  const before = mails.length;
+  const r = await call<{ id: string }>('POST', '/feedback', { kind: 'problem', text: 'Не открывается карта', meta: 'v1.13 · iPhone', image: 'aGVsbG8=' }, t);
+  assert.equal(r.status, 201);
+  const m = mails[before] as { to: string; subject: string; replyTo?: string; attachments?: unknown[] };
+  assert.equal(m.to, 'owner@b.cd');
+  assert.equal(m.replyTo, 'fb@b.cd');
+  assert.match(m.subject, /Проблема/);
+  assert.equal(m.attachments?.length, 1);
+  const list = await call<{ items: { text: string; kind: string }[] }>('GET', '/feedback', undefined, t);
+  assert.equal(list.data.items[0].text, 'Не открывается карта');
 });

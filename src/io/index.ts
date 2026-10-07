@@ -15,9 +15,7 @@ export { importXmind, exportXmind } from './xmind';
 export { exportDocx, exportXlsx, exportPptx, exportCsvTasks } from './office';
 export { buildExportSvg, exportSvgBlob, exportPng, exportPdf } from './exportImage';
 
-/** Значение accept для <input type="file"> */
-export const IMPORT_ACCEPT =
-  '.supermind,.2mind,.xmind,.md,.markdown,.txt,.opml,.json,text/markdown,text/plain,text/x-opml,application/json';
+export { IMPORT_ACCEPT } from './common';
 
 // ---------------------------------------------------------------------
 // Нативный формат .supermind (JSON MindDoc; старые файлы .2mind тоже открываются)

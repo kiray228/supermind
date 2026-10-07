@@ -364,3 +364,95 @@
   .ed-top .icon-btn svg { width: 20px; height: 20px; }
   .ed-modes button { padding: 0 8px; height: 30px; }
 }
+
+/* ================= Телефон: панели как в приложениях Apple ================= */
+.ed-edge { transition: opacity .3s; }
+.ed-back svg { width: 22px; height: 22px; }
+.ed-mode-btn { width: auto !important; padding: 0 8px 0 10px; gap: 2px; border-radius: 999px !important; }
+.ed-mode-btn .ed-mode-caret { width: 11px !important; height: 11px !important; opacity: .55; }
+.tb-btn.danger:not(:disabled) { color: var(--danger, #ff3b30); }
+.tb-btn.wide { min-width: 220px; flex-direction: row; gap: 8px; font-size: 14px; padding: 0 16px; }
+.tb-btn svg { flex-shrink: 0; }
+
+/* «+» у выбранной темы (сенсорный экран) */
+.quick-add {
+  position: absolute; z-index: 16; height: 44px; display: flex; align-items: stretch; padding: 3px;
+  border-radius: 999px; box-shadow: var(--lg-highlight), var(--lg-shadow); animation: qa-in .18s cubic-bezier(.2, .9, .25, 1.15);
+  -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; touch-action: manipulation;
+}
+.quick-add button {
+  flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: none; background: transparent;
+  border-radius: 999px; color: var(--accent); font-size: 14.5px; font-weight: 600; letter-spacing: -0.01em; padding: 0 12px; min-width: 0;
+  transition: background .15s, transform .15s;
+}
+.quick-add button svg { width: 18px; height: 18px; flex-shrink: 0; }
+.quick-add button:active { background: var(--fill-3); transform: scale(.96); }
+.quick-add-sep { width: var(--hairline, 1px); margin: 9px 0; background: var(--separator); flex-shrink: 0; }
+@keyframes qa-in { from { opacity: 0; transform: translateY(4px) scale(.94); } }
+.editor.chrome-light .quick-add {
+  --text: #000; --fill-3: rgba(118, 118, 128, 0.12); --separator: rgba(60, 60, 67, 0.29);
+  --lg-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.7));
+  --lg-highlight: inset 0 1px 0.5px rgba(255, 255, 255, 0.95), inset 0 0 0 0.5px rgba(0, 0, 0, 0.06);
+  --lg-shadow: 0 8px 24px rgba(0, 0, 0, 0.14), 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.editor.chrome-dark .quick-add {
+  --text: #fff; --fill-3: rgba(118, 118, 128, 0.24); --separator: rgba(84, 84, 88, 0.6);
+  --lg-bg: linear-gradient(180deg, rgba(58, 58, 62, 0.8), rgba(34, 34, 38, 0.74));
+  --lg-highlight: inset 0 1px 0.5px rgba(255, 255, 255, 0.2), inset 0 0 0 0.5px rgba(255, 255, 255, 0.1);
+  --lg-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+}
+
+/* панель над клавиатурой во время ввода текста темы */
+.edit-accessory {
+  position: fixed; z-index: 130; left: 8px; right: 8px; bottom: calc(10px + var(--safe-bottom)); height: 48px;
+  display: flex; align-items: center; gap: 4px; padding: 4px; border-radius: 999px;
+  box-shadow: var(--lg-highlight), var(--lg-shadow); animation: qa-in .2s ease;
+  -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; touch-action: manipulation;
+}
+.edit-accessory button {
+  height: 40px; display: inline-flex; align-items: center; gap: 6px; padding: 0 14px; border: none; border-radius: 999px;
+  background: transparent; color: var(--text); font-size: 15px; font-weight: 500;
+}
+.edit-accessory button svg { width: 18px; height: 18px; color: var(--accent); }
+.edit-accessory button:active { background: var(--fill-3); }
+.edit-accessory button.done { background: var(--accent); color: #fff; font-weight: 600; }
+.edit-accessory button.done svg { color: #fff; }
+
+/* меню: заголовок и отметка выбранного пункта */
+.menu-title { padding: 6px 12px 4px; font-size: 13px; font-weight: 600; color: var(--text-2); }
+.menu button.checked { color: var(--accent); font-weight: 600; }
+.menu button .menu-check { margin-left: auto; width: 16px; height: 16px; color: var(--accent); }
+.menu.menu-sheet .menu-title { grid-column: 1 / -1; text-align: center; padding: 0 12px 8px; font-size: 13px; }
+.menu.menu-sheet.single { grid-template-columns: 1fr; }
+
+@media (max-width: 760px) {
+  /* лист «Формат»/«ИИ» с положениями (половина / почти весь экран) */
+  .ed-panel.ed-sheet {
+    flex-direction: column; height: auto; max-height: calc(var(--vvh, 100vh) - var(--safe-top) - 8px);
+    transition: height .34s cubic-bezier(.2, .9, .25, 1), bottom .25s ease; will-change: height;
+    padding-bottom: 0; overflow: hidden;
+  }
+  .ed-panel.ed-sheet.dragging { transition: none; }
+  .ed-panel.ed-sheet > .inspector { flex: 1; min-height: 0; }
+  .ed-panel.ed-sheet .inspector-body { padding-bottom: calc(24px + var(--safe-bottom)); overscroll-behavior: contain; }
+  .sheet-grabber { flex-shrink: 0; height: 18px; display: flex; align-items: flex-end; justify-content: center; cursor: grab; touch-action: none; }
+  .sheet-grabber span { width: 36px; height: 5px; border-radius: 3px; background: var(--fill, rgba(120, 120, 128, 0.36)); }
+  .ed-sheet .inspector-head { border-bottom: none; padding-top: 4px; touch-action: none; }
+  .ed-main.sheet-open .ed-stage { height: calc(100% - max(320px, var(--vvh, 100vh) * 0.52) + 28px); }
+  /* закрыть — серый кружок, как в листах iOS */
+  .ed-sheet .inspector-head > .icon-btn:last-child { background: var(--fill-3); width: 32px; height: 32px; margin: 6px; }
+  .ed-sheet .inspector-head > .icon-btn:last-child svg { width: 15px; height: 15px; color: var(--text-2); }
+  /* крупнее цели касания в инспекторе */
+  .tile { min-height: 44px; }
+  .marker-btn { width: 40px; height: 40px; font-size: 19px; border-radius: 11px; }
+  .swatches { gap: 7px; }
+}
+@media (max-width: 480px) {
+  .ed-top .icon-btn { width: 42px; height: 42px; }
+  .ed-top .icon-btn svg { width: 22px; height: 22px; }
+  .ed-top .ed-title { flex: 1; min-width: 0; max-width: none; padding: 6px 6px; }
+  .ed-top > .grow { display: none; }
+  .ed-toolbar .tb-btn { min-width: 58px; }
+}
+/* во время ввода на телефоне внизу — только панель над клавиатурой */
+.editor.touch-editing :is(.ed-toolbar, .ed-sheets) { display: none; }

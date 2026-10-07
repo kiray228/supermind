@@ -3,6 +3,7 @@ import type { LockedDoc, MindDoc } from '../types';
 import { useApp, toast } from './appStore';
 import { initCloud, onBeforeSync, onRemoteChange, syncSoon } from './cloud';
 import { get } from './kv';
+import { mark, whenIdle } from '../perf';
 
 let done = false;
 
@@ -79,9 +80,20 @@ export async function setupCloud() {
     () => void window.dispatchEvent(new Event('sm-board-changed')),
   );
 
-  // копия до первой синхронизации — если что-то пойдёт не так, будет из чего вернуть
-  await (await import('./safety')).startupSafety();
-  await initCloud();
+  // копия до первой синхронизации — если что-то пойдёт не так, будет из чего вернуть.
+  // Делается в фоне после первой отрисовки: экран не ждёт её, а синхронизация (initCloud) — ждёт.
+  const snapshot = new Promise<void>((resolve) =>
+    whenIdle(() => {
+      void import('./safety')
+        .then((m) => m.startupSafety())
+        .catch(() => {})
+        .then(() => {
+          mark('snapshot-done');
+          resolve();
+        });
+    }, 1000),
+  );
+  await initCloud(snapshot);
   // для проверок в режиме разработки: те же экземпляры модулей, что у приложения
   if (import.meta.env.DEV)
     (window as unknown as { __sm: unknown }).__sm = {

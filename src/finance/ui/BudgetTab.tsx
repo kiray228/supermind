@@ -1,5 +1,5 @@
 import { useMemo, useState, type CSSProperties } from 'react';
-import { Pencil, Plus, Target } from 'lucide-react';
+import { PencilSimple, Plus, Target } from '@phosphor-icons/react';
 import { toast } from '../../store/appStore';
 import {
   addMonthsYmd,
@@ -60,7 +60,7 @@ export function BudgetTab({ data }: { data: FinanceData }) {
             <Target size={16} /> Бюджет на месяц
           </h3>
           <button className="btn btn-sm btn-ghost" onClick={() => setEdit({})}>
-            <Pencil size={14} /> {tb ? 'Изменить' : 'Задать'}
+            <PencilSimple size={14} /> {tb ? 'Изменить' : 'Задать'}
           </button>
         </div>
         {tb ? (

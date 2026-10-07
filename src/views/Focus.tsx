@@ -1,26 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
-import {
-  Check,
-  CircleAlert,
-  Clock,
-  Flame,
-  ListChecks,
-  Pause,
-  Play,
-  Plus,
-  Search,
-  Settings2,
-  SkipForward,
-  Square,
-  Target,
-  Timer,
-  Trash2,
-  Trophy,
-  Volume2,
-  Watch,
-  X,
-} from 'lucide-react';
+import { Check, Clock, Flame, Hourglass, ListChecks, MagnifyingGlass, Pause, Play, Plus, SkipForward, SlidersHorizontal, SpeakerHigh, Stop, Target, Timer, Trash, Trophy, WarningCircle, Watch, X } from '@phosphor-icons/react';
 import type { Countdown, TasksData } from '../tasks/model';
 import { daysBetween, durationLabel, isActive, isOverdue, LIST_COLORS, plural, shortDate, WEEKDAYS, whenLabel } from '../tasks/model';
 import { deleteCountdown, ensureTasks, saveCountdown, setPrefs, toggleDone, useTasks } from '../tasks/store';
@@ -49,7 +29,6 @@ import { toast } from '../store/appStore';
 import { confirmDialog } from '../ui/dialogs';
 import './focus.css';
 import { IconTile } from '../ui/icons';
-import { Hourglass } from '@phosphor-icons/react';
 
 type Tab = 'pomo' | 'stats' | 'countdown';
 const TAB_KEY = 'sm-focus-tab';
@@ -105,7 +84,7 @@ export default function Focus() {
         <div className="grow" />
         <div className="segmented fx-tabs">
           <button className={tab === 'pomo' ? 'active' : ''} onClick={() => setTab('pomo')}>
-            Помодоро
+            Таймер
           </button>
           <button className={tab === 'stats' ? 'active' : ''} onClick={() => setTab('stats')}>
             Статистика
@@ -163,21 +142,21 @@ function PomodoroTab({ data }: { data: TasksData }) {
   return (
     <div className="fx-pomo">
       <div className="fx-pomo-top">
-        <div className="segmented">
+        <div className="segmented fx-mode-seg">
           <button className={!isWatch ? 'active' : ''} onClick={() => setMode('pomo')}>
-            <Timer size={14} /> Помодоро
+            <Timer size={15} weight="bold" /> Помодоро
           </button>
           <button className={isWatch ? 'active' : ''} onClick={() => setMode('stopwatch')}>
-            <Watch size={14} /> Секундомер
+            <Watch size={15} weight="bold" /> Секундомер
           </button>
         </div>
         <button className="icon-btn" onClick={() => setSettings(true)} aria-label="Настройки помодоро" title="Настройки помодоро">
-          <Settings2 />
+          <SlidersHorizontal weight="bold" />
         </button>
       </div>
 
       <button className="fx-task-pick" onClick={() => setPicker(true)}>
-        <Target size={16} />
+        <Target size={17} weight="bold" />
         <span className={'ellipsis' + (task && !isActive(task) ? ' fx-done-text' : '')}>{task ? task.title || 'Без названия' : 'Выбрать задачу'}</span>
       </button>
 
@@ -211,11 +190,13 @@ function PomodoroTab({ data }: { data: TasksData }) {
         {!active ? (
           <>
             <button className="btn btn-primary fx-main-btn" onClick={start}>
-              <Play size={18} /> {isBreak ? 'Начать перерыв' : 'Старт'}
+              <Play size={22} weight="fill" />
+              <span>{isBreak ? 'Перерыв' : 'Старт'}</span>
             </button>
             {isBreak && (
-              <button className="btn fx-side-btn" onClick={skip}>
-                <SkipForward size={16} /> Пропустить
+              <button className="btn fx-side-btn fx-skip" onClick={skip}>
+                <SkipForward size={20} weight="fill" />
+                <span>Пропуск</span>
               </button>
             )}
           </>
@@ -223,19 +204,23 @@ function PomodoroTab({ data }: { data: TasksData }) {
           <>
             {f.running ? (
               <button className="btn btn-primary fx-main-btn" onClick={pause}>
-                <Pause size={18} /> Пауза
+                <Pause size={22} weight="fill" />
+                <span>Пауза</span>
               </button>
             ) : (
               <button className="btn btn-primary fx-main-btn" onClick={resume}>
-                <Play size={18} /> Продолжить
+                <Play size={22} weight="fill" />
+                <span>Дальше</span>
               </button>
             )}
-            <button className="btn fx-side-btn" onClick={stop}>
-              <Square size={15} /> Стоп
+            <button className="btn fx-side-btn fx-stop" onClick={stop}>
+              <Stop size={20} weight="fill" />
+              <span>Стоп</span>
             </button>
             {!isWatch && (
-              <button className="btn fx-side-btn" onClick={skip}>
-                <SkipForward size={16} /> Пропустить
+              <button className="btn fx-side-btn fx-skip" onClick={skip}>
+                <SkipForward size={20} weight="fill" />
+                <span>Пропуск</span>
               </button>
             )}
           </>
@@ -244,13 +229,13 @@ function PomodoroTab({ data }: { data: TasksData }) {
 
       {task && isActive(task) && (
         <button className="btn btn-sm btn-ghost fx-complete" onClick={completeTask}>
-          <Check size={15} /> Выполнить задачу
+          <Check size={15} weight="bold" /> Выполнить задачу
         </button>
       )}
 
-      <div className="card fx-noise">
+      <div className="fx-noise">
         <div className="row fx-noise-head">
-          <Volume2 size={16} className="faint" />
+          <SpeakerHigh size={17} weight="fill" className="fx-noise-ic" />
           <span className="small bold">Фоновый звук</span>
         </div>
         <div className="fx-chips">
@@ -279,7 +264,7 @@ function PomodoroTab({ data }: { data: TasksData }) {
           <div className="fx-sessions">
             {todaySessions.map((s) => (
               <div key={s.id} className="fx-session">
-                {s.kind === 'pomo' ? <Timer size={15} className="fx-session-ic" /> : <Watch size={15} className="fx-session-ic" />}
+                {s.kind === 'pomo' ? <Timer size={17} weight="fill" className="fx-session-ic" /> : <Watch size={17} weight="fill" className="fx-session-ic" />}
                 <span className="fx-session-time">
                   {hhmm(s.start)}–{hhmm(s.start + s.minutes * 60000)}
                 </span>
@@ -321,7 +306,7 @@ function TaskPicker({ data, selected, onClose }: { data: TasksData; selected?: s
           </button>
         </div>
         <div className="fx-search">
-          <Search size={16} />
+          <MagnifyingGlass size={16} />
           <input className="input" placeholder="Поиск задачи" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
         </div>
         <div className="fx-pick-list">
@@ -500,15 +485,15 @@ function StatsTab({ data }: { data: TasksData }) {
 
   return (
     <div className="fx-stats">
-      <div className="fx-cards">
-        <StatCard icon={<Check size={16} />} value={st.byDay.get(today) ?? 0} label="Выполнено сегодня" />
-        <StatCard icon={<ListChecks size={16} />} value={st.week} label="За 7 дней" />
-        <StatCard icon={<Trophy size={16} />} value={data.log.length} label="Всего выполнено" />
-        <StatCard icon={<CircleAlert size={16} />} value={st.overdue} label="Просрочено сейчас" tone={st.overdue ? 'danger' : undefined} />
-        <StatCard icon={<Target size={16} />} value={`${st.rate}%`} label="Выполнение за 7 дней" />
-        <StatCard icon={<Flame size={16} />} value={st.streak} label={`${plural(st.streak, 'день', 'дня', 'дней')} подряд · рекорд ${st.best}`} tone="warn" />
-        <StatCard icon={<Clock size={16} />} value={durationLabel(st.focusByDay.get(today) ?? 0)} label="Фокус сегодня" />
-        <StatCard icon={<Timer size={16} />} value={durationLabel(st.focusTotal)} label="Фокус всего" />
+      <div className="card fx-cards">
+        <StatCard icon={<Check size={15} weight="bold" />} value={st.byDay.get(today) ?? 0} label="Выполнено сегодня" />
+        <StatCard icon={<ListChecks size={15} weight="bold" />} value={st.week} label="За 7 дней" />
+        <StatCard icon={<Trophy size={15} weight="bold" />} value={data.log.length} label="Всего выполнено" />
+        <StatCard icon={<WarningCircle size={15} weight="bold" />} value={st.overdue} label="Просрочено сейчас" tone={st.overdue ? 'danger' : undefined} />
+        <StatCard icon={<Target size={15} weight="bold" />} value={`${st.rate}%`} label="Выполнение за 7 дней" />
+        <StatCard icon={<Flame size={15} weight="bold" />} value={st.streak} label={`${plural(st.streak, 'день', 'дня', 'дней')} подряд · рекорд ${st.best}`} tone="warn" />
+        <StatCard icon={<Clock size={15} weight="bold" />} value={durationLabel(st.focusByDay.get(today) ?? 0)} label="Фокус сегодня" />
+        <StatCard icon={<Timer size={15} weight="bold" />} value={durationLabel(st.focusTotal)} label="Фокус всего" />
       </div>
 
       <div className="card fx-panel">
@@ -560,7 +545,7 @@ function StatsTab({ data }: { data: TasksData }) {
       </div>
 
       <div className="card fx-panel fx-bestday">
-        <Trophy size={20} />
+        <Trophy size={22} weight="fill" />
         <div className="grow">
           <div className="small muted">Лучший день недели</div>
           <div className="bold">
@@ -574,10 +559,12 @@ function StatsTab({ data }: { data: TasksData }) {
 
 function StatCard({ icon, value, label, tone }: { icon: ReactNode; value: number | string; label: string; tone?: 'danger' | 'warn' }) {
   return (
-    <div className={'card fx-stat' + (tone ? ' is-' + tone : '')}>
-      <div className="fx-stat-ic">{icon}</div>
+    <div className={'fx-stat' + (tone ? ' is-' + tone : '')}>
+      <div className="fx-stat-label">
+        <span className="fx-stat-ic">{icon}</span>
+        <span>{label}</span>
+      </div>
       <div className="fx-stat-val">{value}</div>
-      <div className="fx-stat-label">{label}</div>
     </div>
   );
 }
@@ -641,7 +628,7 @@ function CountdownsTab({ data }: { data: TasksData }) {
       <div className="row fx-cd-head">
         <div className="grow muted small">Дни рождения, праздники, поездки и важные даты</div>
         <button className="btn btn-sm btn-primary" onClick={() => setEdit('new')}>
-          <Plus size={16} /> Добавить
+          <Plus size={16} weight="bold" /> Добавить
         </button>
       </div>
       {items.length === 0 ? (
@@ -652,7 +639,7 @@ function CountdownsTab({ data }: { data: TasksData }) {
       ) : (
         <div className="fx-cd-grid">
           {items.map(({ c, diff, target, years }) => (
-            <button key={c.id} className="card fx-cd-card" style={{ '--c': c.color } as CSSProperties} onClick={() => setEdit(c)}>
+            <button key={c.id} className="fx-cd-card" style={{ '--c': c.color } as CSSProperties} onClick={() => setEdit(c)}>
               <span className="fx-cd-emoji">{c.emoji || '📅'}</span>
               <span className="fx-cd-main">
                 <span className="fx-cd-title ellipsis">{c.title}</span>
@@ -745,7 +732,7 @@ function CountdownModal({ item, onClose }: { item: Countdown | null; onClose: ()
         <div className="modal-actions">
           {item && (
             <button className="btn btn-ghost fx-danger" onClick={() => void remove()}>
-              <Trash2 size={16} /> Удалить
+              <Trash size={16} /> Удалить
             </button>
           )}
           <div className="grow" />

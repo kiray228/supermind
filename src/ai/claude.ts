@@ -1,4 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk';
 import type { Sheet, Topic } from '../types';
 import { useApp } from '../store/appStore';
 import { sheetToMarkdown } from '../io/markdown';
@@ -11,10 +10,17 @@ export const AI_MODELS = [
 
 export class AIError extends Error {}
 
-function client() {
+/** SDK Claude большой — загружается только при первом запросе к ИИ, не при запуске приложения */
+async function client() {
   const { apiKey } = useApp.getState().settings;
   if (!apiKey.trim()) throw new AIError('Добавьте API-ключ Claude в Настройках, чтобы пользоваться ИИ.');
-  return new Anthropic({ apiKey: apiKey.trim(), dangerouslyAllowBrowser: true });
+  let Anthropic: typeof import('@anthropic-ai/sdk').default;
+  try {
+    Anthropic = (await import('@anthropic-ai/sdk')).default;
+  } catch {
+    throw new AIError('Не удалось загрузить модуль ИИ. Проверьте интернет и попробуйте ещё раз.');
+  }
+  return { c: new Anthropic({ apiKey: apiKey.trim(), dangerouslyAllowBrowser: true }), Anthropic };
 }
 
 export interface ChatTurn {
@@ -32,7 +38,7 @@ interface StreamOpts {
 
 /** Потоковый запрос к Claude, возвращает итоговый текст */
 export async function streamText({ system, messages, onText, signal, effort = 'medium' }: StreamOpts): Promise<string> {
-  const c = client();
+  const { c, Anthropic } = await client();
   const model = useApp.getState().settings.model || AI_MODELS[0].id;
   const isHaiku = model.startsWith('claude-haiku');
   const supportsFallback = model === 'claude-opus-5-5' || model === 'claude-sonnet-5-5';

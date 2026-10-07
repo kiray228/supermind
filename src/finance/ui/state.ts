@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { Transaction, TxType } from '../model';
 import type { TxDraft } from '../store';
 
-export type FinTab = 'overview' | 'ops' | 'budget' | 'analytics' | 'more';
+export type FinTab = 'overview' | 'ops' | 'budget' | 'debts' | 'analytics' | 'more';
 export type OpsPeriod = 'all' | 'month' | 'prev' | 'year' | 'custom';
 
 export interface OpsFilter {
@@ -24,10 +24,12 @@ interface FinUi {
   filter: OpsFilter;
   /** раздел внутри «Ещё» */
   more: string;
+  /** окно долга: id — открыть карточку, kind — новый долг */
+  debt: { id?: string; kind?: 'owe' | 'lent'; edit?: boolean } | null;
 }
 
 const TAB_KEY = 'sm-fin-tab';
-const TABS: FinTab[] = ['overview', 'ops', 'budget', 'analytics', 'more'];
+const TABS: FinTab[] = ['overview', 'ops', 'budget', 'debts', 'analytics', 'more'];
 
 function readTab(): FinTab {
   try {
@@ -38,7 +40,7 @@ function readTab(): FinTab {
   }
 }
 
-export const useFinUi = create<FinUi>(() => ({ tab: readTab(), sheet: null, filter: DEFAULT_FILTER, more: '' }));
+export const useFinUi = create<FinUi>(() => ({ tab: readTab(), sheet: null, filter: DEFAULT_FILTER, more: '', debt: null }));
 
 export function setFinTab(tab: FinTab) {
   useFinUi.setState({ tab, ...(tab === 'more' ? { more: '' } : {}) });
@@ -69,4 +71,12 @@ export function setFilter(patch: Partial<OpsFilter>) {
 export function openMore(section: string) {
   setFinTab('more');
   useFinUi.setState({ more: section });
+}
+
+/** Долги: новый (kind) или карточка существующего (id) */
+export function openDebt(opts: { id?: string; kind?: 'owe' | 'lent'; edit?: boolean }) {
+  useFinUi.setState({ debt: opts });
+}
+export function closeDebt() {
+  useFinUi.setState({ debt: null });
 }

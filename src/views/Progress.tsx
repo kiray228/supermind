@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { ChevronDown, Flame, Lock, NotebookPen, ListChecks, Sparkles, Timer, Trophy } from 'lucide-react';
+import { CaretDown, Flame, ListChecks, LockSimple, NotePencil, Sparkle, Timer, Trophy } from '@phosphor-icons/react';
 import { toast, useApp } from '../store/appStore';
 import { addDaysYmd, fromYmd } from '../utils/mapTasks';
 import { plural } from '../tasks/model';
@@ -79,14 +79,14 @@ export default function Progress() {
         <h1 className="grow">Прогресс</h1>
         {p && (
           <span className="pg-total-chip" title="Весь опыт">
-            <Sparkles size={14} /> {fmt(p.total)} XP
+            <Sparkle size={14} weight="fill" /> {fmt(p.total)} XP
           </span>
         )}
       </div>
       <div className="page-body">
         {!p ? (
           <div className="empty">
-            <Sparkles className="spin" size={22} />
+            <Sparkle className="spin" size={22} />
             Считаем опыт…
           </div>
         ) : (
@@ -120,9 +120,8 @@ function Hero({ p, states }: { p: ProgressStats; states: AchievementState[] }) {
   const nextTitle = LEVEL_TITLES.find(([from]) => from > lv.level);
   return (
     <section className="card pg-hero">
-      <div className="pg-hero-glow" aria-hidden />
       <div className="pg-hero-top">
-        <LevelRing pct={lv.pct} size={108} stroke={9}>
+        <LevelRing pct={lv.pct} size={104} stroke={12}>
           <span className="pg-hero-lvl">{lv.level}</span>
           <span className="pg-hero-lvl-cap">уровень</span>
         </LevelRing>
@@ -153,13 +152,13 @@ function Hero({ p, states }: { p: ProgressStats; states: AchievementState[] }) {
         </div>
         <div className={`pg-stat${p.counters.streak ? ' hot' : ''}`}>
           <span className="pg-stat-v">
-            <Flame size={16} /> {p.counters.streak}
+            <Flame size={17} weight="fill" /> {p.counters.streak}
           </span>
           <span className="pg-stat-l">{plural(p.counters.streak, 'день', 'дня', 'дней')} подряд</span>
         </div>
         <div className="pg-stat">
           <span className="pg-stat-v">
-            <Trophy size={15} /> {got}
+            <Trophy size={16} weight="fill" /> {got}
           </span>
           <span className="pg-stat-l">из {states.length} наград</span>
         </div>
@@ -167,7 +166,7 @@ function Hero({ p, states }: { p: ProgressStats; states: AchievementState[] }) {
       {next && (
         <div className="pg-hero-next">
           <span className="pg-hero-next-ic" style={{ '--c': achievementColor(next.a) } as CSSProperties}>
-            <next.a.icon size={15} />
+            <next.a.icon size={17} weight="fill" />
           </span>
           <span className="grow ellipsis">
             Следующая награда: <b>{next.a.title}</b>
@@ -192,13 +191,13 @@ function StartCard() {
       </div>
       <div className="pg-start-btns">
         <button className="btn btn-primary btn-sm" onClick={() => go('tasks')}>
-          <ListChecks size={15} /> Задачи
+          <ListChecks size={16} weight="bold" /> Задачи
         </button>
         <button className="btn btn-sm" onClick={() => go('planner')}>
-          <NotebookPen size={15} /> Ежедневник
+          <NotePencil size={16} weight="bold" /> Ежедневник
         </button>
         <button className="btn btn-sm" onClick={() => go('focus')}>
-          <Timer size={15} /> Фокус
+          <Timer size={16} weight="bold" /> Фокус
         </button>
       </div>
     </section>
@@ -239,7 +238,7 @@ function AreasCard({ p }: { p: ProgressStats }) {
           return (
             <div key={r.id} className={`pg-area${r.xp ? '' : ' zero'}`} style={{ '--c': m.color } as CSSProperties}>
               <span className="pg-area-ic">
-                <m.icon size={16} />
+                <m.icon size={18} weight="fill" />
               </span>
               <div className="pg-area-body">
                 <div className="pg-area-row">
@@ -463,10 +462,10 @@ function AchTile({ s, isNew }: { s: AchievementState; isNew: boolean }) {
     <div className={`pg-ach${s.done ? ' done' : ''} tier-${a.tier}${isNew ? ' new' : ''}`} style={{ '--c': achievementColor(a) } as CSSProperties} title={TIER_LABEL[a.tier]}>
       {isNew && <span className="pg-ach-new">Новое</span>}
       <span className="pg-ach-ic">
-        <Icon size={20} />
+        <Icon size={26} weight={s.done ? 'fill' : 'regular'} />
         {!s.done && (
           <span className="pg-ach-lock">
-            <Lock size={10} />
+            <LockSimple size={10} weight="fill" />
           </span>
         )}
       </span>
@@ -545,7 +544,7 @@ function HowTo({ level }: { level: number }) {
     <section className={`card pg-card pg-howto${open ? ' open' : ''}`}>
       <button className="pg-howto-head" onClick={() => setOpen(!open)} aria-expanded={open}>
         <h3 className="grow">Как получать опыт</h3>
-        <ChevronDown size={18} className="pg-howto-chev" />
+        <CaretDown size={16} weight="bold" className="pg-howto-chev" />
       </button>
       {open && (
         <div className="pg-howto-body">
@@ -560,7 +559,7 @@ function HowTo({ level }: { level: number }) {
                 <div key={g.area} className="pg-rule-group" style={{ '--c': m.color } as CSSProperties}>
                   <div className="pg-rule-title">
                     <span className="pg-area-ic sm">
-                      <m.icon size={13} />
+                      <m.icon size={14} weight="fill" />
                     </span>
                     {m.label}
                   </div>

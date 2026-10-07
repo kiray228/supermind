@@ -1,23 +1,26 @@
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import {
-  Plus, Sparkles, Upload, Search, Star, Trash2, MoreHorizontal, Lock, Copy, Pencil, RotateCcw, Download, Clock, X, Square,
+  Plus, Sparkles, Upload, Search, Star, Trash2, MoreHorizontal, Lock, Copy, Pencil, RotateCcw, Download, Clock, X,
 } from 'lucide-react';
-import type { DocMeta, StructureType } from '../types';
+import type { DocMeta } from '../types';
 import { deleteDoc, listDocs, loadDoc, saveDoc, saveLocked, updateMeta } from '../store/db';
 import { createAndOpen, openDoc } from '../actions';
-import { TEMPLATES, docFromTemplate, docFromMarkdown } from '../templates';
+import { TEMPLATES, docFromTemplate } from '../templates';
 import { StructureIcon } from '../editor/StructureIcon';
 import { askText, askPassword, confirmDialog } from '../ui/dialogs';
 import { decryptDoc, encryptDoc } from '../utils/crypto';
 import { toast, useApp } from '../store/appStore';
 import { pickFile, downloadBlob, safeFilename } from '../io/download';
-import { IMPORT_ACCEPT, importFile, exportNative } from '../io/index';
-import { PROMPTS, streamText, AIError } from '../ai/claude';
+import { IMPORT_ACCEPT } from '../io/common';
 import { uid } from '../utils/tree';
-import { STRUCTURES } from '../editor/Inspector';
 import './home.css';
+import { mark } from '../perf';
 import { IconTile } from '../ui/icons';
 import { PlusCircle } from '@phosphor-icons/react';
+
+// импорт/экспорт (xmind, office…) и ИИ — отдельными модулями, только когда нужны
+const AICreate = lazy(() => import('./HomeAI'));
+const loadIo = () => import('../io/index');
 
 type Tab = 'recent' | 'starred' | 'trash';
 
@@ -30,7 +33,11 @@ export default function Home() {
   const [tplOpen, setTplOpen] = useState(false);
 
   const docsVersion = useApp((s) => s.docsVersion);
-  const refresh = () => listDocs().then(setDocs);
+  const refresh = () =>
+    listDocs().then((d) => {
+      mark('home-docs');
+      setDocs(d);
+    });
   useEffect(() => {
     refresh();
   }, [docsVersion]);
@@ -48,7 +55,7 @@ export default function Home() {
     const f = await pickFile(IMPORT_ACCEPT);
     if (!f) return;
     try {
-      const doc = await importFile(f);
+      const doc = await (await loadIo()).importFile(f);
       await createAndOpen(doc);
       toast('Импортировано: ' + doc.title);
     } catch (e) {
@@ -90,7 +97,7 @@ export default function Home() {
       case 'export': {
         const d = await loadDoc(id);
         if (!d || 'locked' in d) return toast('Зашифрованную карту экспортируйте из редактора');
-        await downloadBlob(exportNative(d), safeFilename(d.title) + '.supermind');
+        await downloadBlob((await loadIo()).exportNative(d), safeFilename(d.title) + '.supermind');
         break;
       }
       case 'trash':
@@ -229,7 +236,11 @@ export default function Home() {
         </div>
       )}
 
-      {aiOpen && <AICreate onClose={() => setAiOpen(false)} />}
+      {aiOpen && (
+        <Suspense fallback={null}>
+          <AICreate onClose={() => setAiOpen(false)} />
+        </Suspense>
+      )}
       {tplOpen && (
         <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && setTplOpen(false)}>
           <div className="modal" style={{ width: 'min(760px,100%)' }}>
@@ -255,78 +266,4 @@ function fmtDate(ts: number) {
   const now = new Date();
   if (d.toDateString() === now.toDateString()) return 'Сегодня, ' + d.toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' });
   return d.toLocaleDateString('ru', { day: 'numeric', month: 'short', year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric' });
-}
-
-function AICreate({ onClose }: { onClose(): void }) {
-  const apiKey = useApp((s) => s.settings.apiKey);
-  const go = useApp((s) => s.go);
-  const [idea, setIdea] = useState('');
-  const [depth, setDepth] = useState<'brief' | 'normal' | 'deep'>('normal');
-  const [structure, setStructure] = useState<StructureType>('map');
-  const [out, setOut] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
-  const [ac, setAc] = useState<AbortController | null>(null);
-
-  const run = async () => {
-    const c = new AbortController();
-    setAc(c);
-    setBusy(true);
-    setErr('');
-    setOut('');
-    try {
-      const p = idea.trim().length > 400 ? PROMPTS.textToMap(idea) : PROMPTS.generate(idea, depth);
-      const text = await streamText({ system: p.system, messages: [{ role: 'user', content: p.user }], onText: setOut, signal: c.signal });
-      const doc = docFromMarkdown(text.replace(/^```[a-z]*\n?/im, '').replace(/```\s*$/m, ''), undefined, structure);
-      doc.sheets[0].themeId = ['classic', 'fire', 'ocean', 'candy', 'forest'][Math.floor(Math.random() * 5)];
-      onClose();
-      await createAndOpen(doc);
-    } catch (e) {
-      setErr(e instanceof AIError ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && !busy && onClose()}>
-      <div className="modal" style={{ width: 'min(560px,100%)' }}>
-        <div className="row">
-          <div className="ai-badge-lg"><Sparkles size={18} /></div>
-          <h2 className="grow">Создать карту с ИИ</h2>
-          <button className="icon-btn" onClick={() => { ac?.abort(); onClose(); }}><X /></button>
-        </div>
-        {!apiKey ? (
-          <div className="col" style={{ marginTop: 14 }}>
-            <p className="muted">Для ИИ нужен ваш API-ключ Claude. Он хранится только на этом устройстве.</p>
-            <button className="btn btn-primary" onClick={() => { onClose(); go('settings'); }}>Перейти в настройки</button>
-          </div>
-        ) : (
-          <>
-            <p className="muted small" style={{ margin: '8px 0 0' }}>Опишите идею одной фразой или вставьте целый текст — статью, конспект, заметки.</p>
-            <textarea className="textarea" rows={4} style={{ marginTop: 12 }} autoFocus placeholder="Например: «Как подготовиться к марафону за 6 месяцев»" value={idea} onChange={(e) => setIdea(e.target.value)} disabled={busy} />
-            <div className="row" style={{ marginTop: 10, flexWrap: 'wrap' }}>
-              <div className="segmented">
-                {(['brief', 'normal', 'deep'] as const).map((d) => (
-                  <button key={d} className={depth === d ? 'active' : ''} onClick={() => setDepth(d)}>{d === 'brief' ? 'Кратко' : d === 'normal' ? 'Стандарт' : 'Подробно'}</button>
-                ))}
-              </div>
-              <select className="select" style={{ width: 'auto', flex: 1 }} value={structure} onChange={(e) => setStructure(e.target.value as StructureType)}>
-                {STRUCTURES.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </div>
-            {(busy || out) && <pre className="ai-preview">{out || 'Думаю…'}</pre>}
-            {err && <div className="ai-err">{err}</div>}
-            <div className="modal-actions">
-              {busy ? (
-                <button className="btn" onClick={() => ac?.abort()}><Square size={14} /> Остановить</button>
-              ) : (
-                <button className="btn btn-primary" disabled={!idea.trim()} onClick={run}><Sparkles size={16} /> Сгенерировать</button>
-              )}
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
 }

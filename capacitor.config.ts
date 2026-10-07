@@ -10,11 +10,13 @@ const config: CapacitorConfig = {
   plugins: {
     LocalNotifications: {
       smallIcon: 'ic_stat_supermind',
-      iconColor: '#FF4A2B',
+      iconColor: '#10B981',
     },
     SplashScreen: {
+      // короткая заставка: дольше держать её нельзя — пока она на экране, первый кадр WebView
+      // (на слабых устройствах — долгий) блокирует окно, и Android показывает «Приложение не отвечает»
       launchShowDuration: 600,
-      backgroundColor: '#ee2a3a',
+      backgroundColor: '#F2F2F7',
       showSpinner: false,
     },
   },

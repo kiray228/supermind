@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, Check, ExternalLink, ListPlus, Loader2, MoreHorizontal, Plus, Sparkles, Square, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowSquareOut, ArrowUp, Check, CircleNotch, DotsThree, ListPlus, Plus, Sparkle, Stop, Trash, X } from '@phosphor-icons/react';
 import { AIError } from '../../ai/claude';
 import { toast } from '../../store/appStore';
 import { confirmDialog } from '../../ui/dialogs';
@@ -96,7 +96,7 @@ export function TaskMini({ goalId, taskId, look }: { goalId: string; taskId: str
   return (
     <div className={'gl-item gl-task' + (closed ? ' is-done' : '')}>
       <button className={'gl-check' + (closed ? ' on' : '')} onClick={() => toggleDone(t.id)} aria-label={closed ? 'Вернуть задачу' : 'Выполнить задачу'}>
-        {closed && <Check size={13} strokeWidth={3} />}
+        {closed && <Check size={13} weight="bold" />}
       </button>
       <button className="gl-task-title grow" onClick={() => openTask(t.id)}>
         <span className="ellipsis">{t.title}</span>
@@ -127,16 +127,16 @@ function StageBlock({ goal, stage, index, look }: { goal: Goal; stage: GoalStage
       <div className="gl-stage-head">
         {simple ? (
           <button className={'gl-check gl-check-lg' + (done ? ' on' : '')} onClick={() => toggleStageDone(goal.id, stage.id)} aria-label="Отметить этап">
-            {done && <Check size={14} strokeWidth={3} />}
+            {done && <Check size={14} weight="bold" />}
           </button>
         ) : (
           <ProgressRing pct={(u.done / u.total) * 100} size={26} stroke={3} color={done ? 'var(--ok)' : undefined}>
-            <span className="gl-stage-num">{done ? <Check size={12} strokeWidth={3} /> : index + 1}</span>
+            <span className="gl-stage-num">{done ? <Check size={12} weight="bold" /> : index + 1}</span>
           </ProgressRing>
         )}
         <InlineText className="gl-stage-title" value={stage.title} onCommit={(t) => updateStage(goal.id, stage.id, { title: t })} />
         <button className={'icon-btn gl-mini-btn' + (menu ? ' active' : '')} onClick={() => setMenu(!menu)} aria-label="Действия с этапом">
-          <MoreHorizontal size={17} />
+          <DotsThree size={17} />
         </button>
       </div>
       <div className="gl-stage-sub">
@@ -162,7 +162,7 @@ function StageBlock({ goal, stage, index, look }: { goal: Goal; stage: GoalStage
             <ListPlus size={14} /> Задача этапа
           </button>
           <button className="btn btn-sm btn-ghost btn-danger" onClick={() => void remove()}>
-            <Trash2 size={14} /> Удалить
+            <Trash size={14} /> Удалить
           </button>
         </div>
       )}
@@ -173,12 +173,12 @@ function StageBlock({ goal, stage, index, look }: { goal: Goal; stage: GoalStage
           return (
             <div key={s.id} className={'gl-item' + (sd ? ' is-done' : '')}>
               <button className={'gl-check' + (sd ? ' on' : '')} onClick={() => toggleStep(goal.id, stage.id, s.id)} aria-label={sd ? 'Снять отметку' : 'Выполнить шаг'}>
-                {sd && <Check size={13} strokeWidth={3} />}
+                {sd && <Check size={13} weight="bold" />}
               </button>
               <InlineText className="grow" value={s.title} done={sd} onCommit={(t) => updateStep(goal.id, stage.id, s.id, { title: t })} />
               {task ? (
                 <button className="icon-btn gl-mini-btn gl-linked" onClick={() => openTask(task.id)} aria-label="Открыть задачу" title={task.date ? 'Задача · ' + dayLabel(task.date) : 'Открыть задачу'}>
-                  <ExternalLink size={15} />
+                  <ArrowSquareOut size={15} />
                 </button>
               ) : (
                 !sd && (
@@ -253,9 +253,9 @@ export function StagesSection({ goal, area, look }: { goal: Goal; area?: LifeAre
         )}
         <div className="grow" />
         <button className={'btn btn-sm gl-ai-btn' + (busy ? ' is-busy' : '')} onClick={() => void runAi()}>
-          {busy ? <Loader2 size={14} className="gl-spin" /> : <Sparkles size={14} />}
+          {busy ? <CircleNotch size={14} className="gl-spin" /> : <Sparkle size={14} />}
           {busy ? (chars ? `Думаю… ${chars}` : 'Думаю…') : 'ИИ: разбить цель на шаги'}
-          {busy && <Square size={11} className="gl-stop" />}
+          {busy && <Stop size={11} className="gl-stop" />}
         </button>
       </div>
       {goal.stages.length === 0 && <div className="small faint gl-sec-empty">Разбейте цель на этапы со своими сроками и шагами — так её проще достичь.</div>}

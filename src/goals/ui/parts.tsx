@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
-import { X } from 'lucide-react';
+import { X } from '@phosphor-icons/react';
 import { useTasks } from '../../tasks/store';
 import { makeTaskLookup, type GoalsData, type LifeArea, type TaskLookup } from '../model';
 

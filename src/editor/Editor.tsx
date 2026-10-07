@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ArrowLeft, Undo2, Redo2, Sparkles, SlidersHorizontal, Search, MoreHorizontal, Plus, CornerDownRight, Trash2, Spline, SquareDashed,
-  Braces, Minus, Maximize, Presentation, Expand, Download, Lock, Unlock, Network, ListTree, CalendarRange, X, ChevronLeft, ChevronRight,
-  Keyboard, Copy, Scissors, ClipboardPaste, FilePlus2, Pencil, ChevronsDownUp, ArrowUpFromLine, CopyPlus, StickyNote, Cloud, Check, Palette, ArrowLeftRight,
-} from 'lucide-react';
+  CaretLeft, ArrowCounterClockwise, ArrowClockwise, Sparkle, SlidersHorizontal, MagnifyingGlass, DotsThree, Plus, ArrowElbowDownRight, Trash, BezierCurve, Selection,
+  BracketsCurly, Minus, CornersOut, PresentationChart, ArrowsOutSimple, DownloadSimple, Lock, LockOpen, Graph, TreeView, ChartBarHorizontal, X, CaretRight,
+  Keyboard, Copy, Scissors, ClipboardText, FilePlus, PencilSimple, ArrowsInLineVertical, ArrowLineUp, CopySimple, NotePencil, CloudArrowUp, Check, Palette, ArrowsLeftRight,
+  Export, CaretDown, type Icon,
+} from '@phosphor-icons/react';
 import { useDoc, topicSide } from '../store/docStore';
 import { toast } from '../store/appStore';
 import { leaveEditor } from '../actions';
@@ -25,6 +26,7 @@ import { exportXmind } from '../io/xmind';
 import { exportDocx, exportPptx, exportXlsx } from '../io/office';
 import { exportNative } from '../io/index';
 import { getTheme } from '../themes';
+import { haptic, isTouchUI, useKeyboardInset } from './touch';
 import './editor.css';
 
 type Mode = 'map' | 'outline' | 'gantt';
@@ -34,14 +36,26 @@ interface Menu {
   x: number;
   y: number;
   items: (MenuItem | 'sep')[];
+  /** заголовок (на телефоне — над списком) */
+  title?: string;
+  /** на телефоне — в одну колонку (короткие списки выбора) */
+  single?: boolean;
 }
 interface MenuItem {
   icon?: React.ReactNode;
   label: string;
   kbd?: string;
   danger?: boolean;
+  /** отмеченный пункт выбора */
+  checked?: boolean;
   onClick(): void;
 }
+
+const MODES: { id: Mode; label: string; icon: Icon }[] = [
+  { id: 'map', label: 'Карта', icon: Graph },
+  { id: 'outline', label: 'Структура', icon: TreeView },
+  { id: 'gantt', label: 'Гант', icon: ChartBarHorizontal },
+];
 
 const isMobile = () => window.matchMedia('(max-width: 760px)').matches;
 
@@ -54,6 +68,7 @@ export default function Editor() {
   const canRedo = useDoc((s) => s.future.length > 0);
   const saving = useDoc((s) => s.saving);
   const password = useDoc((s) => s.password);
+  const editing = useDoc((s) => s.editingId !== null);
   const canvas = useRef<MapCanvasHandle>(null);
 
   const [mode, setMode] = useState<Mode>('map');
@@ -65,7 +80,11 @@ export default function Editor() {
   const [searchIdx, setSearchIdx] = useState(0);
   const [zen, setZen] = useState(false);
   const [pitch, setPitch] = useState<{ slides: string[]; i: number } | null>(null);
-  const [zoom, setZoom] = useState(1);
+  const zoomLabel = useRef<HTMLButtonElement>(null);
+  // процент масштаба обновляется напрямую — без перерисовки всего редактора на каждом кадре щипка
+  const onViewChange = useCallback((v: { k: number }) => {
+    if (zoomLabel.current) zoomLabel.current.textContent = Math.round(v.k * 100) + '%';
+  }, []);
   const [showKeys, setShowKeys] = useState(false);
   const [isMobileView, setIsMobileView] = useState(isMobile);
   useEffect(() => {
@@ -76,6 +95,8 @@ export default function Editor() {
   }, []);
 
   const st = useDoc.getState();
+  // телефон/планшет с пальцем: «+» у темы, упрощённые панели
+  const touchUI = isMobileView && isTouchUI();
 
   // ---------- поиск ----------
   const hits = useMemo(() => {
@@ -130,14 +151,32 @@ export default function Editor() {
     primeKeyboard();
     if (mode !== 'map') setMode('map');
     st.addChild(selId ?? sheet?.root.id);
+    haptic();
   };
   const addSibling = () => {
     primeKeyboard();
     st.addSibling(selId ?? sheet?.root.id);
+    haptic();
+  };
+  /** Удалить темы с отклонением «Отменить» в уведомлении (на телефоне легко промахнуться) */
+  const removeTopics = (ids?: string[]) => {
+    const s = useDoc.getState();
+    const sh = s.sheet();
+    if (!sh) return;
+    const list = (ids ?? s.selection).filter((id) => id !== sh.root.id);
+    if (!list.length) return;
+    const name = findInSheet(sh, list[0])?.topic.text.trim() ?? '';
+    s.deleteTopics(list);
+    haptic(12);
+    const label = list.length > 1 ? `Удалено тем: ${list.length}` : name ? `Удалено: «${name.length > 26 ? name.slice(0, 25) + '…' : name}»` : 'Тема удалена';
+    toast(label, { label: 'Отменить', run: () => useDoc.getState().undo() });
   };
   const del = () => {
-    if (selectedRel) st.removeRelationship(selectedRel);
-    else st.deleteTopics();
+    if (selectedRel) {
+      st.removeRelationship(selectedRel);
+      haptic(12);
+      toast('Связь удалена', { label: 'Отменить', run: () => useDoc.getState().undo() });
+    } else removeTopics();
   };
   const startRel = () => {
     if (!selId) return toast('Сначала выберите тему');
@@ -154,6 +193,22 @@ export default function Editor() {
   const openNote = () => {
     setPanel('inspector');
     setInspTab('topic');
+  };
+
+  const openSearch = () => {
+    primeKeyboard(); // iPhone: клавиатура открывается только из касания
+    setSearch((q) => (q === null ? '' : q));
+  };
+
+  const openModeMenu = (e: React.MouseEvent) => {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setMenu({
+      x: Math.max(8, r.left - 80),
+      y: r.bottom + 6,
+      title: 'Вид',
+      single: true,
+      items: MODES.map((m) => ({ icon: <m.icon size={18} />, label: m.label, checked: mode === m.id, onClick: () => setMode(m.id) })),
+    });
   };
 
   const exportAs = useCallback(
@@ -207,27 +262,46 @@ export default function Editor() {
     toast('Карта зашифрована 🔒');
   };
 
+  const openExportMenu = (x: number, y: number) =>
+    setMenu({
+      x, y,
+      title: 'Экспорт и отправка',
+      items: [
+        { icon: <DownloadSimple size={16} />, label: 'PNG (изображение)', onClick: () => exportAs('png') },
+        { icon: <DownloadSimple size={16} />, label: 'PDF', onClick: () => exportAs('pdf') },
+        { icon: <DownloadSimple size={16} />, label: 'SVG', onClick: () => exportAs('svg') },
+        { icon: <DownloadSimple size={16} />, label: 'Xmind (.xmind)', onClick: () => exportAs('xmind') },
+        { icon: <DownloadSimple size={16} />, label: 'Word (.docx)', onClick: () => exportAs('docx') },
+        { icon: <DownloadSimple size={16} />, label: 'Excel (.xlsx)', onClick: () => exportAs('xlsx') },
+        { icon: <DownloadSimple size={16} />, label: 'PowerPoint (.pptx)', onClick: () => exportAs('pptx') },
+        { icon: <DownloadSimple size={16} />, label: 'Markdown', onClick: () => exportAs('md') },
+        { icon: <DownloadSimple size={16} />, label: 'OPML', onClick: () => exportAs('opml') },
+        { icon: <DownloadSimple size={16} />, label: 'Файл SuperMind', onClick: () => exportAs('native') },
+      ],
+    });
+
   const openMoreMenu = (e: React.MouseEvent) => {
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const x = Math.max(8, Math.min(r.right - 240, window.innerWidth - 256));
+    const y = r.bottom + 6;
     setMenu({
-      x: Math.max(8, Math.min(r.right - 240, window.innerWidth - 256)),
-      y: r.bottom + 6,
+      x, y,
       items: [
-        { icon: <Presentation size={16} />, label: 'Презентация (Pitch)', onClick: startPitch },
-        { icon: <Expand size={16} />, label: 'Режим Zen', kbd: 'Ctrl+E', onClick: () => setZen(true) },
+        // на телефоне часть кнопок верхней панели переехала сюда
+        ...(touchUI
+          ? [
+              { icon: <ArrowClockwise size={16} />, label: 'Повторить', onClick: () => useDoc.getState().redo() },
+              { icon: <MagnifyingGlass size={16} />, label: 'Найти в карте', onClick: openSearch },
+              { icon: <SlidersHorizontal size={16} />, label: 'Формат', onClick: () => setPanel('inspector') },
+              { icon: <FilePlus size={16} />, label: 'Новый лист', onClick: () => st.addSheet() },
+              'sep' as const,
+            ]
+          : []),
+        { icon: <PresentationChart size={16} />, label: 'Презентация', onClick: startPitch },
+        { icon: <ArrowsOutSimple size={16} />, label: 'Режим Zen', kbd: 'Ctrl+E', onClick: () => setZen(true) },
+        { icon: <Export size={16} />, label: 'Экспорт…', onClick: () => openExportMenu(x, y) },
         'sep',
-        { icon: <Download size={16} />, label: 'PNG (изображение)', onClick: () => exportAs('png') },
-        { icon: <Download size={16} />, label: 'PDF', onClick: () => exportAs('pdf') },
-        { icon: <Download size={16} />, label: 'SVG', onClick: () => exportAs('svg') },
-        { icon: <Download size={16} />, label: 'Xmind (.xmind)', onClick: () => exportAs('xmind') },
-        { icon: <Download size={16} />, label: 'Word (.docx)', onClick: () => exportAs('docx') },
-        { icon: <Download size={16} />, label: 'Excel (.xlsx)', onClick: () => exportAs('xlsx') },
-        { icon: <Download size={16} />, label: 'PowerPoint (.pptx)', onClick: () => exportAs('pptx') },
-        { icon: <Download size={16} />, label: 'Markdown', onClick: () => exportAs('md') },
-        { icon: <Download size={16} />, label: 'OPML', onClick: () => exportAs('opml') },
-        { icon: <Download size={16} />, label: 'Файл SuperMind (резервная копия)', onClick: () => exportAs('native') },
-        'sep',
-        { icon: password ? <Unlock size={16} /> : <Lock size={16} />, label: password ? 'Снять пароль' : 'Защитить паролем', onClick: togglePassword },
+        { icon: password ? <LockOpen size={16} /> : <Lock size={16} />, label: password ? 'Снять пароль' : 'Защитить паролем', onClick: togglePassword },
         // на телефоне клавиатурных сокращений нет
         ...(window.matchMedia('(pointer: coarse)').matches ? [] : [{ icon: <Keyboard size={16} />, label: 'Горячие клавиши', onClick: () => setShowKeys(true) }]),
       ],
@@ -240,12 +314,12 @@ export default function Editor() {
       setMenu({
         x, y,
         items: [
-          { icon: <Plus size={16} />, label: 'Плавающая тема', onClick: () => st.addFloating(wx, wy) },
-          { icon: <ClipboardPaste size={16} />, label: 'Вставить в центральную', kbd: 'Ctrl+V', onClick: () => st.paste(sheet.root.id) },
+          { icon: <Plus size={16} />, label: 'Плавающая тема', onClick: () => { primeKeyboard(); st.addFloating(wx, wy); haptic(); } },
+          { icon: <ClipboardText size={16} />, label: 'Вставить в центральную', kbd: 'Ctrl+V', onClick: () => st.paste(sheet.root.id) },
           'sep',
-          { icon: <Maximize size={16} />, label: 'Вписать в экран', kbd: 'Ctrl+0', onClick: () => canvas.current?.fit() },
-          { icon: <ChevronsDownUp size={16} />, label: 'Свернуть все ветви', onClick: () => st.collapseAll(true, 1) },
-          { icon: <Expand size={16} />, label: 'Развернуть всё', onClick: () => st.collapseAll(false) },
+          { icon: <CornersOut size={16} />, label: 'Вписать в экран', kbd: 'Ctrl+0', onClick: () => canvas.current?.fit() },
+          { icon: <ArrowsInLineVertical size={16} />, label: 'Свернуть все ветви', onClick: () => st.collapseAll(true, 1) },
+          { icon: <ArrowsOutSimple size={16} />, label: 'Развернуть всё', onClick: () => st.collapseAll(false) },
         ],
       });
       return;
@@ -255,28 +329,28 @@ export default function Editor() {
     setMenu({
       x, y,
       items: [
-        { icon: <Pencil size={16} />, label: 'Редактировать', kbd: 'F2', onClick: () => { primeKeyboard(); st.setEditing(topicId); } },
-        { icon: <CornerDownRight size={16} />, label: 'Подтема', kbd: 'Tab', onClick: () => { primeKeyboard(); st.addChild(topicId); } },
+        { icon: <PencilSimple size={16} />, label: 'Редактировать', kbd: 'F2', onClick: () => { primeKeyboard(); st.setEditing(topicId); } },
+        { icon: <ArrowElbowDownRight size={16} />, label: 'Подтема', kbd: 'Tab', onClick: () => { primeKeyboard(); st.addChild(topicId); haptic(); } },
         ...(!isRoot && f?.parent ? [
-          { icon: <Plus size={16} />, label: 'Тема рядом', kbd: 'Enter', onClick: () => { primeKeyboard(); st.addSibling(topicId); } },
-          { icon: <ArrowUpFromLine size={16} />, label: 'Родительская тема', kbd: 'Ctrl+Enter', onClick: () => st.addParent(topicId) },
+          { icon: <Plus size={16} />, label: 'Тема рядом', kbd: 'Enter', onClick: () => { primeKeyboard(); st.addSibling(topicId); haptic(); } },
+          { icon: <ArrowLineUp size={16} />, label: 'Родительская тема', kbd: 'Ctrl+Enter', onClick: () => st.addParent(topicId) },
         ] : []),
         'sep',
         ...(f?.parent?.id === sheet.root.id && sheet.structure === 'map'
-          ? [{ icon: <ArrowLeftRight size={16} />, label: topicSide(sheet, topicId) === 'left' ? 'Перенести направо' : 'Перенести налево', onClick: () => st.setSide(topicId, topicSide(sheet, topicId) === 'left' ? 'right' : 'left') }]
+          ? [{ icon: <ArrowsLeftRight size={16} />, label: topicSide(sheet, topicId) === 'left' ? 'Перенести направо' : 'Перенести налево', onClick: () => st.setSide(topicId, topicSide(sheet, topicId) === 'left' ? 'right' : 'left') }]
           : []),
-        { icon: <Spline size={16} />, label: 'Связь', onClick: startRel },
-        { icon: <SquareDashed size={16} />, label: 'Граница', onClick: () => st.addBoundary(topicId) },
-        { icon: <Braces size={16} />, label: 'Итог', onClick: () => st.addSummary(topicId) },
-        { icon: <StickyNote size={16} />, label: 'Заметка, задача…', onClick: openNote },
-        { icon: <Sparkles size={16} />, label: 'ИИ: идеи для темы', onClick: () => setPanel('ai') },
+        { icon: <BezierCurve size={16} />, label: 'Связь', onClick: startRel },
+        { icon: <Selection size={16} />, label: 'Граница', onClick: () => st.addBoundary(topicId) },
+        { icon: <BracketsCurly size={16} />, label: 'Итог', onClick: () => st.addSummary(topicId) },
+        { icon: <NotePencil size={16} />, label: 'Заметка, задача…', onClick: openNote },
+        { icon: <Sparkle size={16} />, label: 'ИИ: идеи для темы', onClick: () => setPanel('ai') },
         'sep',
         { icon: <Copy size={16} />, label: 'Копировать', kbd: 'Ctrl+C', onClick: () => st.copy() },
         ...(!isRoot ? [{ icon: <Scissors size={16} />, label: 'Вырезать', kbd: 'Ctrl+X', onClick: () => st.copy(true) }] : []),
-        { icon: <ClipboardPaste size={16} />, label: 'Вставить', kbd: 'Ctrl+V', onClick: () => st.paste(topicId) },
-        ...(!isRoot && f?.parent ? [{ icon: <CopyPlus size={16} />, label: 'Дублировать', kbd: 'Ctrl+D', onClick: () => st.duplicate(topicId) }] : []),
-        ...(f?.topic.children.length ? [{ icon: <ChevronsDownUp size={16} />, label: f.topic.collapsed ? 'Развернуть' : 'Свернуть', kbd: 'Ctrl+/', onClick: () => st.toggleCollapse(topicId) }] : []),
-        ...(!isRoot ? ['sep' as const, { icon: <Trash2 size={16} />, label: 'Удалить', kbd: 'Del', danger: true, onClick: () => st.deleteTopics([topicId]) }] : []),
+        { icon: <ClipboardText size={16} />, label: 'Вставить', kbd: 'Ctrl+V', onClick: () => st.paste(topicId) },
+        ...(!isRoot && f?.parent ? [{ icon: <CopySimple size={16} />, label: 'Дублировать', kbd: 'Ctrl+D', onClick: () => st.duplicate(topicId) }] : []),
+        ...(f?.topic.children.length ? [{ icon: <ArrowsInLineVertical size={16} />, label: f.topic.collapsed ? 'Развернуть' : 'Свернуть', kbd: 'Ctrl+/', onClick: () => st.toggleCollapse(topicId) }] : []),
+        ...(!isRoot ? ['sep' as const, { icon: <Trash size={16} />, label: 'Удалить', kbd: 'Del', danger: true, onClick: () => removeTopics([topicId]) }] : []),
       ],
     });
   };
@@ -372,7 +446,7 @@ export default function Editor() {
           else s.addSibling(sel, e.shiftKey);
           return;
         case 'Delete':
-        case 'Backspace': e.preventDefault(); s.deleteTopics(); return;
+        case 'Backspace': e.preventDefault(); removeTopics(); return;
         case 'F2':
         case ' ': e.preventDefault(); s.setEditing(sel); return;
         case 'ArrowUp': e.preventDefault(); s.navigate('up'); return;
@@ -430,6 +504,7 @@ export default function Editor() {
   }, [mode]);
 
   if (!doc || !sheet) return null;
+  const showSheets = !touchUI || doc.sheets.length > 1;
   const hasSel = selection.length > 0;
   const showChrome = !zen && !pitch;
   // панели над картой — светлое или тёмное стекло в цвет фона карты (а не темы приложения)
@@ -438,11 +513,11 @@ export default function Editor() {
   const chrome = mode !== 'map' ? '' : isLightColor(canvasBg) ? 'chrome-light' : 'chrome-dark';
 
   return (
-    <div className={`editor ${chrome} ${zen ? 'zen' : ''} ${showChrome && panel ? 'panel-open' : ''}`}>
+    <div className={`editor ${chrome} ${zen ? 'zen' : ''} ${showChrome && panel ? 'panel-open' : ''}${touchUI && editing ? ' touch-editing' : ''}`}>
       {showChrome && (
         <header className="ed-top glass">
-          <button className="icon-btn" onClick={() => leaveEditor('home')} title="К списку карт">
-            <ArrowLeft />
+          <button className="icon-btn ed-back" onClick={() => leaveEditor('home')} title="К списку карт" aria-label="К списку карт">
+            <CaretLeft weight="bold" />
           </button>
           <input
             className="ed-title"
@@ -453,27 +528,45 @@ export default function Editor() {
           />
           <span className="ed-save" title={saving ? 'Сохранение…' : 'Сохранено на устройстве'}>
             {password && <Lock size={13} />}
-            {saving ? <Cloud size={15} className="faint" /> : <Check size={15} className="faint" />}
+            {saving ? <CloudArrowUp size={15} className="faint" /> : <Check size={15} className="faint" />}
           </span>
           <div className="grow" />
-          <div className="segmented ed-modes">
-            <button className={mode === 'map' ? 'active' : ''} onClick={() => setMode('map')} title="Карта"><Network size={15} /><span>Карта</span></button>
-            <button className={mode === 'outline' ? 'active' : ''} onClick={() => setMode('outline')} title="Структура"><ListTree size={15} /><span>Структура</span></button>
-            <button className={mode === 'gantt' ? 'active' : ''} onClick={() => setMode('gantt')} title="Гант"><CalendarRange size={15} /><span>Гант</span></button>
-          </div>
-          <div className="grow hide-mobile" />
-          <button className="icon-btn hide-mobile" onClick={() => st.undo()} disabled={!canUndo} title="Отменить (Ctrl+Z)"><Undo2 /></button>
-          <button className="icon-btn hide-mobile" onClick={() => st.redo()} disabled={!canRedo} title="Повторить (Ctrl+Shift+Z)"><Redo2 /></button>
-          <button className={`icon-btn ${search !== null ? 'active' : ''}`} onClick={() => setSearch(search === null ? '' : null)} title="Поиск (Ctrl+F)"><Search /></button>
-          <button className={`icon-btn ai-btn ${panel === 'ai' ? 'active' : ''}`} onClick={() => setPanel(panel === 'ai' ? null : 'ai')} title="ИИ"><Sparkles /></button>
-          <button className={`icon-btn ${panel === 'inspector' ? 'active' : ''}`} onClick={() => setPanel(panel === 'inspector' ? null : 'inspector')} title="Формат"><SlidersHorizontal /></button>
-          <button className="icon-btn" onClick={openMoreMenu} title="Ещё"><MoreHorizontal /></button>
+          {touchUI ? (
+            <>
+              {/* телефон: вид — одной кнопкой с меню, остальное — в «Ещё» и нижней панели */}
+              <button className="icon-btn ed-mode-btn" onClick={openModeMenu} title="Вид" aria-label={'Вид: ' + MODES.find((m) => m.id === mode)!.label}>
+                <CurrentModeIcon mode={mode} />
+                <CaretDown className="ed-mode-caret" weight="bold" />
+              </button>
+              <button className="icon-btn" onClick={() => st.undo()} disabled={!canUndo} title="Отменить" aria-label="Отменить"><ArrowCounterClockwise /></button>
+              <button className={`icon-btn ai-btn ${panel === 'ai' ? 'active' : ''}`} onClick={() => setPanel(panel === 'ai' ? null : 'ai')} title="ИИ" aria-label="ИИ-помощник"><Sparkle weight={panel === 'ai' ? 'fill' : 'duotone'} /></button>
+              <button className="icon-btn" onClick={openMoreMenu} title="Ещё" aria-label="Ещё"><DotsThree weight="bold" /></button>
+            </>
+          ) : (
+            <>
+              <div className="segmented ed-modes">
+                {MODES.map((m) => (
+                  <button key={m.id} className={mode === m.id ? 'active' : ''} onClick={() => setMode(m.id)} title={m.label}>
+                    <m.icon size={16} weight={mode === m.id ? 'fill' : 'regular'} />
+                    <span>{m.label}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="grow hide-mobile" />
+              <button className="icon-btn" onClick={() => st.undo()} disabled={!canUndo} title="Отменить (Ctrl+Z)"><ArrowCounterClockwise /></button>
+              <button className="icon-btn hide-xs" onClick={() => st.redo()} disabled={!canRedo} title="Повторить (Ctrl+Shift+Z)"><ArrowClockwise /></button>
+              <button className={`icon-btn ${search !== null ? 'active' : ''}`} onClick={() => setSearch(search === null ? '' : null)} title="Поиск (Ctrl+F)"><MagnifyingGlass weight={search !== null ? 'bold' : 'regular'} /></button>
+              <button className={`icon-btn ai-btn ${panel === 'ai' ? 'active' : ''}`} onClick={() => setPanel(panel === 'ai' ? null : 'ai')} title="ИИ"><Sparkle weight={panel === 'ai' ? 'fill' : 'duotone'} /></button>
+              <button className={`icon-btn ${panel === 'inspector' ? 'active' : ''}`} onClick={() => setPanel(panel === 'inspector' ? null : 'inspector')} title="Формат"><SlidersHorizontal weight={panel === 'inspector' ? 'fill' : 'regular'} /></button>
+              <button className="icon-btn" onClick={openMoreMenu} title="Ещё"><DotsThree weight="bold" /></button>
+            </>
+          )}
         </header>
       )}
 
       {search !== null && showChrome && (
         <div className="ed-search glass">
-          <Search size={16} className="faint" />
+          <MagnifyingGlass size={16} className="faint" />
           <input
             autoFocus
             className="grow"
@@ -486,8 +579,8 @@ export default function Editor() {
             }}
           />
           <span className="tiny muted">{hits.length ? `${searchIdx + 1}/${hits.length}` : search ? '0' : ''}</span>
-          <button className="icon-btn" onClick={() => gotoHit(searchIdx - 1)}><ChevronLeft size={18} /></button>
-          <button className="icon-btn" onClick={() => gotoHit(searchIdx + 1)}><ChevronRight size={18} /></button>
+          <button className="icon-btn" onClick={() => gotoHit(searchIdx - 1)}><CaretLeft size={18} /></button>
+          <button className="icon-btn" onClick={() => gotoHit(searchIdx + 1)}><CaretRight size={18} /></button>
           <button className="icon-btn" onClick={() => setSearch(null)}><X size={18} /></button>
         </div>
       )}
@@ -506,24 +599,62 @@ export default function Editor() {
               pitchFocus={pitchFocus}
               readOnly={!!pitch}
               searchHits={hitSet}
-              onViewChange={(v) => setZoom(v.k)}
+              onViewChange={onViewChange}
             />
           )}
           {mode === 'outline' && <Outliner />}
           {mode === 'gantt' && <Gantt />}
 
-          {mode === 'map' && showChrome && (
+          {mode === 'map' && showChrome && touchUI && (
+            <div className="ed-toolbar glass">
+              {relMode ? (
+                <button className="tb-btn active wide" onClick={() => setRelMode(false)} title="Отменить создание связи"><BezierCurve weight="fill" /><span>Нажмите на тему · Отмена</span></button>
+              ) : hasSel ? (
+                <>
+                  {/* «Подтема» и «Рядом» — на плавающей панели у самой темы */}
+                  <button className="tb-btn" onClick={() => { if (!selId) return; primeKeyboard(); st.setEditing(selId); }} title="Изменить текст"><PencilSimple /><span>Текст</span></button>
+                  <button className="tb-btn" onClick={() => { setInspTab('style'); setPanel('inspector'); }} title="Стиль темы"><Palette /><span>Стиль</span></button>
+                  <button className="tb-btn" onClick={() => { setInspTab('topic'); setPanel('inspector'); }} title="Заметка, задача, метки"><NotePencil /><span>Заметка</span></button>
+                  <button className="tb-btn danger" onClick={del} disabled={!selection.some((id) => id !== sheet.root.id)} title="Удалить"><Trash /><span>Удалить</span></button>
+                  <button
+                    className="tb-btn"
+                    onClick={(e) => {
+                      const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                      if (selId) topicMenu(r.left, r.top, selId, 0, 0);
+                    }}
+                    title="Ещё действия"
+                  >
+                    <DotsThree weight="bold" /><span>Ещё</span>
+                  </button>
+                </>
+              ) : selectedRel ? (
+                <>
+                  <button className="tb-btn" onClick={() => setPanel('inspector')} title="Подпись, цвет, изгиб"><BezierCurve /><span>Связь</span></button>
+                  <button className="tb-btn danger" onClick={del} title="Удалить связь"><Trash /><span>Удалить</span></button>
+                </>
+              ) : (
+                <>
+                  <button className="tb-btn" onClick={addChild} title="Новая основная тема"><Plus /><span>Тема</span></button>
+                  <button className="tb-btn" onClick={() => { setInspTab('map'); setPanel('inspector'); }} title="Структура, тема оформления, формы"><Palette /><span>Оформл.</span></button>
+                  <button className="tb-btn" onClick={openSearch} title="Найти в карте"><MagnifyingGlass /><span>Поиск</span></button>
+                  <button className="tb-btn" onClick={() => canvas.current?.fit()} title="Вписать в экран"><CornersOut /><span>Вписать</span></button>
+                </>
+              )}
+            </div>
+          )}
+
+          {mode === 'map' && showChrome && !touchUI && (
             <div className="ed-toolbar glass">
               {hasSel || selectedRel || !isMobileView ? (
                 <>
-                  <button className="tb-btn" onClick={addChild} title="Подтема (Tab)"><CornerDownRight /><span>Подтема</span></button>
+                  <button className="tb-btn" onClick={addChild} title="Подтема (Tab)"><ArrowElbowDownRight /><span>Подтема</span></button>
                   <button className="tb-btn" onClick={addSibling} disabled={!hasSel} title="Тема рядом (Enter)"><Plus /><span>Рядом</span></button>
-                  <button className="tb-btn" onClick={() => { if (!selId) return; primeKeyboard(); st.setEditing(selId); }} disabled={!hasSel} title="Изменить текст (F2)"><Pencil /><span>Текст</span></button>
+                  <button className="tb-btn" onClick={() => { if (!selId) return; primeKeyboard(); st.setEditing(selId); }} disabled={!hasSel} title="Изменить текст (F2)"><PencilSimple /><span>Текст</span></button>
                   <button className="tb-btn" onClick={() => { setInspTab('style'); setPanel('inspector'); }} disabled={!hasSel} title="Стиль темы: форма, цвет, шрифт"><Palette /><span>Стиль</span></button>
-                  <button className={`tb-btn ${relMode ? 'active' : ''}`} onClick={() => (relMode ? setRelMode(false) : startRel())} title="Связь"><Spline /><span>Связь</span></button>
-                  <button className="tb-btn hide-xs" onClick={() => st.addBoundary()} disabled={!hasSel} title="Граница"><SquareDashed /><span>Граница</span></button>
-                  <button className="tb-btn hide-xs" onClick={() => st.addSummary()} disabled={!hasSel} title="Итог"><Braces /><span>Итог</span></button>
-                  <button className="tb-btn" onClick={del} disabled={!selection.some((id) => id !== sheet.root.id) && !selectedRel} title="Удалить (Del)"><Trash2 /><span>Удалить</span></button>
+                  <button className={`tb-btn ${relMode ? 'active' : ''}`} onClick={() => (relMode ? setRelMode(false) : startRel())} title="Связь"><BezierCurve weight={relMode ? 'fill' : 'regular'} /><span>Связь</span></button>
+                  <button className="tb-btn hide-xs" onClick={() => st.addBoundary()} disabled={!hasSel} title="Граница"><Selection /><span>Граница</span></button>
+                  <button className="tb-btn hide-xs" onClick={() => st.addSummary()} disabled={!hasSel} title="Итог"><BracketsCurly /><span>Итог</span></button>
+                  <button className="tb-btn" onClick={del} disabled={!selection.some((id) => id !== sheet.root.id) && !selectedRel} title="Удалить (Del)"><Trash /><span>Удалить</span></button>
                 </>
               ) : (
                 <>
@@ -532,18 +663,18 @@ export default function Editor() {
                 </>
               )}
               <span className="tb-sep hide-mobile" />
-              <button className="tb-btn show-mobile" onClick={() => st.undo()} disabled={!canUndo}><Undo2 /><span>Отмена</span></button>
+              <button className="tb-btn show-mobile" onClick={() => st.undo()} disabled={!canUndo}><ArrowCounterClockwise /><span>Отмена</span></button>
               {!hasSel && (
-                <button className="tb-btn show-mobile" onClick={() => st.redo()} disabled={!canRedo}><Redo2 /><span>Повтор</span></button>
+                <button className="tb-btn show-mobile" onClick={() => st.redo()} disabled={!canRedo}><ArrowClockwise /><span>Повтор</span></button>
               )}
               <button className="tb-btn hide-mobile" onClick={() => canvas.current?.zoomBy(1 / 1.2)} title="Уменьшить"><Minus /></button>
-              <button className="tb-zoom hide-mobile" onClick={() => canvas.current?.setZoom(1)} title="100%">{Math.round(zoom * 100)}%</button>
+              <button ref={zoomLabel} className="tb-zoom hide-mobile" onClick={() => canvas.current?.setZoom(1)} title="100%">100%</button>
               <button className="tb-btn hide-mobile" onClick={() => canvas.current?.zoomBy(1.2)} title="Увеличить"><Plus /></button>
-              <button className={`tb-btn ${hasSel && isMobileView ? 'hide-xs' : ''}`} onClick={() => canvas.current?.fit()} title="Вписать (Ctrl+0)"><Maximize /><span className="show-mobile-inline">Вписать</span></button>
+              <button className={`tb-btn ${hasSel && isMobileView ? 'hide-xs' : ''}`} onClick={() => canvas.current?.fit()} title="Вписать (Ctrl+0)"><CornersOut /><span className="show-mobile-inline">Вписать</span></button>
             </div>
           )}
 
-          {showChrome && (
+          {showChrome && showSheets && (
             <div className={`ed-sheets${mode !== 'map' ? ' not-map' : ''}`}>
               {doc.sheets.map((s) => (
                 <button
@@ -555,9 +686,9 @@ export default function Editor() {
                     setMenu({
                       x: e.clientX, y: e.clientY - 150,
                       items: [
-                        { icon: <Pencil size={16} />, label: 'Переименовать', onClick: async () => { const t = await askText('Название листа', { value: s.title }); if (t) { st.setActiveSheet(s.id); st.setSheetProps({ title: t }); } } },
-                        { icon: <CopyPlus size={16} />, label: 'Дублировать', onClick: () => st.duplicateSheet(s.id) },
-                        ...(doc.sheets.length > 1 ? [{ icon: <Trash2 size={16} />, label: 'Удалить лист', danger: true, onClick: async () => { if (await confirmDialog('Удалить лист?', s.title, { danger: true, okText: 'Удалить' })) st.removeSheet(s.id); } }] : []),
+                        { icon: <PencilSimple size={16} />, label: 'Переименовать', onClick: async () => { const t = await askText('Название листа', { value: s.title }); if (t) { st.setActiveSheet(s.id); st.setSheetProps({ title: t }); } } },
+                        { icon: <CopySimple size={16} />, label: 'Дублировать', onClick: () => st.duplicateSheet(s.id) },
+                        ...(doc.sheets.length > 1 ? [{ icon: <Trash size={16} />, label: 'Удалить лист', danger: true, onClick: async () => { if (await confirmDialog('Удалить лист?', s.title, { danger: true, okText: 'Удалить' })) st.removeSheet(s.id); } }] : []),
                       ],
                     });
                   }}
@@ -570,7 +701,7 @@ export default function Editor() {
                   {s.title}
                 </button>
               ))}
-              <button className="sheet-tab add" onClick={() => st.addSheet()} title="Новый лист"><FilePlus2 size={15} /></button>
+              <button className="sheet-tab add" onClick={() => st.addSheet()} title="Новый лист"><FilePlus size={15} /></button>
             </div>
           )}
 
@@ -582,9 +713,9 @@ export default function Editor() {
 
           {pitch && (
             <div className="pitch-bar glass">
-              <button className="icon-btn" onClick={() => setPitch((p) => (p && p.i > 0 ? { ...p, i: p.i - 1 } : p))} disabled={pitch.i === 0}><ChevronLeft /></button>
+              <button className="icon-btn" onClick={() => setPitch((p) => (p && p.i > 0 ? { ...p, i: p.i - 1 } : p))} disabled={pitch.i === 0}><CaretLeft /></button>
               <span className="small bold">{pitch.i + 1} / {pitch.slides.length}</span>
-              <button className="icon-btn" onClick={() => setPitch((p) => (p && p.i < p.slides.length - 1 ? { ...p, i: p.i + 1 } : p))} disabled={pitch.i >= pitch.slides.length - 1}><ChevronRight /></button>
+              <button className="icon-btn" onClick={() => setPitch((p) => (p && p.i < p.slides.length - 1 ? { ...p, i: p.i + 1 } : p))} disabled={pitch.i >= pitch.slides.length - 1}><CaretRight /></button>
               <button className="icon-btn" onClick={endPitch}><X /></button>
             </div>
           )}
@@ -599,15 +730,10 @@ export default function Editor() {
           )}
         </div>
 
-        {showChrome && panel === 'inspector' && (
-          <div className="ed-panel">
-            <Inspector tab={inspTab} setTab={setInspTab} onClose={() => setPanel(null)} />
-          </div>
-        )}
-        {showChrome && panel === 'ai' && (
-          <div className="ed-panel">
-            <AIPanel onClose={() => setPanel(null)} />
-          </div>
+        {showChrome && panel && (
+          <PanelSheet key={panel} mobile={isMobileView} onClose={() => setPanel(null)}>
+            {panel === 'inspector' ? <Inspector tab={inspTab} setTab={setInspTab} onClose={() => setPanel(null)} /> : <AIPanel onClose={() => setPanel(null)} />}
+          </PanelSheet>
         )}
       </div>
 
@@ -634,23 +760,94 @@ function ContextMenu({ menu, onClose }: { menu: Menu; onClose(): void }) {
     <div className={`menu-layer${sheet ? ' menu-sheet-layer' : ''}`} onPointerDown={onClose} onContextMenu={(e) => { e.preventDefault(); onClose(); }}>
       <div
         ref={ref}
-        className={`menu${sheet ? ' menu-sheet' : ''}`}
+        role="menu"
+        className={`menu${sheet ? ' menu-sheet' : ''}${menu.single ? ' single' : ''}`}
         style={sheet ? undefined : { left: pos.x, top: pos.y, maxHeight: 'calc(100vh - 16px)', overflow: 'auto' }}
         onPointerDown={(e) => e.stopPropagation()}
       >
         {sheet && <div className="menu-sheet-grip" />}
+        {menu.title && <div className="menu-title">{menu.title}</div>}
         {menu.items.map((it, i) =>
           it === 'sep' ? (
             <div key={i} className="sep" />
           ) : (
-            <button key={i} style={it.danger ? { color: 'var(--danger)' } : undefined} onClick={() => { onClose(); it.onClick(); }}>
+            <button key={i} role="menuitem" className={it.checked ? 'checked' : undefined} style={it.danger ? { color: 'var(--danger)' } : undefined} onClick={() => { onClose(); it.onClick(); }}>
               {it.icon}
               {it.label}
               {it.kbd && <span className="kbd">{it.kbd}</span>}
+              {it.checked && <Check className="menu-check" weight="bold" />}
             </button>
           ),
         )}
       </div>
+    </div>
+  );
+}
+
+function CurrentModeIcon({ mode }: { mode: Mode }) {
+  const M = MODES.find((m) => m.id === mode)!.icon;
+  return <M />;
+}
+
+/**
+ * Панель «Формат»/«ИИ». На компьютере — колонка справа, на телефоне — лист iOS снизу
+ * с двумя положениями (половина экрана / почти весь экран): тянется за «ручку» или заголовок,
+ * смахивание вниз закрывает. Над экранной клавиатурой поднимается целиком.
+ */
+function PanelSheet({ mobile, onClose, children }: { mobile: boolean; onClose(): void; children: React.ReactNode }) {
+  const [detent, setDetent] = useState<'medium' | 'large'>('medium');
+  const [dragH, setDragH] = useState<number | null>(null);
+  const { inset, height: vh } = useKeyboardInset();
+  const start = useRef<{ y: number; h: number; t: number; grip: boolean } | null>(null);
+  if (!mobile) return <div className="ed-panel">{children}</div>;
+  const medium = Math.round(Math.max(320, vh * 0.52));
+  const large = Math.max(medium, vh - 54);
+  const h = dragH ?? (detent === 'large' || inset > 0 ? large : medium);
+  const onDown = (e: React.PointerEvent) => {
+    const t = e.target as HTMLElement;
+    if (!t.closest('.sheet-grabber, .inspector-head') || t.closest('button, input, select, textarea, a, label')) return;
+    start.current = { y: e.clientY, h, t: performance.now(), grip: !!t.closest('.sheet-grabber') };
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+  };
+  const onMove = (e: React.PointerEvent) => {
+    const s = start.current;
+    if (!s) return;
+    const next = s.h - (e.clientY - s.y);
+    // выше верхнего положения — с «резиновым» сопротивлением
+    setDragH(next > large ? large + (next - large) * 0.25 : Math.max(60, next));
+  };
+  const onUp = (e: React.PointerEvent) => {
+    const s = start.current;
+    if (!s) return;
+    start.current = null;
+    setDragH(null);
+    const dy = e.clientY - s.y;
+    if (Math.abs(dy) < 5) {
+      if (s.grip) setDetent((d) => (d === 'medium' ? 'large' : 'medium'));
+      return;
+    }
+    const v = dy / Math.max(1, performance.now() - s.t); // px/мс, вниз > 0
+    const endH = s.h - dy;
+    if (endH < medium * 0.62 || (v > 0.9 && s.h <= medium + 4)) return onClose();
+    if (v < -0.5) setDetent('large');
+    else if (v > 0.5) setDetent('medium');
+    else setDetent(Math.abs(endH - large) < Math.abs(endH - medium) ? 'large' : 'medium');
+  };
+  return (
+    <div
+      className={`ed-panel ed-sheet${dragH !== null ? ' dragging' : ''}`}
+      style={{ height: h, bottom: inset }}
+      onPointerDown={onDown}
+      onPointerMove={onMove}
+      onPointerUp={onUp}
+      onPointerCancel={onUp}
+    >
+      <div className="sheet-grabber" aria-hidden="true"><span /></div>
+      {children}
     </div>
   );
 }

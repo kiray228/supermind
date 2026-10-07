@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import {
-  Sparkles, X, Lightbulb, ListChecks, BookOpen, Wand2, Languages, FileText, ScrollText, Send, Square, MessageCircle, ArrowLeft, Plus, Replace,
-} from 'lucide-react';
+  Sparkle, X, Lightbulb, ListChecks, BookOpen, MagicWand, Translate, FileText, Scroll, PaperPlaneRight, Stop, ChatCircle, CaretLeft, Plus, Swap,
+} from '@phosphor-icons/react';
 import { useDoc } from '../store/docStore';
 import { useApp, toast } from '../store/appStore';
 import { leaveEditor } from '../actions';
@@ -140,14 +140,14 @@ export function AIPanel({ onClose }: { onClose(): void }) {
     <div className="inspector-head">
       {mode !== 'menu' ? (
         <button className="icon-btn" onClick={() => { stop(); setMode('menu'); setRun(null); }} title="Назад">
-          <ArrowLeft />
+          <CaretLeft />
         </button>
       ) : (
-        <div className="ai-badge"><Sparkles size={16} /></div>
+        <div className="ai-badge"><Sparkle size={17} weight="fill" /></div>
       )}
       <div className="bold grow">{mode === 'chat' ? 'Чат с картой' : mode === 'run' ? run?.title : 'ИИ-помощник'}</div>
       <button className="icon-btn" onClick={() => { stop(); onClose(); }} title="Закрыть">
-        <X />
+        <X weight="bold" />
       </button>
     </div>
   );
@@ -158,7 +158,7 @@ export function AIPanel({ onClose }: { onClose(): void }) {
         {header}
         <div className="inspector-body">
           <div className="empty" style={{ color: 'var(--text-2)' }}>
-            <Sparkles size={34} color="var(--accent)" />
+            <Sparkle size={34} color="var(--accent)" />
             <div className="bold">Подключите ИИ</div>
             <div className="small">Все ИИ-функции работают через Claude. Добавьте свой API-ключ в настройках — он хранится только на этом устройстве.</div>
             <button className="btn btn-primary" style={{ marginTop: 8 }} onClick={() => leaveEditor('settings')}>Открыть настройки</button>
@@ -178,24 +178,24 @@ export function AIPanel({ onClose }: { onClose(): void }) {
               Тема: <b>{sel.text || 'Без названия'}</b>
             </div>
             <input className="input" placeholder="Пожелание (необязательно)" value={extra} onChange={(e) => setExtra(e.target.value)} />
-            <AIAction icon={<Lightbulb />} title="Мозговой штурм" desc="Новые идеи-подтемы для выбранной темы" onClick={() => start('Мозговой штурм', 'children', PROMPTS.expand(sheet, selPath, sel.children.map((c) => c.text), extra), sel.id, 'low')} />
-            <AIAction icon={<ListChecks />} title="Разбить на задачи" desc="План действий с чекбоксами" onClick={() => start('Разбить на задачи', 'children', PROMPTS.tasks(sheet, selPath), sel.id, 'low')} />
-            <AIAction icon={<BookOpen />} title="Объяснить тему" desc="Подробное пояснение в заметку" onClick={() => start('Объяснение', 'note', PROMPTS.explain(sheet, selPath), sel.id, 'low')} />
-            <AIAction icon={<Wand2 />} title="Улучшить формулировки" desc="Чётче и короче — для выбранной ветви" onClick={() => transform('Улучшение текста', 'Сделай формулировки чётче, короче и единообразнее, исправь ошибки. Смысл не меняй.' + (extra ? ' ' + extra : ''), 'selection')} />
+            <AIAction icon={<Lightbulb weight="duotone" />} title="Мозговой штурм" desc="Новые идеи-подтемы для выбранной темы" onClick={() => start('Мозговой штурм', 'children', PROMPTS.expand(sheet, selPath, sel.children.map((c) => c.text), extra), sel.id, 'low')} />
+            <AIAction icon={<ListChecks weight="duotone" />} title="Разбить на задачи" desc="План действий с чекбоксами" onClick={() => start('Разбить на задачи', 'children', PROMPTS.tasks(sheet, selPath), sel.id, 'low')} />
+            <AIAction icon={<BookOpen weight="duotone" />} title="Объяснить тему" desc="Подробное пояснение в заметку" onClick={() => start('Объяснение', 'note', PROMPTS.explain(sheet, selPath), sel.id, 'low')} />
+            <AIAction icon={<MagicWand weight="duotone" />} title="Улучшить формулировки" desc="Чётче и короче — для выбранной ветви" onClick={() => transform('Улучшение текста', 'Сделай формулировки чётче, короче и единообразнее, исправь ошибки. Смысл не меняй.' + (extra ? ' ' + extra : ''), 'selection')} />
             <AIAction
-              icon={<Languages />}
+              icon={<Translate weight="duotone" />}
               title="Перевести карту"
               desc={`На язык: ${extra || 'английский'} (укажите в пожелании)`}
               onClick={() => transform('Перевод', `Переведи на ${extra || 'английский'} язык.`, 'all')}
             />
-            <AIAction icon={<ScrollText />} title="Резюме карты" desc="Краткий пересказ и выводы" onClick={() => start('Резюме карты', 'summary', PROMPTS.summarize(sheet))} />
-            <AIAction icon={<MessageCircle />} title="Чат с картой" desc="Вопросы, идеи, обсуждение" onClick={() => setMode('chat')} />
+            <AIAction icon={<Scroll weight="duotone" />} title="Резюме карты" desc="Краткий пересказ и выводы" onClick={() => start('Резюме карты', 'summary', PROMPTS.summarize(sheet))} />
+            <AIAction icon={<ChatCircle weight="duotone" />} title="Чат с картой" desc="Вопросы, идеи, обсуждение" onClick={() => setMode('chat')} />
             <div className="divider" />
             <label className="label"><FileText size={12} /> Текст → карта / Идея → карта</label>
             <textarea className="textarea" rows={4} placeholder="Вставьте статью, конспект или опишите идею: «План запуска кофейни»" value={bigText} onChange={(e) => setBigText(e.target.value)} />
             <div className="row">
               <button className="btn btn-sm grow" disabled={!bigText.trim()} onClick={() => start('Идея → карта', 'replace', PROMPTS.generate(bigText, 'normal'))}>
-                <Sparkles size={14} /> Сгенерировать
+                <Sparkle size={14} /> Сгенерировать
               </button>
               <button className="btn btn-sm grow" disabled={bigText.trim().length < 40} onClick={() => start('Текст → карта', 'replace', PROMPTS.textToMap(bigText))}>
                 <FileText size={14} /> Из текста
@@ -212,13 +212,13 @@ export function AIPanel({ onClose }: { onClose(): void }) {
               <pre className="ai-output">{run.text || (run.busy ? 'Думаю…' : '')}</pre>
             )}
             {run.busy ? (
-              <button className="btn" onClick={stop}><Square size={14} /> Остановить</button>
+              <button className="btn" onClick={stop}><Stop size={14} /> Остановить</button>
             ) : !run.error && run.kind !== 'info' ? (
               <div className="col">
                 {run.kind === 'replace' ? (
                   <>
                     <button className="btn btn-primary" onClick={() => apply('newSheet')}><Plus size={16} /> На новый лист</button>
-                    <button className="btn" onClick={() => apply()}><Replace size={16} /> Заменить текущую карту</button>
+                    <button className="btn" onClick={() => apply()}><Swap size={16} /> Заменить текущую карту</button>
                   </>
                 ) : (
                   <button className="btn btn-primary" onClick={() => apply()}>
@@ -272,9 +272,9 @@ export function AIPanel({ onClose }: { onClose(): void }) {
                 }}
               />
               {chatBusy ? (
-                <button className="icon-btn" onClick={stop}><Square /></button>
+                <button className="icon-btn" onClick={stop}><Stop /></button>
               ) : (
-                <button className="icon-btn active" onClick={sendChat}><Send /></button>
+                <button className="icon-btn active" onClick={sendChat}><PaperPlaneRight /></button>
               )}
             </div>
           </div>

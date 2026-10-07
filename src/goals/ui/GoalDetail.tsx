@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { Archive, CheckCircle2, Link2, Minus, Pause, Pencil, Play, Plus, Quote, RotateCcw, Search, Trash2 } from 'lucide-react';
+import { Archive, ArrowCounterClockwise, CheckCircle, LinkSimple, MagnifyingGlass, Minus, Pause, PencilSimple, Play, Plus, Quotes, Trash } from '@phosphor-icons/react';
 import { confirmDialog } from '../../ui/dialogs';
 import { dayLabel, isActive } from '../../tasks/model';
 import { useTasks } from '../../tasks/store';
@@ -73,7 +73,7 @@ export function GoalDetail({ data, goal, onClose, onEdit }: { data: GoalsData; g
       <Sheet onClose={onClose} className="gl-detail" head={head}>
         {goal.why && (
           <div className="gl-why" style={{ '--c': color } as CSSProperties}>
-            <Quote size={16} />
+            <Quotes size={16} />
             <div>
               <div className="tiny faint">Зачем мне это</div>
               <div className="gl-why-text">{goal.why}</div>
@@ -117,7 +117,7 @@ export function GoalDetail({ data, goal, onClose, onEdit }: { data: GoalsData; g
             <h3>Задачи</h3>
             <div className="grow" />
             <button className="btn btn-sm btn-ghost" onClick={() => setPicker(true)}>
-              <Link2 size={14} /> Привязать
+              <LinkSimple size={14} /> Привязать
             </button>
           </div>
           {goal.taskIds.length === 0 && <div className="small faint gl-sec-empty">Задачи появятся в разделе «Задачи» с тегом #цель.</div>}
@@ -142,7 +142,7 @@ export function GoalDetail({ data, goal, onClose, onEdit }: { data: GoalsData; g
           {goal.status === 'active' && (
             <>
               <button className="btn btn-primary gl-complete-btn" onClick={() => setGoalStatus(goal.id, 'done')}>
-                <CheckCircle2 size={17} /> Цель достигнута
+                <CheckCircle size={17} /> Цель достигнута
               </button>
               <button className="btn" onClick={() => setGoalStatus(goal.id, 'paused')}>
                 <Pause size={16} /> Отложить
@@ -156,7 +156,7 @@ export function GoalDetail({ data, goal, onClose, onEdit }: { data: GoalsData; g
           )}
           {(goal.status === 'done' || goal.status === 'archived') && (
             <button className="btn" onClick={() => setGoalStatus(goal.id, 'active')}>
-              <RotateCcw size={16} /> Вернуть в работу
+              <ArrowCounterClockwise size={16} /> Вернуть в работу
             </button>
           )}
           {goal.status !== 'archived' && (
@@ -166,10 +166,10 @@ export function GoalDetail({ data, goal, onClose, onEdit }: { data: GoalsData; g
           )}
           <div className="grow" />
           <button className="btn btn-ghost" onClick={onEdit}>
-            <Pencil size={16} /> Изменить
+            <PencilSimple size={16} /> Изменить
           </button>
           <button className="btn btn-ghost btn-danger" onClick={() => void remove()} aria-label="Удалить цель">
-            <Trash2 size={16} />
+            <Trash size={16} />
           </button>
         </div>
       </Sheet>
@@ -321,7 +321,7 @@ function TaskPicker({ goal, onClose }: { goal: Goal; onClose: () => void }) {
   return (
     <Sheet onClose={onClose} title="Привязать задачу" className="gl-picker">
       <div className="gl-search">
-        <Search size={16} />
+        <MagnifyingGlass size={16} />
         <input className="input" value={q} placeholder="Поиск задач" onChange={(e) => setQ(e.target.value)} autoFocus />
       </div>
       <div className="gl-pick-list">

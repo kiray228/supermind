@@ -96,6 +96,8 @@ export interface Debt {
   note?: string;
   payments: DebtPayment[];
   closed: boolean;
+  /** напомнить в 09:00 в день «вернуть до» */
+  remind?: boolean;
   updatedAt: number;
 }
 

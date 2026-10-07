@@ -3,6 +3,7 @@
  *
  *   POST /auth/register, /auth/login, /auth/logout, /auth/password · GET /auth/me · DELETE /account
  *   POST /auth/forgot (код на почту) · POST /auth/reset (код + новый пароль → вход)
+ *   POST /feedback (проблема или идея → база и письмо владельцу) · GET /feedback (мои обращения)
  *   GET /sync?since=N · POST /sync
  *   GET /snapshots · GET /snapshots/:id · POST /snapshots — облачные копии данных (каждый час при изменениях — сами)
  *   GET /push/key · POST /devices · PUT /devices/:id/schedule · POST /devices/:id/test · DELETE /devices/:id
@@ -12,7 +13,7 @@ import { hashPassword, newToken, tokenHash, verifyPassword } from './crypto.ts';
 import { ensureSchema, type Row, type Sql } from './sql.ts';
 import { generateVapidKeys, sendPush, type PushResult, type PushSubscription, type VapidKeys } from './webpush.ts';
 import type { NextDueStore } from './objectStore.ts';
-import { envMailer, resetMail, type Mailer } from './mail.ts';
+import { envMailer, feedbackMail, resetMail, type Mailer } from './mail.ts';
 import { randomInt } from 'node:crypto';
 
 export interface Deps {
@@ -24,6 +25,8 @@ export interface Deps {
   nextDue?: NextDueStore | null;
   /** Отправка писем; null — почта не настроена */
   mail?: Mailer | null;
+  /** адрес поддержки (по умолчанию SUPPORT_EMAIL или MAIL_FROM) */
+  supportEmail?: string;
 }
 
 const VAPID_SUBJECT = 'https://kiray228.github.io/2mind/';
@@ -69,6 +72,8 @@ export function createApp(deps: Deps) {
   const push = deps.push ?? ((sub, payload, keys) => sendPush(sub, payload, keys, VAPID_SUBJECT));
   const nextDue = deps.nextDue ?? null;
   const mail = deps.mail === undefined ? envMailer() : deps.mail;
+  /** куда приходят обращения в поддержку */
+  const supportTo = deps.supportEmail ?? process.env.SUPPORT_EMAIL ?? process.env.MAIL_FROM ?? '';
 
   /** Записать время ближайшего неотправленного напоминания */
   async function refreshNextDue() {
@@ -168,6 +173,44 @@ export function createApp(deps: Deps) {
     }
     await sql.query(`DELETE FROM auth_failures WHERE email = $1`, [email]);
     return json({ token: await createSession(user[0], request), user: { id: user[0], email, name: user[1] } });
+  }
+
+  // ---------- Поддержка: проблемы и идеи ----------
+
+  async function sendFeedback(request: Request) {
+    const user = await userOf(request);
+    const b = await body<{ kind?: string; text?: string; meta?: string; image?: string }>(request);
+    const kind = b.kind === 'idea' ? 'idea' : 'problem';
+    const text = (b.text ?? '').trim().slice(0, 5000);
+    if (text.length < 3) throw new HttpError(400, 'Опишите проблему или идею');
+    const meta = (b.meta ?? '').slice(0, 500);
+    // снимок экрана: base64 JPEG/PNG до ~1.5 МБ
+    let image = typeof b.image === 'string' ? b.image.replace(/^data:image\/[a-z]+;base64,/, '') : '';
+    if (image && (image.length > 2_000_000 || !/^[A-Za-z0-9+/=]+$/.test(image))) image = '';
+    const recent = await sql.query(`SELECT count(*) FROM feedback WHERE user_id = $1 AND created_at > now() - interval '1 hour'`, [user.id]);
+    if (Number(recent[0]?.[0] ?? 0) >= 10) throw new HttpError(429, 'Слишком много обращений за час — попробуйте позже');
+    const rows = await sql.query(
+      `INSERT INTO feedback (user_id, email, kind, text, meta, image) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+      [user.id, user.email, kind, text, meta, image || null],
+    );
+    const id = String(rows[0][0]);
+    if (mail && supportTo) {
+      try {
+        await mail(feedbackMail(supportTo, { id, kind, text, email: user.email, name: user.name, meta, image: image || undefined }));
+      } catch (e) {
+        console.error('feedback mail', e); // обращение сохранено в базе — письмо не главное
+      }
+    }
+    return json({ id, ok: true }, 201);
+  }
+
+  async function myFeedback(request: Request) {
+    const user = await userOf(request);
+    const rows = await sql.query(
+      `SELECT id, kind, text, status, (extract(epoch FROM created_at) * 1000)::bigint FROM feedback WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`,
+      [user.id],
+    );
+    return json({ items: rows.map(([id, kind, text, status, at]) => ({ id, kind, text, status, at: Number(at) })) });
   }
 
   // ---------- Восстановление пароля: 6-значный код на почту ----------
@@ -540,6 +583,8 @@ export function createApp(deps: Deps) {
     if (m === 'POST' && path === '/auth/login') return login(request);
     if (m === 'POST' && path === '/auth/logout') return logout(request);
     if (m === 'POST' && path === '/auth/forgot') return forgot(request);
+    if (m === 'POST' && path === '/feedback') return sendFeedback(request);
+    if (m === 'GET' && path === '/feedback') return myFeedback(request);
     if (m === 'POST' && path === '/auth/reset') return reset(request);
     if (m === 'POST' && path === '/auth/password') return changePassword(request);
     if (m === 'GET' && path === '/auth/me') return json({ user: await userOf(request) });

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { FileUp } from 'lucide-react';
+import { FileArrowUp } from '@phosphor-icons/react';
 import { pickFile } from '../../io/download';
 import { toast } from '../../store/appStore';
 import { categoryMap, curSymbol, dateShort, fmtMoney, sortedAccounts, type FinanceData } from '../model';
@@ -97,7 +97,7 @@ export function ImportCsvSheet({ data, onClose }: { data: FinanceData; onClose: 
             Выгрузите выписку из банка в формате CSV и выберите файл. Нужны столбцы с датой и суммой (отрицательная сумма — расход). Категории подберутся автоматически по описанию.
           </p>
           <button className="btn btn-primary" onClick={() => void choose()}>
-            <FileUp size={16} /> Выбрать файл
+            <FileArrowUp size={16} /> Выбрать файл
           </button>
         </div>
       ) : (

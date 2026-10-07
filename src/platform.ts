@@ -87,8 +87,9 @@ export function setupPlatform() {
     });
     import('@capacitor/splash-screen').then(({ SplashScreen }) => SplashScreen.hide().catch(() => {}));
   } else if ('serviceWorker' in navigator && import.meta.env.PROD) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch(() => {});
-    });
+    // офлайн-кэш (service worker скачивает все файлы приложения) — после запуска, чтобы не отнимать сеть у первого экрана
+    const register = () => setTimeout(() => navigator.serviceWorker.register('./sw.js').catch(() => {}), 3000);
+    if (document.readyState === 'complete') register();
+    else window.addEventListener('load', register, { once: true });
   }
 }

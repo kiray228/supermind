@@ -6,6 +6,10 @@ import type JSZipType from 'jszip';
 import type { MindDoc, Sheet, StructureType, TaskInfo, Topic } from '../types';
 import { uid } from '../utils/tree';
 
+/** Значение accept для <input type="file"> */
+export const IMPORT_ACCEPT =
+  '.supermind,.2mind,.xmind,.md,.markdown,.txt,.opml,.json,text/markdown,text/plain,text/x-opml,application/json';
+
 // ---------- XML ----------
 
 /** Символы, недопустимые в XML 1.0 (управляющие, одиночные суррогаты, U+FFFE/U+FFFF) */

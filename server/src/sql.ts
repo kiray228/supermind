@@ -114,6 +114,18 @@ export const SCHEMA = [
     data jsonb NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS snapshots_user ON snapshots (user_id, created_at DESC)`,
+  `CREATE TABLE IF NOT EXISTS feedback (
+    id bigserial PRIMARY KEY,
+    user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+    email text NOT NULL DEFAULT '',
+    kind text NOT NULL,
+    text text NOT NULL,
+    meta text NOT NULL DEFAULT '',
+    image text,
+    status text NOT NULL DEFAULT 'new',
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`,
+  `CREATE INDEX IF NOT EXISTS feedback_user ON feedback (user_id, created_at DESC)`,
   `CREATE TABLE IF NOT EXISTS meta (
     key text PRIMARY KEY,
     value jsonb NOT NULL

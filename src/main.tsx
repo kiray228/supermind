@@ -3,6 +3,9 @@ import { createRoot } from 'react-dom/client';
 import './index.css';
 import App from './App';
 import { setupPlatform } from './platform';
+import { mark, reportPerf } from './perf';
+
+mark('main');
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -11,6 +14,7 @@ createRoot(document.getElementById('root')!).render(
 );
 
 setupPlatform();
+reportPerf();
 
 // приложение обновилось, пока было открыто: файлы раздела старой версии уже не найти — перезагрузиться один раз
 window.addEventListener('vite:preloadError', (e) => {

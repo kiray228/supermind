@@ -1,5 +1,5 @@
 import { useMemo, type CSSProperties } from 'react';
-import { CalendarClock, ChevronRight, Plus, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
+import { CalendarBlank, CaretRight, Plus, TrendDown, TrendUp } from '@phosphor-icons/react';
 import { addDaysYmd } from '../../utils/mapTasks';
 import {
   accountMap,
@@ -22,6 +22,7 @@ import {
 } from '../model';
 import { paySubscription } from '../store';
 import { CurTotals, dayTitle, Money, Progress, TxRow, useToday } from './common';
+import { DebtSummary } from './Debts';
 import { openMore, openTxSheet, setFinTab, showOps } from './state';
 
 export function Overview({ data }: { data: FinanceData }) {
@@ -42,10 +43,8 @@ export function Overview({ data }: { data: FinanceData }) {
 
   return (
     <div className="fn-stack">
-      <section className="card fn-hero">
-        <div className="fn-hero-label">
-          <Wallet size={16} /> Всего на счетах
-        </div>
+      <section className="fn-hero">
+        <div className="fn-hero-label">Всего на счетах</div>
         <div className="fn-hero-total">
           {multi && conv.missing.length === 0 ? <Money v={conv.total} cur={main} /> : <CurTotals totals={totals} />}
         </div>
@@ -59,15 +58,15 @@ export function Overview({ data }: { data: FinanceData }) {
           {accounts.map((a) => (
             <button key={a.id} className="fn-acc-card" style={{ '--c': a.color } as CSSProperties} onClick={() => showOps({ accountId: a.id })}>
               <span className="fn-acc-card-top">
-                <span>{a.emoji}</span>
+                <span className="fn-acc-card-emoji">{a.emoji}</span>
                 <span className="ellipsis">{a.name}</span>
               </span>
-              <Money v={bal.get(a.id) ?? 0} cur={a.currency} className={(bal.get(a.id) ?? 0) < 0 ? 'is-neg' : ''} />
+              <Money v={bal.get(a.id) ?? 0} cur={a.currency} />
             </button>
           ))}
           <button className="fn-acc-card fn-acc-add" onClick={() => openMore('accounts')}>
-            <Plus size={18} />
-            <span className="tiny">Счёт</span>
+            <Plus size={20} weight="bold" />
+            <span>Счёт</span>
           </button>
         </div>
       </section>
@@ -76,19 +75,19 @@ export function Overview({ data }: { data: FinanceData }) {
         <div className="fn-panel-head">
           <h3>{monthTitle(today)}</h3>
           <button className="fn-link small" onClick={() => setFinTab('analytics')}>
-            Аналитика <ChevronRight size={14} />
+            Аналитика <CaretRight size={13} weight="bold" />
           </button>
         </div>
         <div className="fn-month3">
           <div className="fn-kpi is-income">
             <span className="fn-kpi-label">
-              <TrendingUp size={14} /> Доходы
+              <TrendUp size={14} weight="bold" /> Доходы
             </span>
             <Money v={month.income} cur={main} compact />
           </div>
           <div className="fn-kpi is-expense">
             <span className="fn-kpi-label">
-              <TrendingDown size={14} /> Расходы
+              <TrendDown size={14} weight="bold" /> Расходы
             </span>
             <Money v={month.expense} cur={main} compact />
           </div>
@@ -99,11 +98,21 @@ export function Overview({ data }: { data: FinanceData }) {
         </div>
       </section>
 
+      <section className="card fn-panel fn-debt-panel">
+        <div className="fn-panel-head">
+          <h3>Долги</h3>
+          <button className="fn-link small" onClick={() => setFinTab('debts')}>
+            {data.debts.length ? 'Все' : 'Записать'} <CaretRight size={13} weight="bold" />
+          </button>
+        </div>
+        <DebtSummary data={data} onClick={() => setFinTab('debts')} />
+      </section>
+
       <section className="card fn-panel">
         <div className="fn-panel-head">
           <h3>Бюджет</h3>
           <button className="fn-link small" onClick={() => setFinTab('budget')}>
-            {tb || catBudgets.length ? 'Подробнее' : 'Настроить'} <ChevronRight size={14} />
+            {tb || catBudgets.length ? 'Подробнее' : 'Настроить'} <CaretRight size={13} weight="bold" />
           </button>
         </div>
         {tb ? (
@@ -145,13 +154,13 @@ export function Overview({ data }: { data: FinanceData }) {
           <div className="fn-panel-head">
             <h3>Ближайшие платежи</h3>
             <button className="fn-link small" onClick={() => openMore('subs')}>
-              Все <ChevronRight size={14} />
+              Все <CaretRight size={13} weight="bold" />
             </button>
           </div>
           <div className="fn-list">
             {upcoming.map((p) => (
               <div key={p.id} className="fn-upcoming">
-                <CalendarClock size={18} className={p.date < today ? 'fn-neg' : 'fn-accent'} />
+                <CalendarBlank size={20} weight="duotone" className={p.date < today ? 'fn-neg' : 'fn-accent'} />
                 <span className="grow fn-tx-main">
                   <span className="ellipsis fn-tx-title">{p.title}</span>
                   <span className={'tiny ' + (p.date < today ? 'fn-neg' : 'faint')}>{p.date < today ? 'просрочен · ' + dayTitle(p.date) : dayTitle(p.date)}</span>
@@ -171,7 +180,7 @@ export function Overview({ data }: { data: FinanceData }) {
           <h3>Последние операции</h3>
           {recent.length > 0 && (
             <button className="fn-link small" onClick={() => showOps({})}>
-              Все <ChevronRight size={14} />
+              Все <CaretRight size={13} weight="bold" />
             </button>
           )}
         </div>
@@ -185,7 +194,7 @@ export function Overview({ data }: { data: FinanceData }) {
           <div className="fn-empty-inline">
             <p className="muted small fn-m0">Операций пока нет. Нажмите «+», чтобы добавить первый расход или доход.</p>
             <button className="btn btn-primary btn-sm" onClick={() => openTxSheet()}>
-              <Plus size={15} /> Добавить
+              <Plus size={15} weight="bold" /> Добавить
             </button>
           </div>
         )}

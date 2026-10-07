@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Download, Search, X } from 'lucide-react';
+import { DownloadSimple, MagnifyingGlass, X } from '@phosphor-icons/react';
 import { todayYmd } from '../../utils/mapTasks';
 import { downloadText } from '../../io/download';
 import { toast } from '../../store/appStore';
@@ -103,7 +103,7 @@ export function Operations({ data }: { data: FinanceData }) {
     <div className="fn-stack fn-ops">
       <div className="fn-ops-bar">
         <div className="fn-search">
-          <Search size={16} />
+          <MagnifyingGlass size={16} />
           <input className="input" placeholder="Поиск по операциям" value={f.q} onChange={(e) => setFilter({ q: e.target.value })} />
           {f.q && (
             <button className="fn-search-x" onClick={() => setFilter({ q: '' })} aria-label="Очистить">
@@ -112,7 +112,7 @@ export function Operations({ data }: { data: FinanceData }) {
           )}
         </div>
         <button className="icon-btn" onClick={exportList} title="Выгрузить в CSV" aria-label="Выгрузить в CSV">
-          <Download />
+          <DownloadSimple />
         </button>
       </div>
       <div className="fn-filters">
