@@ -53,8 +53,6 @@ const MOOD_NAMES: Record<string, string> = {
 };
 
 const emptyDay = (): PlannerDay => ({ journal: '', tasks: [] });
-const isEmptyDay = (d: PlannerDay) =>
-  !d.journal.trim() && !d.mood && !d.tasks?.length && !d.habits?.length && !Object.keys(d.habitCounts ?? {}).length;
 
 /** Понедельник недели, в которую входит дата */
 function mondayOf(ymd: string): string {
@@ -134,7 +132,31 @@ export default function Planner() {
   const commit = useCallback((p: PlannerData) => {
     dataRef.current = p;
     setData(p);
-    savePlanner(p).catch(() => toast('Не удалось сохранить ежедневник'));
+    savePlanner(p)
+      .then((saved) => {
+        // в сохранённом могут быть дни и привычки с другого устройства — взять те, что здесь не трогали
+        const cur = dataRef.current;
+        if (!cur) return;
+        const sig = (d: PlannerDay | undefined) => (d ? JSON.stringify({ ...d, updatedAt: 0 }) : '');
+        let changed = false;
+        const days = { ...cur.days };
+        for (const [k, d] of Object.entries(saved.days)) {
+          if (cur.days[k] === p.days[k] && sig(d) !== sig(cur.days[k])) {
+            days[k] = d;
+            changed = true;
+          }
+        }
+        let habits = cur.habits;
+        if (cur.habits === p.habits && JSON.stringify(saved.habits) !== JSON.stringify(cur.habits)) {
+          habits = saved.habits;
+          changed = true;
+        }
+        if (!changed) return;
+        const n = { ...cur, days, habits };
+        dataRef.current = n;
+        setData(n);
+      })
+      .catch(() => toast('Не удалось сохранить ежедневник'));
   }, []);
 
   const updateDays = useCallback(
@@ -145,8 +167,8 @@ export default function Planner() {
       fn(
         (ymd) => ({ ...(days[ymd] ?? emptyDay()) }),
         (ymd, d) => {
-          if (isEmptyDay(d)) delete days[ymd];
-          else days[ymd] = d;
+          // пустой день не удаляем: отсутствие дня синхронизация не считает удалением
+          days[ymd] = d;
         },
       );
       commit({ ...p, days });
@@ -287,8 +309,7 @@ export default function Planner() {
     const p = dataRef.current!;
     const days: Record<string, PlannerDay> = {};
     for (const [k, d] of Object.entries(p.days)) {
-      const nd = withoutHabit(d, h.id);
-      if (!isEmptyDay(nd)) days[k] = nd;
+      days[k] = withoutHabit(d, h.id);
     }
     // отметка об удалении остаётся в списке — чтобы привычка не вернулась при синхронизации с другого устройства
     const tomb: Habit = { id: h.id, name: h.name, color: h.color, deleted: true, archived: true, updatedAt: Date.now() };

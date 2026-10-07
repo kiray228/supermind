@@ -4,6 +4,7 @@
  */
 import { create } from 'zustand';
 import { get, set } from '../store/kv';
+import { mergeValues } from '../store/merge';
 import { onBeforeSync, onRemoteChange } from '../store/cloud';
 import type { ActionItem } from './actions';
 
@@ -70,10 +71,19 @@ export function flushChat(): Promise<void> {
   if (!saveTimer) return Promise.resolve();
   clearTimeout(saveTimer);
   saveTimer = null;
-  const old = Date.now() - 90 * 86400000;
+  const old = Date.now() - 365 * 86400000;
   for (const [k, t] of Object.entries(gone)) if (t < old) delete gone[k];
-  const data: ChatData = { messages: useChat.getState().messages, updatedAt: Date.now(), gone };
-  return set(KEY, data).catch(() => undefined);
+  const mine: ChatData = { messages: useChat.getState().messages, updatedAt: Date.now(), gone };
+  // слить с сохранённым: сообщения с другого устройства не теряются
+  return get<ChatData>(KEY)
+    .then((disk) => {
+      const data = disk ? ({ ...(mergeValues(KEY, mine, disk) as ChatData), updatedAt: mine.updatedAt }) : mine;
+      gone = { ...(data.gone ?? {}) };
+      data.messages = [...data.messages].sort((a, b) => a.at - b.at);
+      if (data.messages.length !== mine.messages.length) useChat.setState({ messages: data.messages });
+      return set(KEY, data);
+    })
+    .catch(() => undefined);
 }
 
 function commit(messages: ChatMessage[]) {
@@ -113,7 +123,8 @@ onBeforeSync(flushChat);
 onRemoteChange(
   (k) => k === KEY,
   async () => {
-    if (busy || saveTimer) return;
+    if (busy) return; // ответ ещё печатается — после него запись сольётся с пришедшим
+    await flushChat();
     await read();
   },
 );

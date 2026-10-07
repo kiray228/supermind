@@ -21,6 +21,7 @@ import {
 } from '../tasks/sync';
 import { useApp, toast } from '../store/appStore';
 import { AI_MODELS, streamText, AIError } from '../ai/claude';
+import { openWhatsNew } from '../onboarding/state';
 
 export default function Settings() {
   const settings = useApp((s) => s.settings);
@@ -120,7 +121,10 @@ export default function Settings() {
 
           <section className="card set-card">
             <h3><Info size={18} /> О приложении</h3>
-            <p className="small muted" style={{ margin: 0 }}>SuperMind 1.8 — бесплатные интеллект-карты, задачи с напоминаниями, календарь, привычки, ИИ-ассистент, заметки, цели, финансы, прогресс, фокус, ежедневник и доска задач. Все функции открыты, без подписок.</p>
+            <p className="small muted" style={{ margin: 0 }}>SuperMind 1.9 — бесплатные интеллект-карты, задачи с напоминаниями, календарь, привычки, ИИ-ассистент, заметки, цели, финансы, прогресс, фокус, ежедневник и доска задач. Все функции открыты, без подписок.</p>
+            <button className="btn btn-sm" style={{ marginTop: 10, alignSelf: 'flex-start' }} onClick={openWhatsNew}>
+              <Sparkles size={15} /> Что нового
+            </button>
           </section>
         </div>
       </div>

@@ -71,6 +71,10 @@ export const SCHEMA = [
     PRIMARY KEY (user_id, key)
   )`,
   `CREATE INDEX IF NOT EXISTS kv_user_seq ON kv (user_id, seq)`,
+  // номера изменений по пользователю (раньше — общая последовательность): продолжаем с его максимума
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS kv_seq bigint`,
+  `UPDATE users u SET kv_seq = coalesce((SELECT max(seq) FROM kv WHERE kv.user_id = u.id), 0) WHERE kv_seq IS NULL`,
+  `ALTER TABLE users ALTER COLUMN kv_seq SET DEFAULT 0`,
   `CREATE TABLE IF NOT EXISTS devices (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     secret_hash text NOT NULL,

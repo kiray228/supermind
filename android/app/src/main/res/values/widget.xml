@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_today_label">SuperMind — Сегодня</string>
+    <string name="widget_today_description">Задачи на сегодня, прогресс привычек и быстрое добавление</string>
+    <dimen name="widget_radius">24dp</dimen>
+    <dimen name="widget_inner_radius">14dp</dimen>
+    <color name="widget_bg">#F7FFFFFF</color>
+    <color name="widget_text">#1B1C20</color>
+    <color name="widget_text2">#6B6F78</color>
+    <color name="widget_accent">#FF4A2B</color>
+    <color name="widget_on_accent">#FFFFFF</color>
+    <color name="widget_chip">#F1F2F5</color>
+    <color name="widget_track">#E2E4EA</color>
+    <color name="widget_danger">#E5484D</color>
+</resources>

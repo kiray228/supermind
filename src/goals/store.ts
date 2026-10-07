@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { get, set } from '../store/kv';
+import { get } from '../store/kv';
+import { blobSync } from '../store/blobSync';
 import { toast } from '../store/appStore';
 import { uid } from '../utils/tree';
 import { todayYmd } from '../utils/mapTasks';
@@ -52,6 +53,7 @@ export function ensureGoals(): Promise<GoalsData> {
     loading = (async () => {
       const d = normalizeGoalsData(await get<GoalsData>(KEY));
       useGoals.setState({ data: d });
+      store.loaded();
       return d;
     })().catch((e) => {
       loading = null;
@@ -63,27 +65,29 @@ export function ensureGoals(): Promise<GoalsData> {
 
 /** Перечитать из базы и заменить состояние (после синхронизации / восстановления копии) */
 export async function reloadGoals(): Promise<void> {
-  // несохранённая запись не должна перетереть только что пришедшие данные
-  if (saveTimer) {
-    clearTimeout(saveTimer);
-    saveTimer = null;
+  if (!useGoals.getState().data) {
+    // ещё не загружали — загрузится свежее при открытии
+    loading = null;
+    return;
   }
-  const d = normalizeGoalsData(await get<GoalsData>(KEY));
-  loading = Promise.resolve(d);
-  useGoals.setState({ data: d });
+  await store.reload();
+  loading = Promise.resolve(useGoals.getState().data!);
 }
 
 // ---------- Сохранение ----------
 
-let saveTimer: ReturnType<typeof setTimeout> | null = null;
+/** Запись со слиянием: копия в памяти не перетирает пришедшее с другого устройства */
+const store = blobSync<GoalsData>({
+  key: KEY,
+  read: () => useGoals.getState().data,
+  write: (data) => useGoals.setState({ data }),
+  normalize: (raw) => normalizeGoalsData(raw),
+  onError: () => toast('Не удалось сохранить цели'),
+});
 
-/** Записать отложенные изменения сразу (только если они есть) */
+/** Сохранить отложенные изменения (только если они есть) */
 export function flushGoals(): Promise<void> {
-  if (!saveTimer) return Promise.resolve();
-  clearTimeout(saveTimer);
-  saveTimer = null;
-  const d = useGoals.getState().data;
-  return d ? set(KEY, d).catch(() => toast('Не удалось сохранить цели')) : Promise.resolve();
+  return store.flush();
 }
 
 /** Изменить данные целей: fn получает копию, сохранение — автоматически */
@@ -93,8 +97,7 @@ export function mutateGoals(fn: (d: GoalsData) => void) {
   const d = structuredClone(cur);
   fn(d);
   useGoals.setState({ data: d });
-  if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => void flushGoals(), 250);
+  store.schedule();
 }
 
 function markGone(d: GoalsData, id: string) {

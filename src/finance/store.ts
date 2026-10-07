@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { get, set } from '../store/kv';
+import { get } from '../store/kv';
+import { blobSync } from '../store/blobSync';
 import { uid } from '../utils/tree';
 import { todayYmd } from '../utils/mapTasks';
 import { toast } from '../store/appStore';
@@ -47,6 +48,7 @@ export function ensureFinance(): Promise<FinanceData> {
       const now = useFinance.getState().data;
       if (now) return now;
       useFinance.setState({ data: d });
+      store.loaded();
       return d;
     })().catch((e) => {
       loading = null;
@@ -58,26 +60,29 @@ export function ensureFinance(): Promise<FinanceData> {
 
 /** Перечитать из базы без отметки «изменено» (после получения данных с сервера или восстановления копии) */
 export async function reloadFinance(): Promise<void> {
-  if (saveTimer) {
-    clearTimeout(saveTimer);
-    saveTimer = null;
+  if (!useFinance.getState().data) {
+    // ещё не загружали — загрузится свежее при открытии
+    loading = null;
+    return;
   }
-  const d = normalizeFinance(await get<FinanceData>(KEY));
-  loading = Promise.resolve(d);
-  useFinance.setState({ data: d });
+  await store.reload();
+  loading = Promise.resolve(useFinance.getState().data!);
 }
 
 // ---------- Сохранение ----------
 
-let saveTimer: ReturnType<typeof setTimeout> | null = null;
+/** Запись со слиянием: копия в памяти не перетирает пришедшее с другого устройства */
+const store = blobSync<FinanceData>({
+  key: KEY,
+  read: () => useFinance.getState().data,
+  write: (data) => useFinance.setState({ data }),
+  normalize: (raw) => normalizeFinance(raw),
+  onError: () => toast('Не удалось сохранить финансы'),
+});
 
 /** Сохранить отложенные изменения (только если они есть) */
 export function flushFinance(): Promise<void> {
-  if (!saveTimer) return Promise.resolve();
-  clearTimeout(saveTimer);
-  saveTimer = null;
-  const d = useFinance.getState().data;
-  return d ? set(KEY, d).catch(() => toast('Не удалось сохранить финансы')) : Promise.resolve();
+  return store.flush();
 }
 
 /** Изменить данные: fn получает копию, сохранение — автоматически через 250 мс */
@@ -87,8 +92,7 @@ export function mutateFinance(fn: (d: FinanceData) => void) {
   const d = structuredClone(cur);
   fn(d);
   useFinance.setState({ data: d });
-  if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => void flushFinance(), 250);
+  store.schedule();
 }
 
 export const financeData = () => useFinance.getState().data;

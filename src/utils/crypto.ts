@@ -28,7 +28,7 @@ export async function encryptDoc(doc: MindDoc, password: string): Promise<Locked
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const key = await deriveKey(password, salt);
   const data = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(JSON.stringify(doc)));
-  return { id: doc.id, locked: true, salt: b64(salt), iv: b64(iv), data: b64(data) };
+  return { id: doc.id, locked: true, salt: b64(salt), iv: b64(iv), data: b64(data), updatedAt: doc.updatedAt };
 }
 
 export async function decryptDoc(locked: LockedDoc, password: string): Promise<MindDoc> {

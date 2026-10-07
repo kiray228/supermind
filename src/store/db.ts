@@ -57,7 +57,7 @@ export async function saveLocked(locked: LockedDoc, title: string) {
   await set(docKey(locked.id), locked);
   const list = await listDocs();
   const i = list.findIndex((m) => m.id === locked.id);
-  if (i >= 0) list[i] = { ...list[i], title, locked: true, updatedAt: Date.now() };
+  if (i >= 0) list[i] = { ...list[i], title, locked: true, updatedAt: locked.updatedAt ?? Date.now() };
   await saveIndex(list);
 }
 
@@ -65,7 +65,7 @@ export async function updateMeta(id: string, patch: Partial<DocMeta>) {
   const list = await listDocs();
   const i = list.findIndex((m) => m.id === id);
   if (i < 0) return;
-  list[i] = { ...list[i], ...patch };
+  list[i] = { ...list[i], ...patch, metaAt: Date.now() };
   await saveIndex(list);
 }
 
@@ -88,27 +88,37 @@ export async function loadAllDocs(): Promise<MindDoc[]> {
 
 // ---------- Ежедневник / доска / настройки ----------
 
+/** Версии дней, которые видел тот, кто сохраняет (по ним видно, что изменено здесь, а что пришло извне) */
+let plannerBase: Record<string, string> | null = null;
+const daySig = (d: PlannerDay | undefined) => (d ? JSON.stringify({ ...d, updatedAt: 0 }) : '');
+const sigs = (p: PlannerData) => Object.fromEntries(Object.entries(p.days ?? {}).map(([k, d]) => [k, daySig(d)]));
+
 export async function loadPlanner(): Promise<PlannerData> {
-  return (await get<PlannerData>('planner')) ?? { days: {}, habits: [] };
+  const p = (await get<PlannerData>('planner')) ?? { days: {}, habits: [] };
+  plannerBase = sigs(p);
+  return p;
 }
+
 /**
- * Сохранить ежедневник. Изменённые дни получают отметку времени — при синхронизации побеждает
- * более свежая версия дня (иначе снятая отметка привычки вернулась бы с другого устройства).
- * Удалённый день остаётся пустой записью с отметкой — по той же причине.
+ * Сохранить ежедневник — трёхсторонним слиянием: изменённые здесь дни (по сравнению с загруженными)
+ * записываются с отметкой времени, остальные остаются такими, какими их записала синхронизация.
+ * Пустой день не удаляется, а хранится пустым — отсутствие дня никогда не считается удалением.
+ * Возвращает то, что записано (вызывающий может обновить свою копию).
  */
-export async function savePlanner(p: PlannerData) {
-  const old = (await get<PlannerData>('planner'))?.days ?? {};
+export async function savePlanner(p: PlannerData): Promise<PlannerData> {
+  const disk = (await get<PlannerData>('planner')) ?? { days: {}, habits: [] };
+  const base = plannerBase ?? sigs(disk);
   const now = Date.now();
-  const days: PlannerData['days'] = {};
-  const strip = (d: PlannerDay | undefined) => (d ? JSON.stringify({ ...d, updatedAt: 0 }) : '');
-  for (const [k, d] of Object.entries(p.days ?? {})) days[k] = strip(d) === strip(old[k]) ? (old[k]?.updatedAt ? { ...d, updatedAt: old[k].updatedAt } : d) : { ...d, updatedAt: now };
-  for (const [k, d] of Object.entries(old)) {
-    if (days[k]) continue;
-    const had = !!(d.journal || d.mood || d.tasks?.length || d.habits?.length || (d.habitCounts && Object.keys(d.habitCounts).length));
-    if (had) days[k] = { journal: '', tasks: [], updatedAt: now };
-    else if (d.updatedAt && d.updatedAt > now - 90 * 86400000) days[k] = { journal: '', tasks: [], updatedAt: d.updatedAt };
+  const days: PlannerData['days'] = { ...(disk.days ?? {}) };
+  for (const [k, d] of Object.entries(p.days ?? {})) {
+    if (daySig(d) !== (base[k] ?? '') && daySig(d) !== daySig(disk.days?.[k])) days[k] = { ...d, updatedAt: now };
   }
-  await set('planner', { ...p, days });
+  const { mergeValues } = await import('./merge');
+  const habits = (mergeValues('planner', { days: {}, habits: p.habits ?? [] }, { days: {}, habits: disk.habits ?? [] }) as PlannerData).habits;
+  const out: PlannerData = { ...disk, ...p, days, habits };
+  await set('planner', out);
+  plannerBase = sigs(out);
+  return out;
 }
 
 export const DEFAULT_BOARD: BoardData = {
@@ -120,11 +130,58 @@ export const DEFAULT_BOARD: BoardData = {
   cards: [],
 };
 
+type Sig = Record<string, string>;
+let boardBase: { columns: Sig; cards: Sig } | null = null;
+const itemSig = (x: { updatedAt?: number }) => JSON.stringify({ ...x, updatedAt: 0 });
+const boardSigs = (b: BoardData) => ({
+  columns: Object.fromEntries(b.columns.map((c) => [c.id, itemSig(c)])),
+  cards: Object.fromEntries(b.cards.map((c) => [c.id, itemSig(c)])),
+});
+
 export async function loadBoard(): Promise<BoardData> {
-  return (await get<BoardData>('board')) ?? structuredClone(DEFAULT_BOARD);
+  const b = (await get<BoardData>('board')) ?? structuredClone(DEFAULT_BOARD);
+  boardBase = boardSigs(b);
+  return b;
 }
-export async function saveBoard(b: BoardData) {
-  await set('board', b);
+
+/**
+ * Сохранить доску трёхсторонним слиянием (как ежедневник): изменённое и удалённое здесь —
+ * записывается, пришедшее с другого устройства — остаётся. Возвращает записанное.
+ */
+export async function saveBoard(b: BoardData): Promise<BoardData> {
+  const disk = (await get<BoardData>('board')) ?? structuredClone(DEFAULT_BOARD);
+  const base = boardBase ?? boardSigs(disk);
+  const now = Date.now();
+  const gone = { ...(disk.gone ?? {}), ...(b.gone ?? {}) };
+  function mergeList<T extends { id: string; updatedAt?: number }>(mine: T[], theirs: T[], baseSig: Sig): T[] {
+    const theirById = new Map(theirs.map((x) => [x.id, x]));
+    const mineIds = new Set(mine.map((x) => x.id));
+    const out: T[] = [];
+    for (const x of mine) {
+      const t = theirById.get(x.id);
+      const changedHere = itemSig(x) !== (baseSig[x.id] ?? '');
+      if (changedHere) out.push(itemSig(x) === (t ? itemSig(t) : '') && t ? t : { ...x, updatedAt: now });
+      else if (t) out.push(t);
+      else if (!gone[x.id]) out.push(x); // здесь не меняли, там нет — пусть решит синхронизация
+    }
+    for (const [id, sig] of Object.entries(baseSig)) {
+      // удалено здесь (было при загрузке, а теперь нет) и там не менялось — удаляем
+      if (!mineIds.has(id) && theirById.get(id) && itemSig(theirById.get(id)!) === sig) {
+        theirById.delete(id);
+        gone[id] = now;
+      }
+    }
+    for (const t of theirs) if (!mineIds.has(t.id) && theirById.has(t.id) && !gone[t.id]) out.push(t);
+    return out;
+  }
+  const out: BoardData = {
+    columns: mergeList(b.columns, disk.columns ?? [], base.columns),
+    cards: mergeList(b.cards, disk.cards ?? [], base.cards),
+    gone,
+  };
+  await set('board', out);
+  boardBase = boardSigs(out);
+  return out;
 }
 
 export const DEFAULT_SETTINGS: Settings = {

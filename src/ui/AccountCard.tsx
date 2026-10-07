@@ -16,7 +16,7 @@ function ago(ms?: number): string {
 
 /** Аккаунт: вход/регистрация и синхронизация между устройствами */
 export function AccountCard() {
-  const { account, status, error, lastSync } = useCloud();
+  const { account, status, error, lastSync, localOnly } = useCloud();
   const [mode, setMode] = useState<'login' | 'register'>('register');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -70,6 +70,11 @@ export function AccountCard() {
             </>
           )}
         </p>
+        {!!localOnly && (
+          <p className="small acc-status error">
+            <CloudOff size={14} /> {localOnly} {localOnly === 1 ? 'объект слишком большой' : 'объекта(ов) слишком большие'} для облака (много фото) — они хранятся только на этом устройстве. Скачайте копию файлом в разделе «Данные и копии».
+          </p>
+        )}
         <div className="row" style={{ flexWrap: 'wrap' }}>
           <button className="btn btn-sm" onClick={() => void syncNow()} disabled={status === 'syncing'}>
             <RefreshCw size={15} /> Синхронизировать

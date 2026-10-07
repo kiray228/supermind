@@ -53,7 +53,7 @@ test('данные переживают ошибочную синхрониза�
   assert.equal((await call('GET', '/snapshots')).status, 401);
 });
 
-test('хранение копий: сутки — все, дальше — по одной на день, старше 30 дней — удаляются', async () => {
+test('хранение копий: сутки — все, дальше — первая и последняя за день, старше 30 дней — удаляются', async () => {
   const reg = await call<{ token: string; user: { id: string } }>('POST', '/auth/register', { email: 'keep@b.cd', password: '12345678' });
   const { token: t, user } = reg.data;
   await call('POST', '/sync', { items: [{ key: 'a', value: 1, updatedAt: 1, baseSeq: 0 }] }, t);
@@ -66,6 +66,27 @@ test('хранение копий: сутки — все, дальше — по 
   await add('40 days');
   await call('POST', '/snapshots', {}, t);
   const rows = await sql.query(`SELECT count(*) FROM snapshots WHERE user_id = $1`, [user.id]);
-  // ручная + 2 за сутки + 1 за тот день (из двух) ; 40-дневная удалена
-  assert.equal(Number(rows[0][0]), 4);
+  // ручная + 2 за сутки + первая и последняя за тот день; 40-дневная удалена
+  assert.equal(Number(rows[0][0]), 5);
+  await dayAgo3(3);
+  await call('POST', '/snapshots', {}, t);
+  const after = await sql.query(`SELECT count(*) FROM snapshots WHERE user_id = $1 AND created_at < now() - interval '2 days'`, [user.id]);
+  // из трёх копий того дня — первая и последняя
+  assert.equal(Number(after[0][0]), 2);
+});
+
+test('номера изменений по пользователю растут по порядку, загрузка ничего не пропускает', async () => {
+  const a = await call<{ token: string }>('POST', '/auth/register', { email: 'seq@b.cd', password: '12345678' });
+  const t = a.data.token;
+  const seqs: number[] = [];
+  for (let i = 0; i < 5; i++) {
+    const r = await call<{ results: { ok: boolean; seq: number }[] }>('POST', '/sync', { items: [{ key: 'k' + i, value: i, updatedAt: i + 1, baseSeq: 0 }] }, t);
+    seqs.push(r.data.results[0].seq);
+  }
+  assert.deepEqual(seqs, [1, 2, 3, 4, 5]);
+  // конфликт: значение не перезаписывается
+  const c = await call<{ results: { ok: boolean }[] }>('POST', '/sync', { items: [{ key: 'k0', value: 9, updatedAt: 9, baseSeq: 99 }] }, t);
+  assert.equal(c.data.results[0].ok, false);
+  const pulled = await call<{ items: { key: string; seq: number }[] }>('GET', '/sync?since=2', undefined, t);
+  assert.deepEqual(pulled.data.items.map((x) => x.key), ['k2', 'k3', 'k4']);
 });

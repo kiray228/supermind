@@ -109,7 +109,16 @@ export default function Board() {
   const commit = useCallback((b: BoardData) => {
     boardRef.current = b;
     setBoard(b);
-    saveBoard(b).catch(() => toast('Не удалось сохранить доску'));
+    saveBoard(b)
+      .then((saved) => {
+        // пришедшее с другого устройства — показать, если здесь за это время ничего не меняли
+        if (boardRef.current === b) {
+          const n = normalize(saved);
+          boardRef.current = n;
+          setBoard(n);
+        }
+      })
+      .catch(() => toast('Не удалось сохранить доску'));
   }, []);
 
   const reloadMaps = useCallback(async () => {
@@ -130,8 +139,18 @@ export default function Board() {
       setBoard(n);
     });
     reloadMaps();
+    // доска изменилась на другом устройстве — перечитать
+    const onRemote = () =>
+      void loadBoard().then((b) => {
+        if (!alive) return;
+        const n = normalize(b);
+        boardRef.current = n;
+        setBoard(n);
+      });
+    window.addEventListener('sm-board-changed', onRemote);
     return () => {
       alive = false;
+      window.removeEventListener('sm-board-changed', onRemote);
     };
   }, [reloadMaps]);
 

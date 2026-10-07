@@ -8,6 +8,7 @@ interface DialogReq {
   value?: string;
   placeholder?: string;
   okText?: string;
+  cancelText?: string;
   danger?: boolean;
   multiline?: boolean;
   resolve: (v: string | boolean | null) => void;
@@ -33,7 +34,7 @@ export function askPassword(title: string, message?: string): Promise<string | n
   return push({ kind: 'password', title, message, okText: 'Открыть' }) as Promise<string | null>;
 }
 
-export function confirmDialog(title: string, message?: string, opts: { okText?: string; danger?: boolean } = {}): Promise<boolean> {
+export function confirmDialog(title: string, message?: string, opts: { okText?: string; cancelText?: string; danger?: boolean } = {}): Promise<boolean> {
   return push({ kind: 'confirm', title, message, ...opts }).then((v) => v === true);
 }
 
@@ -118,7 +119,7 @@ function Dialog({ req }: { req: DialogReq }) {
         )}
         <div className="modal-actions">
           <button className="btn btn-ghost" onClick={() => done(req.kind === 'confirm' ? false : null)}>
-            Отмена
+            {req.cancelText ?? 'Отмена'}
           </button>
           <button ref={okRef} className="btn btn-primary" style={req.danger ? { background: 'var(--danger)', borderColor: 'var(--danger)' } : undefined} onClick={ok}>
             {req.okText ?? 'OK'}

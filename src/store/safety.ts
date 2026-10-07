@@ -73,6 +73,10 @@ function plural(n: number, one: string, few: string, many: string) {
 /** Сделать копию всего, что есть на устройстве. Пустое не копируем. */
 export async function takeSnapshot(reason: SnapshotReason): Promise<SnapshotInfo | null> {
   try {
+    if (await lowOnSpace()) {
+      await prune(3);
+      if (reason === 'auto') return null;
+    }
     const data = await collectData();
     const n = Object.keys(data).length;
     if (!n) return null;
@@ -90,19 +94,40 @@ export async function takeSnapshot(reason: SnapshotReason): Promise<SnapshotInfo
   }
 }
 
-/** Свежие — все (до 8), дальше — последняя копия каждого дня, старше 14 дней — прочь */
-async function prune() {
-  const list = await listSnapshots();
-  const seenDays = new Set<string>();
+/**
+ * Свежие — все (до 8); старше — первая и последняя копии каждого дня (первая — ещё «до» беды,
+ * если что-то сломалось днём) и все сделанные перед входом/восстановлением/вручную; старше 14 дней — прочь.
+ */
+async function prune(keepRecent = KEEP_RECENT) {
+  const list = await listSnapshots(); // новые первыми
   const old = Date.now() - KEEP_DAYS * 86400000;
+  const firstOfDay = new Map<string, string>();
+  const lastOfDay = new Map<string, string>();
+  for (const s of list) {
+    const day = new Date(s.at).toDateString();
+    if (!lastOfDay.has(day)) lastOfDay.set(day, s.id);
+    firstOfDay.set(day, s.id);
+  }
   const kept: SnapshotInfo[] = [];
   for (const [i, s] of list.entries()) {
     const day = new Date(s.at).toDateString();
-    if (i < KEEP_RECENT || (s.at > old && !seenDays.has(day))) kept.push(s);
+    const keep =
+      i < keepRecent ||
+      (s.at > old && keepRecent === KEEP_RECENT && (firstOfDay.get(day) === s.id || lastOfDay.get(day) === s.id || s.reason !== 'auto'));
+    if (keep) kept.push(s);
     else await sdel(s.id, store);
-    seenDays.add(day);
   }
   if (kept.length !== list.length) await saveIndex(kept);
+}
+
+/** Места почти нет — копий меньше (основные данные важнее) */
+async function lowOnSpace(): Promise<boolean> {
+  try {
+    const e = await navigator.storage?.estimate?.();
+    return !!(e?.quota && e.usage && e.usage > e.quota * 0.6);
+  } catch {
+    return false;
+  }
 }
 
 /** Список копий хранится отдельно — чтобы не читать сами копии (они бывают большими) */
@@ -200,7 +225,12 @@ function overlay(cur: unknown, snap: unknown, now: number): unknown {
     } else if (Array.isArray(sv) && withId(sv)) {
       sv.forEach((x) => restoredIds.add(x.id as string));
       out[field] = sv.map((x) => touch(x, now));
-    } else if (field === 'days' && isObj(sv) && isObj(cv)) out[field] = { ...cv, ...sv };
+    } else if (field === 'days' && isObj(sv)) {
+      // дни ежедневника из копии — со свежей отметкой, иначе синхронизация вернула бы новые
+      const days: Obj = { ...(isObj(cv) ? cv : {}) };
+      for (const [k, d] of Object.entries(sv)) days[k] = isObj(d) ? { ...d, updatedAt: now } : d;
+      out[field] = days;
+    }
   }
   // отметки об удалении восстановленного снимаем — иначе синхронизация снова удалит
   if (isObj(cur.gone)) {
@@ -231,7 +261,7 @@ export async function restoreData(data: Record<string, unknown>): Promise<{ maps
     if (v === undefined || v === null) continue;
     if (k.startsWith('doc:') || k.startsWith('note:')) {
       // документ целиком; свежая отметка — чтобы при синхронизации победила копия
-      await set(k, isObj(v) && 'updatedAt' in v && !('locked' in v) ? { ...v, updatedAt: now } : v);
+      await set(k, isObj(v) ? { ...v, updatedAt: now } : v);
     } else await set(k, overlay(await get(k), v, now));
   }
   const cur = ((await get('docs:index')) ?? []) as Obj[];

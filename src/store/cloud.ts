@@ -4,7 +4,8 @@
  * отправляются на сервер, чужие изменения забираются и аккуратно сливаются (по id и времени изменения).
  */
 import { create } from 'zustand';
-import { clearDirty, dirtyKeys, get, isSynced, keys, markDirty, onDirty, set, setFromSync, delFromSync, META_KEY } from './kv';
+import { isObj, mergeValues } from './merge';
+import { clearAllDirty, dirtyAt, clearDirty, dirtyKeys, get, isSynced, keys, markDirty, onDirty, set, setFromSync, delFromSync, META_KEY } from './kv';
 
 const PROD_API = 'https://br-soft-term-b1xn6yim-supermind.compute.c-5.eu-central-1.aws.neon.tech';
 /** В режиме разработки можно подключить локальный сервер: localStorage['sm-api'] = 'http://127.0.0.1:8787' */
@@ -30,6 +31,8 @@ interface Account {
 interface SyncMeta {
   cursor: number;
   seqs: Record<string, number>;
+  /** ключи, которые не помещаются в облако (байты) — хранятся только на этом устройстве */
+  localOnly?: Record<string, number>;
   lastSync?: number;
   userId?: string;
 }
@@ -38,6 +41,8 @@ interface CloudState {
   account: Account | null;
   ready: boolean;
   status: 'idle' | 'syncing' | 'error' | 'offline';
+  /** сколько объектов слишком велики для облака */
+  localOnly?: number;
   error?: string;
   lastSync?: number;
 }
@@ -81,7 +86,7 @@ async function saveMeta() {
 export async function initCloud() {
   account = ((await get<Account>(ACCOUNT_KEY)) ?? null) as Account | null;
   meta = ((await get<SyncMeta>(META_KEY)) ?? { cursor: 0, seqs: {} }) as SyncMeta;
-  useCloud.setState({ account, ready: true, lastSync: meta.lastSync });
+  useCloud.setState({ account, ready: true, lastSync: meta.lastSync, localOnly: Object.keys(meta.localOnly ?? {}).length });
   if (!account) return;
   wire();
   syncSoon(800);
@@ -99,15 +104,33 @@ function wire() {
 }
 
 async function startSession(a: Account) {
+  const safety = await import('./safety');
   // данные устройства сольются с облачными — сначала копия на всякий случай
-  await (await import('./safety')).takeSnapshot('login');
-  // другой аккаунт, чем в прошлый раз, — начинаем синхронизацию с нуля
+  await safety.takeSnapshot('login');
+  // на устройстве данные, с которыми входили в другой аккаунт (например, телефон общий) — спросить
+  let foreign = !!meta.userId && meta.userId !== a.user.id;
+  if (foreign) {
+    const { confirmDialog } = await import('../ui/dialogs');
+    const move = await confirmDialog(
+      'Данные другого аккаунта',
+      `На этом устройстве карты и записи, с которыми входили в другой аккаунт. Добавить их в аккаунт ${a.user.email}? Если нет — они уберутся с устройства, но останутся в автокопии «Перед входом в аккаунт».`,
+      { okText: 'Добавить', cancelText: 'Не добавлять' },
+    );
+    foreign = !move;
+  }
+  if (foreign) {
+    // на устройстве данные другого аккаунта: в этот аккаунт они не попадут (они в автокопии «Перед входом»)
+    for (const f of flushers) await f();
+    await clearAllDirty();
+    for (const k of await keys()) if (typeof k === 'string' && isSynced(k)) await delFromSync(k);
+    await safety.reloadAll();
+  }
   if (meta.userId !== a.user.id) meta = { cursor: 0, seqs: {}, userId: a.user.id };
   account = a;
   await setFromSync(ACCOUNT_KEY, a);
   await saveMeta();
   // всё, что есть на устройстве, — в аккаунт (сольётся с данными других устройств)
-  for (const k of await keys()) if (typeof k === 'string' && isSynced(k)) await markDirty(k, 1);
+  if (!foreign) for (const k of await keys()) if (typeof k === 'string' && isSynced(k)) await markDirty(k, 1);
   useCloud.setState({ account: a, error: undefined });
   wire();
   await syncNow();
@@ -125,6 +148,8 @@ export async function login(email: string, password: string) {
 
 /** Выйти: данные остаются на устройстве */
 export async function logout() {
+  // сначала отправить несохранённое — иначе оно останется только на этом устройстве
+  await syncNow().catch(() => {});
   await api('/auth/logout', { method: 'POST', body: '{}' }).catch(() => {});
   account = null;
   await delFromSync(ACCOUNT_KEY);
@@ -203,24 +228,16 @@ export function syncNow(): Promise<void> {
   }
   running = (async () => {
     useCloud.setState({ status: 'syncing' });
+    const changed = new Set<string>();
     try {
       for (const f of flushers) await f();
-      const changed = new Set<string>();
       for (let round = 0; round < 4; round++) {
         await pull(changed);
         if (!(await push())) break;
       }
-      if (changed.size) await reconcileIndex(changed);
       meta.lastSync = Date.now();
       await saveMeta();
       useCloud.setState({ status: 'idle', error: undefined, lastSync: meta.lastSync });
-      if (changed.size) {
-        const list = [...changed];
-        for (const r of reloaders) {
-          const hit = list.filter(r.match);
-          if (hit.length) await Promise.resolve(r.run(hit)).catch(() => {});
-        }
-      }
     } catch (e) {
       const err = e as ApiError;
       if (err.status === 401) {
@@ -229,6 +246,15 @@ export function syncNow(): Promise<void> {
         useCloud.setState({ account: null, status: 'error', error: 'Сессия истекла — войдите снова' });
       } else useCloud.setState({ status: err.status === 0 ? 'offline' : 'error', error: err.message });
     } finally {
+      // полученное применяем, даже если отправка не удалась: иначе разделы остались бы со старыми данными
+      if (changed.size) {
+        await reconcileIndex(changed).catch(() => {});
+        const list = [...changed];
+        for (const r of reloaders) {
+          const hit = list.filter(r.match);
+          if (hit.length) await Promise.resolve(r.run(hit)).catch(() => {});
+        }
+      }
       running = null;
       if (again) {
         again = false;
@@ -250,9 +276,10 @@ interface RemoteItem {
 async function pull(changed: Set<string>) {
   for (let i = 0; i < 1000; i++) {
     const r = await api<{ items: RemoteItem[]; cursor: number; more: boolean }>(`/sync?since=${meta.cursor}`);
-    const dirty = await dirtyKeys();
+    await dirtyKeys(); // свежие отметки (в том числе других вкладок)
     for (const item of r.items) {
-      await applyRemote(item, dirty[item.key], changed);
+      // своё же отправленное («эхо») — уже здесь
+      if (meta.seqs[item.key] !== item.seq) await applyRemote(item, changed);
       meta.seqs[item.key] = item.seq;
     }
     meta.cursor = r.cursor;
@@ -261,34 +288,61 @@ async function pull(changed: Set<string>) {
   }
 }
 
-async function applyRemote(item: RemoteItem, dirtyAt: number | undefined, changed: Set<string>) {
+async function applyRemote(item: RemoteItem, changed: Set<string>) {
   if (!isSynced(item.key)) return;
+  // отметка читается прямо перед записью: правка, сделанная пока шла загрузка, не потеряется
+  let at = dirtyAt(item.key);
   if (item.deleted) {
     // удалено на другом устройстве; локальная правка новее — оставляем (вернётся при отправке)
-    if (!dirtyAt || item.updatedAt >= dirtyAt) {
+    if (!at || item.updatedAt >= at) {
       await delFromSync(item.key);
-      if (dirtyAt) await clearDirty(item.key, dirtyAt);
+      if (at) await clearDirty(item.key, at);
       changed.add(item.key);
     }
     return;
   }
-  if (!dirtyAt) {
+  if (!at) {
     await setFromSync(item.key, item.value);
     changed.add(item.key);
     return;
   }
-  const local = await get(item.key);
-  if (local === undefined) {
-    // удалили здесь, а там изменили позже — вернуть
-    if (item.updatedAt > dirtyAt) {
-      await setFromSync(item.key, item.value);
-      await clearDirty(item.key, dirtyAt);
-      changed.add(item.key);
+  for (let i = 0; i < 5; i++) {
+    const local = await get(item.key);
+    if (dirtyAt(item.key) !== at) {
+      at = dirtyAt(item.key); // пока читали — новая правка; читаем заново
+      continue;
     }
+    if (local === undefined) {
+      // удалили здесь, а там изменили позже — вернуть
+      if (item.updatedAt > at!) {
+        await setFromSync(item.key, item.value);
+        await clearDirty(item.key, at!);
+        changed.add(item.key);
+      }
+      return;
+    }
+    const merged = mergeValues(item.key, local, item.value);
+    if (item.key.startsWith('doc:')) await keepConflictCopy(local, item.value, merged, changed);
+    await setFromSync(item.key, merged);
+    changed.add(item.key);
     return;
   }
-  await setFromSync(item.key, mergeValues(item.key, local, item.value));
-  changed.add(item.key);
+}
+
+/**
+ * Карту изменили и здесь, и на другом устройстве: побеждает более свежая версия,
+ * а проигравшая сохраняется отдельной картой «(версия с …)» — ничья работа не пропадает.
+ */
+async function keepConflictCopy(local: unknown, remote: unknown, winner: unknown, changed: Set<string>) {
+  const loser = winner === local ? remote : local;
+  if (!isObj(loser) || 'locked' in loser || !Array.isArray(loser.sheets)) return;
+  const strip = (d: unknown) => (isObj(d) ? JSON.stringify({ ...d, updatedAt: 0 }) : '');
+  if (strip(loser) === strip(winner)) return;
+  const { uid } = await import('../utils/tree');
+  const id = uid();
+  const copy = { ...loser, id, title: `${String(loser.title || 'Карта')} (${loser === local ? 'версия с этого устройства' : 'версия с другого устройства'})`, updatedAt: Date.now() };
+  await set(`doc:${id}`, copy);
+  changed.add(`doc:${id}`);
 }
 
 /** Отправить изменённое. true — был конфликт (кто-то успел изменить раньше), нужен ещё круг */
@@ -296,113 +350,65 @@ async function push(): Promise<boolean> {
   const dirty = Object.entries(await dirtyKeys());
   if (!dirty.length) return false;
   let conflict = false;
-  let batch: { key: string; value: unknown; updatedAt: number; deleted: boolean; baseSeq: number; at: number }[] = [];
+  type Item = { key: string; value: unknown; updatedAt: number; deleted: boolean; baseSeq: number; at: number; bytes: number };
+  let batch: Item[] = [];
   let size = 0;
-  const send = async () => {
-    if (!batch.length) return;
+  const post = async (items: Item[]) => {
     const r = await api<{ results: { key: string; ok: boolean; seq?: number }[] }>('/sync', {
       method: 'POST',
-      body: JSON.stringify({ items: batch.map(({ at, ...x }) => (void at, x)) }),
+      body: JSON.stringify({ items: items.map(({ key, value, updatedAt, deleted, baseSeq }) => ({ key, value, updatedAt, deleted, baseSeq })) }),
     });
     for (const res of r.results) {
-      const sent = batch.find((b) => b.key === res.key)!;
+      const sent = items.find((b) => b.key === res.key)!;
       if (res.ok && res.seq) {
         meta.seqs[res.key] = res.seq;
+        if (meta.localOnly) delete meta.localOnly[res.key];
         await clearDirty(res.key, sent.at);
       } else conflict = true;
     }
-    await saveMeta();
+  };
+  const send = async () => {
+    if (!batch.length) return;
+    const items = batch;
     batch = [];
     size = 0;
+    try {
+      await post(items);
+    } catch (e) {
+      if ((e as ApiError).status !== 413) throw e;
+      // слишком большой запрос — по одному; не помещающееся — только на этом устройстве
+      for (const it of items) {
+        try {
+          await post([it]);
+        } catch (e2) {
+          if ((e2 as ApiError).status !== 413) throw e2;
+          (meta.localOnly ??= {})[it.key] = it.bytes;
+        }
+      }
+    }
+    await saveMeta();
   };
+  const enc = new TextEncoder();
   for (const [key, at] of dirty) {
     const value = await get(key);
     const deleted = value === undefined;
     const json = deleted ? '' : JSON.stringify(value);
-    if (json.length > 7.5 * 1024 * 1024) continue; // слишком большой (картинки) — только на этом устройстве
-    if (size + json.length > 3 * 1024 * 1024 || batch.length >= 40) await send();
-    batch.push({ key, value: deleted ? null : value, updatedAt: Math.max(at, 1), deleted, baseSeq: meta.seqs[key] ?? 0, at });
-    size += json.length;
+    // размер в байтах (кириллица — 2 байта на букву)
+    const bytes = json.length > 200_000 ? enc.encode(json).length : json.length * 2;
+    if (bytes > 7.5 * 1024 * 1024) {
+      (meta.localOnly ??= {})[key] = bytes; // слишком большой (картинки) — только на этом устройстве
+      continue;
+    }
+    if (size + bytes > 3 * 1024 * 1024 || batch.length >= 40) await send();
+    batch.push({ key, value: deleted ? null : value, updatedAt: Math.max(at, 1), deleted, baseSeq: meta.seqs[key] ?? 0, at, bytes });
+    size += bytes;
   }
   await send();
+  useCloud.setState({ localOnly: Object.keys(meta.localOnly ?? {}).length });
   return conflict;
 }
 
-// ================= Слияние =================
-
 type Obj = Record<string, unknown>;
-const isObj = (v: unknown): v is Obj => !!v && typeof v === 'object' && !Array.isArray(v);
-
-function mergeValues(key: string, local: unknown, remote: unknown): unknown {
-  if (key.startsWith('doc:') || key.startsWith('note:')) {
-    // документ целиком: побеждает более свежий
-    const lu = isObj(local) ? Number(local.updatedAt) || 0 : 0;
-    const ru = isObj(remote) ? Number(remote.updatedAt) || 0 : 0;
-    return ru > lu ? remote : local;
-  }
-  if (key === 'docs:index' && Array.isArray(local) && Array.isArray(remote)) return mergeArray(local, remote, {}, 'doc');
-  if (key === 'planner' && isObj(local) && isObj(remote)) {
-    const days: Obj = { ...(remote.days as Obj) };
-    for (const [d, v] of Object.entries((local.days as Obj) ?? {})) {
-      const r = days[d];
-      if (!isObj(r) || !isObj(v)) days[d] = v;
-      // день с отметкой времени: побеждает свежая версия целиком (снятые отметки не возвращаются)
-      else if (r.updatedAt || v.updatedAt) days[d] = (Number(r.updatedAt) || 0) > (Number(v.updatedAt) || 0) ? r : v;
-      else days[d] = { ...r, ...v, habits: [...new Set([...((r.habits as string[]) ?? []), ...((v.habits as string[]) ?? [])])] };
-    }
-    return { ...remote, ...local, days, habits: mergeArray((local.habits as Obj[]) ?? [], (remote.habits as Obj[]) ?? [], {}, 'habit') };
-  }
-  if (isObj(local) && isObj(remote)) return mergeBlob(local, remote);
-  return local;
-}
-
-/** Набор сущностей: массивы объектов с id сливаются по id (свежее по updatedAt), удалённое не возвращается */
-function mergeBlob(local: Obj, remote: Obj): Obj {
-  const gone: Record<string, number> = { ...((remote.gone as Record<string, number>) ?? {}), ...((local.gone as Record<string, number>) ?? {}) };
-  const out: Obj = { ...remote, ...local };
-  for (const field of new Set([...Object.keys(local), ...Object.keys(remote)])) {
-    const l = local[field];
-    const r = remote[field];
-    if (Array.isArray(l) || Array.isArray(r)) {
-      const la = (Array.isArray(l) ? l : []) as unknown[];
-      const ra = (Array.isArray(r) ? r : []) as unknown[];
-      const withId = [...la, ...ra].every((x) => isObj(x) && typeof x.id === 'string');
-      if (withId) out[field] = mergeArray(la as Obj[], ra as Obj[], gone, field.replace(/s$/, ''));
-      else if (field === 'log') out[field] = unionBy(la as Obj[], ra as Obj[], (x) => `${x.taskId}|${x.at}`);
-      else out[field] = la.length ? la : ra;
-    } else if (isObj(l) && isObj(r) && field !== 'prefs') out[field] = { ...r, ...l };
-  }
-  // старые отметки об удалении больше не нужны
-  const old = Date.now() - 90 * 86400000;
-  for (const [k, t] of Object.entries(gone)) if (t < old) delete gone[k];
-  out.gone = gone;
-  return out;
-}
-
-function mergeArray(local: Obj[], remote: Obj[], gone: Record<string, number>, singular: string): Obj[] {
-  const isGone = (id: string) => !!(gone[id] || gone[`${singular}:${id}`] || gone[`${singular}s:${id}`]);
-  const byId = new Map<string, Obj>();
-  for (const x of local) byId.set(x.id as string, x);
-  for (const x of remote) {
-    const cur = byId.get(x.id as string);
-    if (!cur || (Number(x.updatedAt) || 0) > (Number(cur.updatedAt) || 0)) byId.set(x.id as string, x);
-  }
-  // порядок: как на этом устройстве, новые — в конце
-  const order = [...local.map((x) => x.id as string), ...remote.map((x) => x.id as string)];
-  return [...new Set(order)].filter((id) => !isGone(id)).map((id) => byId.get(id)!);
-}
-
-function unionBy(a: Obj[], b: Obj[], key: (x: Obj) => string): Obj[] {
-  const seen = new Set<string>();
-  const out: Obj[] = [];
-  for (const x of [...a, ...b]) {
-    const k = key(x);
-    if (seen.has(k)) continue;
-    seen.add(k);
-    out.push(x);
-  }
-  return out.sort((x, y) => (Number(x.at) || 0) - (Number(y.at) || 0));
-}
 
 /** Список карт должен совпадать с картами на устройстве (после прихода чужих изменений) */
 async function reconcileIndex(changed: Set<string>) {
@@ -416,7 +422,7 @@ async function reconcileIndex(changed: Set<string>) {
     if (ids.has(id)) continue;
     const doc = await get<Obj>(k);
     if (!doc) continue;
-    if (doc.locked) next.push({ id, title: 'Защищённая карта', createdAt: Date.now(), updatedAt: Date.now(), locked: true });
+    if (doc.locked) next.push({ id, title: 'Защищённая карта', createdAt: Number(doc.updatedAt) || 0, updatedAt: Number(doc.updatedAt) || 0, locked: true });
     else {
       const { metaFor } = await import('./db');
       next.push(metaFor(doc as never) as unknown as Obj);

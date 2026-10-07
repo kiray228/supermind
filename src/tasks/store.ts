@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { get, set } from '../store/kv';
+import { blobSync } from '../store/blobSync';
 import type { ID, PlannerData } from '../types';
 import { uid } from '../utils/tree';
 import { todayYmd, updateMapTask } from '../utils/mapTasks';
@@ -71,6 +72,7 @@ export function ensureTasks(): Promise<TasksData> {
       const d = normalize(await get<TasksData>(KEY));
       await absorbPlanner(d);
       useTasks.setState({ data: d });
+      store.loaded();
       return d;
     })().catch((e) => {
       // следующая попытка загрузки начнётся заново
@@ -118,14 +120,18 @@ async function absorbPlanner(d: TasksData) {
 
 // ---------- Сохранение ----------
 
-let saveTimer: ReturnType<typeof setTimeout> | null = null;
+/** Запись со слиянием: копия в памяти не перетирает пришедшее с другого устройства */
+const store = blobSync<TasksData>({
+  key: KEY,
+  read: () => useTasks.getState().data,
+  write: (data) => useTasks.setState({ data }),
+  normalize: (raw) => normalize(raw),
+  onError: () => toast('Не удалось сохранить задачи'),
+});
+
 export function flushTasks(): Promise<void> {
-  // сохраняем только несохранённые изменения: иначе вкладка со старыми данными перезапишет свежие
-  if (!saveTimer) return Promise.resolve();
-  clearTimeout(saveTimer);
-  saveTimer = null;
-  const d = useTasks.getState().data;
-  return d ? set(KEY, d).catch(() => toast('Не удалось сохранить задачи')) : Promise.resolve();
+  // сохраняем только несохранённые изменения
+  return store.flush();
 }
 
 /** Изменить данные задач: fn получает копию, изменения сохраняются автоматически */
@@ -135,8 +141,7 @@ export function mutateTasks(fn: (d: TasksData) => void) {
   const d = structuredClone(cur);
   fn(d);
   useTasks.setState({ data: d });
-  if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => void flushTasks(), 250);
+  store.schedule();
 }
 
 export const tasksData = () => useTasks.getState().data;
@@ -344,11 +349,10 @@ export function emptyTrash() {
   });
 }
 
-/** Данные задач изменились на другом устройстве: перечитать (если нет несохранённых правок) */
+/** Данные задач изменились на другом устройстве: свои правки — сохранить со слиянием, затем перечитать */
 export async function reloadTasksFromSync(): Promise<boolean> {
-  if (saveTimer) return false;
-  const d = normalize(await get<TasksData>(KEY));
-  useTasks.setState({ data: d });
+  if (!useTasks.getState().data) return true;
+  await store.reload();
   return true;
 }
 

@@ -151,6 +151,8 @@ export interface DocMeta {
   /** цвет карточки (из темы) */
   accent?: string;
   trashed?: boolean;
+  /** когда меняли звёздочку/корзину (для синхронизации) */
+  metaAt?: number;
 }
 
 /** Зашифрованный документ */
@@ -160,6 +162,8 @@ export interface LockedDoc {
   salt: string;
   iv: string;
   data: string;
+  /** когда менялась карта (для синхронизации: свежая версия побеждает) */
+  updatedAt?: number;
 }
 
 // ---------- Ежедневник и доска задач ----------
@@ -237,6 +241,7 @@ export interface BoardColumn {
   /** колонки todo/doing/done связаны со статусами задач в картах */
   status?: TaskStatus;
   color?: string;
+  updatedAt?: number;
 }
 
 export interface BoardCard {
@@ -250,11 +255,14 @@ export interface BoardCard {
   checklist?: { id: ID; text: string; done: boolean }[];
   order: number;
   createdAt: number;
+  updatedAt?: number;
 }
 
 export interface BoardData {
   columns: BoardColumn[];
   cards: BoardCard[];
+  /** удалённые карточки и колонки (id → когда) — синхронизация не вернёт их */
+  gone?: Record<string, number>;
 }
 
 export interface Settings {

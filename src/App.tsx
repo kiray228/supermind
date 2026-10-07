@@ -13,6 +13,7 @@ import { isActive } from './tasks/model';
 import { todayYmd } from './utils/mapTasks';
 import { TaskDetailHost } from './tasks/ui/TaskDetail';
 import { QuickAddHost } from './tasks/ui/QuickAdd';
+import { SearchHost, SearchNavButton, SearchSheetButton } from './search/SearchHost';
 import { ReminderStack } from './tasks/ui/Reminders';
 import { applyAppearance } from './ui/appearance';
 import './ui/appearance.css';
@@ -31,6 +32,7 @@ const Finance = lazy(() => import('./views/Finance'));
 const Assistant = lazy(() => import('./views/Assistant'));
 const Progress = lazy(() => import('./views/Progress'));
 const LevelBadge = lazy(() => import('./progress/LevelBadge').then((m) => ({ default: m.LevelBadge })));
+const OnboardingHost = lazy(() => import('./onboarding/OnboardingHost'));
 
 /** phone: false — на телефоне пункт в меню «Ещё» */
 const NAV: { id: View; label: string; icon: typeof Network; phone: boolean }[] = [
@@ -74,14 +76,20 @@ export default function App() {
     void import('./store/cloudWire').then((m) => m.setupCloud()).catch(() => {});
     void import('./store/push').then((m) => m.ensurePush()).catch(() => {});
     void import('./tasks/focusTimer').then((m) => m.initFocusTimer()).catch(() => {});
+    void import('./native/widget').then((m) => m.initWidget()).catch(() => {});
     // первая карта-подсказка при первом запуске
-    if (!welcomeStarted) (welcomeStarted = true) && (async () => {
-      if (await idbGet('welcomed')) return;
-      await idbSet('welcomed', true);
-      if ((await listDocs()).length) return;
-      await saveDoc(welcomeDoc());
-      useApp.setState({ docsVersion: Date.now() });
-    })();
+    if (!welcomeStarted) {
+      welcomeStarted = true;
+      void (async () => {
+        if (await idbGet('welcomed')) return;
+        // отметка — только после сохранения карты: прерванный первый запуск не оставит пустой список
+        if (!(await listDocs()).length) {
+          await saveDoc(welcomeDoc());
+          useApp.setState({ docsVersion: Date.now() });
+        }
+        await idbSet('welcomed', true);
+      })();
+    }
     // заранее подгружаем редактор и разделы, чтобы карта открывалась мгновенно
     const preload = setTimeout(() => {
       import('./editor/Editor');
@@ -142,6 +150,7 @@ export default function App() {
           <Suspense fallback={null}>
             <LevelBadge className="nav-level" />
           </Suspense>
+          <SearchNavButton />
           {NAV.map((n) => (
             <button key={n.id} className={`nav-item ${view === n.id ? 'active' : ''}${n.phone ? '' : ' nav-desk'}`} onClick={() => go(n.id)}>
               <span className="nav-ico">
@@ -179,6 +188,7 @@ export default function App() {
       {more && (
         <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && setMore(false)}>
           <div className="modal nav-more-sheet">
+            <SearchSheetButton onPick={() => setMore(false)} />
             <Suspense fallback={null}>
               <LevelBadge className="nav-sheet-level" onClick={() => (setMore(false), go('progress'))} />
             </Suspense>
@@ -200,8 +210,12 @@ export default function App() {
       )}
       <TaskDetailHost />
       <QuickAddHost />
+      <SearchHost />
       <ReminderStack />
       <DialogHost />
+      <Suspense fallback={null}>
+        <OnboardingHost />
+      </Suspense>
       {toastMsg && (
         <div className={`toast${toastAction ? ' has-action' : ''}`}>
           <span>{toastMsg}</span>

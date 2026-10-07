@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { del, get, set } from '../store/kv';
+import { blobSync } from '../store/blobSync';
 import type { ID } from '../types';
 import { uid } from '../utils/tree';
 import { toast } from '../store/appStore';
@@ -53,6 +54,7 @@ export function ensureNotes(): Promise<NotesData> {
     loading = (async () => {
       const d = normalize(await get<NotesData>(KEY));
       useNotes.setState({ data: d });
+      index.loaded();
       return d;
     })().catch((e) => {
       loading = null;
@@ -66,14 +68,17 @@ export const notesData = () => useNotes.getState().data;
 
 // ---------- Сохранение индекса ----------
 
-let saveTimer: ReturnType<typeof setTimeout> | null = null;
+/** Запись индекса со слиянием: копия в памяти не перетирает пришедшее с другого устройства */
+const index = blobSync<NotesData>({
+  key: KEY,
+  read: () => useNotes.getState().data,
+  write: (data) => useNotes.setState({ data }),
+  normalize: (raw) => normalize(raw),
+  onError: () => toast('Не удалось сохранить заметки'),
+});
 
 function flushIndex(): Promise<void> {
-  if (!saveTimer) return Promise.resolve();
-  clearTimeout(saveTimer);
-  saveTimer = null;
-  const d = useNotes.getState().data;
-  return d ? set(KEY, d).catch(() => toast('Не удалось сохранить заметки')) : Promise.resolve();
+  return index.flush();
 }
 
 /** Изменить индекс (заметки и папки): fn получает копию, сохранение — автоматически */
@@ -83,8 +88,7 @@ export function mutateNotes(fn: (d: NotesData) => void) {
   const d = structuredClone(cur);
   fn(d);
   useNotes.setState({ data: d });
-  if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => void flushIndex(), 250);
+  index.schedule();
 }
 
 // ---------- Тела заметок ----------
@@ -146,13 +150,15 @@ export async function flushNotes(): Promise<void> {
 
 /** Перечитать индекс из базы (после синхронизации или восстановления копии) */
 export async function reloadNotes(): Promise<void> {
-  if (saveTimer) {
-    clearTimeout(saveTimer);
-    saveTimer = null;
+  if (!useNotes.getState().data) {
+    loading = null;
+    return;
   }
-  const d = normalize(await get<NotesData>(KEY));
+  // несохранённые тела и индекс — сначала записать (со слиянием), потом перечитать
+  await Promise.all([...pending.keys()].map(writeBody));
+  await index.reload();
+  const d = useNotes.getState().data!;
   loading = Promise.resolve(d);
-  useNotes.setState({ data: d });
   const { openId } = useNotes.getState();
   if (!openId) return;
   if (!d.notes.some((n) => n.id === openId)) {

@@ -1,11 +1,12 @@
 import { create } from 'zustand';
 import type {
-  Boundary, FloatingTopic, ID, LineStyle, MindDoc, Relationship, Sheet, StructureType, Summary, Topic, TopicStyle,
+  Boundary, FloatingTopic, ID, LineStyle, LockedDoc, MindDoc, Relationship, Sheet, StructureType, Summary, Topic, TopicStyle,
 } from '../types';
 import { clone, findInSheet, isAncestor, newTopic, reId, uid, visibleOrder, pathTo } from '../utils/tree';
 import { saveDoc, saveLocked } from './db';
 import { mapSides } from '../layout/layout';
 import { encryptDoc } from '../utils/crypto';
+import { get as kvGet, remoteRev } from './kv';
 
 export function newSheet(title = 'Лист 1', rootText = 'Центральная тема', structure: StructureType = 'map'): Sheet {
   return {
@@ -124,11 +125,32 @@ export async function flushSave() {
   if (!doc) return;
   useDoc.setState({ saving: true });
   try {
+    if (!password) await keepRemoteVersion(doc);
     if (password) await saveLocked(await encryptDoc(doc, password), doc.title);
     else await saveDoc(doc);
+    base = { id: doc.id, rev: remoteRev(`doc:${doc.id}`), updatedAt: doc.updatedAt };
   } finally {
     useDoc.setState({ saving: false });
   }
+}
+
+/** Какую версию открытой карты видели: если синхронизация записала новее — это правка с другого устройства */
+let base: { id: ID; rev: number; updatedAt: number } | null = null;
+export function markOpened(doc: MindDoc) {
+  base = { id: doc.id, rev: remoteRev(`doc:${doc.id}`), updatedAt: doc.updatedAt };
+}
+
+/** Карту изменили на другом устройстве, пока она открыта здесь: та версия сохраняется отдельной картой */
+async function keepRemoteVersion(doc: MindDoc) {
+  if (!base || base.id !== doc.id || remoteRev(`doc:${doc.id}`) === base.rev) return;
+  const disk = await kvGet<MindDoc | LockedDoc>(`doc:${doc.id}`);
+  base.rev = remoteRev(`doc:${doc.id}`);
+  if (!disk || 'locked' in disk || !(disk.updatedAt > base.updatedAt)) return;
+  const copy: MindDoc = { ...disk, id: uid(), title: `${disk.title || 'Карта'} (версия с другого устройства)`, updatedAt: Date.now() };
+  await saveDoc(copy);
+  const { useApp, toast } = await import('./appStore');
+  useApp.setState({ docsVersion: Date.now() });
+  toast('Карту одновременно меняли на другом устройстве — та версия сохранена отдельной картой');
 }
 
 const HISTORY_LIMIT = 150;
@@ -177,6 +199,7 @@ export const useDoc = create<DocState>((set, get) => {
     open(doc, password = null) {
       // на телефоне ничего не выделяем: первый тап по теме — выбор, а не редактирование
       const touch = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
+      markOpened(doc);
       set({ doc, password, selection: touch ? [] : [activeSheet(doc).root.id], editingId: null, pendingText: null, past: [], future: [], selectedRel: null });
     },
     close() {

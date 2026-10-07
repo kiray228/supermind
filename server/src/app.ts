@@ -25,6 +25,7 @@ const VAPID_SUBJECT = 'https://kiray228.github.io/2mind/';
 const MAX_ITEM_BYTES = 8 * 1024 * 1024;
 const MAX_SCHEDULE = 500;
 const PULL_LIMIT = 300;
+const PULL_BYTES = 4 * 1024 * 1024;
 /** Облачные копии: не чаще раза в час; хранятся все за последние сутки и по одной на день за 30 дней */
 const SNAPSHOT_EVERY = '55 minutes';
 const KEEP_DAYS = 30;
@@ -201,8 +202,16 @@ export function createApp(deps: Deps) {
       `SELECT key, value, updated_at, deleted, seq FROM kv WHERE user_id = $1 AND seq > $2 ORDER BY seq LIMIT $3`,
       [user.id, since, PULL_LIMIT + 1],
     );
-    const more = rows.length > PULL_LIMIT;
-    const items = rows.slice(0, PULL_LIMIT).map(([key, value, updatedAt, deleted, seq]) => ({
+    // страница ограничена и числом, и размером (большие карты с фото)
+    let take = 0;
+    let bytes = 0;
+    for (const r of rows.slice(0, PULL_LIMIT)) {
+      bytes += (r[1]?.length ?? 0) * 2;
+      if (take > 0 && bytes > PULL_BYTES) break;
+      take++;
+    }
+    const more = rows.length > take;
+    const items = rows.slice(0, take).map(([key, value, updatedAt, deleted, seq]) => ({
       key,
       value: value == null ? null : JSON.parse(value),
       updatedAt: Number(updatedAt),
@@ -231,9 +240,12 @@ export function createApp(deps: Deps) {
       const value = item.deleted ? null : JSON.stringify(item.value ?? null);
       if (value && value.length > MAX_ITEM_BYTES) throw new HttpError(413, `Слишком большой объект: ${item.key}`);
       const base = Math.max(0, Number(item.baseSeq) || 0);
+      // номер изменения — свой у каждого пользователя и под блокировкой его строки: номера фиксируются
+      // строго по порядку, и загрузка «всё новее N» не пропустит запись, зафиксированную позже меньшего номера
       const rows = await sql.query(
-        `INSERT INTO kv (user_id, key, value, updated_at, deleted, seq)
-         VALUES ($1, $2, $3::jsonb, $4, $5, nextval('kv_seq'))
+        `WITH u AS (UPDATE users SET kv_seq = coalesce(kv_seq, 0) + 1 WHERE id = $1 RETURNING kv_seq)
+         INSERT INTO kv (user_id, key, value, updated_at, deleted, seq)
+         SELECT $1, $2, $3::jsonb, $4, $5, u.kv_seq FROM u
          ON CONFLICT (user_id, key) DO UPDATE
            SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at, deleted = EXCLUDED.deleted, seq = EXCLUDED.seq
            WHERE kv.seq = $6
@@ -257,13 +269,15 @@ export function createApp(deps: Deps) {
        RETURNING id`,
       [userId, reason],
     );
-    // старше суток — только последняя копия каждого дня; старше 30 дней — прочь
+    // старше суток — первая и последняя копии каждого дня (первая — ещё «до» беды), ручные — все; старше 30 дней — прочь
     await sql.query(
       `DELETE FROM snapshots s WHERE s.user_id = $1 AND (
          s.created_at < now() - make_interval(days => $2)
-         OR (s.created_at < now() - interval '1 day' AND s.id <> (
-           SELECT x.id FROM snapshots x WHERE x.user_id = $1 AND date_trunc('day', x.created_at) = date_trunc('day', s.created_at)
-           ORDER BY x.created_at DESC LIMIT 1)))`,
+         OR (s.created_at < now() - interval '1 day' AND s.reason = 'auto'
+             AND s.id <> (SELECT x.id FROM snapshots x WHERE x.user_id = $1 AND date_trunc('day', x.created_at) = date_trunc('day', s.created_at)
+                          ORDER BY x.created_at DESC LIMIT 1)
+             AND s.id <> (SELECT x.id FROM snapshots x WHERE x.user_id = $1 AND date_trunc('day', x.created_at) = date_trunc('day', s.created_at)
+                          ORDER BY x.created_at ASC LIMIT 1)))`,
       [userId, KEEP_DAYS],
     );
     return rows[0]?.[0] ?? null;

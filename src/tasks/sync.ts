@@ -676,9 +676,10 @@ export function initTaskSync() {
   if (isNative()) {
     void setupNative().then(async () => {
       // как в TickTick: разрешение на уведомления спрашиваем при первом запуске
+      // (новичка спросит знакомство с приложением — не показываем два запроса сразу)
       let asked = false;
       try {
-        asked = !!localStorage.getItem('sm-notify-asked');
+        asked = !!localStorage.getItem('sm-notify-asked') || !localStorage.getItem('sm-onboarded');
         localStorage.setItem('sm-notify-asked', '1');
       } catch {
         /* хранилище недоступно */

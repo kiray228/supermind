@@ -18,7 +18,24 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- «Поделиться → SuperMind»: текст и ссылки из других приложений -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
         </activity>
+
+        <!-- Виджет «SuperMind — Сегодня» -->
+        <receiver
+            android:name=".TodayWidget"
+            android:label="@string/widget_today_label"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_today_info" />
+        </receiver>
 
         <provider
             android:name="androidx.core.content.FileProvider"
