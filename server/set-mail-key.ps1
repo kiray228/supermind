@@ -13,7 +13,12 @@ if (-not $key) { Write-Host 'Ключ пустой - отмена'; exit 1 }
 $from = Read-Host -Prompt 'Адрес отправителя, подтверждённый в Brevo [edamkaldybek@gmail.com]'
 if (-not $from) { $from = 'edamkaldybek@gmail.com' }
 
-& neon functions deploy supermind --src src/index.ts `
+# neon может не быть в PATH этого терминала — берём из глобальной папки npm
+$neon = (Get-Command neon -ErrorAction SilentlyContinue).Source
+if (-not $neon) { $neon = Join-Path $env:APPDATA 'npm/neon.cmd' }
+if (-not (Test-Path -LiteralPath $neon)) { Write-Host 'Не найден Neon CLI (npm i -g neonctl)'; exit 1 }
+
+& $neon functions deploy supermind --src src/index.ts `
   --project-id summer-math-35594657 --branch br-soft-term-b1xn6yim `
   --env "BREVO_API_KEY=$key" --env "MAIL_FROM=$from" --env "MAIL_NAME=SuperMind"
 $code = $LASTEXITCODE
