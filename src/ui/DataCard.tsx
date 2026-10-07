@@ -23,7 +23,7 @@ import { isNative } from '../platform';
 const when = (ms: number) =>
   new Date(ms).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 const size = (b: number) => (b > 1048576 ? `${(b / 1048576).toFixed(1)} МБ` : `${Math.max(1, Math.round(b / 1024))} КБ`);
-const CLOUD_REASON: Record<string, string> = { auto: 'Ежедневная', manual: 'Вручную' };
+const CLOUD_REASON: Record<string, string> = { auto: 'Автоматическая', manual: 'Вручную' };
 
 /** Данные: защита, автокопии на устройстве и в облаке, файл-копия, удаление */
 export function DataCard() {
@@ -148,7 +148,7 @@ export function DataCard() {
         <b>Автокопии на устройстве</b>
         <span className="tiny muted">{newest ? `последняя ${when(newest.at)}` : 'ещё нет'}</span>
       </div>
-      <p className="tiny muted dc-note">Делаются сами: раз в сутки, перед обновлением приложения, перед входом в аккаунт и перед восстановлением. Хранятся последние 12.</p>
+      <p className="tiny muted dc-note">Делаются сами: каждые 3 часа, перед обновлением приложения, перед входом в аккаунт и перед восстановлением. Хранятся свежие и по одной на каждый день за 2 недели.</p>
       <div className="dc-list">
         {shown.map((s) => (
           <div key={s.id} className="dc-row">
@@ -183,11 +183,11 @@ export function DataCard() {
             </b>
             <span className="tiny muted">{cloud?.[0] ? `последняя ${when(cloud[0].at)}` : ''}</span>
           </div>
-          <p className="tiny muted dc-note">Сервер сам сохраняет копию раз в сутки, до первых изменений за день, и хранит последние 14 — даже если данные испортятся на всех устройствах.</p>
+          <p className="tiny muted dc-note">Сервер сам сохраняет копию каждый час, когда вы что-то меняете: все за последние сутки и по одной на каждый день за 30 дней — даже если данные испортятся на всех устройствах.</p>
           <div className="dc-list">
             {cloudErr && <p className="tiny muted">{cloudErr}</p>}
-            {cloud?.length === 0 && <p className="tiny muted">Первая копия появится завтра или нажмите «Копия в облако».</p>}
-            {(cloud ?? []).slice(0, all ? 14 : 3).map((s) => (
+            {cloud?.length === 0 && <p className="tiny muted">Первая копия появится при следующем изменении или нажмите «Копия в облако».</p>}
+            {(cloud ?? []).slice(0, all ? 60 : 3).map((s) => (
               <div key={s.id} className="dc-row">
                 <div className="grow">
                   <div className="small bold">

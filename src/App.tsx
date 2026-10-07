@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { Network, KanbanSquare, Settings as SettingsIcon, CheckSquare, CalendarRange, Timer, Menu as MenuIcon, NotebookPen, StickyNote, Target, Wallet } from 'lucide-react';
+import { Network, KanbanSquare, Settings as SettingsIcon, CheckSquare, CalendarRange, Timer, Menu as MenuIcon, NotebookPen, StickyNote, Target, Wallet, Bot, Trophy } from 'lucide-react';
 import { useApp, type View } from './store/appStore';
 import { listDocs, loadSettings, saveDoc } from './store/db';
 import { get as idbGet, set as idbSet } from './store/kv';
@@ -28,6 +28,8 @@ const Focus = lazy(() => import('./views/Focus'));
 const Notes = lazy(() => import('./views/Notes'));
 const Goals = lazy(() => import('./views/Goals'));
 const Finance = lazy(() => import('./views/Finance'));
+const Assistant = lazy(() => import('./views/Assistant'));
+const Progress = lazy(() => import('./views/Progress'));
 
 /** phone: false — на телефоне пункт в меню «Ещё» */
 const NAV: { id: View; label: string; icon: typeof Network; phone: boolean }[] = [
@@ -35,9 +37,11 @@ const NAV: { id: View; label: string; icon: typeof Network; phone: boolean }[] =
   { id: 'tasks', label: 'Задачи', icon: CheckSquare, phone: true },
   { id: 'calendar', label: 'Календарь', icon: CalendarRange, phone: true },
   { id: 'planner', label: 'Ежедневник', icon: NotebookPen, phone: true },
+  { id: 'assistant', label: 'Ассистент', icon: Bot, phone: false },
   { id: 'notes', label: 'Заметки', icon: StickyNote, phone: false },
   { id: 'goals', label: 'Цели', icon: Target, phone: false },
   { id: 'finance', label: 'Финансы', icon: Wallet, phone: false },
+  { id: 'progress', label: 'Прогресс', icon: Trophy, phone: false },
   { id: 'focus', label: 'Фокус', icon: Timer, phone: false },
   { id: 'board', label: 'Доска', icon: KanbanSquare, phone: false },
   { id: 'settings', label: 'Настройки', icon: SettingsIcon, phone: false },
@@ -164,6 +168,8 @@ export default function App() {
           {view === 'notes' && <Notes />}
           {view === 'goals' && <Goals />}
           {view === 'finance' && <Finance />}
+          {view === 'assistant' && <Assistant />}
+          {view === 'progress' && <Progress />}
         </Suspense>
       </main>
       {more && (

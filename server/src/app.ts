@@ -3,7 +3,7 @@
  *
  *   POST /auth/register, /auth/login, /auth/logout, /auth/password · GET /auth/me · DELETE /account
  *   GET /sync?since=N · POST /sync
- *   GET /snapshots · GET /snapshots/:id · POST /snapshots — облачные копии данных (раз в сутки — сами)
+ *   GET /snapshots · GET /snapshots/:id · POST /snapshots — облачные копии данных (каждый час при изменениях — сами)
  *   GET /push/key · POST /devices · PUT /devices/:id/schedule · POST /devices/:id/test · DELETE /devices/:id
  *   POST /cron — Neon Function Trigger раз в минуту: рассылает наступившие напоминания
  */
@@ -25,8 +25,9 @@ const VAPID_SUBJECT = 'https://kiray228.github.io/2mind/';
 const MAX_ITEM_BYTES = 8 * 1024 * 1024;
 const MAX_SCHEDULE = 500;
 const PULL_LIMIT = 300;
-/** Сколько облачных копий хранить на пользователя */
-const KEEP_SNAPSHOTS = 14;
+/** Облачные копии: не чаще раза в час; хранятся все за последние сутки и по одной на день за 30 дней */
+const SNAPSHOT_EVERY = '55 minutes';
+const KEEP_DAYS = 30;
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -221,7 +222,7 @@ export function createApp(deps: Deps) {
     const b = await body<{ items?: { key: string; value: unknown; updatedAt: number; deleted?: boolean; baseSeq?: number }[] }>(
       request,
     );
-    // перед первым за сутки изменением уже сохранённого — копия того, что было (защита от ошибочной синхронизации);
+    // перед первым за час изменением уже сохранённого — копия того, что было (защита от ошибочной синхронизации);
     // новые ключи ничего не затирают — для них копия не нужна
     if ((b.items ?? []).some((i) => Number(i.baseSeq) > 0)) await autoSnapshot(user.id);
     const results: { key: string; ok: boolean; seq?: number }[] = [];
@@ -256,17 +257,21 @@ export function createApp(deps: Deps) {
        RETURNING id`,
       [userId, reason],
     );
+    // старше суток — только последняя копия каждого дня; старше 30 дней — прочь
     await sql.query(
-      `DELETE FROM snapshots WHERE user_id = $1 AND id NOT IN (
-         SELECT id FROM snapshots WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2)`,
-      [userId, KEEP_SNAPSHOTS],
+      `DELETE FROM snapshots s WHERE s.user_id = $1 AND (
+         s.created_at < now() - make_interval(days => $2)
+         OR (s.created_at < now() - interval '1 day' AND s.id <> (
+           SELECT x.id FROM snapshots x WHERE x.user_id = $1 AND date_trunc('day', x.created_at) = date_trunc('day', s.created_at)
+           ORDER BY x.created_at DESC LIMIT 1)))`,
+      [userId, KEEP_DAYS],
     );
     return rows[0]?.[0] ?? null;
   }
 
   async function autoSnapshot(userId: string) {
     const rows = await sql.query(
-      `SELECT 1 FROM snapshots WHERE user_id = $1 AND reason = 'auto' AND created_at > now() - interval '20 hours' LIMIT 1`,
+      `SELECT 1 FROM snapshots WHERE user_id = $1 AND reason = 'auto' AND created_at > now() - interval '${SNAPSHOT_EVERY}' LIMIT 1`,
       [userId],
     );
     if (!rows[0]) await snapshot(userId, 'auto');

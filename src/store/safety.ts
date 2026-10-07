@@ -1,5 +1,5 @@
 /**
- * Защита данных от потери: автокопии на устройстве (раз в сутки, при обновлении приложения,
+ * Защита данных от потери: автокопии на устройстве (раз в 3 часа, при обновлении приложения,
  * перед входом в аккаунт и перед восстановлением), запрет браузеру очищать хранилище
  * и восстановление из любой копии — локальной, облачной или файла.
  */
@@ -11,11 +11,14 @@ export const APP_VERSION = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__
 
 /** Отдельная база: «Удалить всё» и сбои основной базы копии не трогают */
 const store = createStore('supermind-safety', 'snapshots');
-const KEEP = 12;
+/** Автокопия не чаще чем раз в 3 часа; хранятся 8 последних и по одной на день за 14 дней */
+const EVERY = 3 * 3600_000;
+const KEEP_RECENT = 8;
+const KEEP_DAYS = 14;
 
 export type SnapshotReason = 'auto' | 'update' | 'login' | 'restore' | 'manual';
 export const REASON_LABEL: Record<SnapshotReason, string> = {
-  auto: 'Ежедневная',
+  auto: 'Автоматическая',
   update: 'Перед обновлением',
   login: 'Перед входом в аккаунт',
   restore: 'Перед восстановлением',
@@ -77,24 +80,52 @@ export async function takeSnapshot(reason: SnapshotReason): Promise<SnapshotInfo
     const at = Date.now();
     const snap: Snapshot = { id: `${at}`, at, reason, version: APP_VERSION, keys: n, bytes, summary: summarize(data), data };
     await sset(snap.id, snap, store);
-    const index = await listSnapshots();
-    // самые старые — прочь; хотя бы одна ежедневная остаётся всегда
-    for (const old of index.slice(KEEP)) await sdel(old.id, store);
-    await sset('index', index.slice(0, KEEP), store);
+    const { data: _data, ...info } = snap;
+    void _data;
+    await saveIndex([info, ...(await listSnapshots())]);
+    await prune();
     return snap;
   } catch {
     return null; // нет места и т. п. — приложение работает дальше
   }
 }
 
+/** Свежие — все (до 8), дальше — последняя копия каждого дня, старше 14 дней — прочь */
+async function prune() {
+  const list = await listSnapshots();
+  const seenDays = new Set<string>();
+  const old = Date.now() - KEEP_DAYS * 86400000;
+  const kept: SnapshotInfo[] = [];
+  for (const [i, s] of list.entries()) {
+    const day = new Date(s.at).toDateString();
+    if (i < KEEP_RECENT || (s.at > old && !seenDays.has(day))) kept.push(s);
+    else await sdel(s.id, store);
+    seenDays.add(day);
+  }
+  if (kept.length !== list.length) await saveIndex(kept);
+}
+
+/** Список копий хранится отдельно — чтобы не читать сами копии (они бывают большими) */
+const INDEX = 'meta-index';
+let cache: SnapshotInfo[] | null = null;
+async function saveIndex(list: SnapshotInfo[]) {
+  cache = [...new Map(list.map((x) => [x.id, x])).values()].sort((a, b) => b.at - a.at);
+  await sset(INDEX, cache, store);
+}
+
 export async function listSnapshots(): Promise<SnapshotInfo[]> {
+  if (cache) return [...cache];
+  const saved = await sget<SnapshotInfo[]>(INDEX, store);
+  if (saved) return [...(cache = saved)];
+  // копии версии 1.7 — без списка: собрать один раз
   const ids = (await skeys(store)).filter((k): k is string => typeof k === 'string' && /^\d+$/.test(k));
   const out: SnapshotInfo[] = [];
   for (const id of ids) {
     const s = await sget<Snapshot>(id, store);
     if (s) out.push({ id: s.id, at: s.at, reason: s.reason, version: s.version, keys: s.keys, bytes: s.bytes, summary: s.summary });
   }
-  return out.sort((a, b) => b.at - a.at);
+  await saveIndex(out);
+  return [...cache!];
 }
 
 export async function snapshotData(id: string): Promise<Record<string, unknown> | null> {
@@ -103,19 +134,28 @@ export async function snapshotData(id: string): Promise<Record<string, unknown> 
 
 const LAST_VERSION = 'last-version';
 
-/** При запуске: копия раз в сутки и при смене версии приложения; просим браузер не очищать данные */
+/** При запуске: копия раз в 3 часа и при смене версии приложения; просим браузер не очищать данные */
 export async function startupSafety() {
   void requestPersistence();
   try {
     const last = await sget<string>(LAST_VERSION, store);
     const list = await listSnapshots();
     if (last && last !== APP_VERSION) await takeSnapshot('update');
-    else if (!list.some((s) => s.reason === 'auto' && s.at > Date.now() - 20 * 3600_000)) await takeSnapshot('auto');
+    else if (!list.some((s) => s.at > Date.now() - EVERY)) await takeSnapshot('auto');
     if (last !== APP_VERSION) await sset(LAST_VERSION, APP_VERSION, store);
   } catch {
     /* копия не получилась — не мешаем запуску */
   }
+  // приложение открыто долго — копия при сворачивании, если прошло 3 часа
+  if (!wired) {
+    wired = true;
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'hidden') return;
+      void listSnapshots().then((l) => (l.some((s) => s.at > Date.now() - EVERY) ? null : takeSnapshot('auto')));
+    });
+  }
 }
+let wired = false;
 
 /** Защищено ли хранилище от автоматической очистки браузером (Safari чистит сайты через 7 дней без входа) */
 export async function requestPersistence(): Promise<boolean> {
