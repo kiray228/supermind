@@ -241,11 +241,12 @@ function briefingFor(tasks: TaskItem[], p: PlannerData | undefined, day: string)
   const active = tasks.filter((t) => isActive(t) && t.date);
   const today = active.filter((t) => t.date === day).sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0) || (a.time ?? '99').localeCompare(b.time ?? '99'));
   const overdue = active.filter((t) => t.date! < day && day <= addDaysYmd(toYmd(new Date()), 1)).length;
-  const habits = p ? hm.activeHabits(p.habits ?? []).filter((h) => hm.dueOn(p.days ?? {}, h, day)).length : 0;
+  const due = p ? hm.activeHabits(p.habits ?? []).filter((h) => hm.dueOn(p.days ?? {}, h, day)) : [];
+  const habits = due.filter((h) => !hm.doneOn(p?.days ?? {}, h, day)).length;
   const parts: string[] = [];
   parts.push(today.length ? `Задач на сегодня: ${today.length}` : 'Задач на сегодня нет');
   if (overdue) parts.push(`просрочено: ${overdue}`);
-  if (habits) parts.push(`привычек: ${habits}`);
+  if (habits) parts.push(habits < due.length ? `привычки: осталось ${habits} из ${due.length}` : `привычек: ${habits}`);
   let body = parts.join(' · ');
   if (today[0]) {
     const t = today[0].time;

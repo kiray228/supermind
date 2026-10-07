@@ -162,6 +162,7 @@
 
 /* ================= Окно задачи ================= */
 .td-modal { width: min(620px, 100%); padding: 14px 16px 18px; display: flex; flex-direction: column; gap: 4px; }
+.td-modal > * { flex-shrink: 0; }
 .td-top { display: flex; align-items: center; gap: 6px; padding-bottom: 6px; border-bottom: 1px solid var(--border); margin-bottom: 6px; }
 .td-top .tk-check { width: 22px; height: 22px; margin: 0 4px 0 2px; }
 .td-when {

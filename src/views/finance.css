@@ -137,6 +137,8 @@
 
 /* ---------- Окно операции ---------- */
 .fn-modal { display: flex; flex-direction: column; }
+/* с клавиатурой окно ниже — содержимое прокручивается, а не сжимается */
+.fn-modal > * { flex-shrink: 0; }
 .fn-modal-head { margin-bottom: 8px; }
 .fn-modal-head h2 { margin: 0; }
 .fn-actions { align-items: center; }

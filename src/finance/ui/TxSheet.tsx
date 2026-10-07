@@ -195,7 +195,15 @@ function TxForm({ data }: { data: FinanceData }) {
           {date !== today && date !== yesterday ? dateShort(date) : 'Дата…'}
           <input type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} />
         </label>
-        <input type="time" className="input fn-time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="Время" />
+        <label className={'chip fn-chip fn-date-chip' + (time ? ' active' : '')}>
+          {time || 'Время'}
+          <input type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="Время" />
+        </label>
+        {time && (
+          <button type="button" className="chip fn-chip" onClick={() => setTime('')} aria-label="Без времени">
+            ✕
+          </button>
+        )}
       </div>
 
       <label className="label">Комментарий</label>

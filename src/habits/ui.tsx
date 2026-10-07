@@ -47,7 +47,7 @@ const dayTitle = (ymd: string) => {
 function metaParts(h: Habit, days: Days, date: string): string[] {
   const out: string[] = [];
   const t = targetOf(h);
-  if (t > 1) out.push(`${countOn(days[date], h)} / ${t}${h.unit ? ` ${h.unit}` : ''}`);
+  if (t > 1) out.push(`${h.unit ? `${h.unit}: ` : ''}${countOn(days[date], h)} / ${t}`);
   const tr = timeRangeLabel(h);
   if (tr) out.push(tr);
   else if (h.duration) out.push(durationLabel(h.duration));
@@ -217,7 +217,7 @@ export function HabitDetail({
   const cols = heatmap(days, h, today, 12);
   const remind = reminderTimeOf(h);
   const t = targetOf(h);
-  const info = [freqLabel(h), timeRangeLabel(h) || (h.duration ? durationLabel(h.duration) : ''), t > 1 ? `цель ×${t}${h.unit ? ` ${h.unit}` : ''}` : '']
+  const info = [freqLabel(h), timeRangeLabel(h) || (h.duration ? durationLabel(h.duration) : ''), t > 1 ? `цель ×${t}${h.unit ? ` (${h.unit})` : ''}` : '']
     .filter(Boolean)
     .join(' · ');
   // подписи месяцев над столбцами — там, где месяц сменился
@@ -649,7 +649,7 @@ export function HabitsManager({
                     <span className="grow hb-item-body">
                       <span className="hb-item-name ellipsis">{h.name}</span>
                       <span className="hb-item-meta ellipsis">
-                        {[freqLabel(h), timeRangeLabel(h), targetOf(h) > 1 ? `×${targetOf(h)}${h.unit ? ` ${h.unit}` : ''}` : ''].filter(Boolean).join(' · ')}
+                        {[freqLabel(h), timeRangeLabel(h), targetOf(h) > 1 ? `×${targetOf(h)}${h.unit ? ` (${h.unit})` : ''}` : ''].filter(Boolean).join(' · ')}
                       </span>
                     </span>
                     {reminderTimeOf(h) && <Bell size={14} className="faint" />}

@@ -134,10 +134,10 @@
 /* окна и меню лежат поверх затемнения с размытием — их собственное размытие там не работает,
    поэтому они плотнее карточек (текст под окном не просвечивает) */
 :root[data-glass='liquid'] :is(.modal, .menu, .td-pop, .menu-sheet, .rm-card) {
-  background: var(--lg-sheen), rgba(255, 255, 255, 0.9);
+  background: var(--lg-sheen), rgba(255, 255, 255, 0.96);
 }
 :root[data-glass='liquid'][data-theme='dark'] :is(.modal, .menu, .td-pop, .menu-sheet, .rm-card) {
-  background: var(--lg-sheen), rgba(30, 32, 40, 0.94);
+  background: var(--lg-sheen), rgba(30, 32, 40, 0.985);
 }
 :root[data-glass='liquid'] .ai-grad {
   background: linear-gradient(135deg, var(--accent), #a855f7);
