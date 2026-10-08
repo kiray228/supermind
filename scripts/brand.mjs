@@ -1,5 +1,5 @@
 /**
- * Логотип SuperMind «Рост» — дерево мыслей на изумрудном градиенте.
+ * Логотип SuperMind «S-ветвь» — буква S из ветви интеллект-карты с узлами на концах, синий градиент Apple.
  * Генерирует все иконки (веб, PWA, Android) и заставки:  node scripts/brand.mjs
  */
 import { Resvg } from '@resvg/resvg-js';
@@ -11,37 +11,27 @@ const require = createRequire(import.meta.url);
 void require;
 
 const GRAD = `<linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-  <stop offset="0" stop-color="#34D399"/><stop offset=".55" stop-color="#10B981"/><stop offset="1" stop-color="#0E7490"/>
+  <stop offset="0" stop-color="#5AC8FA"/><stop offset=".55" stop-color="#007AFF"/><stop offset="1" stop-color="#3634A3"/>
 </linearGradient>
 <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
-  <stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset=".45" stop-color="#fff" stop-opacity="0"/>
+  <stop offset="0" stop-color="#fff" stop-opacity=".24"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/>
 </linearGradient>`;
 
-/** Дерево мыслей (белое) в квадрате 512 */
-const TREE = `<g fill="none" stroke="#fff" stroke-width="22" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M256 392 L256 236"/>
-  <path d="M256 304 C256 262 214 252 180 218"/>
-  <path d="M256 264 C256 224 296 214 332 182"/>
-  <path d="M256 236 C256 196 244 168 256 132"/>
-</g>
-<g fill="#fff">
-  <circle cx="174" cy="210" r="30"/>
-  <circle cx="338" cy="174" r="30"/>
-  <circle cx="256" cy="122" r="34"/>
-</g>
-<rect x="198" y="384" width="116" height="22" rx="11" fill="#fff" opacity=".9"/>`;
+/** «S-ветвь» (белая) в квадрате 512 */
+const GLYPH = `<path fill="none" stroke="#fff" stroke-width="30" stroke-linecap="round" stroke-linejoin="round" d="M342 166 C330 126 286 112 250 116 C196 122 170 164 184 200 C200 240 256 246 290 262 C336 284 346 330 318 366 C292 398 228 400 186 366"/>
+<g fill="#fff"><circle cx="346" cy="160" r="30"/><circle cx="178" cy="362" r="30"/></g>`;
 
 const svg = (body, defs = GRAD) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs>${defs}</defs>${body}</svg>`;
 
 /** Полная иконка: скруглённый квадрат */
-export const ICON = svg(`<rect width="512" height="512" rx="114" fill="url(#g)"/><rect width="512" height="512" rx="114" fill="url(#sheen)"/>${TREE}`);
-/** Без скругления (iOS скругляет сам, PWA maskable) — дерево меньше, в безопасной зоне */
-const FULL = svg(`<rect width="512" height="512" fill="url(#g)"/><rect width="512" height="512" fill="url(#sheen)"/><g transform="translate(256 262) scale(.78) translate(-256 -262)">${TREE}</g>`);
-const MASKABLE = svg(`<rect width="512" height="512" fill="url(#g)"/><g transform="translate(256 262) scale(.66) translate(-256 -262)">${TREE}</g>`);
-const ROUND = svg(`<circle cx="256" cy="256" r="256" fill="url(#g)"/><circle cx="256" cy="256" r="256" fill="url(#sheen)"/><g transform="translate(256 262) scale(.82) translate(-256 -262)">${TREE}</g>`);
+export const ICON = svg(`<rect width="512" height="512" rx="114" fill="url(#g)"/><rect width="512" height="512" rx="114" fill="url(#sheen)"/>${GLYPH}`);
+/** Без скругления (iOS скругляет сам, PWA maskable) — логотип меньше, в безопасной зоне */
+const FULL = svg(`<rect width="512" height="512" fill="url(#g)"/><rect width="512" height="512" fill="url(#sheen)"/><g transform="translate(262 258) scale(.78) translate(-262 -258)">${GLYPH}</g>`);
+const MASKABLE = svg(`<rect width="512" height="512" fill="url(#g)"/><g transform="translate(262 258) scale(.66) translate(-262 -258)">${GLYPH}</g>`);
+const ROUND = svg(`<circle cx="256" cy="256" r="256" fill="url(#g)"/><circle cx="256" cy="256" r="256" fill="url(#sheen)"/><g transform="translate(262 258) scale(.82) translate(-262 -258)">${GLYPH}</g>`);
 const BG = svg(`<rect width="512" height="512" fill="url(#g)"/><rect width="512" height="512" fill="url(#sheen)"/>`);
-/** Передний слой адаптивной иконки Android: в xml есть отступ 16.7%, поэтому дерево почти во весь слой */
-const FG = svg(`<g transform="translate(256 262) scale(.92) translate(-256 -262)">${TREE}</g>`);
+/** Передний слой адаптивной иконки Android: в xml есть отступ 16.7%, поэтому логотип почти во весь слой */
+const FG = svg(`<g transform="translate(262 258) scale(.92) translate(-262 -258)">${GLYPH}</g>`);
 
 const png = (s, w, h = w) => new Resvg(s, { fitTo: { mode: 'width', value: w }, background: 'rgba(0,0,0,0)' }).render().asPng();
 function pngCanvas(inner, w, h, bg) {

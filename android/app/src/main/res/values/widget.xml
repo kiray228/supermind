@@ -23,7 +23,7 @@
     <color name="widget_bg">#F7FFFFFF</color>
     <color name="widget_text">#1B1C20</color>
     <color name="widget_text2">#6B6F78</color>
-    <color name="widget_accent">#10B981</color>
+    <color name="widget_accent">#007AFF</color>
     <color name="widget_on_accent">#FFFFFF</color>
     <color name="widget_chip">#F1F2F5</color>
     <color name="widget_track">#E2E4EA</color>

@@ -286,7 +286,7 @@ function setupNative(): Promise<void> {
       visibility: 1,
       vibration: true,
       lights: true,
-      lightColor: '#10B981',
+      lightColor: '#007AFF',
     }).catch(() => {});
     await LN.registerActionTypes({
       types: [

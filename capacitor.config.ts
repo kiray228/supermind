@@ -10,7 +10,7 @@ const config: CapacitorConfig = {
   plugins: {
     LocalNotifications: {
       smallIcon: 'ic_stat_supermind',
-      iconColor: '#10B981',
+      iconColor: '#007AFF',
     },
     SplashScreen: {
       // короткая заставка: дольше держать её нельзя — пока она на экране, первый кадр WebView

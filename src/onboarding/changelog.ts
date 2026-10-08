@@ -16,6 +16,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.17',
+    title: 'Новый логотип',
+    items: [
+      { icon: Sparkles, title: 'Логотип «S-ветвь»', text: 'Буква S из ветви интеллект-карты — на значке приложения, заставке, сайте и виджетах. В цвет «Стандарт».' },
+    ],
+  },
+  {
     version: '1.16',
     title: 'ИИ для всех и 50+ исправлений',
     items: [

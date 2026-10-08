@@ -72,10 +72,10 @@ export function resetMail(to: string, name: string, code: string): Mail {
     html: `<!doctype html><html><body style="margin:0;background:#f2f2f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f2f2f7;padding:32px 16px"><tr><td align="center">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:440px;background:#ffffff;border-radius:20px;padding:32px 28px">
-<tr><td align="center" style="padding-bottom:16px"><div style="width:64px;height:64px;border-radius:16px;background:linear-gradient(135deg,#34D399,#10B981 55%,#0E7490);color:#fff;font-size:32px;line-height:64px">🌱</div></td></tr>
+<tr><td align="center" style="padding-bottom:16px"><div style="width:64px;height:64px;border-radius:16px;background:linear-gradient(135deg,#5AC8FA,#007AFF 55%,#3634A3);color:#fff;font-size:36px;font-weight:700;line-height:64px">S</div></td></tr>
 <tr><td style="font-size:22px;font-weight:700;color:#000;text-align:center;padding-bottom:8px">Восстановление пароля</td></tr>
 <tr><td style="font-size:16px;color:#3c3c43;text-align:center;line-height:1.5;padding-bottom:22px">${hello} Введите этот код в SuperMind, чтобы задать новый пароль:</td></tr>
-<tr><td align="center" style="padding-bottom:22px"><div style="display:inline-block;font-size:34px;font-weight:700;letter-spacing:8px;color:#0c9f6e;background:#ecfdf5;border-radius:14px;padding:14px 22px">${code}</div></td></tr>
+<tr><td align="center" style="padding-bottom:22px"><div style="display:inline-block;font-size:34px;font-weight:700;letter-spacing:8px;color:#007aff;background:#eef5ff;border-radius:14px;padding:14px 22px">${code}</div></td></tr>
 <tr><td style="font-size:14px;color:#8e8e93;text-align:center;line-height:1.5">Код действует 15 минут. Если вы не запрашивали восстановление — просто проигнорируйте письмо, пароль не изменится.</td></tr>
 </table></td></tr></table></body></html>`,
   };
