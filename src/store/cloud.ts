@@ -53,6 +53,9 @@ export const useCloud = create<CloudState>(() => ({ account: null, ready: false,
 let account: Account | null = null;
 let meta: SyncMeta = { cursor: 0, seqs: {} };
 
+/** Ключи, которые не помещаются в облако: их отметка «изменено» не снимается — в счёт неотправленного не идут */
+export const isLocalOnly = (key: string) => !!meta.localOnly && key in meta.localOnly;
+
 export function authHeader(): Record<string, string> {
   return account ? { Authorization: `Bearer ${account.token}` } : {};
 }

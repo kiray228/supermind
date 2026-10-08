@@ -5,7 +5,7 @@
  * Данные — те же, что у Ежедневника (IDB 'planner').
  */
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, ReactNode, TouchEvent as ReactTouchEvent } from 'react';
+import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactNode, TouchEvent as ReactTouchEvent } from 'react';
 import {
   CaretDown,
   CaretLeft,
@@ -16,9 +16,11 @@ import {
   Minus,
   MoonStars,
   NotePencil,
+  Pause,
   Plant,
   Plus,
   SlidersHorizontal,
+  Snowflake,
   Sparkle,
   Sun,
   SunHorizon,
@@ -42,17 +44,18 @@ import {
   durationLabel,
   freqLabel,
   freqOf,
+  frozenOn,
   isCounter,
   mondayOf,
   partOf,
   PARTS,
-  perWeekOf,
   plural,
   reminderTimeOf,
   streakText,
   targetOf,
   timeRangeLabel,
   weekCount,
+  weekGoal,
   withCount,
   withDone,
   withoutHabit,
@@ -60,6 +63,8 @@ import {
 import type { Streak } from '../habits/model';
 import { HABIT_LIBRARY, habitFromPreset } from '../habits/library';
 import { HabitDetail, HabitEditor, HabitsManager } from '../habits/ui';
+import { FreezeSheet } from '../habits/freeze';
+import { freezeHandlers, freezeStatus, hasPauseAhead } from '../habits/freezeActions';
 import './habits-page.css';
 
 type Days = PlannerData['days'];
@@ -116,16 +121,21 @@ const existedOn = (h: Habit, ymd: string) => !h.createdAt || toYmd(new Date(h.cr
 
 const isDue = (days: Days, h: Habit, ymd: string) => existedOn(h, ymd) && dueOn(days, h, ymd);
 
-/** Выполнено / запланировано за день */
-function dayScore(days: Days, habits: Habit[], ymd: string): { done: number; due: number } {
+/** Заморожена в этот день (пропуск или пауза) — среди тех, что уже существовали */
+const isFrozen = (days: Days, h: Habit, ymd: string) => existedOn(h, ymd) && !!frozenOn(days, h, ymd);
+
+/** Выполнено / запланировано / заморожено за день */
+function dayScore(days: Days, habits: Habit[], ymd: string): { done: number; due: number; frozen: number } {
   let done = 0;
   let due = 0;
+  let frozen = 0;
   for (const h of habits) {
+    if (isFrozen(days, h, ymd)) frozen++;
     if (!isDue(days, h, ymd)) continue;
     due++;
     if (doneOn(days, h, ymd)) done++;
   }
-  return { done, due };
+  return { done, due, frozen };
 }
 
 const haptic = () => {
@@ -233,7 +243,16 @@ function usePlannerData() {
     [commit],
   );
 
-  return { data, ref, commit, updateDay };
+  /** изменить список привычек на свежих данных */
+  const updateHabits = useCallback(
+    (fn: (list: Habit[]) => Habit[]) => {
+      const p = ref.current;
+      if (p) commit({ ...p, habits: fn(p.habits) });
+    },
+    [commit],
+  );
+
+  return { data, ref, commit, updateDay, updateHabits };
 }
 
 /** Сегодняшняя дата, которая сама меняется после полуночи */
@@ -256,7 +275,7 @@ function useToday(): string {
 // ---------- Раздел ----------
 
 export default function Habits() {
-  const { data, ref, commit, updateDay } = usePlannerData();
+  const { data, ref, commit, updateDay, updateHabits } = usePlannerData();
   const today = useToday();
   /** выбранный день; null — всегда «сегодня» */
   const [picked, setPicked] = useState<string | null>(null);
@@ -270,6 +289,8 @@ export default function Habits() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [editing, setEditing] = useState<Habit | 'new' | null>(null);
   const [burst, setBurst] = useState<string | null>(null);
+  /** лист заморозки: меню привычки или сразу «Пауза…» */
+  const [sheet, setSheet] = useState<{ id: string; stage: 'menu' | 'pause' } | null>(null);
   const burstTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(burstTimer.current), []);
 
@@ -289,7 +310,8 @@ export default function Habits() {
 
   // ----- сводка -----
   const due = useMemo(() => habits.filter((h) => isDue(days, h, date)).sort(compareByTime), [habits, days, date]);
-  const off = useMemo(() => habits.filter((h) => !isDue(days, h, date)), [habits, days, date]);
+  const frozen = useMemo(() => habits.filter((h) => isFrozen(days, h, date)), [habits, days, date]);
+  const off = useMemo(() => habits.filter((h) => !isDue(days, h, date) && !isFrozen(days, h, date)), [habits, days, date]);
   const doneCount = due.filter((h) => doneOn(days, h, date)).length;
   const bestNow = useMemo(() => {
     let best: { h: Habit; s: Streak } | null = null;
@@ -359,6 +381,9 @@ export default function Habits() {
     if (reminderTimeOf(h) && !h.archived) void askNotifyIfNeeded();
     syncSoon(300);
   };
+  // ----- заморозка серии -----
+  const freeze = freezeHandlers(() => ({ updateHabits, updateDay, today, feedback: haptic }));
+
   const addPreset = (h: Habit) => {
     saveHabit(h);
     toast(`${h.icon ?? ''} «${h.name}» добавлена`.trim());
@@ -403,6 +428,8 @@ export default function Habits() {
 
   const day = data.days[date] ?? emptyDay();
   const detail = detailId ? data.habits.find((h) => h.id === detailId && !h.deleted) : undefined;
+  const sheetHabit = sheet ? data.habits.find((h) => h.id === sheet.id && !h.deleted) : undefined;
+  const pausedNow = habits.filter((h) => hasPauseAhead(h, today));
   const groups = PARTS.map((p) => ({ ...p, list: due.filter((h) => partOf(h) === p.id) })).filter((g) => g.list.length);
   const isToday = date === today;
   const future = date > today;
@@ -417,6 +444,7 @@ export default function Habits() {
       onTap={() => tap(h)}
       onMinus={() => tap(h, -1)}
       onOpen={() => setDetailId(h.id)}
+      onMenu={() => setSheet({ id: h.id, stage: 'menu' })}
     />
   );
 
@@ -454,14 +482,20 @@ export default function Habits() {
                 <div className="hp-hero-text">
                   <div className="hp-hero-big">
                     {due.length === 0 ? (
-                      'Свободный день'
+                      frozen.length > 0 ? (
+                        'Пауза ❄️'
+                      ) : (
+                        'Свободный день'
+                      )
                     ) : (
                       <>
                         {doneCount} из {due.length} {isToday ? 'сегодня' : future ? 'по плану' : 'за день'}
                       </>
                     )}
                   </div>
-                  <div className="hp-hero-sub">{heroHint(doneCount, due.length, isToday, future)}</div>
+                  <div className="hp-hero-sub">
+                    {due.length === 0 && frozen.length > 0 ? 'Серии заморожены — они не прервутся' : heroHint(doneCount, due.length, isToday, future)}
+                  </div>
                 </div>
               </div>
             )}
@@ -484,6 +518,23 @@ export default function Habits() {
                     <b>{Math.round(weekRate * 100)}%</b>
                     <span className="hp-chip-dim">за неделю</span>
                   </span>
+                )}
+                {pausedNow.length > 0 && (
+                  <button
+                    className="hp-chip hp-chip-pause"
+                    onClick={() => (pausedNow.length === 1 ? setSheet({ id: pausedNow[0].id, stage: 'menu' }) : freeze.resume('all'))}
+                    title={pausedNow.length === 1 ? 'Пауза: возобновить или продлить' : 'Снять паузу со всех привычек'}
+                  >
+                    <Pause size={18} weight="fill" />
+                    <b className="ellipsis">
+                      {pausedNow.length === 1
+                        ? pausedNow[0].name
+                        : pausedNow.length === habits.length
+                          ? 'Все на паузе'
+                          : `${pausedNow.length} ${plural(pausedNow.length, ['привычка', 'привычки', 'привычек'])} на паузе`}
+                    </b>
+                    <span className="hp-chip-dim">{pausedNow.length === 1 ? 'на паузе' : 'Возобновить'}</span>
+                  </button>
                 )}
               </div>
             )}
@@ -512,7 +563,7 @@ export default function Habits() {
               <div className="hp-layout">
                 <main className="hp-main">
                   {future && <div className="hp-note">Это будущий день — здесь видно, что запланировано. Отмечать можно в сам день.</div>}
-                  {due.length === 0 && (
+                  {due.length === 0 && frozen.length === 0 && (
                     <div className="hp-free">
                       <span className="hp-free-ic">
                         <Sun size={30} weight="duotone" />
@@ -542,6 +593,18 @@ export default function Habits() {
                       </section>
                     );
                   })}
+                  {frozen.length > 0 && (
+                    <section className="hp-group hp-frozen">
+                      <div className="hp-group-head">
+                        <span className="hp-part-ic">
+                          <Snowflake size={22} weight="duotone" />
+                        </span>
+                        <h2>Пауза и пропуски</h2>
+                        <span className="hp-count">{frozen.length}</span>
+                      </div>
+                      <div className="hp-list">{frozen.map((h) => card(h, true))}</div>
+                    </section>
+                  )}
                   {off.length > 0 && (
                     <section className="hp-group hp-off">
                       <button className={`hp-off-toggle${showOff ? ' open' : ''}`} onClick={() => setShowOff((v) => !v)} aria-expanded={showOff}>
@@ -592,6 +655,29 @@ export default function Habits() {
           onArchive={(a) => archiveHabit(detail, a)}
           onDelete={() => void deleteHabit(detail)}
           onToggleDay={(ymd) => toggleHabitDay(detail, ymd)}
+          freeze={{
+            onSkip: (on) => freeze.skip(detail, today, on),
+            onPause: () => setSheet({ id: detail.id, stage: 'pause' }),
+            onResume: () => freeze.resume(detail),
+          }}
+        />
+      )}
+      {sheet && sheetHabit && (
+        <FreezeSheet
+          key={`${sheet.id}|${sheet.stage}`}
+          h={sheetHabit}
+          days={data.days}
+          date={detail ? today : date}
+          today={today}
+          initial={sheet.stage}
+          handlers={freeze}
+          onOpen={detail ? undefined : () => setDetailId(sheetHabit.id)}
+          onDone={() => {
+            const ymd = detail ? today : date;
+            updateDay(ymd, (d) => withDone(d, sheetHabit, true));
+            if (ymd === today) syncSoon(1500);
+          }}
+          onClose={() => setSheet(null)}
         />
       )}
       {editing && (
@@ -714,7 +800,7 @@ function WeekStrip({
   dir: 'l' | 'r' | '';
   date: string;
   today: string;
-  score: (ymd: string) => { done: number; due: number };
+  score: (ymd: string) => { done: number; due: number; frozen: number };
   onPick: (ymd: string) => void;
   onShift: (n: number) => void;
 }) {
@@ -757,18 +843,25 @@ function WeekStrip({
           const s = score(ymd);
           const v = s.due ? s.done / s.due : 0;
           const full = !fut && s.due > 0 && s.done === s.due;
+          // все привычки дня заморожены — кольцо «ледяное»
+          const iced = s.due === 0 && s.frozen > 0;
           return (
             <button
               key={ymd}
-              className={`hp-day${ymd === date ? ' sel' : ''}${ymd === today ? ' today' : ''}${fut ? ' future' : ''}${full ? ' full' : ''}`}
+              className={`hp-day${ymd === date ? ' sel' : ''}${ymd === today ? ' today' : ''}${fut ? ' future' : ''}${full ? ' full' : ''}${iced ? ' iced' : ''}`}
               onClick={() => onPick(ymd)}
               aria-pressed={ymd === date}
-              aria-label={`${dateLine(ymd)}${s.due && !fut ? `: ${s.done} из ${s.due}` : ''}`}
+              aria-label={`${dateLine(ymd)}${s.due && !fut ? `: ${s.done} из ${s.due}` : ''}${iced ? ' — пауза' : s.frozen ? ` (на паузе: ${s.frozen})` : ''}`}
             >
               <span className="hp-day-wd">{WD_SHORT[d.getDay()]}</span>
               <Ring size={44} stroke={4} value={fut ? 0 : v} className="hp-day-ring">
                 {full ? <Check size={18} weight="bold" /> : d.getDate()}
               </Ring>
+              {s.frozen > 0 && (
+                <span className="hp-day-ice" aria-hidden>
+                  <Snowflake size={11} weight="bold" />
+                </span>
+              )}
             </button>
           );
         })}
@@ -788,6 +881,7 @@ function HabitCard({
   onTap,
   onMinus,
   onOpen,
+  onMenu,
 }: {
   h: Habit;
   days: Days;
@@ -797,7 +891,12 @@ function HabitCard({
   onTap: () => void;
   onMinus: () => void;
   onOpen: () => void;
+  /** долгое нажатие / правая кнопка: пропуск, пауза */
+  onMenu: () => void;
 }) {
+  const press = useLongPress(onMenu);
+  const ice = freezeStatus(days, h, date);
+  const fz = frozenOn(days, h, date);
   const on = doneOn(days, h, date);
   const t = targetOf(h);
   const count = countOn(days[date], h);
@@ -805,9 +904,13 @@ function HabitCard({
   const streak = currentStreak(days, h, date);
   const f = freqOf(h);
   const time = timeRangeLabel(h) || (h.duration ? durationLabel(h.duration) : '');
-  const freq = f === 'weekly' ? `${weekCount(days, h, date)} из ${perWeekOf(h)} за неделю` : f === 'weekdays' ? freqLabel(h) : '';
+  const freq = f === 'weekly' ? `${weekCount(days, h, date)} из ${weekGoal(days, h, date)} за неделю` : f === 'weekdays' ? freqLabel(h) : '';
   return (
-    <div className={`hp-card${on ? ' on' : ''}${off ? ' off' : ''}${burst ? ' burst' : ''}`} style={{ '--hc': h.color } as CSSProperties}>
+    <div
+      className={`hp-card${on ? ' on' : ''}${off ? ' off' : ''}${fz ? ` frozen ${fz}` : ''}${burst ? ' burst' : ''}`}
+      style={{ '--hc': h.color } as CSSProperties}
+      {...press}
+    >
       <button className="hp-card-main" onClick={onOpen} aria-label={`${h.name}: статистика и настройки`}>
         <span className="hp-tile" aria-hidden>
           {h.icon ?? '🔥'}
@@ -827,8 +930,14 @@ function HabitCard({
                 {time}
               </span>
             )}
-            {freq && <span className="hp-meta-item">{freq}</span>}
-            {!counter && !time && !freq && <span className="hp-meta-item">Каждый день</span>}
+            {ice && (
+              <span className="hp-meta-ice">
+                {fz === 'skip' ? <Snowflake size={15} weight="bold" /> : <Pause size={15} weight="fill" />}
+                {ice}
+              </span>
+            )}
+            {!ice && freq && <span className="hp-meta-item">{freq}</span>}
+            {!ice && !counter && !time && !freq && <span className="hp-meta-item">Каждый день</span>}
             {streak.n > 0 && (
               <span className="hp-streak" title={`Серия: ${streakText(streak)}`}>
                 <Fire size={15} weight="fill" />
@@ -839,11 +948,16 @@ function HabitCard({
           </span>
         </span>
       </button>
-      {counter && count > 0 && !on && (
+      {counter && count > 0 && !on && !fz && (
         <button className="hp-minus" onClick={onMinus} aria-label={`${h.name}: −1`}>
           <Minus size={18} weight="bold" />
         </button>
       )}
+      {fz ? (
+        <button className="hp-check hp-check-ice" onClick={onMenu} aria-label={`${h.name}: ${ice ?? ''} — изменить`}>
+          {fz === 'skip' ? <Snowflake size={26} weight="bold" /> : <Pause size={24} weight="fill" />}
+        </button>
+      ) : (
       <button
         className={`hp-check${counter && !on ? ' is-counter' : ''}`}
         onClick={onTap}
@@ -858,8 +972,54 @@ function HabitCard({
           <Check size={28} weight="bold" className="hp-check-ic" />
         )}
       </button>
+      )}
     </div>
   );
+}
+
+/** Долгое нажатие (палец ~0.5 с без сдвига) и правая кнопка мыши; клик после долгого нажатия гасится */
+function useLongPress(fn: () => void) {
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const start = useRef<{ x: number; y: number } | null>(null);
+  const fired = useRef(false);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const cancel = () => {
+    clearTimeout(timer.current);
+    start.current = null;
+  };
+  return {
+    onPointerDown: (e: ReactPointerEvent) => {
+      fired.current = false;
+      if (e.pointerType === 'mouse') return;
+      start.current = { x: e.clientX, y: e.clientY };
+      clearTimeout(timer.current);
+      timer.current = setTimeout(() => {
+        fired.current = true;
+        start.current = null;
+        haptic();
+        fn();
+      }, 480);
+    },
+    onPointerMove: (e: ReactPointerEvent) => {
+      const s = start.current;
+      if (s && Math.hypot(e.clientX - s.x, e.clientY - s.y) > 10) cancel();
+    },
+    onPointerUp: cancel,
+    onPointerCancel: cancel,
+    onClickCapture: (e: ReactMouseEvent) => {
+      if (!fired.current) return;
+      fired.current = false;
+      e.stopPropagation();
+      e.preventDefault();
+    },
+    onContextMenu: (e: ReactMouseEvent) => {
+      e.preventDefault();
+      // на телефоне меню уже открыто долгим нажатием
+      if (fired.current) return;
+      cancel();
+      fn();
+    },
+  };
 }
 
 // ---------- Пусто ----------

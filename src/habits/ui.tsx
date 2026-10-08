@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { Archive, ArchiveRestore, Bell, BellOff, Check, ChevronDown, ChevronRight, Flame, Minus, Pencil, Plus, Trash2, Trophy, X } from 'lucide-react';
+import { Archive, ArchiveRestore, Bell, BellOff, Check, ChevronDown, ChevronRight, Flame, Minus, Pause, Pencil, Plus, Snowflake, Trash2, Trophy, X } from 'lucide-react';
 import type { Habit, HabitFreq, HabitPart, PlannerData } from '../types';
 import { addDaysYmd, fromYmd } from '../utils/mapTasks';
 import { uid } from '../utils/tree';
@@ -15,12 +15,15 @@ import {
   durationLabel,
   freqLabel,
   freqOf,
+  frozenOn,
   HABIT_COLORS,
   HABIT_EMOJIS,
   heatmap,
   partOf,
   PARTS,
+  pausedOn,
   perWeekOf,
+  pauseUntilLabel,
   reminderTimeOf,
   scheduledOn,
   streakText,
@@ -30,10 +33,12 @@ import {
   WD_SHORT_BY_DAY,
   WEEK_ORDER,
   weekCount,
+  weekGoal,
 } from './model';
 import { HABIT_CATEGORIES, HABIT_LIBRARY, habitFromPreset } from './library';
 import type { HabitCategory, HabitPreset } from './library';
 import '../views/habits.css';
+import './freeze.css';
 
 type Days = PlannerData['days'];
 
@@ -52,8 +57,10 @@ function metaParts(h: Habit, days: Days, date: string): string[] {
   if (tr) out.push(tr);
   else if (h.duration) out.push(durationLabel(h.duration));
   const f = freqOf(h);
-  if (f === 'weekly') out.push(`${weekCount(days, h, date)} из ${perWeekOf(h)} за неделю`);
+  if (f === 'weekly') out.push(`${weekCount(days, h, date)} из ${weekGoal(days, h, date)} за неделю`);
   else if (f === 'weekdays') out.push(freqLabel(h));
+  const fz = frozenOn(days, h, date);
+  if (fz) out.unshift(fz === 'skip' ? '❄️ пропуск' : `⏸ на паузе ${pauseUntilLabel(h, date) ?? ''}`.trim());
   return out;
 }
 
@@ -86,7 +93,7 @@ export function HabitRow({
   const ring = t > 1 && !on;
   const meta = metaParts(h, days, date);
   return (
-    <div className={`pl-habit${on ? ' on' : ''}${off ? ' off' : ''}`} style={{ '--hc': h.color, '--p': Math.min(1, count / t) } as CSSProperties}>
+    <div className={`pl-habit${on ? ' on' : ''}${off ? ' off' : ''}${frozenOn(days, h, date) ? ' frozen' : ''}`} style={{ '--hc': h.color, '--p': Math.min(1, count / t) } as CSSProperties}>
       <button
         className={`pl-habit-toggle${ring ? ' ring' : ''}`}
         onClick={onTap}
@@ -107,7 +114,14 @@ export function HabitRow({
           {Array.from({ length: 7 }, (_, i) => {
             const d = addDaysYmd(date, i - 6);
             const sc = scheduledOn(h, d);
-            return <span key={d} className={`pl-habit-cell${doneOn(days, h, d) ? ' on' : ''}${!sc ? ' skip' : ''}${d === date ? ' cur' : ''}`} title={dayTitle(d)} />;
+            const fz = frozenOn(days, h, d);
+            return (
+              <span
+                key={d}
+                className={`pl-habit-cell${doneOn(days, h, d) ? ' on' : ''}${!sc ? ' skip' : ''}${fz ? ' frozen' : ''}${d === date ? ' cur' : ''}`}
+                title={`${dayTitle(d)}${fz === 'skip' ? ' — пропуск' : fz === 'pause' ? ' — пауза' : ''}`}
+              />
+            );
           })}
         </span>
       </button>
@@ -200,6 +214,7 @@ export function HabitDetail({
   onArchive,
   onDelete,
   onToggleDay,
+  freeze,
 }: {
   h: Habit;
   days: Days;
@@ -209,7 +224,11 @@ export function HabitDetail({
   onArchive: (archived: boolean) => void;
   onDelete: () => void;
   onToggleDay: (ymd: string) => void;
+  /** заморозка серии: пропуск сегодня, пауза, возобновление */
+  freeze?: { onSkip: (on: boolean) => void; onPause: () => void; onResume: () => void };
 }) {
+  const fzToday = frozenOn(days, h, today);
+  const pauseAhead = !!h.pauses?.some((p) => p.to >= today);
   const cur = currentStreak(days, h, today);
   const best = bestStreak(days, h, today);
   const c30 = completion(days, h, today, 30);
@@ -243,6 +262,30 @@ export function HabitDetail({
             <X />
           </button>
         </div>
+
+        {freeze && !h.archived && (fzToday || pauseAhead) && (
+          <div className="hb-freeze">
+            <span className="hb-freeze-ic" aria-hidden>
+              {fzToday === 'skip' ? '❄️' : '⏸'}
+            </span>
+            <span className="grow">
+              {fzToday === 'skip'
+                ? 'Сегодня пропуск — серия не прервётся'
+                : pausedOn(h, today)
+                  ? `На паузе ${pauseUntilLabel(h, today) ?? ''}`
+                  : `Пауза с ${dayTitle(h.pauses!.find((p) => p.to >= today)!.from).toLowerCase()}`}
+            </span>
+            {fzToday === 'skip' ? (
+              <button className="btn btn-sm" onClick={() => freeze.onSkip(false)}>
+                Отменить
+              </button>
+            ) : (
+              <button className="btn btn-sm" onClick={freeze.onResume}>
+                Возобновить
+              </button>
+            )}
+          </div>
+        )}
 
         <div className="hb-stats">
           <div className="hb-stat">
@@ -290,7 +333,25 @@ export function HabitDetail({
           <span>больше</span>
           <span className="grow" />
           <i className="skip" /> <span>не по плану</span>
+          {freeze && (
+            <>
+              <i className="frozen" /> <span>пропуск</span>
+            </>
+          )}
         </div>
+
+        {freeze && !h.archived && (
+          <div className="hb-actions hb-freeze-actions">
+            {!fzToday && !doneOn(days, h, today) && (
+              <button className="btn" onClick={() => freeze.onSkip(true)} title="Пропуск по уважительной причине — серия не прервётся">
+                <Snowflake size={15} /> Пропустить сегодня
+              </button>
+            )}
+            <button className="btn" onClick={freeze.onPause} title="Больничный, отпуск: не по плану, без напоминаний, серия не прерывается">
+              <Pause size={15} /> {pausedOn(h, today) ? 'Продлить паузу…' : 'Пауза…'}
+            </button>
+          </div>
+        )}
 
         <div className="hb-actions">
           <button className="btn" onClick={onEdit}>
@@ -317,14 +378,16 @@ function HeatRow({ r, cols, onToggle }: { r: number; cols: ReturnType<typeof hea
       <span className="hb-heat-wd">{r % 2 === 0 ? WD_SHORT_BY_DAY[wd] : ''}</span>
       {cols.map((col) => {
         const c = col[r];
-        if (c.level === null) return <span key={c.ymd} className="hb-cell future" />;
-        const cls = `hb-cell${c.level === -1 ? ' skip' : c.level === 0 ? ' zero' : ''}`;
+        const fz = c.frozen ? ` frozen ${c.frozen}` : '';
+        const fzTitle = c.frozen === 'skip' ? ' — пропуск, серия сохранена' : c.frozen === 'pause' ? ' — пауза' : '';
+        if (c.level === null) return <span key={c.ymd} className={`hb-cell future${fz}`} title={fz ? `${dayTitle(c.ymd)}${fzTitle}` : undefined} />;
+        const cls = `hb-cell${c.level === -1 ? ' skip' : c.level === 0 ? ' zero' : ''}${fz}`;
         return (
           <button
             key={c.ymd}
             className={cls}
             style={{ '--lv': Math.max(0, c.level) } as CSSProperties}
-            title={`${dayTitle(c.ymd)}${c.level === 1 ? ' — выполнено' : c.level > 0 ? ` — ${Math.round(c.level * 100)}%` : ''}`}
+            title={`${dayTitle(c.ymd)}${c.level === 1 ? ' — выполнено' : c.level > 0 ? ` — ${Math.round(c.level * 100)}%` : fzTitle}`}
             onClick={() => onToggle(c.ymd)}
           />
         );

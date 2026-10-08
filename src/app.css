@@ -162,7 +162,10 @@
 .acc-profile { min-height: 82px; }
 .acc-profile .ls-title { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
 .acc-status { display: inline-flex; align-items: center; gap: 5px; }
-.acc-status.error, .acc-status.offline { color: var(--danger); }
+.acc-status.error { color: var(--danger); }
+.acc-status.offline { color: var(--warn); }
+.acc-unsent { display: block; }
+.acc-spinner { width: 18px; height: 18px; border-width: 2px; flex-shrink: 0; }
 .acc-seg { display: flex; width: 100%; }
 .acc-seg button { flex: 1; }
 .acc-form-row { padding: 10px 16px; }

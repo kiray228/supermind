@@ -486,3 +486,9 @@
 /* светлая тема: зелёный текст сумм темнее — читается на белом (как «доступный» зелёный iOS) */
 :root:not([data-theme='dark']) :is(.fn-pos, .fn-money.is-pos, .fn-tx-amt.is-income, .fn-kpi.is-income .fn-kpi-label svg, .fn-stat.is-income .fn-stat-ic) { color: #248a3d; }
 :root:not([data-theme='dark']) .fn-warn-text { color: #c93400; }
+
+/* счёт-копилка цели: «цель 6%» */
+.fn-acc-goal {
+  flex-shrink: 0; margin-left: auto; padding: 1px 6px; border-radius: 999px; font-size: 11px; font-weight: 600;
+  background: rgba(255, 255, 255, .22); color: #fff; white-space: nowrap;
+}

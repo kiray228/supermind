@@ -1,4 +1,4 @@
-import { useMemo, type CSSProperties } from 'react';
+import { useEffect, useMemo, type CSSProperties } from 'react';
 import { CalendarBlank, CaretRight, Plus, TrendDown, TrendUp } from '@phosphor-icons/react';
 import { addDaysYmd } from '../../utils/mapTasks';
 import {
@@ -21,6 +21,8 @@ import {
   type FinanceData,
 } from '../model';
 import { paySubscription } from '../store';
+import { ensureGoals, useGoals } from '../../goals/store';
+import { savingsByAccount } from '../../goals/savings';
 import { CurTotals, dayTitle, Money, Progress, TxRow, useToday } from './common';
 import { DebtSummary } from './Debts';
 import { openMore, openTxSheet, setFinTab, showOps } from './state';
@@ -40,6 +42,10 @@ export function Overview({ data }: { data: FinanceData }) {
   const tb = totalBudget(data);
   const catBudgets = data.budgets.filter((b) => b.categoryId && cats.has(b.categoryId));
   const accounts = sortedAccounts(data);
+  // счета-копилки целей: значок «цель N%»
+  const goals = useGoals((s) => s.data);
+  useEffect(() => void ensureGoals().catch(() => undefined), []);
+  const piggy = useMemo(() => savingsByAccount(goals, data), [goals, data]);
 
   return (
     <div className="fn-stack">
@@ -60,6 +66,7 @@ export function Overview({ data }: { data: FinanceData }) {
               <span className="fn-acc-card-top">
                 <span className="fn-acc-card-emoji">{a.emoji}</span>
                 <span className="ellipsis">{a.name}</span>
+                {piggy.has(a.id) && <span className="fn-acc-goal" title={`Цель «${piggy.get(a.id)!.title}»`}>цель {piggy.get(a.id)!.pct}%</span>}
               </span>
               <Money v={bal.get(a.id) ?? 0} cur={a.currency} />
             </button>

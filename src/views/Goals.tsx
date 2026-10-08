@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { ChartPieSlice, Plus, SlidersHorizontal } from '@phosphor-icons/react';
 import { ensureTasks } from '../tasks/store';
+import { useFinance } from '../finance/store';
 import { todayYmd } from '../utils/mapTasks';
 import {
   compareGoals,
@@ -118,6 +119,8 @@ interface Group {
 
 function GoalsList({ data, onNew, onWheel, onTab }: { data: GoalsData; onNew: (p?: Partial<Goal>) => void; onWheel: () => void; onTab: (t: Tab) => void }) {
   const look = useTaskLookup();
+  // средний прогресс учитывает копилки — пересчитываем при изменении финансов
+  useFinance((s) => (data.goals.some((g) => g.mode === 'savings') ? s.data : null));
   const today = todayYmd();
   const view: GoalsView = data.prefs.view ?? 'active';
   const areas = useMemo(() => sortedAreas(data), [data.areas]); // eslint-disable-line react-hooks/exhaustive-deps

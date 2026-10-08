@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { ArrowDown, ArrowUp, Plus } from '@phosphor-icons/react';
 import { uid } from '../../utils/tree';
 import { toast } from '../../store/appStore';
@@ -7,6 +7,8 @@ import { balances, COLORS, fmtMoney, parseMoneyInput, r2, sortedAccounts, sorted
 import { deleteAccount, deleteCategory, moveAccount, moveCategory, saveAccount, saveCategory } from '../store';
 import { AmountInput, CatIcon, ColorDots, CurrencySelect, EmojiPicker, Money, Sheet } from './common';
 import { showOps } from './state';
+import { ensureGoals, useGoals } from '../../goals/store';
+import { savingsByAccount } from '../../goals/savings';
 
 // ================= Счета =================
 
@@ -14,6 +16,10 @@ export function AccountsSection({ data }: { data: FinanceData }) {
   const [edit, setEdit] = useState<Account | 'new' | null>(null);
   const bal = useMemo(() => balances(data), [data]);
   const list = sortedAccounts(data, true);
+  // счета-копилки целей
+  const goals = useGoals((s) => s.data);
+  useEffect(() => void ensureGoals().catch(() => undefined), []);
+  const piggy = useMemo(() => savingsByAccount(goals, data), [goals, data]);
   return (
     <div className="fn-stack">
       <div className="card fn-list">
@@ -26,6 +32,7 @@ export function AccountsSection({ data }: { data: FinanceData }) {
                 <span className="fn-tx-sub">
                   {a.currency}
                   {a.archived ? ' · в архиве' : ''}
+                  {piggy.has(a.id) ? ` · цель «${piggy.get(a.id)!.title}»: ${piggy.get(a.id)!.pct}%` : ''}
                 </span>
               </span>
               <Money v={bal.get(a.id) ?? 0} cur={a.currency} className={(bal.get(a.id) ?? 0) < 0 ? 'is-neg' : ''} />

@@ -6,11 +6,12 @@
 import type { TaskItem } from '../tasks/model';
 import { daysBetween, mondayOf, MONTHS, plural, shortDate } from '../tasks/model';
 import { addDaysYmd, fromYmd, todayYmd, toYmd } from '../utils/mapTasks';
+import { normalizeSavings, savingsInfo, savingsNext } from './savings';
 
 export type GoalPeriod = 'year' | 'quarter' | 'month' | 'week' | 'custom';
 export type GoalStatus = 'active' | 'done' | 'paused' | 'archived';
-/** manual — ползунок, stages — этапы и шаги, target — числовая цель, tasks — связанные задачи */
-export type ProgressMode = 'manual' | 'stages' | 'target' | 'tasks';
+/** manual — ползунок, stages — этапы и шаги, target — числовая цель, tasks — связанные задачи, savings — копилка (остаток счёта в Финансах) */
+export type ProgressMode = 'manual' | 'stages' | 'target' | 'tasks' | 'savings';
 export type GoalPriority = 0 | 1 | 2 | 3;
 
 export interface LifeArea {
@@ -51,6 +52,18 @@ export interface GoalTarget {
   step: number;
 }
 
+/** Копилка: сколько накопить и на каком счёте лежат деньги */
+export interface GoalSavings {
+  /** счёт в Финансах */
+  accountId: string;
+  /** сколько накопить (в валюте цели) */
+  amount: number;
+  /** валюта цели (обычно — валюта счёта) */
+  currency: string;
+  /** остаток счёта при создании, который не засчитывается (нет — считается весь остаток) */
+  base?: number;
+}
+
 export interface GoalHistoryEntry {
   id: string;
   at: number;
@@ -79,6 +92,8 @@ export interface Goal {
   /** процент для ручного режима */
   manual: number;
   target?: GoalTarget;
+  /** режим «Копилка» (необязательное поле: старые версии его просто не знают) */
+  savings?: GoalSavings;
   stages: GoalStage[];
   /** задачи, связанные с целью напрямую */
   taskIds: string[];
@@ -162,6 +177,7 @@ export const MODES: { v: ProgressMode; label: string; hint: string }[] = [
   { v: 'target', label: 'Число', hint: 'Например, 12 книг или 100 км' },
   { v: 'tasks', label: 'Задачи', hint: 'Прогресс по выполненным связанным задачам' },
   { v: 'manual', label: 'Вручную', hint: 'Процент выполнения задаёте сами' },
+  { v: 'savings', label: 'Копилка', hint: 'Деньги на счёте в Финансах — прогресс по остатку' },
 ];
 
 export const GOAL_PRIORITIES: { v: GoalPriority; label: string; color: string }[] = [
@@ -175,7 +191,8 @@ export const GOAL_PRIORITIES: { v: GoalPriority; label: string; color: string }[
 
 export function normalizeGoal(g: Partial<Goal> & { id: string }): Goal {
   const now = Date.now();
-  return {
+  const savings = normalizeSavings(g.savings);
+  const out: Goal = {
     updatedAt: now,
     createdAt: g.updatedAt ?? now,
     title: '',
@@ -193,6 +210,10 @@ export function normalizeGoal(g: Partial<Goal> & { id: string }): Goal {
     taskIds: g.taskIds ?? [],
     history: g.history ?? [],
   };
+  // битую копилку отбрасываем: цель покажет «выберите счёт»
+  if (savings) out.savings = savings;
+  else delete out.savings;
+  return out;
 }
 
 export function normalizeGoalsData(raw: Partial<GoalsData> | undefined | null): GoalsData {
@@ -350,6 +371,10 @@ export function goalProgressInfo(g: Goal, look: TaskLookup): ProgressInfo {
       return { pct: clamp(g.manual, 0, 100), done: 0, total: 0 };
     case 'target':
       return { pct: targetPercent(g.target), done: g.target?.current ?? 0, total: g.target?.target ?? 0 };
+    case 'savings': {
+      const s = savingsInfo(g);
+      return { pct: s.pct, done: s.saved, total: s.amount };
+    }
     case 'tasks': {
       let done = 0;
       let total = 0;
@@ -387,6 +412,7 @@ export function fmtNum(n: number): string {
 /** Следующий шаг для карточки цели */
 export function nextStep(g: Goal, look: TaskLookup): string | null {
   if (g.status === 'done') return null;
+  if (g.mode === 'savings') return savingsNext(g);
   if (g.mode === 'target' && g.target) {
     const left = g.target.target - g.target.current;
     if ((g.target.target >= g.target.start && left > 0) || (g.target.target < g.target.start && left < 0))

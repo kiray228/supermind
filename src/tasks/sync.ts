@@ -239,7 +239,7 @@ async function plan(fromMs: number, toMs: number): Promise<Planned[]> {
         const at = fromYmd(day).getTime() + minutesOf(time) * 60000;
         if (at < fromMs || at > toMs) continue;
         const t = hm.targetOf(h);
-        const left = hm.freqOf(h) === 'weekly' ? hm.perWeekOf(h) - hm.weekCount(pdays, h, day, day) : 0;
+        const left = hm.freqOf(h) === 'weekly' ? hm.weekGoal(pdays, h, day) - hm.weekCount(pdays, h, day, day) : 0;
         const body =
           t > 1
             ? `Цель на сегодня: ${h.unit ? `${h.unit} ` : ''}×${t}${h.duration ? ` · ${hm.durationLabel(h.duration)}` : ''}`

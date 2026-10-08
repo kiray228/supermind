@@ -1,0 +1,34 @@
+/* ================= Индикатор неотправленных изменений (src/ui/SyncBadge.tsx) ================= */
+.nav-sync { --sync-tint: var(--ios-orange); animation: sync-in .3s ease-out; }
+.nav-sync.error, .nav-sync-dot.error, .sync-sheet-row.error { --sync-tint: var(--danger); }
+.nav-sync .nav-ico { color: var(--sync-tint); }
+.nav-sync > span:nth-child(2) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-sync-n {
+  flex-shrink: 0; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--fill-3); color: var(--text-2); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: 0;
+}
+
+/* телефон: точка на вкладке «Ещё» */
+.nav-sync-dot {
+  --sync-tint: var(--ios-orange);
+  position: absolute; top: 0; right: -3px; width: 9px; height: 9px; border-radius: 50%;
+  background: var(--sync-tint); animation: sync-pop .35s cubic-bezier(.3, 1.6, .5, 1);
+}
+
+/* телефон: строка в меню «Ещё» */
+.sync-sheet-row {
+  --sync-tint: var(--ios-orange);
+  grid-column: 1 / -1; display: flex; align-items: center; gap: 9px; height: 44px; padding: 0 14px; margin-top: -6px;
+  border: none; border-radius: 12px; background: color-mix(in srgb, var(--sync-tint) 13%, transparent);
+  color: var(--text); font-size: 15px; font-weight: 500; letter-spacing: -0.015em; text-align: left;
+  -webkit-tap-highlight-color: transparent; transition: transform .2s cubic-bezier(.3, 1.6, .5, 1);
+}
+.sync-sheet-row:active { transform: scale(.97); }
+.sync-sheet-row > svg { flex-shrink: 0; color: var(--sync-tint); }
+.sync-sheet-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sync-sheet-sub { color: var(--text-2); font-weight: 400; }
+.sync-sheet-go { flex-shrink: 0; color: var(--accent); font-size: 15px; font-weight: 400; }
+
+@keyframes sync-in { from { opacity: 0; } }
+@keyframes sync-pop { from { transform: scale(0); } }
+@media (prefers-reduced-motion: reduce) { .nav-sync, .nav-sync-dot { animation: none; } }

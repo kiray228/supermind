@@ -33,6 +33,7 @@ export async function aiBreakdown(goal: Goal, area: LifeArea | undefined, opts: 
     goal.why.trim() ? `Зачем это нужно: ${goal.why.trim()}` : '',
     goal.deadline ? `Срок: до ${goal.deadline} (осталось дней: ${Math.max(0, daysBetween(today, goal.deadline))})` : 'Срок не задан',
     goal.mode === 'target' && goal.target ? `Числовая цель: ${goal.target.target} ${goal.target.unit}` : '',
+    goal.mode === 'savings' && goal.savings ? `Накопить: ${goal.savings.amount} ${goal.savings.currency} (деньги копятся на отдельном счёте)` : '',
     goal.stages.length ? `Уже есть этапы (не повторяй их): ${goal.stages.map((s) => s.title).join('; ')}` : '',
     goal.notes.trim() ? `Заметки: ${goal.notes.trim().slice(0, 2000)}` : '',
     `Сегодня: ${today}`,

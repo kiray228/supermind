@@ -5,8 +5,13 @@
  * Совместимость: все новые поля привычки необязательны; привычка без `freq` — ежедневная,
  * без `target` — простая отметка. Выполнение дня хранится в PlannerDay.habits (как раньше),
  * счётчики — в PlannerDay.habitCounts; при достижении цели id попадает и в habits.
+ *
+ * Заморозка серии: пропуск дня — id в PlannerDay.skipped (сливается вместе с днём, как отметки),
+ * пауза — Habit.pauses (диапазоны дат, сливаются вместе с привычкой). Замороженный день
+ * (пропуск или пауза, если привычка не выполнена) — не по плану: серию не рвёт и не продлевает,
+ * не считается пропуском в статистике и уменьшает недельную цель «N раз в неделю».
  */
-import type { Habit, HabitFreq, HabitPart, PlannerData, PlannerDay } from '../types';
+import type { Habit, HabitFreq, HabitPart, HabitPause, PlannerData, PlannerDay } from '../types';
 import { addDaysYmd, fromYmd, toYmd } from '../utils/mapTasks';
 
 type Days = PlannerData['days'];
@@ -134,7 +139,11 @@ export function withCount(day: PlannerDay, h: Habit, n: number): PlannerDay {
   const v = Math.max(0, Math.min(999, Math.round(n)));
   const out: PlannerDay = { ...day };
   const hs = (day.habits ?? []).filter((x) => x !== h.id);
-  if (v >= t) hs.push(h.id);
+  if (v >= t) {
+    hs.push(h.id);
+    // выполнено — пропуск больше не нужен
+    if (day.skipped?.includes(h.id)) setSkipped(out, day.skipped.filter((x) => x !== h.id));
+  }
   out.habits = hs;
   if (t > 1) {
     const counts = { ...(day.habitCounts ?? {}) };
@@ -160,6 +169,7 @@ export function withDone(day: PlannerDay, h: Habit, done: boolean): PlannerDay {
 export function withoutHabit(day: PlannerDay, id: string): PlannerDay {
   const out: PlannerDay = { ...day };
   if (day.habits?.includes(id)) out.habits = day.habits.filter((x) => x !== id);
+  if (day.skipped?.includes(id)) setSkipped(out, day.skipped.filter((x) => x !== id));
   if (day.habitCounts?.[id] != null) {
     const counts = { ...day.habitCounts };
     delete counts[id];
@@ -167,6 +177,102 @@ export function withoutHabit(day: PlannerDay, id: string): PlannerDay {
     else delete out.habitCounts;
   }
   return out;
+}
+
+// ---------- Заморозка: пропуск дня и пауза ----------
+
+function setSkipped(out: PlannerDay, list: string[]) {
+  if (list.length) out.skipped = list;
+  else delete out.skipped;
+}
+
+/** Пропуск по уважительной причине отмечен в этот день */
+export const skipMarked = (day: PlannerDay | undefined, h: Habit) => !!day?.skipped?.includes(h.id);
+
+/**
+ * Отметить / снять пропуск дня; пропуск снимает отметку выполнения.
+ * Неполный счётчик («6 из 8 стаканов») сохраняется — отмена пропуска вернёт его как был.
+ */
+export function withSkip(day: PlannerDay, h: Habit, on: boolean): PlannerDay {
+  const partial = isCounter(h) && countOn(day, h) < targetOf(h);
+  const out = !on ? { ...day } : partial ? { ...day, habits: (day.habits ?? []).filter((x) => x !== h.id) } : withoutHabit(day, h.id);
+  const rest = (day.skipped ?? []).filter((x) => x !== h.id);
+  setSkipped(out, on ? [...rest, h.id] : rest);
+  return out;
+}
+
+/** Пауза, в которую попадает день (если есть) */
+export function pauseOn(h: Habit, ymd: string): HabitPause | undefined {
+  return h.pauses?.find((p) => p.from <= ymd && ymd <= p.to);
+}
+
+/** Привычка на паузе в этот день */
+export const pausedOn = (h: Habit, ymd: string) => !!pauseOn(h, ymd);
+
+export type FreezeKind = 'skip' | 'pause';
+
+/** День заморожен (не выполнен, но пропущен или на паузе): не по плану, серию не рвёт */
+export function frozenOn(days: Days, h: Habit, ymd: string): FreezeKind | null {
+  if (!h.pauses?.length && !days[ymd]?.skipped?.length) return null;
+  if (doneOn(days, h, ymd)) return null;
+  if (pausedOn(h, ymd)) return 'pause';
+  if (skipMarked(days[ymd], h)) return 'skip';
+  return null;
+}
+
+/** Последний день непрерывной паузы, в которую попадает `ymd` (смежные паузы склеены normPauses) */
+export function pauseEnd(h: Habit, ymd: string): string | undefined {
+  let end: string | undefined;
+  let d = ymd;
+  for (let i = 0; i < 50; i++) {
+    const p = pauseOn(h, d);
+    if (!p) break;
+    end = p.to;
+    d = addDaysYmd(p.to, 1);
+  }
+  return end;
+}
+
+const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Порядок и склейка пауз: пересекающиеся и смежные — в одну; кончившиеся больше 2 лет назад — прочь */
+export function normPauses(list: HabitPause[] | undefined, today = toYmd(new Date())): HabitPause[] {
+  const old = addDaysYmd(today, -730);
+  const ok = (list ?? []).filter((p) => p && YMD_RE.test(p.from) && YMD_RE.test(p.to) && p.from <= p.to && p.to >= old);
+  ok.sort((a, b) => (a.from < b.from ? -1 : a.from > b.from ? 1 : 0));
+  const out: HabitPause[] = [];
+  for (const p of ok) {
+    const last = out[out.length - 1];
+    if (last && p.from <= addDaysYmd(last.to, 1)) {
+      if (p.to > last.to) last.to = p.to;
+    } else out.push({ from: p.from, to: p.to });
+  }
+  return out;
+}
+
+/** Поставить на паузу с `from` по `to` включительно */
+export function withPause(h: Habit, from: string, to: string): Habit {
+  return { ...h, pauses: normPauses([...(h.pauses ?? []), { from, to }]) };
+}
+
+/** Снять паузу с `today`: прошедшие дни паузы остаются (история серии), сегодня и дальше — по плану */
+export function withResume(h: Habit, today: string): Habit {
+  const y = addDaysYmd(today, -1);
+  const pauses = (h.pauses ?? []).flatMap((p) => (p.to < today ? [p] : p.from <= y ? [{ from: p.from, to: y }] : []));
+  return { ...h, pauses };
+}
+
+const MONTHS_SHORT = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+
+/** «до завтра», «до 15 окт» — до какого дня (не включая) привычка на паузе; null — не на паузе */
+export function pauseUntilLabel(h: Habit, ymd: string): string | null {
+  const end = pauseEnd(h, ymd);
+  if (!end) return null;
+  const back = addDaysYmd(end, 1);
+  if (back === addDaysYmd(ymd, 1)) return 'до завтра';
+  const d = fromYmd(back);
+  const y = d.getFullYear() !== fromYmd(ymd).getFullYear() ? ` ${d.getFullYear()}` : '';
+  return `до ${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}${y}`;
 }
 
 // ---------- Расписание ----------
@@ -179,6 +285,18 @@ export function mondayOf(ymd: string): string {
 export function scheduledOn(h: Habit, ymd: string): boolean {
   if (freqOf(h) !== 'weekdays') return true;
   return h.days!.includes(fromYmd(ymd).getDay());
+}
+
+/**
+ * Недельная цель «N раз в неделю» с учётом заморозки: замороженные дни уменьшают цель пропорционально
+ * (неделя целиком на паузе — цель 0: такая неделя серию не рвёт и не продлевает).
+ */
+export function weekGoal(days: Days, h: Habit, ymd: string): number {
+  const per = perWeekOf(h);
+  const mon = mondayOf(ymd);
+  let active = 0;
+  for (let i = 0; i < 7; i++) if (!frozenOn(days, h, addDaysYmd(mon, i))) active++;
+  return active >= 7 ? per : Math.min(per, Math.ceil((per * active) / 7));
 }
 
 /** Сколько дней недели (с понедельника) выполнено; `except` — не считать этот день */
@@ -197,10 +315,12 @@ export function weekCount(days: Days, h: Habit, ymd: string, except?: string): n
  * N раз в неделю — пока недельная цель не выполнена другими днями (или если отмечена в этот день).
  */
 export function dueOn(days: Days, h: Habit, ymd: string): boolean {
+  // пропуск и пауза — не по плану (выполненный день — по плану всегда)
+  if (frozenOn(days, h, ymd)) return false;
   const f = freqOf(h);
   if (f === 'daily') return true;
   if (f === 'weekdays') return scheduledOn(h, ymd);
-  return doneOn(days, h, ymd) || weekCount(days, h, ymd, ymd) < perWeekOf(h);
+  return doneOn(days, h, ymd) || weekCount(days, h, ymd, ymd) < weekGoal(days, h, ymd);
 }
 
 const createdYmd = (h: Habit) => (h.createdAt ? toYmd(new Date(h.createdAt)) : undefined);
@@ -226,28 +346,33 @@ export const streakText = (s: Streak) =>
 
 /**
  * Текущая серия на дату `ymd`.
- * Ежедневно / по дням недели — подряд выполненные запланированные дни (незапланированные дни серию не рвут,
- * сам `ymd`, если ещё не отмечен, тоже). N раз в неделю — подряд недели с выполненной целью
- * (текущая неделя, пока цель не набрана, серию не рвёт).
+ * Ежедневно / по дням недели — подряд выполненные запланированные дни (незапланированные и замороженные дни
+ * серию не рвут и не продлевают, сам `ymd`, если ещё не отмечен, тоже). N раз в неделю — подряд недели
+ * с выполненной целью (текущая неделя, пока цель не набрана, серию не рвёт; неделя целиком на паузе — тоже).
  */
 export function currentStreak(days: Days, h: Habit, ymd: string): Streak {
+  const stop = firstMark(days, h);
   if (freqOf(h) === 'weekly') {
-    const per = perWeekOf(h);
+    if (!stop) return { n: 0, unit: 'week' };
+    const first = mondayOf(stop);
     let w = mondayOf(ymd);
-    let n = weekCount(days, h, w) >= per ? 1 : 0;
+    const g0 = weekGoal(days, h, w);
+    let n = g0 > 0 && weekCount(days, h, w) >= g0 ? 1 : 0;
     for (let i = 0; i < 520; i++) {
       w = addDaysYmd(w, -7);
-      if (weekCount(days, h, w) < per) break;
+      if (w < first) break;
+      const g = weekGoal(days, h, w);
+      if (g === 0) continue;
+      if (weekCount(days, h, w) < g) break;
       n++;
     }
     return { n, unit: 'week' };
   }
-  const stop = firstMark(days, h);
   let n = 0;
   let d = ymd;
   for (let i = 0; i < 3700 && stop && d >= stop; i++) {
     if (doneOn(days, h, d)) n++;
-    else if (i > 0 && scheduledOn(h, d)) break;
+    else if (i > 0 && scheduledOn(h, d) && !frozenOn(days, h, d)) break;
     d = addDaysYmd(d, -1);
   }
   return { n, unit: 'day' };
@@ -258,11 +383,13 @@ export function bestStreak(days: Days, h: Habit, today: string): Streak {
   const first = firstMark(days, h);
   if (!first) return { n: 0, unit: freqOf(h) === 'weekly' ? 'week' : 'day' };
   if (freqOf(h) === 'weekly') {
-    const per = perWeekOf(h);
     let best = 0;
     let run = 0;
     for (let w = mondayOf(first), i = 0; w <= today && i < 1000; w = addDaysYmd(w, 7), i++) {
-      if (weekCount(days, h, w) >= per) best = Math.max(best, ++run);
+      const g = weekGoal(days, h, w);
+      // неделя целиком на паузе — мостик
+      if (g === 0) continue;
+      if (weekCount(days, h, w) >= g) best = Math.max(best, ++run);
       else run = 0;
     }
     return { n: best, unit: 'week' };
@@ -271,7 +398,7 @@ export function bestStreak(days: Days, h: Habit, today: string): Streak {
   let run = 0;
   for (let d = first, i = 0; d <= today && i < 5000; d = addDaysYmd(d, 1), i++) {
     if (doneOn(days, h, d)) best = Math.max(best, ++run);
-    else if (scheduledOn(h, d) && d !== today) run = 0;
+    else if (scheduledOn(h, d) && d !== today && !frozenOn(days, h, d)) run = 0;
   }
   return { n: best, unit: 'day' };
 }
@@ -302,10 +429,15 @@ export function completion(days: Days, h: Habit, today: string, n = 30): Complet
     const ok = doneOn(days, h, d);
     if (ok) done++;
     if (d === today && !ok) continue;
+    // пропуск и пауза — не в счёт
+    if (!ok && frozenOn(days, h, d)) continue;
     span++;
     if (freqOf(h) !== 'weekly' && scheduledOn(h, d)) expected++;
   }
-  if (freqOf(h) === 'weekly') expected = Math.max(1, Math.round((perWeekOf(h) * span) / 7));
+  if (freqOf(h) === 'weekly') {
+    if (!span) return { rate: 0, done, expected: 0 };
+    expected = Math.max(1, Math.round((perWeekOf(h) * span) / 7));
+  }
   if (freqOf(h) !== 'weekly') {
     // выполнения в незапланированные дни — бонус, но не больше 100%
     const scheduledDone = countScheduledDone(days, h, start, today);
@@ -331,6 +463,8 @@ export interface HeatCell {
   ymd: string;
   /** 0..1 — доля цели дня; -1 — день не запланирован; null — будущее */
   level: number | null;
+  /** день заморожен: пропуск или пауза (и в будущем — запланированная пауза) */
+  frozen?: FreezeKind;
 }
 
 /** Тепловая карта: `weeks` столбцов (недели с понедельника), в каждом 7 дней */
@@ -342,13 +476,15 @@ export function heatmap(days: Days, h: Habit, today: string, weeks = 12): HeatCe
     const col: HeatCell[] = [];
     for (let i = 0; i < 7; i++) {
       const ymd = addDaysYmd(start, w * 7 + i);
-      if (ymd > today) {
-        col.push({ ymd, level: null });
-        continue;
+      const fz = frozenOn(days, h, ymd);
+      const cell: HeatCell = { ymd, level: null };
+      if (fz) cell.frozen = fz;
+      if (ymd <= today) {
+        const c = countOn(days[ymd], h);
+        const level = doneOn(days, h, ymd) ? 1 : t > 1 ? Math.min(1, c / t) : 0;
+        cell.level = level === 0 && !scheduledOn(h, ymd) ? -1 : level;
       }
-      const c = countOn(days[ymd], h);
-      const level = doneOn(days, h, ymd) ? 1 : t > 1 ? Math.min(1, c / t) : 0;
-      col.push({ ymd, level: level === 0 && !scheduledOn(h, ymd) ? -1 : level });
+      col.push(cell);
     }
     cols.push(col);
   }
@@ -387,6 +523,9 @@ export function cleanHabit(h: Habit): Habit {
   if (!out.remind) delete out.remind;
   if (!out.remindOff) delete out.remindOff;
   if (!out.archived) delete out.archived;
+  const pauses = normPauses(out.pauses);
+  if (pauses.length) out.pauses = pauses;
+  else delete out.pauses;
   return out;
 }
 

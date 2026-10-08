@@ -14,6 +14,7 @@ import { SearchHost, SearchNavButton, SearchSheetButton } from './search/SearchH
 import { applyAppearance } from './ui/appearance';
 import { initLargeTitles } from './ui/navbar';
 import { VoiceFab, VoiceNavButton } from './voice/VoiceButton';
+import { SyncDot, SyncNavButton, SyncSheetRow } from './ui/SyncBadge';
 import { useVoice } from './voice/state';
 import { IconTile, SectionIcon, type SectionId } from './ui/icons';
 import './ui/appearance.css';
@@ -194,6 +195,8 @@ export default function App() {
           )}
           <SearchNavButton />
           <VoiceNavButton />
+          {/* неотправленные в облако изменения — только когда есть повод */}
+          <SyncNavButton />
           {NAV.map((n) => (
             <button key={n.id} className={`nav-item ${view === n.id ? 'active' : ''}${n.phone ? '' : ' nav-desk'}`} onClick={() => go(n.id)}>
               <span className="nav-ico">
@@ -206,6 +209,7 @@ export default function App() {
           <button className={`nav-item nav-more ${moreActive ? 'active' : ''}`} onClick={() => setMore(true)}>
             <span className="nav-ico">
               <SectionIcon section="more" size={24} weight={moreActive ? 'fill' : 'regular'} />
+              <SyncDot />
             </span>
             <span>Ещё</span>
           </button>
@@ -234,6 +238,7 @@ export default function App() {
         <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && setMore(false)}>
           <div className="modal nav-more-sheet" role="dialog" aria-label="Все разделы">
             <SearchSheetButton onPick={() => setMore(false)} />
+            <SyncSheetRow onPick={() => setMore(false)} />
             <Suspense fallback={null}>
               <LevelBadge className="nav-sheet-level" onClick={() => (setMore(false), go('progress'))} />
             </Suspense>

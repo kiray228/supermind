@@ -167,19 +167,28 @@ export interface ProgressInput {
 
 const dayOf = (ms: number) => toYmd(new Date(ms));
 
-/** Серии подряд идущих дней: лучшая и текущая (текущая может закончиться вчера) */
-export function streaks(days: Iterable<string>, today: string): { best: number; current: number } {
+/**
+ * Серии подряд идущих дней: лучшая и текущая (текущая может закончиться вчера).
+ * `bridge` — дни-мостики (пропуск, пауза привычки): серию не рвут и не продлевают.
+ */
+export function streaks(days: Iterable<string>, today: string, bridge?: (ymd: string) => boolean): { best: number; current: number } {
   const sorted = [...new Set(days)].filter((d) => d <= today).sort();
+  // между a и b (не включая) только мостики
+  const linked = (a: string, b: string) => {
+    let x = addDaysYmd(a, 1);
+    for (let i = 0; x < b && i < 400; i++, x = addDaysYmd(x, 1)) if (!bridge?.(x)) return false;
+    return x === b;
+  };
   let best = 0;
   let run = 0;
   let prev = '';
   for (const d of sorted) {
-    run = prev && addDaysYmd(prev, 1) === d ? run + 1 : 1;
+    run = prev && linked(prev, d) ? run + 1 : 1;
     if (run > best) best = run;
     prev = d;
   }
   const last = sorted[sorted.length - 1];
-  const current = last && (last === today || last === addDaysYmd(today, -1)) ? run : 0;
+  const current = last && (last === today || linked(last, today)) ? run : 0;
   return { best, current };
 }
 
@@ -281,8 +290,13 @@ export function computeProgress(src: ProgressInput, today: string): ProgressStat
         add('journal', day, XP.mood);
       }
     }
-    for (const days of habitDays.values()) {
-      const s = streaks(days, today);
+    // пропуск дня и пауза привычки — мостик в серии (без опыта, но и без штрафа)
+    const pausesOf = new Map<string, { from: string; to: string }[]>();
+    for (const h of Array.isArray(p.habits) ? p.habits : []) if (h && Array.isArray(h.pauses) && h.pauses.length) pausesOf.set(h.id, h.pauses);
+    for (const [id, days] of habitDays) {
+      const pauses = pausesOf.get(id);
+      const bridge = (d: string) => !!p.days[d]?.skipped?.includes(id) || !!pauses?.some((x) => x.from <= d && d <= x.to);
+      const s = streaks(days, today, bridge);
       if (s.best > c.bestHabitStreak) c.bestHabitStreak = s.best;
     }
     const js = streaks(journalDays, today);

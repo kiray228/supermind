@@ -185,6 +185,8 @@ export interface PlannerDay {
   habits?: ID[];
   /** счётчики привычек с целью на день (id → сколько раз), напр. «стакан воды ×8» */
   habitCounts?: Record<ID, number>;
+  /** id привычек, пропущенных в этот день по уважительной причине (серия не рвётся) */
+  skipped?: ID[];
   /** когда день меняли (для синхронизации: свежая версия дня побеждает) */
   updatedAt?: number;
 }
@@ -194,6 +196,12 @@ export type HabitPart = 'morning' | 'day' | 'evening' | 'any';
 
 /** Как часто: каждый день, по дням недели или N раз в неделю */
 export type HabitFreq = 'daily' | 'weekdays' | 'weekly';
+
+/** Пауза привычки: дни с from по to включительно */
+export interface HabitPause {
+  from: string;
+  to: string;
+}
 
 export interface Habit {
   id: ID;
@@ -221,6 +229,8 @@ export interface Habit {
   target?: number;
   /** единица счёта, напр. «стакан» */
   unit?: string;
+  /** паузы (больничный, отпуск): дни с from по to включительно (YYYY-MM-DD) — не по плану и серию не рвут */
+  pauses?: HabitPause[];
   /** в архиве: не показывается, история сохранена */
   archived?: boolean;
   /** удалена (отметка для синхронизации, чтобы привычка не вернулась с другого устройства) */

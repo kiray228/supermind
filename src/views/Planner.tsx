@@ -31,6 +31,8 @@ import { confirmDialog } from '../ui/dialogs';
 import { toast } from '../store/appStore';
 import { activeHabits, cleanHabit, countOn, doneOn, dueOn, isCounter, reminderTimeOf, withCount, withDone, withoutHabit } from '../habits/model';
 import { HabitDetail, HabitEditor, HabitsManager, HabitsToday } from '../habits/ui';
+import { FreezeSheet } from '../habits/freeze';
+import { freezeHandlers } from '../habits/freezeActions';
 import './views.css';
 
 // ---------- Константы ----------
@@ -97,6 +99,8 @@ export default function Planner() {
   const [detailId, setDetailId] = useState<string | null>(null);
   /** редактор: привычка или новая */
   const [editing, setEditing] = useState<Habit | 'new' | null>(null);
+  /** лист «Пауза…» для привычки */
+  const [pauseId, setPauseId] = useState<string | null>(null);
   const tasksDataState = useTasks((s) => s.data);
   const today = todayYmd();
 
@@ -182,6 +186,14 @@ export default function Planner() {
   );
 
   const saveJournal = useCallback((ymd: string, text: string) => updateDay(ymd, (d) => ({ ...d, journal: text })), [updateDay]);
+  /** изменить список привычек на свежих данных (заморозка серии) */
+  const updateHabits = useCallback(
+    (fn: (list: Habit[]) => Habit[]) => {
+      const p = dataRef.current;
+      if (p) commit({ ...p, habits: fn(p.habits) });
+    },
+    [commit],
+  );
 
   // отметки для календаря
   const marks = useMemo(() => {
@@ -319,6 +331,8 @@ export default function Planner() {
     syncSoon(300);
   };
   const detail = detailId ? data.habits.find((h) => h.id === detailId && !h.deleted) : undefined;
+  const freeze = freezeHandlers(() => ({ updateHabits, updateDay, today }));
+  const pauseHabit = pauseId ? data.habits.find((h) => h.id === pauseId && !h.deleted) : undefined;
 
   const pick = (ymd: string) => {
     setDate(ymd);
@@ -550,7 +564,15 @@ export default function Planner() {
           onArchive={(a) => archiveHabit(detail, a)}
           onDelete={() => void deleteHabit(detail)}
           onToggleDay={(ymd) => toggleHabitDay(detail, ymd)}
+          freeze={{
+            onSkip: (on) => freeze.skip(detail, today, on),
+            onPause: () => setPauseId(detail.id),
+            onResume: () => freeze.resume(detail),
+          }}
         />
+      )}
+      {pauseHabit && (
+        <FreezeSheet h={pauseHabit} days={data.days} date={today} today={today} initial="pause" handlers={freeze} onClose={() => setPauseId(null)} />
       )}
       {editing && (
         <HabitEditor

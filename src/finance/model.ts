@@ -189,6 +189,12 @@ export function fmtMoney(x: number, cur: string, opts: { sign?: boolean; compact
 
 /** Разбор суммы из поля ввода: «1 200,5» → 1200.5 */
 export function parseMoneyInput(s: string): number {
+  // «4,5к», «12k», «1,2 млн» — тысячи и миллионы (знак валюты в конце не мешает)
+  const k = s.trim().toLowerCase().replace(/[\s  ]*[₸₽$€£¥]$/, '').match(/^(.*\d)[\s  ]*(к|k|тыс\.?|млн\.?|mln|m|м)$/);
+  if (k) {
+    const base = parseMoneyInput(k[1]);
+    return Number.isFinite(base) ? r2(base * (/^[кkт]/.test(k[2]) ? 1e3 : 1e6)) : NaN;
+  }
   let t = s.replace(/[\s ]/g, '').replace(/[−–]/g, '-');
   // «1.200,50» / «1,200.50»: дробный разделитель — тот, что правее, другой разделяет тысячи
   if (t.includes(',') && t.includes('.') && !/\d[+-]/.test(t)) t = t.lastIndexOf(',') > t.lastIndexOf('.') ? t.replace(/\./g, '') : t.replace(/,/g, '');

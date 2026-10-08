@@ -2,6 +2,10 @@ import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import { toast } from '../../store/appStore';
 import { todayYmd } from '../../utils/mapTasks';
+import { uid } from '../../utils/tree';
+import { fmtNum, parseMoneyInput } from '../../finance/model';
+import { saveAccount, useFinance } from '../../finance/store';
+import { accountBalance, defaultSavingsName, NEW_SAVINGS_ACCOUNT, savingsBase, type SavingsDraft } from '../savings';
 import {
   GOAL_EMOJIS,
   GOAL_PRIORITIES,
@@ -12,12 +16,14 @@ import {
   type Goal,
   type GoalPeriod,
   type GoalPriority,
+  type GoalSavings,
   type GoalsData,
   type GoalTarget,
   type ProgressMode,
 } from '../model';
 import { addGoal, openGoal, updateGoal } from '../store';
 import { Sheet } from './parts';
+import { SavingsFields } from './Savings';
 
 /** Последний символ строки (эмодзи из нескольких кодов не разрываются) */
 function lastGrapheme(s: string): string {
@@ -44,6 +50,50 @@ export function GoalEditor({ data, goal, preset, onClose }: { data: GoalsData; g
   // числа редактируем строками: иначе нельзя ввести «-» или «1,»
   const [tf, setTf] = useState({ start: String(t0.start), target: String(t0.target), current: String(t0.current), step: String(t0.step), unit: t0.unit });
   const tfSet = (k: keyof typeof tf) => (e: { target: { value: string } }) => setTf({ ...tf, [k]: k === 'unit' ? e.target.value.slice(0, 20) : e.target.value });
+  // копилка: счёт в Финансах и сумма
+  const fin = useFinance((s) => s.data);
+  const sv0 = init.savings;
+  const [sv, setSv] = useState<SavingsDraft>({
+    accountId: sv0?.accountId ?? NEW_SAVINGS_ACCOUNT,
+    amount: sv0?.amount ? fmtNum(sv0.amount) : '',
+    newName: '',
+    newCurrency: '',
+    countExisting: !sv0?.base,
+  });
+
+  const pickMode = (m: ProgressMode) => {
+    setMode(m);
+    if (m !== 'savings' || goal) return;
+    // новая копилка: подходящий значок и сфера «Финансы»
+    if (emoji === '🎯') setEmoji('🐷');
+    if (!areaId && data.areas.some((a) => a.id === 'area-finance')) setAreaId('area-finance');
+  };
+
+  /** Собрать копилку (новый счёт создаётся здесь же). null — ошибка уже показана */
+  const buildSavings = (): GoalSavings | null => {
+    if (!fin) {
+      toast('Финансы ещё загружаются');
+      return null;
+    }
+    const amount = parseMoneyInput(sv.amount);
+    if (!(amount > 0)) {
+      toast('Укажите, сколько нужно накопить');
+      return null;
+    }
+    if (sv.accountId === NEW_SAVINGS_ACCOUNT) {
+      const currency = sv.newCurrency || fin.prefs.mainCurrency;
+      const id = uid();
+      saveAccount({ id, name: sv.newName.trim() || defaultSavingsName(title), emoji: '🐷', color: '#ec4899', currency, initial: 0 });
+      return { accountId: id, amount, currency };
+    }
+    const acc = fin.accounts.find((a) => a.id === sv.accountId);
+    if (!acc) {
+      toast('Выберите счёт-копилку');
+      return null;
+    }
+    const base = savingsBase(sv, sv0, accountBalance(fin, acc.id));
+    return { accountId: acc.id, amount, currency: acc.currency, ...(base ? { base } : {}) };
+  };
 
   const pickPeriod = (p: GoalPeriod, n = shift) => {
     setPeriod(p);
@@ -67,6 +117,8 @@ export function GoalEditor({ data, goal, preset, onClose }: { data: GoalsData; g
     if (deadline && start && deadline < start) return toast('Срок не может быть раньше начала');
     const target: GoalTarget = { start: num(tf.start), target: num(tf.target), current: num(tf.current), unit: tf.unit.trim(), step: num(tf.step, 1) };
     if (mode === 'target' && target.target === target.start) return toast('Целевое значение должно отличаться от начального');
+    let savings: GoalSavings | null = null;
+    if (mode === 'savings' && !(savings = buildSavings())) return;
     const patch: Partial<Goal> = {
       title: title.trim(),
       emoji: emoji || '🎯',
@@ -78,6 +130,7 @@ export function GoalEditor({ data, goal, preset, onClose }: { data: GoalsData; g
       priority,
       mode,
       ...(mode === 'target' ? { target: { ...target, step: target.step > 0 ? target.step : 1 } } : {}),
+      ...(savings ? { savings } : {}),
     };
     if (goal) {
       updateGoal(goal.id, patch);
@@ -178,7 +231,7 @@ export function GoalEditor({ data, goal, preset, onClose }: { data: GoalsData; g
       <label className="label">Как считать прогресс</label>
       <div className="gl-modes">
         {MODES.map((m) => (
-          <button key={m.v} type="button" className={'gl-mode' + (mode === m.v ? ' active' : '')} onClick={() => setMode(m.v)}>
+          <button key={m.v} type="button" className={'gl-mode' + (m.v === 'savings' ? ' is-wide' : '') + (mode === m.v ? ' active' : '')} onClick={() => pickMode(m.v)}>
             <b>{m.label}</b>
             <span className="tiny muted">{m.hint}</span>
           </button>
@@ -210,6 +263,7 @@ export function GoalEditor({ data, goal, preset, onClose }: { data: GoalsData; g
           )}
         </div>
       )}
+      {mode === 'savings' && <SavingsFields draft={sv} onChange={setSv} prev={sv0} deadline={deadline} title={title} />}
 
       <div className="modal-actions">
         <button className="btn btn-ghost" onClick={onClose}>

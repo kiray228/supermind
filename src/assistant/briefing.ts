@@ -105,11 +105,15 @@ export function habitsForDay(planner: PlannerData | null, ymd: string): BriefHab
   const day = (isObj(planner.days) ? (planner.days as Obj)[ymd] : undefined) as Obj | undefined;
   const doneIds = Array.isArray(day?.habits) ? (day!.habits as unknown[]) : [];
   const counts = isObj(day?.habitCounts) ? (day!.habitCounts as Obj) : {};
+  const skipped = Array.isArray(day?.skipped) ? (day!.skipped as unknown[]) : [];
   const date = fromYmd(ymd);
   const out: BriefHabit[] = [];
   for (const raw of planner.habits as unknown[]) {
     if (!isObj(raw) || typeof raw.id !== 'string' || typeof raw.name !== 'string') continue;
     if (!habitScheduledOn(raw, date)) continue;
+    // пропуск дня и пауза (больничный, отпуск) — не на сегодня, если не выполнена
+    const paused = Array.isArray(raw.pauses) && raw.pauses.some((p) => isObj(p) && typeof p.from === 'string' && typeof p.to === 'string' && p.from <= ymd && ymd <= p.to);
+    if ((paused || skipped.includes(raw.id)) && !doneIds.includes(raw.id)) continue;
     const target = habitTarget(raw);
     const cnt = Number(counts[raw.id]);
     const count = Number.isFinite(cnt) ? cnt : doneIds.includes(raw.id) ? target : 0;

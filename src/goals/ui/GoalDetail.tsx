@@ -23,12 +23,16 @@ import {
 import { bumpTarget, createGoalTask, deleteGoal, linkTask, setGoalStatus, setManualProgress, updateGoal } from '../store';
 import { areaColor, areaOf, ProgressBar, ProgressRing, Sheet, useTaskLookup } from './parts';
 import { AddInput, StagesSection, TaskMini } from './Stages';
+import { SavingsBlock } from './Savings';
+import { useFinance } from '../../finance/store';
 
 const dtFmt = (ms: number) =>
   new Date(ms).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 export function GoalDetail({ data, goal, onClose, onEdit }: { data: GoalsData; goal: Goal; onClose: () => void; onEdit: () => void }) {
   const look = useTaskLookup();
+  // копилка: прогресс зависит от остатка счёта — перерисовываемся при изменении финансов
+  useFinance((s) => (goal.mode === 'savings' ? s.data : null));
   const [picker, setPicker] = useState(false);
   const today = todayYmd();
   const area = areaOf(data, goal.areaId);
@@ -93,13 +97,16 @@ export function GoalDetail({ data, goal, onClose, onEdit }: { data: GoalsData; g
               {elapsed > pct + 15 && pct < 100 ? ' — стоит ускориться' : ''}
             </div>
           )}
+          {goal.mode !== 'savings' && (
           <div className="segmented gl-mode-seg">
-            {MODES.map((m) => (
+            {MODES.filter((m) => m.v !== 'savings').map((m) => (
               <button key={m.v} className={goal.mode === m.v ? 'active' : ''} onClick={() => updateGoal(goal.id, { mode: m.v })} title={m.hint}>
                 {m.label}
               </button>
             ))}
           </div>
+          )}
+          {goal.mode === 'savings' && <SavingsBlock goal={goal} onEdit={onEdit} />}
           {goal.mode === 'manual' && <ManualSlider goal={goal} />}
           {goal.mode === 'target' && <TargetBlock goal={goal} />}
           {goal.mode === 'stages' && (

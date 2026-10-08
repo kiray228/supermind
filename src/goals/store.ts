@@ -5,6 +5,9 @@ import { toast } from '../store/appStore';
 import { uid } from '../utils/tree';
 import { todayYmd } from '../utils/mapTasks';
 import { addTask, ensureTasks, getTask, openTask, toggleDone, useTasks } from '../tasks/store';
+import { addTransaction, deleteTransaction, ensureFinance, useFinance } from '../finance/store';
+import { fmtMoney } from '../finance/model';
+import { savingsInfo, setSavingsSource } from './savings';
 import {
   AREA_COLORS,
   fmtNum,
@@ -31,6 +34,9 @@ export type { GoalDue } from './model';
 const KEY = 'goals';
 const HISTORY_MAX = 300;
 
+// копилки считают прогресс по остатку счёта в Финансах
+setSavingsSource(() => useFinance.getState().data);
+
 interface GoalsState {
   data: GoalsData | null;
   /** открытая карточка цели */
@@ -54,6 +60,8 @@ export function ensureGoals(): Promise<GoalsData> {
       const d = normalizeGoalsData(await get<GoalsData>(KEY));
       useGoals.setState({ data: d });
       store.loaded();
+      // есть копилки — подгружаем финансы, иначе прогресс будет 0%
+      if (d.goals.some((g) => g.mode === 'savings')) void ensureFinance().catch(() => undefined);
       return d;
     })().catch((e) => {
       loading = null;
@@ -295,6 +303,47 @@ export function bumpTarget(id: string, delta: number, note?: string) {
       log(g, `${delta > 0 ? '+' : '−'}${fmtNum(Math.abs(delta))}${unit} → ${fmtNum(g.target.current)}${note ? ` · ${note}` : ''}`, { kind: 'target', delta });
     }),
   );
+}
+
+/**
+ * Пополнить копилку: перевод с другого счёта на счёт-копилку (операция в Финансах).
+ * toAmount — сумма зачисления, если валюты счетов разные.
+ */
+export function depositToSavings(goalId: string, fromAccountId: string, amount: number, toAmount?: number): boolean {
+  const g = getGoal(goalId);
+  const sv = g?.savings;
+  const fin = useFinance.getState().data;
+  if (!g || !sv || !fin || !(amount > 0)) return false;
+  const to = fin.accounts.find((a) => a.id === sv.accountId);
+  if (!to) {
+    toast('Счёт-копилка удалён');
+    return false;
+  }
+  if (fromAccountId === to.id) return false;
+  const before = goalProgress(g, lookup());
+  const t = addTransaction(
+    { type: 'transfer', amount, accountId: fromAccountId, toAccountId: to.id, ...(toAmount && toAmount > 0 ? { toAmount } : {}), date: todayYmd(), note: `Копилка: ${g.title}` },
+    { silent: true },
+  );
+  if (!t) return false;
+  const got = toAmount && toAmount > 0 ? toAmount : amount;
+  let hid = '';
+  editGoal(goalId, (x) => {
+    log(x, `+${fmtMoney(got, to.currency)} в копилку`, { kind: 'target', delta: got });
+    hid = x.history[x.history.length - 1].id;
+  });
+  const after = getGoal(goalId);
+  const s = after ? savingsInfo(after) : null;
+  if (s?.reached && before < 100 && after?.status === 'active') toast('Копилка собрана! 🎉 Завершить цель?', { label: 'Завершить', run: () => setGoalStatus(goalId, 'done') });
+  else
+    toast(`+${fmtMoney(got, to.currency)} в копилку`, {
+      label: 'Отменить',
+      run: () => {
+        deleteTransaction(t.id, false);
+        editGoal(goalId, (x) => void (x.history = x.history.filter((h) => h.id !== hid)));
+      },
+    });
+  return true;
 }
 
 // ---------- Этапы и шаги ----------

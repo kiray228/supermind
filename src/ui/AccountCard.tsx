@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { ArrowsClockwise, BellRinging, Cloud, CloudSlash, PaperPlaneTilt, Password, User } from '@phosphor-icons/react';
+import { ArrowsClockwise, BellRinging, CloudArrowUp, CloudCheck, CloudSlash, CloudWarning, PaperPlaneTilt, Password, User } from '@phosphor-icons/react';
 import { changePassword, deleteAccount, login, logout, register, syncNow, useCloud } from '../store/cloud';
 import { enablePush, disablePush, isStandalone, pushActive, pushSupported, testPush } from '../store/push';
 import { toast } from '../store/appStore';
 import { dirtyKeys } from '../store/kv';
+import { changesText, clockText, recount, usePendingSync } from '../store/pending';
 import { askPassword, askText, confirmDialog } from './dialogs';
 import { isNative } from '../platform';
 import { IconTile } from './icons';
@@ -25,6 +26,9 @@ export function AccountCard() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
+  const [sending, setSending] = useState(false);
+  // неотправленные изменения (пересчёт по событиям)
+  const { count, since } = usePendingSync();
   const [, tick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => tick((n) => n + 1), 30000);
@@ -45,8 +49,28 @@ export function AccountCard() {
     }
   };
 
+  /** «Отправить сейчас»: синхронизация и понятный итог */
+  const sendNow = async () => {
+    setSending(true);
+    try {
+      await syncNow();
+      const left = await recount();
+      const s = useCloud.getState();
+      if (s.status === 'offline') toast('Нет интернета — отправим, когда появится связь');
+      else if (s.status === 'error') toast(s.error ?? 'Не удалось синхронизировать');
+      else if (left) toast(`Не всё отправлено: осталось ${changesText(left)}`);
+      else toast(count ? 'Все изменения отправлены в облако' : 'Синхронизировано');
+    } finally {
+      setSending(false);
+    }
+  };
+
   if (account) {
     const who = account.user.name || account.user.email;
+    const syncing = status === 'syncing' || sending;
+    const cloudIcon = status === 'offline' ? CloudSlash : status === 'error' ? CloudWarning : count ? CloudArrowUp : CloudCheck;
+    const cloudTone = status === 'error' ? 'red' : status === 'offline' || count ? 'orange' : 'blue';
+    const unsent = count ? `Не отправлено: ${changesText(count)}${since ? ` · с ${clockText(since)}` : ''}` : '';
     return (
       <>
         <ListSection>
@@ -58,18 +82,31 @@ export function AccountCard() {
           />
         </ListSection>
         <ListSection
+          className="acc-sync"
           header="Синхронизация"
           footer="Карты, задачи, ежедневник и всё остальное сохраняются в облаке и одинаковы на всех устройствах."
         >
           <ListRow
-            icon={<IconTile icon={status === 'error' || status === 'offline' ? CloudSlash : Cloud} tone={status === 'error' || status === 'offline' ? 'red' : 'blue'} size="list" />}
+            icon={<IconTile icon={cloudIcon} tone={cloudTone} size="list" />}
             title="Облако"
             subtitle={
-              status === 'error' || status === 'offline' ? (
-                <span className={`acc-status ${status}`}>{error}</span>
-              ) : undefined
+              status === 'offline' ? (
+                <>
+                  <span className="acc-status offline">Нет интернета — отправим, когда появится связь</span>
+                  {unsent && <span className="acc-unsent">{unsent}</span>}
+                </>
+              ) : status === 'error' ? (
+                <>
+                  <span className="acc-status error">{error ?? 'Ошибка синхронизации'}</span>
+                  {unsent && <span className="acc-unsent">{unsent}</span>}
+                </>
+              ) : status === 'syncing' ? (
+                count ? `Отправляем ${changesText(count)}…` : 'Синхронизация…'
+              ) : (
+                unsent || `Все изменения в облаке${lastSync ? ` · синхронизировано ${ago(lastSync)}` : ''}`
+              )
             }
-            value={status === 'syncing' ? 'Синхронизация…' : status === 'error' || status === 'offline' ? undefined : ago(lastSync)}
+            value={status === 'syncing' && !sending ? <span className="spinner acc-spinner" aria-label="Синхронизация" /> : undefined}
           />
           {!!localOnly && (
             <ListRow
@@ -79,11 +116,12 @@ export function AccountCard() {
             />
           )}
           <ListRow
-            icon={<IconTile icon={ArrowsClockwise} tone="green" size="list" />}
-            title={status === 'syncing' ? 'Синхронизация…' : 'Синхронизировать сейчас'}
+            icon={<IconTile icon={count ? CloudArrowUp : ArrowsClockwise} tone="green" size="list" />}
+            title={syncing ? (count ? 'Отправка…' : 'Синхронизация…') : count ? 'Отправить сейчас' : 'Синхронизировать сейчас'}
             tone="accent"
-            disabled={status === 'syncing'}
-            onClick={() => void syncNow()}
+            disabled={syncing}
+            trailing={sending ? <span className="spinner acc-spinner" /> : undefined}
+            onClick={() => void sendNow()}
           />
         </ListSection>
         <ListSection>

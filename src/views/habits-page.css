@@ -427,3 +427,25 @@
 .hp-group-head h2, .hp-group-title { font-weight: 700; letter-spacing: -0.022em; }
 .hp-navbar { position: absolute; top: 0; left: 0; right: 0; opacity: 0; pointer-events: none; transition: opacity .2s; }
 .page.is-scrolled .hp-navbar { opacity: 1; }
+
+/* ================= Заморозка серии: пропуск дня и пауза ================= */
+.hp-card { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.hp-group.hp-frozen { --pc: #0ea5e9; }
+.hp-card.frozen { background: color-mix(in srgb, #38bdf8 7%, var(--surface)); }
+.hp-card.frozen .hp-tile { filter: saturate(.55); }
+.hp-meta-ice { display: inline-flex; align-items: center; gap: 5px; font-weight: 650; color: #0284c7; }
+.hp-card.frozen.pause .hp-meta-ice { color: var(--text-2); }
+.hp-check.hp-check-ice {
+  border: 2px dashed color-mix(in srgb, #38bdf8 55%, var(--border)); background: color-mix(in srgb, #38bdf8 10%, var(--surface)); color: #0284c7;
+}
+.hp-card.frozen.pause .hp-check-ice { border-color: color-mix(in srgb, #94a3b8 60%, var(--border)); background: var(--fill-4, var(--surface-2)); color: var(--text-2); }
+.hp-chip-pause { border: none; cursor: pointer; font: inherit; }
+.hp-chip-pause svg { color: #0ea5e9; }
+.hp-chip-pause:active { transform: scale(.96); }
+.hp-day { position: relative; }
+.hp-day-ice { position: absolute; top: 25px; right: calc(50% - 25px); display: inline-flex; color: #0ea5e9; pointer-events: none; }
+.hp-day.sel .hp-day-ice { color: #fff; }
+.hp-day.iced .hp-ring-track { stroke: color-mix(in srgb, #38bdf8 35%, var(--surface-3)); stroke-dasharray: 3 4; }
+.hp-day.sel.iced .hp-ring-track { stroke: rgba(255, 255, 255, 0.5); }
+:root[data-theme='dark'] .hp-meta-ice, :root[data-theme='dark'] .hp-check.hp-check-ice { color: #7dd3fc; }
+:root[data-theme='dark'] .hp-card.frozen { background: color-mix(in srgb, #38bdf8 9%, var(--surface)); }
