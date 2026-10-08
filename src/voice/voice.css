@@ -5,6 +5,10 @@
   position: absolute; top: 14px; right: 14px; width: 30px; height: 30px; border-radius: 50%; border: 0;
   background: var(--fill-3); color: var(--text-2); display: grid; place-items: center; cursor: pointer; z-index: 1;
 }
+.vc-speaker {
+  position: absolute; top: 14px; left: 14px; width: 30px; height: 30px; border-radius: 50%; border: 0;
+  background: var(--fill-3); color: var(--text-2); display: grid; place-items: center; cursor: pointer; z-index: 1;
+}
 .vc-top { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; padding: 8px 8px 0; }
 
 /* кнопка-«сфера» микрофона */
@@ -47,6 +51,9 @@
 .vc-card.k-add_transaction .vc-ico { background: #34c759; }
 .vc-card.k-add_habit .vc-ico { background: #ff9500; }
 .vc-card.k-add_note .vc-ico { background: #ffcc00; color: #5c4a00; }
+.vc-card.k-mark_done .vc-ico { background: #30b0c7; }
+.vc-card.k-ask .vc-ico { background: #5856d6; }
+.vc-card.k-ask .vc-meta { white-space: normal; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
 .vc-card.undone, .vc-card.fail { opacity: .55; }
 .vc-card.undone .vc-title { text-decoration: line-through; }
 .vc-card-body {

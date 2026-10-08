@@ -8,19 +8,20 @@ import { addTask, ensureTasks, openTask, purgeTask } from '../tasks/store';
 import { repeatLabel, type Priority, type RepeatRule } from '../tasks/model';
 import { addTransaction, deleteTransaction, ensureFinance } from '../finance/store';
 import { fmtMoney, sortedAccounts, sortedCategories } from '../finance/model';
+import { answer, dayLabel, findDone, markDone, type Done } from './answers';
 import { createNote, ensureNotes, openNote, purgeNote } from '../notes/store';
 import { loadPlanner, savePlanner } from '../store/db';
 import { HABIT_LIBRARY } from '../habits/library';
 import { cleanHabit, HABIT_COLORS } from '../habits/model';
 import { syncSoon } from '../tasks/sync';
-import { addDaysYmd, todayYmd } from '../utils/mapTasks';
+import { todayYmd } from '../utils/mapTasks';
 import { uid } from '../utils/tree';
 import type { Habit } from '../types';
 import { useApp, type View } from '../store/appStore';
 
 const go = (v: View) => useApp.getState().go(v);
 
-export type { VoiceAction };
+export type { VoiceAction, Done };
 
 /** ИИ на сервере не подключён — в этом сеансе больше не спрашиваем */
 let aiOff = false;
@@ -112,6 +113,22 @@ export function fromAi(raw: unknown): VoiceAction | null {
       const title = str(raw.title, 120) ?? text.split('\n')[0].slice(0, 80);
       return title ? { type: 'add_note', title, text } : null;
     }
+    case 'mark_done': {
+      const query = str(raw.query ?? raw.title, 200);
+      if (!query) return null;
+      const n = Math.round(Number(raw.n));
+      return { type: 'mark_done', query, strict: true, ...(n > 1 && n <= 100 ? { n } : {}) };
+    }
+    case 'ask': {
+      if (raw.what === 'balance') return { type: 'ask', what: 'balance' };
+      if (raw.what === 'agenda') return { type: 'ask', what: 'agenda', date: ymd(raw.date) ?? todayYmd() };
+      if (raw.what !== 'spent' && raw.what !== 'income') return null;
+      const today = todayYmd();
+      const from = ymd(raw.from) ?? today.slice(0, 8) + '01';
+      const to = ymd(raw.to) ?? today;
+      const period = from === to ? (from === today ? 'сегодня' : `за ${dayLabel(from)}`) : `с ${dayLabel(from)} по ${dayLabel(to)}`;
+      return { type: 'ask', what: raw.what, from, to, period, ...(str(raw.category, 80) ? { category: str(raw.category, 80) } : {}) };
+    }
     default:
       return null;
   }
@@ -122,6 +139,9 @@ export async function interpret(text: string): Promise<{ actions: VoiceAction[];
   const ctx = await context();
   const local = parseVoice(text, ctx);
   if (local.confident && local.actions.length) return { actions: local.actions, via: 'local' };
+  // «выпил стакан воды» — если похоже на привычку, отмечаем без ИИ
+  const md = local.actions[0];
+  if (md?.type === 'mark_done' && (await findDone(md.query, false, md.kind))) return { actions: local.actions, via: 'local' };
   if (!aiOff && useCloud.getState().account) {
     try {
       const now = new Date();
@@ -143,30 +163,10 @@ export async function interpret(text: string): Promise<{ actions: VoiceAction[];
       if ((e as { status?: number }).status === 503) aiOff = true;
     }
   }
-  return { actions: local.actions, via: 'local' };
+  return { actions: local.fallback ?? local.actions, via: 'local' };
 }
 
 // ---------- Выполнение ----------
-
-export interface Done {
-  ok: boolean;
-  /** что сделано: «Задача», «Расход»… */
-  label: string;
-  title: string;
-  meta?: string;
-  undo?: () => void | Promise<void>;
-  open?: () => void;
-}
-
-const MONTHS = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
-export function dayLabel(d: string): string {
-  const t = todayYmd();
-  if (d === t) return 'сегодня';
-  if (d === addDaysYmd(t, 1)) return 'завтра';
-  if (d === addDaysYmd(t, -1)) return 'вчера';
-  const [, m, day] = d.split('-').map(Number);
-  return `${day} ${MONTHS[m - 1]}`;
-}
 
 const lower = (s: string) => s.toLowerCase().replace(/ё/g, 'е');
 function byName<T extends { id: string; name: string }>(items: T[], q?: string): T | undefined {
@@ -196,8 +196,11 @@ const HABIT_ICONS: [RegExp, string, string][] = [
   [/уборк|убира/, '🧹', '#14b8a6'],
 ];
 
-function habitLook(name: string): { icon: string; color: string } {
+function habitLook(name: string): { icon: string; color: string; target?: number; unit?: string } {
   const low = lower(name);
+  // точно как в библиотеке («Пить воду») — берём и цель-счётчик (8 стаканов)
+  const same = HABIT_LIBRARY.find((h) => lower(h.name) === low);
+  if (same) return { icon: same.icon ?? '✨', color: same.color ?? HABIT_COLORS[0], ...(same.target ? { target: same.target, unit: same.unit } : {}) };
   for (const [re, icon, color] of HABIT_ICONS) if (re.test(low)) return { icon, color };
   const words = lower(name).split(/[^\p{L}\d]+/u).filter((w) => w.length >= 4);
   const p = HABIT_LIBRARY.find((h) => lower(h.name).split(/[^\p{L}\d]+/u).some((w) => w.length >= 4 && words.some((x) => x.slice(0, 4) === w.slice(0, 4))));
@@ -207,6 +210,10 @@ function habitLook(name: string): { icon: string; color: string } {
 
 export async function execute(a: VoiceAction): Promise<Done> {
   switch (a.type) {
+    case 'mark_done':
+      return markDone(a.query, a.strict, a.n, a.kind);
+    case 'ask':
+      return answer(a);
     case 'add_task': {
       const d = await ensureTasks();
       const list = byName(d.lists, a.list);
@@ -271,6 +278,7 @@ export async function execute(a: VoiceAction): Promise<Done> {
         name: a.name,
         icon: look.icon,
         color: look.color,
+        ...(look.target ? { target: look.target, ...(look.unit ? { unit: look.unit } : {}) } : {}),
         ...(a.days?.length ? { freq: 'weekdays' as const, days: a.days } : a.perWeek ? { freq: 'weekly' as const, perWeek: a.perWeek } : {}),
         ...(a.time ? { time: a.time } : {}),
         createdAt: now,

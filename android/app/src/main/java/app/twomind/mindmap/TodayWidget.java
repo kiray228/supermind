@@ -347,6 +347,7 @@ public class TodayWidget extends AppWidgetProvider {
         rv.setViewVisibility(R.id.w_count, rows.isEmpty() ? View.GONE : View.VISIBLE);
 
         rv.setOnClickPendingIntent(R.id.w_add, activityIntent(ctx, 1, "quick_add", null, null));
+        rv.setOnClickPendingIntent(R.id.w_mic, activityIntent(ctx, 7, "voice", null, null));
         rv.setOnClickPendingIntent(R.id.w_header, activityIntent(ctx, 2, "open_view", null, "tasks"));
         rv.setOnClickPendingIntent(R.id.w_more, activityIntent(ctx, 2, "open_view", null, "tasks"));
         rv.setOnClickPendingIntent(R.id.w_empty, activityIntent(ctx, 2, "open_view", null, "tasks"));

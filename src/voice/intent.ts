@@ -12,7 +12,13 @@ export type VoiceAction =
   | { type: 'add_task'; title: string; date?: string; time?: string; repeat?: RepeatRule; remindAtTime?: boolean; priority?: Priority; list?: string }
   | { type: 'add_transaction'; kind: 'expense' | 'income'; amount: number; categoryId?: string; category?: string; account?: string; note?: string; date?: string }
   | { type: 'add_habit'; name: string; time?: string; perWeek?: number; days?: number[]; target?: number; unit?: string }
-  | { type: 'add_note'; title: string; text: string };
+  | { type: 'add_note'; title: string; text: string }
+  /** отметить выполненным: задачу или привычку по словам из фразы; strict — сказано явно («выполнил…», «отметь…») */
+  | { type: 'mark_done'; query: string; n?: number; strict: boolean; kind?: 'task' | 'habit' }
+  /** вопрос: что на день, сколько потрачено/получено, сколько денег на счетах */
+  | { type: 'ask'; what: 'agenda'; date: string }
+  | { type: 'ask'; what: 'spent' | 'income'; from: string; to: string; period: string; categoryId?: string; category?: string }
+  | { type: 'ask'; what: 'balance' };
 
 export interface VoiceCtx {
   now?: Date;
@@ -25,6 +31,8 @@ export interface VoiceParse {
   actions: VoiceAction[];
   /** фраза однозначна — ИИ не нужен */
   confident: boolean;
+  /** если «выполнил…» не совпало ни с одной привычкой или задачей — что сделать вместо */
+  fallback?: VoiceAction[];
 }
 
 const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
@@ -312,19 +320,125 @@ function parseTaskCmd(raw: string, now: Date): { action: VoiceAction; explicit: 
   };
 }
 
-/** Главный разбор: деньги → привычка → заметка → задача */
+// ---------- Вопросы ----------
+
+const MONTH_NAMES = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'];
+const ymdOf = (d: Date) => toYmd(d);
+
+/** Период из фразы: «сегодня», «вчера», «за неделю», «в прошлом месяце», «за год»; по умолчанию — этот месяц */
+function periodOf(t: string, now: Date): { from: string; to: string; period: string } {
+  const today = toYmd(now);
+  if (/вчера/i.test(t)) {
+    const y = addDaysYmd(today, -1);
+    return { from: y, to: y, period: 'вчера' };
+  }
+  if (/сегодня|за\s+день/i.test(t)) return { from: today, to: today, period: 'сегодня' };
+  if (/недел/i.test(t)) {
+    const past = /прошл/i.test(t);
+    const wd = (now.getDay() + 6) % 7;
+    const mon = addDaysYmd(today, -wd - (past ? 7 : 0));
+    return { from: mon, to: past ? addDaysYmd(mon, 6) : today, period: past ? 'за прошлую неделю' : 'за эту неделю' };
+  }
+  if (/(?:за|в)\s+(?:этом\s+)?год/i.test(t)) return { from: `${now.getFullYear()}-01-01`, to: today, period: `за ${now.getFullYear()} год` };
+  const past = /прошл/i.test(t);
+  const m = new Date(now.getFullYear(), now.getMonth() - (past ? 1 : 0), 1);
+  const end = new Date(m.getFullYear(), m.getMonth() + 1, 0);
+  return { from: ymdOf(m), to: past ? ymdOf(end) : today, period: `за ${MONTH_NAMES[m.getMonth()]}` };
+}
+
+function parseAsk(raw: string, ctx: VoiceCtx, now: Date): VoiceAction | null {
+  const t = raw.toLowerCase().replace(/[?!.]+$/, '').trim();
+  const today = toYmd(now);
+  const money = /сколько\s+(?:я\s+|мы\s+)?(?:всего\s+)?(потратил\p{L}*|потрачено|ушло|израсходовал\p{L}*|расход\p{L}*|заработал\p{L}*|получил\p{L}*|доход\p{L}*)/iu.exec(t);
+  if (money || /^(?:мои\s+|какие\s+(?:у\s+меня\s+)?)?(расходы|траты|доходы)\s+(?:за|в|на|сегодня|вчера)/iu.test(t)) {
+    const word = money?.[1] ?? t;
+    const what = /заработал|получил|доход/iu.test(word) ? 'income' : 'spent';
+    const p = periodOf(t, now);
+    const after = money ? t.slice(money.index + money[0].length) : t;
+    const onCat = /(?:^|\s)на\s+(?!этой|прошлой|этом|прошлом)([\p{L}\s]+?)(?=$|\s+(?:за|в|сегодня|вчера))/iu.exec(after);
+    const cat = onCat ? pickCategory(onCat[1], what === 'income' ? 'income' : 'expense', ctx) : {};
+    return { type: 'ask', what, ...p, ...(cat.id ? { categoryId: cat.id } : {}), ...(cat.name ? { category: cat.name } : {}) };
+  }
+  if (/(какой|сколько|покажи).*(баланс|денег|на\s+сч[её]т|на\s+карте|остал\p{L}*\s+денег)|^баланс$/iu.test(t)) return { type: 'ask', what: 'balance' };
+  if (
+    /^(?:а\s+)?(?:что|какие|какое)\s+(?:у\s+меня\s+)?(?:сегодня|завтра|послезавтра|на\s+сегодня|на\s+завтра|по\s+планам|запланирован\p{L}*|в\s+планах|дела|задачи|планы|расписание)/iu.test(t) ||
+    /^(?:мои\s+)?(?:задачи|дела|планы|расписание)\s+(?:на\s+)?(?:сегодня|завтра|послезавтра)$/iu.test(t) ||
+    /что\s+(?:мне\s+)?(?:надо|нужно)\s+(?:сделать|успеть)/iu.test(t)
+  ) {
+    const date = /послезавтра/.test(t) ? addDaysYmd(today, 2) : /завтра/.test(t) ? addDaysYmd(today, 1) : today;
+    return { type: 'ask', what: 'agenda', date };
+  }
+  return null;
+}
+
+// ---------- «Выполнил…» ----------
+
+function parseDone(raw: string): VoiceAction | null {
+  const t = wordsToDigits(raw).replace(/[.!]+$/, '').trim();
+  const explicit = /^(?:я\s+)?(?:уже\s+)?(?:выполнил\p{L}*|сделал\p{L}*|закончил\p{L}*|отметь(?:те)?|отметить|отмечай|готово:?|галочк\p{L}*\s+на)\s+(.+)$/iu.exec(t);
+  const implicit = !explicit && /^(?:я\s+)?(?:уже\s+)?(\p{L}{3,}(?:ал|ял|ил|ел|ыл|ул|ла|ли))\s+(.+)$/iu.exec(t);
+  const m = explicit || implicit;
+  if (!m) return null;
+  let q = explicit
+    ? m[1]
+    : // «выпил стакан воды», «прочитал 20 страниц» — глагол тоже часть смысла
+      t.replace(/^(?:я\s+)?(?:уже\s+)?/iu, '');
+  q = q
+    .replace(/(?:^|\s)(?:задач[уаи]|привычк[уаи]|дело|как|что|выполнен\p{L}*|сделан\p{L}*|готов\p{L}*|на\s+сегодня|сегодня|пожалуйста)(?=$|\s)/giu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (q.length < 2) return null;
+  const num = /(?:^|\s)(\d{1,3})(?=\s)/.exec(' ' + q + ' ');
+  const n = num ? Math.min(100, +num[1]) : undefined;
+  // «выполнил задачу…» / «отметь привычку…» — где искать
+  const kind = /(?:^|\s)задач/iu.test(t) ? 'task' : /(?:^|\s)привычк/iu.test(t) ? 'habit' : undefined;
+  return { type: 'mark_done', query: q, ...(n && n > 1 ? { n } : {}), strict: !!explicit, ...(kind ? { kind } : {}) };
+}
+
+// ---------- Несколько трат в одной фразе ----------
+
+/** «Потратил 2000 на такси и 3500 на обед» → две траты; глагол и дата переходят на следующие части */
+function parseMoneyList(raw: string, ctx: VoiceCtx, today: string): VoiceAction[] | null {
+  const parts = wordsToDigits(raw).split(/(?:,\s+|\s+и\s+|\s+а\s+(?:ещё|еще)\s+|\s+плюс\s+ещ[её]\s+)/iu);
+  if (parts.length < 2 || !parts.every((p) => /\d/.test(p))) return null;
+  const first = parseMoney(parts[0], ctx, today);
+  if (!first || first.type !== 'add_transaction') return null;
+  const verb = first.kind === 'income' ? 'получил' : 'потратил';
+  const out: VoiceAction[] = [first];
+  for (const p of parts.slice(1)) {
+    const a = parseMoney(EXPENSE_RE.test(p) || INCOME_RE.test(p) ? p : `${verb} ${p}`, ctx, today);
+    if (!a || a.type !== 'add_transaction') return null;
+    out.push(first.date && !a.date ? { ...a, date: first.date } : a);
+  }
+  return out;
+}
+
+/** Главный разбор: вопросы → деньги → привычка → заметка → «выполнил» → задача */
 export function parseVoice(input: string, ctx: VoiceCtx = {}): VoiceParse {
   const raw = input.replace(/\s+/g, ' ').trim();
   if (!raw) return { actions: [], confident: true };
   const now = ctx.now ?? new Date();
   const today = toYmd(now);
+  const ask = parseAsk(raw, ctx, now);
+  if (ask) return { actions: [ask], confident: true };
+  const list = parseMoneyList(raw, ctx, today);
+  if (list) return { actions: list, confident: true };
   const money = parseMoney(raw, ctx, today);
   if (money) return { actions: [money], confident: true };
+  if (/^(?:я\s+)?(?:уже\s+)?(?:выполнил|сделал|закончил|отметь|отметить)/iu.test(raw) && !HABIT_RE.test(raw.replace(/^отметь\s+привычк/iu, ''))) {
+    const done = parseDone(raw);
+    if (done) return { actions: [done], confident: true };
+  }
   const habit = parseHabit(raw);
   if (habit) return { actions: [habit], confident: true };
   const note = parseNote(raw);
   if (note) return { actions: [note], confident: true };
   const task = parseTaskCmd(raw, now);
+  // «выпил стакан воды», «прочитал 20 страниц» — возможно, отметка привычки (проверяется по данным)
+  const done = parseDone(raw);
+  // без глагола-инфинитива («купил хлеб») это не задача: если отмечать нечего — честно «не понял», а не мусорная задача
+  const hasInfinitive = /(?:^|\s)\p{L}{2,}(?:ть|ться|ти|тись)(?=$|[\s,.])/iu.test(raw);
+  if (done && task && !task.explicit) return { actions: [done], confident: false, fallback: hasInfinitive ? [task.action] : [] };
   if (task) return { actions: [task.action], confident: task.explicit };
   return { actions: [], confident: false };
 }

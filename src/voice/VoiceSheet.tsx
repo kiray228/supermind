@@ -3,13 +3,14 @@
  * Результат можно сразу отменить или открыть.
  */
 import { useEffect, useRef, useState } from 'react';
-import { ArrowCounterClockwise, ArrowUp, CaretRight, CheckSquare, Microphone, NotePencil, Plant, Wallet, X } from '@phosphor-icons/react';
+import { ArrowCounterClockwise, ArrowUp, CaretRight, ChatCircleText, CheckCircle, CheckSquare, Microphone, NotePencil, Plant, SpeakerHigh, SpeakerSlash, Wallet, X } from '@phosphor-icons/react';
 import { canListen, listen, type Listening } from './listen';
 import { execute, interpret, type Done, type VoiceAction } from './run';
 import { haptic } from '../editor/touch';
 import { isIOS } from '../io/download';
 import { isNative } from '../platform';
 import { closeVoice, useVoice } from './state';
+import { speak, speakEnabled, setSpeakEnabled, stopSpeaking } from './speak';
 import './voice.css';
 
 /** Окно открыто, пока VoiceHost в DOM; закрывается снаружи через closeVoice */
@@ -23,8 +24,8 @@ export default function VoiceHost() {
 type Phase = 'listening' | 'thinking' | 'done' | 'idle' | 'unknown';
 type Card = Done & { key: number; kind: VoiceAction['type']; undone?: boolean };
 
-const KIND_ICON = { add_task: CheckSquare, add_transaction: Wallet, add_habit: Plant, add_note: NotePencil } as const;
-const EXAMPLES = ['Купить хлеб завтра в 9', 'Каждый день выпивать 2 л воды', 'Потратил 4500 на одежду', 'Получил зарплату 300 тысяч', 'Новая привычка — читать 20 минут', 'Запиши заметку: идея подарка маме'];
+const KIND_ICON = { add_task: CheckSquare, add_transaction: Wallet, add_habit: Plant, add_note: NotePencil, mark_done: CheckCircle, ask: ChatCircleText } as const;
+const EXAMPLES = ['Купить хлеб завтра в 9', 'Каждый день выпивать 2 л воды', 'Потратил 2000 на такси и 3500 на обед', 'Выпил стакан воды', 'Выполнил задачу купить хлеб', 'Что у меня сегодня?', 'Сколько я потратил за месяц?', 'Новая привычка — читать 20 минут'];
 
 function VoiceSheet() {
   const [phase, setPhase] = useState<Phase>('idle');
@@ -32,13 +33,15 @@ function VoiceSheet() {
   const [typed, setTyped] = useState('');
   const [cards, setCards] = useState<Card[]>([]);
   const [error, setError] = useState('');
+  const [voiceOut, setVoiceOut] = useState(speakEnabled);
   const rec = useRef<Listening | null>(null);
   const alive = useRef(true);
   const seq = useRef(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const voiceOk = canListen();
 
-  const run = async (text: string) => {
+  /** byVoice — фраза сказана голосом: тогда и ответ проговариваем */
+  const run = async (text: string, byVoice = false) => {
     const t = text.trim();
     if (!t) return;
     setHeard(t);
@@ -57,6 +60,8 @@ function VoiceSheet() {
       setCards((c) => [...out, ...c]);
       setPhase('done');
       haptic(15);
+      const say = out.map((c) => c.say).filter(Boolean).join(' ');
+      if (say && byVoice && speakEnabled()) void speak(say);
     } catch (e) {
       if (!alive.current) return;
       setError(e instanceof Error ? e.message : String(e));
@@ -75,7 +80,7 @@ function VoiceSheet() {
       onDone: (t) => {
         rec.current = null;
         if (!alive.current) return;
-        if (t.trim()) void run(t);
+        if (t.trim()) void run(t, true);
         else {
           setError('Ничего не услышал — нажмите на микрофон и скажите ещё раз');
           setPhase('idle');
@@ -105,6 +110,7 @@ function VoiceSheet() {
       alive.current = false;
       rec.current?.abort();
       rec.current = null;
+      void stopSpeaking();
       window.removeEventListener('keydown', onKey);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -144,6 +150,19 @@ function VoiceSheet() {
   return (
     <div className="modal-backdrop vc-backdrop" onPointerDown={(e) => e.target === e.currentTarget && close()}>
       <div className="modal vc-sheet" role="dialog" aria-label="Голосовая команда">
+        <button
+          className="vc-speaker"
+          onClick={() => {
+            const on = !voiceOut;
+            setVoiceOut(on);
+            setSpeakEnabled(on);
+            if (!on) void stopSpeaking();
+          }}
+          aria-label={voiceOut ? 'Не озвучивать ответы' : 'Озвучивать ответы'}
+          title={voiceOut ? 'Ответы озвучиваются' : 'Ответы без звука'}
+        >
+          {voiceOut ? <SpeakerHigh size={18} weight="fill" /> : <SpeakerSlash size={18} weight="fill" />}
+        </button>
         <button className="vc-close" onClick={close} aria-label="Закрыть">
           <X size={18} weight="bold" />
         </button>
