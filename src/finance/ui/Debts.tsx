@@ -202,7 +202,8 @@ function DebtEditSheet({ data, debt, kind: kind0 }: { data: FinanceData; debt?: 
       note: note.trim() || undefined,
       remind: dueDate ? remind : undefined,
       payments: debt?.payments ?? [],
-      closed: debt ? debt.closed || (paid > 0 && paid >= v - 0.005) : false,
+      // при возвратах статус следует из суммы: увеличили долг — он снова открыт
+      closed: debt ? (paid > 0 ? paid >= v - 0.005 : debt.closed) : false,
     });
     if (debt) openDebt({ id });
     else {

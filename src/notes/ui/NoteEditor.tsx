@@ -449,13 +449,16 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
     const s = el.selectionStart;
     const before = el.value.slice(0, s);
     const after = el.value.slice(el.selectionEnd);
-    const first = parsed[0];
-    const rest = parsed.slice(1);
+    const replaceHead = !before && b.type === 'p';
+    // первый вставленный блок — не текст (разделитель): к тексту он не приклеивается, а идёт следом
+    const glue = replaceHead || isTextBlock(parsed[0]);
+    const first = glue ? parsed[0] : newBlock('p');
+    const rest = glue ? parsed.slice(1) : parsed;
     const last = rest[rest.length - 1];
     editOpenBody((bd) => {
       const i = bd.blocks.findIndex((x) => x.id === b.id);
       if (i < 0) return;
-      const head: Block = !before && b.type === 'p' ? { ...first, id: b.id } : { ...b, text: before + (first.text ?? '') };
+      const head: Block = replaceHead ? { ...first, id: b.id } : { ...b, text: before + (first.text ?? '') };
       const tail = isTextBlock(last) ? [...rest.slice(0, -1), { ...last, text: (last.text ?? '') + after }] : after ? [...rest, newBlock('p', { text: after })] : rest;
       bd.blocks.splice(i, 1, head, ...tail);
       const lt = tail[tail.length - 1];

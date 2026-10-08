@@ -11,11 +11,11 @@ export interface AccentOption {
 }
 
 /** Акцент по умолчанию */
-export const DEFAULT_ACCENT = 'emerald';
+export const DEFAULT_ACCENT = 'apple';
 
 export const ACCENTS: AccentOption[] = [
+  { id: 'apple', name: 'Стандарт', color: '#007aff', color2: '#5ac8fa', dark: '#0a84ff' },
   { id: 'emerald', name: 'Изумруд', color: '#0c9f6e', color2: '#34d399', dark: '#30d494' },
-  { id: 'apple', name: 'Apple', color: '#007aff', color2: '#5ac8fa', dark: '#0a84ff' },
   { id: 'flame', name: 'Огонь', color: '#ff4a2b', color2: '#ff9a3d', dark: '#ff5a3c' },
   { id: 'ocean', name: 'Океан', color: '#2f6bff', color2: '#22c1ee', dark: '#4c82ff' },
   { id: 'violet', name: 'Фиалка', color: '#7c4dff', color2: '#d946ef', dark: '#9b75ff' },

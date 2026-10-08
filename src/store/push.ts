@@ -112,15 +112,20 @@ export async function testPush(): Promise<boolean> {
 
 let timer: ReturnType<typeof setTimeout> | null = null;
 let lastSig = '';
+/** ждущие отправки: перенос таймера не оставляет их висеть навсегда */
+let waiting: (() => void)[] = [];
 
 /** Отправить серверу расписание напоминаний на 3 недели вперёд (с задержкой, без повторов одного и того же) */
 export function uploadSchedule(now = false): Promise<void> {
   if (timer) clearTimeout(timer);
   return new Promise((resolve) => {
+    waiting.push(resolve);
     timer = setTimeout(
       () => {
         timer = null;
-        void doUpload().finally(resolve);
+        const done = waiting;
+        waiting = [];
+        void doUpload().finally(() => done.forEach((r) => r()));
       },
       now ? 0 : 1500,
     );
@@ -140,7 +145,8 @@ async function doUpload() {
     data: Object.fromEntries(Object.entries(p.extra).map(([k, v]) => [k, String(v)])),
   }));
   for (const s of pendingWebSnoozes()) items.push({ id: `snooze|${s.taskId}|${s.at}`, at: s.at, title: s.title, body: 'Отложенное напоминание', data: { taskId: s.taskId, date: '' } });
-  const sig = JSON.stringify(items);
+  // устройство в подписи: после повторного включения push (новое устройство на сервере) расписание уйдёт заново
+  const sig = d.deviceId + JSON.stringify(items);
   if (sig === lastSig) return;
   try {
     await call(`/devices/${d.deviceId}/schedule`, { method: 'PUT', body: JSON.stringify({ secret: d.secret, items }) });

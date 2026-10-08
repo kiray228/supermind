@@ -6,7 +6,7 @@
 import { create } from 'zustand';
 import { isObj, mergeValues } from './merge';
 import { mark } from '../perf';
-import { clearAllDirty, dirtyAt, clearDirty, dirtyKeys, get, isSynced, keys, markDirty, onDirty, set, setFromSync, delFromSync, META_KEY } from './kv';
+import { clearAllDirty, dirtyAt, clearDirty, dirtyKeys, get, hasDirty, isSynced, keys, markDirty, onDirty, set, setFromSync, delFromSync, META_KEY } from './kv';
 
 const PROD_API = 'https://br-soft-term-b1xn6yim-supermind.compute.c-5.eu-central-1.aws.neon.tech';
 /** В режиме разработки можно подключить локальный сервер: localStorage['sm-api'] = 'http://127.0.0.1:8787' */
@@ -110,7 +110,16 @@ function wire() {
   if (wired) return;
   wired = true;
   onDirty(() => syncSoon(4000));
-  document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && syncSoon(300));
+  // уход из приложения (iPhone сразу усыпляет страницу) — отправить правки сейчас, а не через 4 с:
+  // иначе на другом устройстве их не будет, пока это приложение снова не откроют
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') syncSoon(300);
+    else
+      void (async () => {
+        for (const f of flushers) await f();
+        if (hasDirty()) await syncNow();
+      })().catch(() => {});
+  });
   window.addEventListener('online', () => syncSoon(300));
   setInterval(() => document.visibilityState === 'visible' && syncSoon(0), 60_000);
 }
@@ -347,9 +356,10 @@ async function applyRemote(item: RemoteItem, changed: Set<string>) {
       return;
     }
     const merged = mergeValues(item.key, local, item.value);
-    if (item.key.startsWith('doc:')) await keepConflictCopy(local, item.value, merged, changed);
+    // слитое пишем сразу после проверки отметки (копия конфликта — потом): правка в промежутке не затрётся
     await setFromSync(item.key, merged);
     changed.add(item.key);
+    if (item.key.startsWith('doc:')) await keepConflictCopy(local, item.value, merged, changed);
     return;
   }
 }

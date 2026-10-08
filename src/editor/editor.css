@@ -18,7 +18,7 @@
   display: flex; align-items: center; gap: 4px; padding: 4px 6px 4px 12px; border-radius: 14px; border: var(--hairline) solid var(--separator);
   box-shadow: var(--shadow-lg); width: min(460px, calc(100vw - 24px));
 }
-.ed-search input { border: none; outline: none; background: none; height: 34px; }
+.ed-search input { border: none; outline: none; background: none; height: 34px; min-width: 0; }
 
 .ed-main { flex: 1; min-height: 0; display: flex; position: relative; }
 .ed-stage { flex: 1; min-width: 0; position: relative; overflow: hidden; }

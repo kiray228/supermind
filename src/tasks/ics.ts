@@ -9,6 +9,11 @@ export function toRRule(r: RepeatRule, date: string, opts: { allDay?: boolean; d
   if (r.fromCompletion) return null;
   const parts = [`FREQ=${r.freq.toUpperCase()}`];
   if (r.interval > 1) parts.push(`INTERVAL=${r.interval}`);
+  if (r.freq === 'yearly' && r.month != null && r.day != null) {
+    const d = fromYmd(date);
+    // перенесённая ежегодная задача: дата повтора — закреплённые месяц и число
+    if ((d.getMonth() !== r.month || d.getDate() !== r.day) && r.day <= 28) parts.push(`BYMONTH=${r.month + 1};BYMONTHDAY=${r.day}`);
+  }
   if (r.freq === 'weekly') parts.push(`BYDAY=${(r.weekdays?.length ? r.weekdays : [fromYmd(date).getDay()]).map((d) => WD[d]).join(',')}`);
   if (r.freq === 'monthly') {
     if (r.monthWeek) parts.push(`BYDAY=${r.monthWeek.n}${WD[r.monthWeek.wd]}`);
@@ -17,6 +22,8 @@ export function toRRule(r: RepeatRule, date: string, opts: { allDay?: boolean; d
       // «31-го числа» в коротких месяцах — последний день (как в приложении), а не пропуск месяца
       const day = r.day ?? fromYmd(date).getDate();
       if (day > 28) parts.push(`BYMONTHDAY=${Array.from({ length: day - 27 }, (_, i) => 28 + i).join(',')};BYSETPOS=-1`);
+      // задачу перенесли на другое число, а повтор закреплён за прежним
+      else if (day !== fromYmd(date).getDate()) parts.push(`BYMONTHDAY=${day}`);
     }
   }
   if (r.count) parts.push(`COUNT=${Math.max(1, r.count - (opts.done ?? 0))}`);

@@ -272,6 +272,8 @@ export interface Settings {
   language: 'ru';
   /** цвет акцента (ACCENTS в ui/appearance.ts) */
   accent?: string;
+  /** версия цвета по умолчанию: 2 — «Стандарт» (синий Apple) вместо прежнего изумрудного */
+  accentV?: number;
   /** «soft» — лёгкое стекло, «liquid» — Liquid Glass */
   glass?: 'soft' | 'liquid';
   /** фон приложения */

@@ -1,6 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ArrowUp, CalendarCheck, CircleAlert, KeyRound, PencilLine, Sparkles, Square, Target, Trash2, Wallet } from 'lucide-react';
-import { useApp } from '../store/appStore';
+import { ArrowUp, CalendarCheck, CircleAlert, PencilLine, Sparkles, Square, Target, Trash2, Wallet } from 'lucide-react';
 import { AIError, streamText, type ChatTurn } from '../ai/claude';
 import { confirmDialog } from '../ui/dialogs';
 import { uid } from '../utils/tree';
@@ -52,9 +51,8 @@ function toTurns(messages: ChatMessage[]): ChatTurn[] {
 }
 
 export default function Assistant() {
-  const apiKey = useApp((s) => s.settings.apiKey);
-  const go = useApp((s) => s.go);
-  const hasKey = !!apiKey?.trim();
+  // ИИ есть у всех: свой ключ Claude или бесплатный ИИ на сервере
+  const hasKey = true;
   const messages = useChat((s) => s.messages);
   const loaded = useChat((s) => s.loaded);
   const [input, setInput] = useState('');
@@ -217,22 +215,7 @@ export default function Assistant() {
         <div className="as-inner">
           <BriefingCard hasKey={hasKey} />
 
-          {!hasKey ? (
-            <div className="card as-nokey">
-              <span className="as-nokey-ico">
-                <KeyRound size={22} />
-              </span>
-              <h3>Подключите Claude</h3>
-              <p className="muted">
-                Ассистент отвечает на вопросы о ваших задачах, целях и расходах, планирует день и сам записывает задачи и заметки. Для этого нужен ваш API-ключ Claude — он хранится
-                только на этом устройстве.
-              </p>
-              <p className="faint small">Брифинг выше работает и без ключа.</p>
-              <button className="btn btn-primary" onClick={() => go('settings')}>
-                Открыть настройки
-              </button>
-            </div>
-          ) : empty ? (
+          {empty ? (
             <div className="as-welcome">
               <div className="as-welcome-badge">
                 <Sparkles size={22} />

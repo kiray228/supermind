@@ -457,3 +457,8 @@
 /* светлая тема: зелёный и оранжевый текст темнее — читается на белом */
 :root:not([data-theme='dark']) :is(.gl-due.is-done, .gl-card .gl-due.is-done, .gl-delta.is-up, .gl-inc.is-up) { color: #248a3d; }
 :root:not([data-theme='dark']) :is(.gl-due.is-soon, .gl-card .gl-due.is-soon) { color: #c93400; }
+
+/* поле «добавить шаг/этап» объявлено ниже общего правила — на телефоне тоже 16px, иначе iPhone увеличивает страницу */
+@media (max-width: 760px) {
+  .gl-add input { font-size: 16px; }
+}

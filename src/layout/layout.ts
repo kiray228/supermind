@@ -135,9 +135,12 @@ function measure(n: LNode) {
 
   let img: { w: number; h: number } | undefined;
   if (t.image) {
-    const maxIw = Math.max(120, Math.min(320, t.image.w));
-    const k = Math.min(1, maxIw / t.image.w);
-    img = { w: t.image.w * k, h: t.image.h * k };
+    // размеры из чужого файла могут быть пустыми или кривыми — иначе NaN разломал бы всю карту
+    const iw = t.image.w > 0 ? t.image.w : 200;
+    const ih = t.image.h > 0 ? t.image.h : 150;
+    const maxIw = Math.max(120, Math.min(320, iw));
+    const k = Math.min(1, maxIw / iw);
+    img = { w: iw * k, h: ih * k };
   }
 
   const hasMeta = !!t.task && (t.task.due || (t.task.progress ?? 0) > 0);
@@ -257,7 +260,7 @@ export function layoutSheet(sheet: Sheet): LayoutResult {
     if (o.borderColor !== undefined) st.borderColor = o.borderColor;
     if (o.borderWidth !== undefined) st.borderWidth = o.borderWidth;
     if (o.shape !== undefined) st.shape = o.shape;
-    if (o.fontSize !== undefined) st.fontSize = o.fontSize;
+    if (typeof o.fontSize === 'number' && o.fontSize > 0) st.fontSize = o.fontSize;
     if (o.bold !== undefined) st.bold = o.bold;
     if (o.italic !== undefined) st.italic = o.italic;
     if (o.strike !== undefined) st.strike = o.strike;
@@ -608,7 +611,9 @@ export function layoutSheet(sheet: Sheet): LayoutResult {
   for (const n of order) {
     if (!n.topic.children.length) continue;
     const isMainRoot = n.depth === 0 && n.level === 'central';
-    if (isMainRoot && sheet.structure === 'map') continue;
+    // у центральной темы карты кнопки нет — кроме случая, когда её всё же свернули (Ctrl+/, «Структура», импорт):
+    // иначе вся карта пропадала без способа развернуть её касанием
+    if (isMainRoot && sheet.structure === 'map' && !n.topic.collapsed) continue;
     const structure: StructureType = n.level === 'floating' || nodes.get(n.rootId)?.level === 'floating'
       ? (sheet.structure === 'org' || sheet.structure === 'tree' ? 'org' : 'logic-right')
       : sheet.structure;

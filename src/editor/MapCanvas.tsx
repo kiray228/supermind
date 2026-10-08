@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { ArrowElbowDownRight, Check, Plus } from '@phosphor-icons/react';
 import type { ID, Sheet, Topic } from '../types';
 import { layoutSheet, subtreeBounds, type LayoutResult, type LNode } from '../layout/layout';
-import { useDoc } from '../store/docStore';
+import { useDoc, flushSave } from '../store/docStore';
 import { AddHandle, BoundaryView, NodeView, RelationshipView, SummaryView, Toggle } from './render';
 import { FONT_FAMILY } from '../layout/measure';
 import { findInSheet } from '../utils/tree';
@@ -136,6 +136,16 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
     if (zoomBadgeTimer.current) clearTimeout(zoomBadgeTimer.current);
     zoomBadgeTimer.current = setTimeout(() => setZoomBadge(false), 900);
   };
+  // ушли из карты посреди жеста — не оставлять таймеры и инерцию работать вхолостую
+  useEffect(
+    () => () => {
+      if (inertia.current) cancelAnimationFrame(inertia.current);
+      if (longPress.current) clearTimeout(longPress.current);
+      if (zoomBadgeTimer.current) clearTimeout(zoomBadgeTimer.current);
+      if (animTimer.current) clearTimeout(animTimer.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     onViewChange?.(viewRef.current);
@@ -680,6 +690,8 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
     if (d.kind === 'pinch') {
       if (pointers.current.size === 1) {
         const [p] = [...pointers.current.values()];
+        // замеры скорости — заново от оставшегося пальца, иначе после щипка карта «улетала» по инерции
+        samples.current = [{ x: p.x, y: p.y, t: performance.now() }];
         setDrag({ kind: 'pan', sx: p.x, sy: p.y, vx: viewRef.current.x, vy: viewRef.current.y, moved: true });
       } else setDrag(null);
       return;
@@ -859,7 +871,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
             </g>
           )}
           {drag?.kind === 'select' && (
-            <rect className="no-export" x={Math.min(drag.sx, drag.x)} y={Math.min(drag.sy, drag.y)} width={Math.abs(drag.x - drag.sx)} height={Math.abs(drag.y - drag.sy)} fill="rgba(16,185,129,.08)" stroke="#10b981" strokeDasharray="4 3" />
+            <rect className="no-export" x={Math.min(drag.sx, drag.x)} y={Math.min(drag.sy, drag.y)} width={Math.abs(drag.x - drag.sx)} height={Math.abs(drag.y - drag.sy)} fill="rgba(0,122,255,.08)" stroke="#007aff" strokeDasharray="4 3" />
           )}
         </g>
         <defs>
@@ -1014,6 +1026,8 @@ function QuickAdd({ n, view, isRoot, wrap, onAdd }: { n: LNode; view: View; isRo
 function InlineEditor({ n, view, animating }: { n: LNode; view: View; animating?: boolean }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const initial = useRef(useDoc.getState().pendingText ?? n.topic.text);
+  /** текст темы до начала ввода */
+  const startText = useRef(n.topic.text);
   const [text, setText] = useState(initial.current);
   const done = useRef(false);
   const textRef = useRef(text);
@@ -1022,15 +1036,40 @@ function InlineEditor({ n, view, animating }: { n: LNode; view: View; animating?
   // iOS Safari не присылает blur, когда поле удаляется из DOM, — сохраняем при размонтировании
   useEffect(
     () => () => {
-      if (done.current) return;
+      // текст не меняли — не трогаем (иначе «Отменить» во время ввода тут же возвращал бы отменённое)
+      if (done.current || textRef.current === startText.current) return;
       const st = useDoc.getState();
-      const sh = st.sheet();
-      const cur = sh ? findInSheet(sh, n.id)?.topic : null;
-      if (cur && cur.text !== textRef.current) st.setText(n.id, textRef.current);
+      // тема могла остаться на другом листе (переключили лист, не закрыв поле)
+      const has = st.doc?.sheets.some((sh) => {
+        const cur = findInSheet(sh, n.id)?.topic;
+        return !!cur && cur.text !== textRef.current;
+      });
+      if (has)
+        st.mutateDoc((d) => {
+          for (const sh of d.sheets) {
+            const f = findInSheet(sh, n.id);
+            if (f) return void (f.topic.text = textRef.current);
+          }
+        });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
+
+  // приложение свернули посреди ввода (iPhone может выгрузить его в фоне) — записать текст, не закрывая поле
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState !== 'hidden' || done.current) return;
+      const st = useDoc.getState();
+      const sh = st.sheet();
+      const cur = sh ? findInSheet(sh, n.id)?.topic : null;
+      if (!cur || cur.text === textRef.current) return;
+      st.setText(n.id, textRef.current);
+      void flushSave();
+    };
+    document.addEventListener('visibilitychange', onHide);
+    return () => document.removeEventListener('visibilitychange', onHide);
+  }, [n.id]);
 
   useEffect(() => {
     const el = ref.current!;

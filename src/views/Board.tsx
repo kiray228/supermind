@@ -71,7 +71,11 @@ type SourceFilter = 'all' | 'board' | 'maps';
 function normalize(b: BoardData): BoardData {
   const columns = b.columns?.length ? b.columns : structuredClone(DEFAULT_BOARD.columns);
   const ids = new Set(columns.map((c) => c.id));
-  const cards = (b.cards ?? []).map((c) => (ids.has(c.columnId) ? c : { ...c, columnId: columns[0].id }));
+  // повреждённые записи (без id или названия) не должны ронять доску на поиске и сортировке
+  const cards = (b.cards ?? [])
+    .filter((c) => c && typeof c.id === 'string')
+    .map((c) => ({ ...c, title: typeof c.title === 'string' ? c.title : '', order: Number.isFinite(c.order) ? c.order : 0 }))
+    .map((c) => (ids.has(c.columnId) ? c : { ...c, columnId: columns[0].id }));
   return { columns, cards };
 }
 

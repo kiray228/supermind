@@ -3,7 +3,7 @@
  */
 import type { VoiceAction } from './intent';
 import type { Habit } from '../types';
-import { ensureTasks, mutateTasks, openTask, toggleDone } from '../tasks/store';
+import { ensureTasks, mutateTasks, openTask, toggleDone, unlogLast } from '../tasks/store';
 import { isActive, occurrences } from '../tasks/model';
 import { ensureFinance } from '../finance/store';
 import { balances, categoryMap, fmtMoney, sortedAccounts, summarize, toMainLoose } from '../finance/model';
@@ -139,8 +139,7 @@ export async function markDone(query: string, strict: boolean, n?: number, kind?
       mutateTasks((x) => {
         const i = x.tasks.findIndex((t) => t.id === f.id);
         if (i >= 0) x.tasks[i] = { ...snap, updatedAt: Date.now() };
-        const li = x.log.map((l) => l.taskId).lastIndexOf(f.id);
-        if (li >= 0) x.log.splice(li, 1);
+        unlogLast(x, f.id);
       });
     },
     open: () => {

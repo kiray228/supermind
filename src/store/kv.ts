@@ -64,6 +64,8 @@ export async function dirtyKeys(): Promise<Dirty> {
 
 /** Отметка ключа по последним данным этой вкладки (без ожидания базы) */
 export const dirtyAt = (key: string): number | undefined => dirty[key];
+/** Есть ли неотправленные изменения (по последним данным этой вкладки) */
+export const hasDirty = () => Object.keys(dirty).length > 0;
 
 /** Снять отметку, если ключ не менялся после отправки. */
 export async function clearDirty(key: string, sentAt: number) {

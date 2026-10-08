@@ -360,7 +360,9 @@ async function convertSheet(xs: XSheet, index: number, zip: Zip): Promise<Sheet>
     const color = r.style?.properties?.['line-color'];
     if (color && /^#[0-9a-f]{3,8}$/i.test(color)) rel.color = color;
     const pattern = r.style?.properties?.['line-pattern'];
-    if (pattern && pattern !== 'solid') rel.dashed = true;
+    // у нас связь по умолчанию пунктирная — сплошную нужно отметить явно
+    if (pattern === 'solid') rel.dashed = false;
+    else if (pattern) rel.dashed = true;
     sheet.relationships.push(rel);
   }
   sheet.boundaries = ctx.boundaries;
@@ -623,7 +625,8 @@ export async function exportXmind(doc: MindDoc): Promise<Blob> {
         const rel: Record<string, unknown> = { id: r.id, class: 'relationship', end1Id: r.from, end2Id: r.to, title: r.label ?? '' };
         const props: Record<string, string> = {};
         if (r.color) props['line-color'] = r.color;
-        if (r.dashed) props['line-pattern'] = 'dash';
+        // у нас связь пунктирная, если явно не сделана сплошной
+        props['line-pattern'] = r.dashed === false ? 'solid' : 'dash';
         if (Object.keys(props).length) rel.style = { id: uid(), properties: props };
         return rel;
       });

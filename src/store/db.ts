@@ -92,10 +92,20 @@ export async function loadAllDocs(): Promise<MindDoc[]> {
 let plannerBase: Record<string, string> | null = null;
 const daySig = (d: PlannerDay | undefined) => (d ? JSON.stringify({ ...d, updatedAt: 0 }) : '');
 const sigs = (p: PlannerData) => Object.fromEntries(Object.entries(p.days ?? {}).map(([k, d]) => [k, daySig(d)]));
+/**
+ * Каким был каждый выданный объект дня. Общая plannerBase перезаписывается любым чтением
+ * (поиск, виджет), а по самому объекту видно, менял ли день именно тот, кто сохраняет:
+ * устаревшая копия нетронутого дня не затрёт пришедшее с другого устройства.
+ */
+const seenDays = new WeakMap<object, { k: string; sig: string }>();
+function remember(p: PlannerData) {
+  for (const [k, d] of Object.entries(p.days ?? {})) if (d && typeof d === 'object') seenDays.set(d, { k, sig: daySig(d) });
+}
 
 export async function loadPlanner(): Promise<PlannerData> {
   const p = (await get<PlannerData>('planner')) ?? { days: {}, habits: [] };
   plannerBase = sigs(p);
+  remember(p);
   return p;
 }
 
@@ -111,13 +121,17 @@ export async function savePlanner(p: PlannerData): Promise<PlannerData> {
   const now = Date.now();
   const days: PlannerData['days'] = { ...(disk.days ?? {}) };
   for (const [k, d] of Object.entries(p.days ?? {})) {
-    if (daySig(d) !== (base[k] ?? '') && daySig(d) !== daySig(disk.days?.[k])) days[k] = { ...d, updatedAt: now };
+    const sig = daySig(d);
+    const seen = d && typeof d === 'object' ? seenDays.get(d) : undefined;
+    const changedHere = seen && seen.k === k ? sig !== seen.sig : sig !== (base[k] ?? '');
+    if (changedHere && sig !== daySig(disk.days?.[k])) days[k] = { ...d, updatedAt: now };
   }
   const { mergeValues } = await import('./merge');
   const habits = (mergeValues('planner', { days: {}, habits: p.habits ?? [] }, { days: {}, habits: disk.habits ?? [] }) as PlannerData).habits;
   const out: PlannerData = { ...disk, ...p, days, habits };
   await set('planner', out);
   plannerBase = sigs(out);
+  remember(out);
   return out;
 }
 
@@ -192,7 +206,14 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 
 export async function loadSettings(): Promise<Settings> {
-  return { ...DEFAULT_SETTINGS, ...((await get<Settings>('settings')) ?? {}) };
+  const s: Settings = { ...DEFAULT_SETTINGS, ...((await get<Settings>('settings')) ?? {}) };
+  // цвет по умолчанию стал «Стандарт» (синий Apple): прежний стандартный изумрудный меняем один раз
+  if (s.accentV !== 2) {
+    if (!s.accent || s.accent === 'emerald') delete s.accent;
+    s.accentV = 2;
+    await set('settings', s);
+  }
+  return s;
 }
 export async function saveSettings(s: Settings) {
   await set('settings', s);

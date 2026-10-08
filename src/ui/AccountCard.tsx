@@ -3,6 +3,7 @@ import { ArrowsClockwise, BellRinging, Cloud, CloudSlash, PaperPlaneTilt, Passwo
 import { changePassword, deleteAccount, login, logout, register, syncNow, useCloud } from '../store/cloud';
 import { enablePush, disablePush, isStandalone, pushActive, pushSupported, testPush } from '../store/push';
 import { toast } from '../store/appStore';
+import { dirtyKeys } from '../store/kv';
 import { askPassword, askText, confirmDialog } from './dialogs';
 import { isNative } from '../platform';
 import { IconTile } from './icons';
@@ -107,7 +108,13 @@ export function AccountCard() {
             title="Выйти"
             tone="danger"
             onClick={async () => {
-              if (await confirmDialog('Выйти из аккаунта?', 'Данные останутся на этом устройстве, но перестанут синхронизироваться.', { okText: 'Выйти' })) await logout();
+              // сначала отправить несохранённое; не ушло (нет сети) — предупредить
+              await syncNow();
+              const unsent = Object.keys(await dirtyKeys()).length;
+              const text = unsent
+                ? `Не все изменения успели уйти в облако (нет связи): ${unsent} — они останутся только на этом устройстве и отправятся, когда вы снова войдёте в этот аккаунт.`
+                : 'Данные останутся на этом устройстве, но перестанут синхронизироваться.';
+              if (await confirmDialog('Выйти из аккаунта?', text, { okText: 'Выйти', danger: !!unsent })) await logout();
             }}
           />
           <ListRow

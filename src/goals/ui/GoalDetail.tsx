@@ -206,7 +206,7 @@ function TargetBlock({ goal }: { goal: Goal }) {
   if (!t) return null;
   const unit = t.unit ? ' ' + t.unit : '';
   const add = (sign: 1 | -1) => {
-    const n = Number(amount.replace(',', '.'));
+    const n = Number(amount.replace(/\s/g, '').replace(',', '.'));
     if (!amount.trim() || !Number.isFinite(n) || n === 0) return;
     bumpTarget(goal.id, sign * Math.abs(n));
     setAmount('');

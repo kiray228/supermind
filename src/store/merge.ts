@@ -49,7 +49,8 @@ function mergeBlob(local: Obj, remote: Obj): Obj {
       const ra = (Array.isArray(r) ? r : []) as unknown[];
       const withId = [...la, ...ra].every((x) => isObj(x) && typeof x.id === 'string');
       if (withId) out[field] = mergeArray(la as Obj[], ra as Obj[], gone, field.replace(/s$/, ''));
-      else if (field === 'log') out[field] = unionBy(la as Obj[], ra as Obj[], (x) => `${x.taskId}|${x.at}`);
+      // журнал выполнений: объединение, кроме записей, снятых «Отменить»/снятием галочки (gone['log:…'])
+      else if (field === 'log') out[field] = unionBy(la as Obj[], ra as Obj[], logId).filter((x) => !gone[`log:${logId(x)}`]);
       else out[field] = la.length ? la : ra;
     } else if (isObj(l) && isObj(r)) {
       // настройки раздела: целиком более свежие (если время изменения известно), иначе — этого устройства
@@ -84,6 +85,9 @@ function mergeArray(local: Obj[], remote: Obj[], gone: Record<string, number>, s
     })
     .map((id) => byId.get(id)!);
 }
+
+/** Ключ записи журнала выполнений задач (для отметки об удалении: gone['log:' + ключ]) */
+export const logId = (x: Obj) => `${x.taskId}|${x.at}`;
 
 function unionBy(a: Obj[], b: Obj[], key: (x: Obj) => string): Obj[] {
   const seen = new Set<string>();

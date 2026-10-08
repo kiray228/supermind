@@ -161,7 +161,9 @@ export function addTransaction(p: TxDraft, opts: { silent?: boolean } = {}): Tra
   const alert = !opts.silent && t.type === 'expense' ? budgetAlert(d, t) : null;
   mutateFinance((x) => {
     x.transactions.push(t);
-    if (x.prefs.lastAccountId !== t.accountId) x.prefs = { ...x.prefs, lastAccountId: t.accountId, updatedAt: now };
+    // последний счёт — удобство этого устройства: время изменения настроек не трогаем,
+    // иначе при слиянии он перетёр бы курсы и валюту, изменённые на другом устройстве
+    if (x.prefs.lastAccountId !== t.accountId) x.prefs = { ...x.prefs, lastAccountId: t.accountId };
   });
   if (alert) toast(alert);
   return t;
@@ -391,6 +393,8 @@ export function removeDebtPayment(id: string, paymentId: string) {
     const x = d.debts.find((y) => y.id === id);
     if (!x) return;
     x.payments = x.payments.filter((p) => p.id !== paymentId);
+    // удалили возврат у погашенного долга — он снова открыт
+    if (x.closed && x.payments.reduce((a, q) => a + q.amount, 0) < x.amount - 0.005) x.closed = false;
     x.updatedAt = Date.now();
   });
 }

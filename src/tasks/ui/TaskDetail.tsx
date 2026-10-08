@@ -88,10 +88,6 @@ function TaskDetail({ task, onClose }: { task: TaskItem; onClose: () => void }) 
   };
 
   const aiSplit = async () => {
-    if (!useApp.getState().settings.apiKey.trim()) {
-      toast('Добавьте API-ключ Claude в Настройках');
-      return;
-    }
     setAiBusy(true);
     try {
       const { streamText } = await import('../../ai/claude');

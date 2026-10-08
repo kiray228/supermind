@@ -77,7 +77,8 @@ export default function Editor() {
   const [relMode, setRelMode] = useState(false);
   const [menu, setMenu] = useState<Menu | null>(null);
   const [search, setSearch] = useState<string | null>(null);
-  const [searchIdx, setSearchIdx] = useState(0);
+  // -1 — по найденному ещё не переходили: первый Enter ведёт к первому совпадению, а не ко второму
+  const [searchIdx, setSearchIdx] = useState(-1);
   const [zen, setZen] = useState(false);
   const [pitch, setPitch] = useState<{ slides: string[]; i: number } | null>(null);
   const zoomLabel = useRef<HTMLButtonElement>(null);
@@ -115,6 +116,7 @@ export default function Editor() {
     setSearchIdx(j);
     st.focusTopic(hits[j]);
   };
+  const stepHit = (d: 1 | -1) => gotoHit(searchIdx < 0 ? (d > 0 ? 0 : -1) : searchIdx + d);
 
   // ---------- презентация ----------
   const startPitch = () => {
@@ -572,15 +574,15 @@ export default function Editor() {
             className="grow"
             placeholder="Найти в карте…"
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setSearchIdx(0); }}
+            onChange={(e) => { setSearch(e.target.value); setSearchIdx(-1); }}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') gotoHit(searchIdx + (e.shiftKey ? -1 : hits.length ? 1 : 0));
+              if (e.key === 'Enter') stepHit(e.shiftKey ? -1 : 1);
               if (e.key === 'Escape') setSearch(null);
             }}
           />
-          <span className="tiny muted">{hits.length ? `${searchIdx + 1}/${hits.length}` : search ? '0' : ''}</span>
-          <button className="icon-btn" onClick={() => gotoHit(searchIdx - 1)}><CaretLeft size={18} /></button>
-          <button className="icon-btn" onClick={() => gotoHit(searchIdx + 1)}><CaretRight size={18} /></button>
+          <span className="tiny muted">{hits.length ? (searchIdx >= 0 ? `${Math.min(searchIdx, hits.length - 1) + 1}/${hits.length}` : String(hits.length)) : search ? '0' : ''}</span>
+          <button className="icon-btn" onClick={() => stepHit(-1)}><CaretLeft size={18} /></button>
+          <button className="icon-btn" onClick={() => stepHit(1)}><CaretRight size={18} /></button>
           <button className="icon-btn" onClick={() => setSearch(null)}><X size={18} /></button>
         </div>
       )}

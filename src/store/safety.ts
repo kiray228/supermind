@@ -255,6 +255,14 @@ function touchAll(v: Obj, now: number): Obj {
 
 /** Вернуть данные из копии. Перед этим — копия текущего состояния (можно передумать). */
 export async function restoreData(data: Record<string, unknown>): Promise<{ maps: number }> {
+  // несохранённое в разделах — сначала в базу: иначе отложенная запись потом затрёт восстановленное
+  await Promise.all([
+    import('./docStore').then((m) => m.flushSave()),
+    import('../tasks/store').then((m) => m.flushTasks()),
+    import('../finance/store').then((m) => m.flushFinance()),
+    import('../goals/store').then((m) => m.flushGoals()),
+    import('../notes/store').then((m) => m.flushNotes()),
+  ]).catch(() => {});
   await takeSnapshot('restore');
   const now = Date.now();
   for (const [k, v] of Object.entries(data)) {
@@ -266,7 +274,8 @@ export async function restoreData(data: Record<string, unknown>): Promise<{ maps
     } else await set(k, overlay(await get(k), v, now));
   }
   const cur = ((await get('docs:index')) ?? []) as Obj[];
-  const incoming = (Array.isArray(data['docs:index']) ? data['docs:index'] : []) as Obj[];
+  // свежая отметка и у записей списка: иначе при слиянии победила бы более поздняя (например, «в корзине»)
+  const incoming = (Array.isArray(data['docs:index']) ? data['docs:index'] : []).filter(isObj).map((m): Obj => ({ ...m, metaAt: now }));
   const merged = [...incoming, ...cur.filter((c) => !incoming.some((i) => i.id === c.id))];
   await set('docs:index', merged);
   await reloadAll();

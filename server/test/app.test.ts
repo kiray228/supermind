@@ -163,3 +163,59 @@ test('голосовая команда: модель на сервере, ли�
   // без ключа модели
   assert.equal((await call('POST', '/ai/command', { text: 'тест' }, t)).status, 503);
 });
+
+test('напоминания: старые неотправленные (старше 6 часов) не мешают отправить наступившие', async () => {
+  const dev = await call<{ deviceId: string }>('POST', '/devices', { subscription: { endpoint: 'https://push.example/cron', keys: { p256dh: 'p', auth: 'a' } } });
+  const id = dev.data.deviceId;
+  // 300+ «зависших» напоминаний (сервер не работал полдня) — раньше они занимали всю выборку
+  await sql.query(
+    `INSERT INTO push_queue (device_id, item_id, fire_at, payload)
+     SELECT $1::uuid, 'old' || g, now() - interval '7 hours' - make_interval(secs => g), '{"title":"x"}'::jsonb FROM generate_series(1, 310) g`,
+    [id],
+  );
+  await sql.query(`INSERT INTO push_queue (device_id, item_id, fire_at, payload) VALUES ($1::uuid, 'fresh', now() - interval '1 minute', '{"title":"y"}'::jsonb)`, [id]);
+  const r = await app.fetch(
+    new Request('http://x/cron', { method: 'POST', headers: { 'x-neon-trigger-invocation-id': 'inv1' }, body: JSON.stringify({ invocation_id: 'inv1' }) }),
+  );
+  const d = (await r.json()) as { due: number; sent: number };
+  assert.equal(d.due, 1);
+  assert.equal(d.sent, 1);
+});
+
+test('синхронизация: слишком большой объект — пачка не записывается частично; неверные данные входа — не 500', async () => {
+  const reg = await call<{ token: string }>('POST', '/auth/register', { email: 'big@b.cd', password: '12345678' });
+  const t = reg.data.token;
+  const huge = 'x'.repeat(8 * 1024 * 1024 + 10);
+  const r = await call('POST', '/sync', { items: [{ key: 'small', value: 1, updatedAt: 1, baseSeq: 0 }, { key: 'huge', value: huge, updatedAt: 1, baseSeq: 0 }] }, t);
+  assert.equal(r.status, 413);
+  const pulled = await call<{ items: unknown[] }>('GET', '/sync?since=0', undefined, t);
+  assert.equal(pulled.data.items.length, 0);
+  assert.equal((await call('POST', '/auth/login', { email: 'big@b.cd', password: 12345678 })).status, 401);
+  assert.equal((await call('POST', '/auth/register', { email: ['x'], password: {} })).status, 400);
+  assert.equal((await call('POST', '/auth/password', { oldPassword: '12345678', newPassword: 123456789 }, t)).status, 400);
+});
+
+test('бесплатный ИИ: текстовый ответ без своего ключа, проверка запроса', async () => {
+  const seen: unknown[] = [];
+  const aiApp = createApp({
+    sql,
+    mail: null,
+    ai: async (system, user, opts) => {
+      seen.push({ system, user, opts });
+      return 'Привет! Вот план.';
+    },
+  });
+  const req = (b: unknown, token?: string) =>
+    aiApp.fetch(new Request('http://x/ai/chat', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(b) }));
+  const reg = await call<{ token: string }>('POST', '/auth/register', { email: 'chat@b.cd', password: '12345678' });
+  const t = reg.data.token;
+  assert.equal((await req({ system: 's', messages: [{ role: 'user', content: 'hi' }] })).status, 401);
+  assert.equal((await req({ system: 's', messages: [] }, t)).status, 400);
+  const r = await req({ system: 'Ты помощник', messages: [{ role: 'user', content: 'план' }, { role: 'assistant', content: 'ок' }, { role: 'user', content: 'ещё' }] }, t);
+  assert.equal(r.status, 200);
+  assert.equal(((await r.json()) as { text: string }).text, 'Привет! Вот план.');
+  const last = seen[seen.length - 1] as { system: string; user: { role: string }[]; opts: { json?: boolean } };
+  assert.equal(last.system, 'Ты помощник');
+  assert.deepEqual(last.user.map((m) => m.role), ['user', 'assistant', 'user']);
+  assert.ok(!last.opts?.json);
+});

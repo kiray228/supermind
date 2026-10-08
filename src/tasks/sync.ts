@@ -474,6 +474,13 @@ async function webTick() {
   }
   // пропущенные, пока приложение было закрыто, — не старше 12 часов
   const from = Math.max(last + 1, now - 12 * 3600000);
+  // отрезок времени «занимаем» сразу: проверка по таймеру и по возврату в приложение
+  // могут идти одновременно (plan ждёт базу) — иначе одно напоминание покажется дважды
+  try {
+    localStorage.setItem(LAST_KEY, String(Math.max(now, last)));
+  } catch {
+    /* ignore */
+  }
   if (from <= now) {
     const due = await plan(from, now);
     // при открытии после долгого перерыва не засыпаем уведомлениями: максимум 5
@@ -487,11 +494,6 @@ async function webTick() {
       const t = getTask(s.taskId);
       if (t && !t.done) await showWeb(t.title, 'Отложенное напоминание · ' + reminderBody(t, t.date ?? todayYmd()), { taskId: t.id, date: t.date ?? '' });
     }
-  }
-  try {
-    localStorage.setItem(LAST_KEY, String(now));
-  } catch {
-    /* ignore */
   }
 }
 

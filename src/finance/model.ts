@@ -189,7 +189,11 @@ export function fmtMoney(x: number, cur: string, opts: { sign?: boolean; compact
 
 /** Разбор суммы из поля ввода: «1 200,5» → 1200.5 */
 export function parseMoneyInput(s: string): number {
-  const t = s.replace(/[\s ]/g, '').replace(',', '.').replace(/[^\d.+-]/g, '');
+  let t = s.replace(/[\s ]/g, '').replace(/[−–]/g, '-');
+  // «1.200,50» / «1,200.50»: дробный разделитель — тот, что правее, другой разделяет тысячи
+  if (t.includes(',') && t.includes('.') && !/\d[+-]/.test(t)) t = t.lastIndexOf(',') > t.lastIndexOf('.') ? t.replace(/\./g, '') : t.replace(/,/g, '');
+  // запятая — дробная часть в каждом слагаемом («1200,5+300,5»)
+  t = t.replace(/,/g, '.').replace(/[^\d.+-]/g, '');
   // простая арифметика «1200+350» — удобно на телефоне
   if (/^[\d.]+([+-][\d.]+)+$/.test(t)) {
     const parts = t.match(/[+-]?[\d.]+/g) ?? [];

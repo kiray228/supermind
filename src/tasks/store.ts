@@ -191,6 +191,11 @@ export function updateTask(id: ID, patch: Partial<TaskItem>) {
     if (('date' in patch || 'time' in patch) && !('reminders' in patch) && next.date) {
       if (!old.date || !!old.time !== !!next.time) next.reminders = defaultReminders(d, !!next.time);
     }
+    // без даты нет ни времени, ни повтора (иначе они «всплывут» при следующем выборе даты)
+    if (!next.date) {
+      delete next.time;
+      delete next.repeat;
+    }
     if (!next.time) delete next.duration;
     // новое правило повтора закрепляем по дате; перенос задачи расписание не меняет
     if ('repeat' in patch && next.repeat && next.date) next.repeat = pinRule(next.repeat, next.date);
@@ -222,10 +227,7 @@ function restore(id: ID, snap: Snapshot) {
     x.wontDo = snap.wontDo;
     for (const k of ['date', 'repeatDone', 'completedAt', 'wontDo'] as const) if (x[k] === undefined) delete x[k];
     x.updatedAt = Date.now();
-    if (snap.logged) {
-      const li = d.log.map((l) => l.taskId).lastIndexOf(id);
-      if (li >= 0) d.log.splice(li, 1);
-    }
+    if (snap.logged) unlogLast(d, id);
   });
 }
 
@@ -242,10 +244,7 @@ export function toggleDone(id: ID) {
       delete x.completedAt;
       x.updatedAt = Date.now();
       // запись в статистике есть только у выполненных (не у «Не буду делать»)
-      if (wasDone) {
-        const li = d.log.map((l) => l.taskId).lastIndexOf(id);
-        if (li >= 0) d.log.splice(li, 1);
-      }
+      if (wasDone) unlogLast(d, id);
     });
     if (t.source) void updateMapTask(t.source.docId, t.source.topicId, { status: 'todo' }).catch(() => {});
     return;
@@ -329,6 +328,14 @@ export function restoreTask(id: ID) {
     if (x) delete x.deleted;
   });
 }
+/** Убрать последнюю запись журнала о выполнении задачи (с отметкой об удалении — синхронизация её не вернёт) */
+export function unlogLast(d: TasksData, id: ID) {
+  const li = d.log.map((l) => l.taskId).lastIndexOf(id);
+  if (li < 0) return;
+  const [l] = d.log.splice(li, 1);
+  (d.gone ??= {})[`log:${l.taskId}|${l.at}`] = Date.now();
+}
+
 /** Отметка «удалено навсегда» для синхронизации */
 function bury(d: TasksData, ...ids: string[]) {
   const now = Date.now();
@@ -360,9 +367,8 @@ export function duplicateTask(id: ID): TaskItem | null {
   const t = getTask(id);
   if (!t) return null;
   const copy: Partial<TaskItem> = { ...structuredClone(t), title: t.title + ' (копия)', done: false };
-  delete copy.id;
-  delete copy.cal;
-  delete copy.completedAt;
+  // копия — новая задача: без отметок выполнения, истории повторов, фокуса и корзины
+  for (const k of ['id', 'cal', 'completedAt', 'wontDo', 'repeatDone', 'focusMinutes', 'deleted', 'createdAt', 'updatedAt', 'order'] as const) delete copy[k];
   copy.checklist = (copy.checklist ?? []).map((c) => ({ ...c, id: uid() }));
   return addTask(copy);
 }
@@ -462,7 +468,8 @@ export function deleteCountdown(id: ID) {
 }
 
 export function setPrefs(patch: Partial<TaskPrefs>) {
-  mutateTasks((d) => void (d.prefs = { ...d.prefs, ...patch }));
+  // отметка времени: при слиянии с другим устройством побеждают свежие настройки, а не «свои»
+  mutateTasks((d) => void (d.prefs = { ...d.prefs, ...patch, updatedAt: Date.now() }));
 }
 
 // ---------- Окна ----------

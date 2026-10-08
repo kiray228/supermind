@@ -903,7 +903,8 @@ function TimeGrid({
   };
 
   const block = (it: Item, start: number, dur: number, col: number, cols: number, ghost = false) => {
-    const h = Math.max(22, (dur / 60) * HOUR - 2);
+    // блок не вылезает за полночь (ниже сетки времени)
+    const h = Math.max(22, (Math.min(dur, 1440 - start) / 60) * HOUR - 2);
     const style = {
       '--c': it.color,
       top: (start / 60) * HOUR + 1,

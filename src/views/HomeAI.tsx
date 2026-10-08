@@ -4,13 +4,10 @@ import { Sparkles, X, Square } from 'lucide-react';
 import type { StructureType } from '../types';
 import { createAndOpen } from '../actions';
 import { docFromMarkdown } from '../templates';
-import { useApp } from '../store/appStore';
 import { PROMPTS, streamText, AIError } from '../ai/claude';
 import { STRUCTURES } from '../editor/Inspector';
 
 export default function AICreate({ onClose }: { onClose(): void }) {
-  const apiKey = useApp((s) => s.settings.apiKey);
-  const go = useApp((s) => s.go);
   const [idea, setIdea] = useState('');
   const [depth, setDepth] = useState<'brief' | 'normal' | 'deep'>('normal');
   const [structure, setStructure] = useState<StructureType>('map');
@@ -47,12 +44,7 @@ export default function AICreate({ onClose }: { onClose(): void }) {
           <h2 className="grow">Создать карту с ИИ</h2>
           <button className="icon-btn" onClick={() => { ac?.abort(); onClose(); }}><X /></button>
         </div>
-        {!apiKey ? (
-          <div className="col" style={{ marginTop: 14 }}>
-            <p className="muted">Для ИИ нужен ваш API-ключ Claude. Он хранится только на этом устройстве.</p>
-            <button className="btn btn-primary" onClick={() => { onClose(); go('settings'); }}>Перейти в настройки</button>
-          </div>
-        ) : (
+        {(
           <>
             <p className="muted small" style={{ margin: '8px 0 0' }}>Опишите идею одной фразой или вставьте целый текст — статью, конспект, заметки.</p>
             <textarea className="textarea" rows={4} style={{ marginTop: 12 }} autoFocus placeholder="Например: «Как подготовиться к марафону за 6 месяцев»" value={idea} onChange={(e) => setIdea(e.target.value)} disabled={busy} />

@@ -64,7 +64,8 @@ function rank(list: Entry[], toks: Token[], qn: string): Ranked[] {
       else if (e.nt.startsWith(qn)) s += 4;
     }
     s += e.boost ?? 0;
-    if (e.at) s += Math.max(0, 1 - (now - e.at) / (180 * 86400000));
+    // свежее чуть выше; будущие даты (операции, записи наперёд) — не выше сегодняшних
+    if (e.at) s += Math.max(0, Math.min(1, 1 - (now - e.at) / (180 * 86400000)));
     out.push({ e, s, inBody: !titleAll });
   }
   out.sort((x, y) => y.s - x.s);

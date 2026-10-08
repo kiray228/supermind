@@ -8,6 +8,7 @@ import {
   durationLabel,
   MONTHS,
   mondayOf,
+  pinRule,
   repeatLabel,
   reminderLabel,
   TIMED_REMINDER_OPTIONS,
@@ -59,7 +60,9 @@ export function DatePicker({ value, onDone, onClose }: { value: When; onDone: (v
     { label: `Каждый месяц (${fromYmd(base).getDate()} число)`, rule: { freq: 'monthly', interval: 1 } },
     { label: 'Каждый год', rule: { freq: 'yearly', interval: 1 } },
   ];
-  const presetIdx = presets.findIndex((p) => JSON.stringify(p.rule ?? null) === JSON.stringify(v.repeat ?? null));
+  // сохранённое правило «закреплено» (число, месяц) — сравниваем закреплённые версии, порядок полей не важен
+  const sig = (r: RepeatRule | undefined) => (r ? JSON.stringify(Object.entries(pinRule(r, base)).sort(([a], [b]) => a.localeCompare(b))) : 'null');
+  const presetIdx = presets.findIndex((p) => sig(p.rule) === sig(v.repeat));
 
   // в body: окно не должно зависеть от родителя (стекло и анимации «запирают» position: fixed)
   return createPortal(

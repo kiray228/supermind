@@ -66,7 +66,8 @@ export function parseDate(s: string): { date: string; time?: string } | null {
     [d, m, y] = [Number(mm[1]), Number(mm[2]), Number(mm[3])];
     if (y < 100) y += 2000;
   }
-  if (m < 1 || m > 12 || d < 1 || d > 31 || y < 1970 || y > 2100) return null;
+  // 30.02 и 31.04 не бывает
+  if (m < 1 || m > 12 || d < 1 || d > new Date(y, m, 0).getDate() || y < 1970 || y > 2100) return null;
   const tm = t.slice(mm[0].length).match(/(\d{1,2}):(\d{2})/);
   const time = tm && Number(tm[1]) < 24 ? `${pad(Number(tm[1]))}:${tm[2]}` : undefined;
   return { date: `${y}-${pad(m)}-${pad(d)}`, ...(time ? { time } : {}) };
@@ -82,7 +83,8 @@ export function parseAmount(s: string): number | null {
     t = t.slice(1, -1);
   }
   t = t.replace(/[\s  ']/g, '').replace(/[^\d.,+-]/g, '');
-  if (t.startsWith('-')) neg = !neg;
+  // минус в начале или в конце («500,00-» — так пишут некоторые банки)
+  if (t.startsWith('-') || (t.endsWith('-') && /\d/.test(t))) neg = !neg;
   t = t.replace(/[+-]/g, '');
   const lastC = t.lastIndexOf(','), lastD = t.lastIndexOf('.');
   if (lastC >= 0 && lastD >= 0) {
@@ -186,7 +188,14 @@ export interface ImportPreview {
 
 export function buildImport(d: FinanceData, rows: string[][], map: ColumnMap, accountId: string, opts: { invert?: boolean } = {}): ImportPreview {
   const hist = historyIndex(d);
-  const seen = new Set(d.transactions.filter((t) => t.type !== 'transfer').map((t) => dupKey(t.date, t.type, t.amount, t.note)));
+  // сколько таких операций уже есть: две одинаковые покупки за день в выписке — не дубликаты,
+  // а при повторном импорте того же файла пропускаются обе
+  const seen = new Map<string, number>();
+  for (const t of d.transactions) {
+    if (t.type === 'transfer') continue;
+    const k = dupKey(t.date, t.type, t.amount, t.note);
+    seen.set(k, (seen.get(k) ?? 0) + 1);
+  }
   const items: TxDraft[] = [];
   let duplicates = 0;
   let errors = 0;
@@ -201,11 +210,12 @@ export function buildImport(d: FinanceData, rows: string[][], map: ColumnMap, ac
     const type = amt < 0 ? 'expense' : 'income';
     const note = (map.description >= 0 ? r[map.description] ?? '' : '').replace(/\s+/g, ' ').trim();
     const key = dupKey(dt.date, type, Math.abs(amt), note);
-    if (seen.has(key)) {
+    const left = seen.get(key) ?? 0;
+    if (left > 0) {
+      seen.set(key, left - 1);
       duplicates++;
       continue;
     }
-    seen.add(key);
     items.push({
       type,
       amount: Math.abs(amt),

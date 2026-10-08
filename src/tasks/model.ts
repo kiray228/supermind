@@ -143,6 +143,8 @@ export interface TaskPrefs {
   nag: number;
   /** утренний брифинг: время HH:MM, '' — выключен (по умолчанию 08:00) */
   briefing?: string;
+  /** время изменения (для слияния с другими устройствами) */
+  updatedAt?: number;
 }
 
 export interface TasksData {
@@ -279,7 +281,7 @@ export function nextOccurrence(rule: RepeatRule, from: string, anchor = from): s
     case 'monthly': {
       if (rule.monthWeek) {
         const f = fromYmd(from);
-        for (let k = 0; k <= 24; k++) {
+        for (let k = 0; k <= Math.max(24, iv * 2); k++) {
           const t = new Date(f.getFullYear(), f.getMonth() + k * 1, 1);
           const monthsFromAnchor = (t.getFullYear() - fromYmd(anchor).getFullYear()) * 12 + t.getMonth() - fromYmd(anchor).getMonth();
           if (monthsFromAnchor % iv !== 0) continue;
@@ -332,12 +334,30 @@ export function occurrences(task: TaskItem, from: string, to: string, limit = 40
   return out;
 }
 
+/**
+ * «От даты выполнения»: ровно N дней/недель/месяцев/лет после выполнения
+ * (закреплённые день недели/число относятся к сроку, а не к дате выполнения)
+ */
+function afterCompletion(rule: RepeatRule, done: string): string {
+  const iv = Math.max(1, rule.interval || 1);
+  if (rule.freq === 'daily') return addDaysYmd(done, iv);
+  if (rule.freq === 'weekly') {
+    // несколько дней недели — ближайший из них; один — через N недель
+    if ((rule.weekdays?.length ?? 0) > 1) return nextOccurrence(rule, done, done);
+    return addDaysYmd(done, 7 * iv);
+  }
+  if (rule.freq === 'monthly') {
+    if (rule.monthWeek || rule.lastDay) return nextOccurrence(rule, done, done);
+    return addMonthsClamped(done, iv);
+  }
+  return addMonthsClamped(done, 12 * iv);
+}
+
 /** Следующая дата после выполнения повторяющейся задачи; null — повторы закончились */
 export function advanceRepeat(task: TaskItem, completedOn = todayYmd()): string | null {
   if (!task.repeat || !task.date) return null;
   const rule = task.repeat;
-  const base = rule.fromCompletion ? completedOn : task.date;
-  let next = nextOccurrence(rule, base, rule.fromCompletion ? completedOn : task.date);
+  let next = rule.fromCompletion ? afterCompletion(rule, completedOn) : nextOccurrence(rule, task.date, task.date);
   // пропущенные повторы не копятся: просроченная задача после выполнения переносится на ближайший день после сегодня
   if (!rule.fromCompletion) {
     for (let i = 0; i < 5000 && next <= completedOn; i++) next = nextOccurrence(rule, next, task.date);
@@ -365,9 +385,11 @@ export function reminderFires(tasks: TaskItem[], fromMs: number, toMs: number): 
     const ahead = Math.max(2 * 1440, ...t.reminders.map((r) => -r + 1440));
     const toDay = toYmd(new Date(toMs + ahead * 60000));
     for (const d of occurrences(t, fromDay, toDay, 120)) {
-      const base = startAt(t, d).getTime();
       for (const off of t.reminders) {
-        const at = base + off * 60000;
+        // сдвиг по местному времени: «за 1 день в 09:00» остаётся в 09:00 и при переходе на летнее время
+        const s = startAt(t, d);
+        s.setMinutes(s.getMinutes() + off);
+        const at = s.getTime();
         if (at >= fromMs && at <= toMs) out.push({ task: t, date: d, at, offset: off });
       }
     }
@@ -455,6 +477,8 @@ export function repeatLabel(r: RepeatRule): string {
       else if (iv === 1 && isWeekend) s = 'По выходным';
       else {
         s = iv === 1 ? 'Каждую неделю' : `Каждые ${iv} ${plural(iv, 'неделю', 'недели', 'недель')}`;
+        // «от даты выполнения» с одним днём недели — просто через N недель, день не закреплён
+        if (r.fromCompletion && wd.length === 1) break;
         if (wd.length === 1) s = iv === 1 ? EVERY_WD[wd[0]] : `${s}: ${WD_SHORT[wd[0]]}`;
         else if (wd.length > 1) s += `: ${wd.map((x) => WD_SHORT[x]).join(', ')}`;
       }

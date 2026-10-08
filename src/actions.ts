@@ -5,8 +5,18 @@ import { decryptDoc } from './utils/crypto';
 import type { MindDoc } from './types';
 import { askPassword } from './ui/dialogs';
 
+/**
+ * Дописать то, что сейчас в поле ввода (текст темы, название, заметка): поля сохраняются по blur,
+ * а iPhone не присылает blur, когда поле просто исчезает вместе с редактором.
+ */
+function commitActiveInput() {
+  const el = document.activeElement;
+  if (el instanceof HTMLElement && el.matches('input, textarea, [contenteditable=true]')) el.blur();
+}
+
 /** Открыть документ в редакторе (и, при необходимости, сфокусироваться на теме) */
 export async function openDoc(id: string, focusTopicId?: string): Promise<void> {
+  commitActiveInput();
   await flushSave();
   const raw = await loadDoc(id);
   if (!raw) {
@@ -49,6 +59,7 @@ export async function createAndOpen(doc: MindDoc) {
 
 /** Выйти из редактора в раздел */
 export async function leaveEditor(view: Exclude<View, 'editor'> = 'home') {
+  commitActiveInput();
   await flushSave();
   useDoc.getState().close();
   useApp.getState().go(view);

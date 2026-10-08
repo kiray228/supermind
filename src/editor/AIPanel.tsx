@@ -3,8 +3,7 @@ import {
   Sparkle, X, Lightbulb, ListChecks, BookOpen, MagicWand, Translate, FileText, Scroll, PaperPlaneRight, Stop, ChatCircle, CaretLeft, Plus, Swap,
 } from '@phosphor-icons/react';
 import { useDoc } from '../store/docStore';
-import { useApp, toast } from '../store/appStore';
-import { leaveEditor } from '../actions';
+import { toast } from '../store/appStore';
 import { PROMPTS, streamText, transformTopics, type ChatTurn, AIError } from '../ai/claude';
 import { markdownToTopic, textToTopics } from '../io/markdown';
 import { findInSheet, pathTo, walk } from '../utils/tree';
@@ -24,7 +23,6 @@ interface RunState {
 }
 
 export function AIPanel({ onClose }: { onClose(): void }) {
-  const apiKey = useApp((s) => s.settings.apiKey);
   const sheet = useDoc((s) => s.sheet());
   const selection = useDoc((s) => s.selection);
   const [mode, setMode] = useState<Mode>('menu');
@@ -151,22 +149,6 @@ export function AIPanel({ onClose }: { onClose(): void }) {
       </button>
     </div>
   );
-
-  if (!apiKey) {
-    return (
-      <aside className="inspector">
-        {header}
-        <div className="inspector-body">
-          <div className="empty" style={{ color: 'var(--text-2)' }}>
-            <Sparkle size={34} color="var(--accent)" />
-            <div className="bold">Подключите ИИ</div>
-            <div className="small">Все ИИ-функции работают через Claude. Добавьте свой API-ключ в настройках — он хранится только на этом устройстве.</div>
-            <button className="btn btn-primary" style={{ marginTop: 8 }} onClick={() => leaveEditor('settings')}>Открыть настройки</button>
-          </div>
-        </div>
-      </aside>
-    );
-  }
 
   return (
     <aside className="inspector">

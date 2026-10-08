@@ -1,19 +1,27 @@
 /**
- * Бесплатная модель для разбора голосовых команд: Google Gemini (бесплатный тариф AI Studio)
- * или Groq (бесплатный тариф, модели Llama). Ключ — в переменных окружения сервера, у клиента его нет.
+ * Бесплатный ИИ на сервере: Google Gemini (бесплатный тариф AI Studio) или Groq (бесплатный тариф, модели Llama).
+ * Разбор голосовых команд (ответ — JSON) и все ИИ-функции приложения для тех, у кого нет своего ключа Claude (текст).
+ * Ключ — в переменных окружения сервера, у клиента его нет.
  *   GEMINI_API_KEY [+ GEMINI_MODEL]  или  GROQ_API_KEY [+ GROQ_MODEL]
  */
 
-/** Вызов модели: системная инструкция + текст → ответ (строка JSON) */
-export type Ai = (system: string, user: string) => Promise<string>;
+export interface ChatTurn {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+/** Вызов модели: системная инструкция + текст (или диалог) → ответ; json — ответ строго JSON */
+export type Ai = (system: string, user: string | ChatTurn[], opts?: { json?: boolean; maxTokens?: number }) => Promise<string>;
 
 const GEMINI_MODELS = ['gemini-3.5-flash-lite', 'gemini-2.5-flash-lite', 'gemini-2.5-flash'];
+
+const turns = (user: string | ChatTurn[]): ChatTurn[] => (typeof user === 'string' ? [{ role: 'user', content: user }] : user);
 
 export function envAi(env: Record<string, string | undefined> = process.env): Ai | null {
   if (env.GEMINI_API_KEY) {
     const key = env.GEMINI_API_KEY;
     const models = env.GEMINI_MODEL ? [env.GEMINI_MODEL, ...GEMINI_MODELS] : GEMINI_MODELS;
-    return async (system, user) => {
+    return async (system, user, opts = {}) => {
       let last = '';
       // модель могут переименовать или убрать — тогда пробуем следующую
       for (const model of models) {
@@ -22,8 +30,10 @@ export function envAi(env: Record<string, string | undefined> = process.env): Ai
           headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' },
           body: JSON.stringify({
             systemInstruction: { parts: [{ text: system }] },
-            contents: [{ role: 'user', parts: [{ text: user }] }],
-            generationConfig: { responseMimeType: 'application/json', temperature: 0, maxOutputTokens: 1024 },
+            contents: turns(user).map((t) => ({ role: t.role === 'assistant' ? 'model' : 'user', parts: [{ text: t.content }] })),
+            generationConfig: opts.json
+              ? { responseMimeType: 'application/json', temperature: 0, maxOutputTokens: opts.maxTokens ?? 1024 }
+              : { temperature: 0.7, maxOutputTokens: opts.maxTokens ?? 4096 },
           }),
         });
         // модели нет (404), перегружена (503/500) или исчерпана её квота (429) — у других моделей свои лимиты
@@ -41,19 +51,16 @@ export function envAi(env: Record<string, string | undefined> = process.env): Ai
   if (env.GROQ_API_KEY) {
     const key = env.GROQ_API_KEY;
     const model = env.GROQ_MODEL || 'llama-3.3-70b-versatile';
-    return async (system, user) => {
+    return async (system, user, opts = {}) => {
       const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model,
-          temperature: 0,
-          max_tokens: 1024,
-          response_format: { type: 'json_object' },
-          messages: [
-            { role: 'system', content: system },
-            { role: 'user', content: user },
-          ],
+          temperature: opts.json ? 0 : 0.7,
+          max_tokens: opts.maxTokens ?? (opts.json ? 1024 : 4096),
+          ...(opts.json ? { response_format: { type: 'json_object' } } : {}),
+          messages: [{ role: 'system', content: system }, ...turns(user)],
         }),
       });
       if (!r.ok) throw new Error(`Groq ${r.status}: ${(await r.text()).slice(0, 200)}`);

@@ -2,6 +2,7 @@
  * «ИИ-разбор месяца»: краткая сводка месяца → советы Claude на русском.
  */
 import { streamText } from '../ai/claude';
+import { fromYmd } from '../utils/mapTasks';
 import {
   addMonthsYmd,
   categoryMap,
@@ -9,7 +10,7 @@ import {
   fmtMoney,
   monthEnd,
   monthStart,
-  monthTitle,
+  MONTHS,
   subMonthly,
   summarize,
   toMainLoose,
@@ -27,7 +28,8 @@ export function monthSummaryText(d: FinanceData, anyDayOfMonth: string): string 
   const cats = categoryMap(d);
   const name = (id: string) => (id ? (cats.get(id)?.name ?? 'Без категории') : 'Без категории');
   const lines: string[] = [];
-  lines.push(`Месяц: ${monthTitle(r.from)} ${r.from.slice(0, 4)} (данные по ${r.to}). Основная валюта: ${cur}.`);
+  // monthTitle добавляет год только для прошлых лет — здесь год нужен всегда, без повтора
+  lines.push(`Месяц: ${MONTHS[fromYmd(r.from).getMonth()]} ${r.from.slice(0, 4)} (данные по ${r.to}). Основная валюта: ${cur}.`);
   lines.push(`Доходы: ${m(s.income)}; расходы: ${m(s.expense)}; итог: ${m(s.income - s.expense)}.`);
   lines.push(`Прошлый месяц: доходы ${m(p.income)}, расходы ${m(p.expense)}.`);
   lines.push('Расходы по категориям (этот месяц / прошлый):');

@@ -3,7 +3,7 @@ import {
   TextB, TextItalic, TextStrikethrough, Image as ImageIcon, Trash, Link, X, Plus, CheckSquare, Note, Tag, Palette, MapTrifold as MapIcon, Shapes, Bell,
 } from '@phosphor-icons/react';
 import type { LineStyle, ShapeType, StructureType, TaskStatus, Topic } from '../types';
-import { useDoc, beginBatch, endBatch } from '../store/docStore';
+import { useDoc, beginBatch, endBatch, flushSave } from '../store/docStore';
 import { findInSheet } from '../utils/tree';
 import { MARKER_GROUPS, MARKERS, toggleMarker } from '../markers';
 import { COLOR_SWATCHES, THEMES } from '../themes';
@@ -57,13 +57,25 @@ function ShapePreview({ shape }: { shape: ShapeType }) {
   );
 }
 
+/** Начать пакет на время касания: конец — по отпусканию где угодно (иначе незакрытый пакет глотал бы шаги отмены) */
+function beginRangeBatch() {
+  beginBatch();
+  const end = () => {
+    endBatch();
+    window.removeEventListener('pointerup', end, true);
+    window.removeEventListener('pointercancel', end, true);
+  };
+  window.addEventListener('pointerup', end, true);
+  window.addEventListener('pointercancel', end, true);
+}
+
 /** Ползунок: всё перетаскивание — один шаг отмены */
 function Range(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       type="range"
       {...props}
-      onPointerDown={beginBatch}
+      onPointerDown={beginRangeBatch}
       onPointerUp={endBatch}
       onPointerCancel={endBatch}
       onBlur={endBatch}
@@ -176,6 +188,27 @@ function TopicPanel({ t, ids }: { t: Topic; ids: string[] }) {
       st.updateTopic(t.id, { note: v || undefined });
     }, 400);
   };
+  /** Записать набранное сразу (уход из поля, выход из карты, сворачивание приложения) */
+  const flushNote = () => {
+    if (noteTimer.current) clearTimeout(noteTimer.current);
+    noteTimer.current = null;
+    const v = pendingNote.current;
+    if (v === null) return;
+    pendingNote.current = null;
+    const sh = useDoc.getState().sheet();
+    if (sh && findInSheet(sh, t.id)) useDoc.getState().updateTopic(t.id, { note: v || undefined });
+  };
+  const flushRef = useRef(flushNote);
+  flushRef.current = flushNote;
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState !== 'hidden' || pendingNote.current === null) return;
+      flushRef.current();
+      void flushSave();
+    };
+    document.addEventListener('visibilitychange', onHide);
+    return () => document.removeEventListener('visibilitychange', onHide);
+  }, []);
 
   const onImage = async (file: File) => {
     const src = await resizeImage(file, 640);
@@ -287,7 +320,7 @@ function TopicPanel({ t, ids }: { t: Topic; ids: string[] }) {
       />
 
       <label className="label"><Note size={12} /> Заметка</label>
-      <textarea className="textarea" rows={5} placeholder="Подробности, мысли, ссылки…" value={note} onChange={(e) => saveNote(e.target.value)} />
+      <textarea className="textarea" rows={5} placeholder="Подробности, мысли, ссылки…" value={note} onChange={(e) => saveNote(e.target.value)} onBlur={flushNote} />
 
       <label className="label"><Link size={12} /> Ссылка</label>
       <div className="row">

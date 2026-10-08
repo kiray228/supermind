@@ -26,7 +26,7 @@ export interface ParsedTask {
 const B = '(?<=^|[\\s,.;:()])';
 /** после «в N» без минут: время, только если дальше конец текста или дата/метка */
 /** после числа идёт единица измерения — это не дата */
-const UNIT_NEXT = /^(час|мин|сек|л\b|литр|мл|кг|г\b|гр|грам|м\b|км|см|мм|%|раз|шт|руб|₽|\$|тыс|недел|дн|лет|год|месяц)/i;
+const UNIT_NEXT = /^(час|мин|сек|л(?![а-яё])|литр|мл|кг|г(?![а-яё])|гр|грам|м(?![а-яё])|км|см|мм|%|раз|шт|руб|₽|\$|тыс|недел|дн|лет|год|месяц|подход|повтор|круг|стакан|страниц|глав|человек|чел(?![а-яё]))/i;
 const BARE_HOUR_NEXT = /^($|[#!~^,.]|сегодня|завтра|послезавтра|кажд|ежедн|еженед|по |в |во |на |напомн|через|\d{1,2}[./]\d|\d{1,2}\s+[а-яё]{3})/i;
 const E = '(?=$|[\\s,.;:!?()])';
 
@@ -56,6 +56,8 @@ const WD: [RegExp, number][] = [
   [/^воскресень|^вс/, 0],
 ];
 const WD_RE = '(понедельникам|вторникам|средам|четвергам|пятницам|субботам|воскресеньям|понедельник|вторник|среду|среда|четверг|пятницу|пятница|субботу|суббота|воскресенье|пн|вт|ср|чт|пт|сб|вс)';
+/** перед «в N» уже стоит дата («завтра в 8 бег») — голый час тоже время */
+const DATE_BEFORE = new RegExp(`(?:^|[\\s,])(сегодня|завтра|послезавтра|${WD_RE}|\\d{1,2}[./]\\d{1,2}(?:[./]\\d{2,4})?|\\d{1,2}\\s+${MONTH_RE}\\.?)\\s*$`, 'i');
 const U_MIN = 'минуту|минуты|минут|мин';
 const U_HOUR = 'часов|часа|час|ч';
 const U_DAY = 'день|дня|дней';
@@ -130,10 +132,10 @@ export function parseTask(input: string, now = new Date()): ParsedTask {
   });
 
   // ---------- напоминание ----------
-  take(new RegExp(`${B}напомни(?:ть)?\\s+за\\s+${NUM_RE}?\\s*(${U_MIN}|${U_HOUR}|${U_DAY}|${U_WEEK})${E}`, 'i'), (m) => {
+  take(new RegExp(`${B}напомни(?:ть)?\\s+за\\s+${NUM_RE}?\\s*(полчаса|${U_MIN}|${U_HOUR}|${U_DAY}|${U_WEEK})${E}`, 'i'), (m) => {
     const n = numOf(m[1]?.toLowerCase());
     const u = m[2].toLowerCase();
-    out.reminder = -(u.startsWith('м') ? n : u.startsWith('ч') ? n * 60 : u.startsWith('н') ? n * 10080 : n * 1440);
+    out.reminder = -(u === 'полчаса' ? 30 : u.startsWith('м') ? n : u.startsWith('ч') ? n * 60 : u.startsWith('н') ? n * 10080 : n * 1440);
   });
 
   // ---------- интервал времени «с 14 до 16», «14:00-15:30» ----------
@@ -151,7 +153,7 @@ export function parseTask(input: string, now = new Date()): ParsedTask {
 
   // ---------- время ----------
   if (!out.time) {
-    take(new RegExp(`${B}(?:в|к)\\s+${T}(\\s*час(?:а|ов)?)?(?:\\s*(утра|дня|вечера|ночи))?${E}`, 'i'), (m) => {
+    take(new RegExp(`${B}(?:в|к)\\s+${T}(\\s*час(?:а|ов|ам)?)?(?:\\s*(утра|дня|вечера|ночи))?${E}`, 'i'), (m) => {
       let h = +m[1];
       const mi = +(m[2] ?? 0);
       const hourWord = !!m[3];
@@ -160,7 +162,10 @@ export function parseTask(input: string, now = new Date()): ParsedTask {
       if (part === 'ночи' && h === 12) h = 0;
       if (h > 23 || mi > 59) return false;
       // «в 3 раза» — не время: голый час принимаем только в конце или перед датой/меткой
-      if (!m[2] && !part && !hourWord && !BARE_HOUR_NEXT.test(s.slice(m.index + m[0].length).trimStart())) return false;
+      // …или рядом уже есть повтор/дата: «каждый день в 8 бег», «завтра в 8 бег»
+      const rest = s.slice(m.index + m[0].length).trimStart();
+      const ctx = (!!out.repeat || DATE_BEFORE.test(s.slice(0, m.index))) && !UNIT_NEXT.test(rest);
+      if (!m[2] && !part && !hourWord && !ctx && !BARE_HOUR_NEXT.test(rest)) return false;
       // «встреча в 3» — скорее днём, чем в 3 ночи
       if (!m[2] && !part && h >= 1 && h <= 5) h += 12;
       out.time = `${pad2(h)}:${pad2(mi)}`;
@@ -218,7 +223,12 @@ export function parseTask(input: string, now = new Date()): ParsedTask {
     out.date = nextWeekday(today, wd, !!m[1]);
     if (m[1] && out.date && daysBetweenSimple(today, out.date) < 7) out.date = addDaysYmd(out.date, 7);
   });
-  take(new RegExp(`${B}(\\d{1,2})\\s+${MONTH_RE}\\.?(?:\\s+(\\d{4}))?${E}`, 'i'), (m) => {
+  // «до пятницы», «к пятнице» — срок в этот день
+  take(new RegExp(`${B}(?:до|к|ко)\\s+(понедельника|вторника|среды|четверга|пятницы|субботы|воскресенья|понедельнику|вторнику|среде|четвергу|пятнице|субботе|воскресенью)${E}`, 'i'), (m) => {
+    if (out.date) return false;
+    out.date = nextWeekday(today, wdOf(m[1].toLowerCase()));
+  });
+  take(new RegExp(`${B}(?:(?:до|к)\\s+)?(\\d{1,2})\\s+${MONTH_RE}\\.?(?:\\s+(\\d{4}))?${E}`, 'i'), (m) => {
     if (out.date) return false;
     const day = +m[1];
     const mon = monthOf(m[2].toLowerCase());

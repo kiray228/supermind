@@ -56,8 +56,10 @@ export function GoalEditor({ data, goal, preset, onClose }: { data: GoalsData; g
   };
 
   const num = (v: string, def = 0) => {
-    const n = Number(v.replace(',', '.'));
-    return Number.isFinite(n) ? n : def;
+    // «10 000» и «4,5»: пробелы — разделители разрядов, запятая — дробь
+    const t = v.replace(/\s/g, '').replace(',', '.').replace(/^[−–]/, '-');
+    const n = Number(t);
+    return t && Number.isFinite(n) ? n : def;
   };
 
   const save = () => {

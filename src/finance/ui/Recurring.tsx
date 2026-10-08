@@ -31,7 +31,7 @@ export function SubscriptionsSection({ data }: { data: FinanceData }) {
   const [edit, setEdit] = useState<Subscription | 'new' | null>(null);
   const accs = useMemo(() => accountMap(data), [data]);
   const cats = useMemo(() => categoryMap(data), [data]);
-  const list = [...data.subscriptions].sort((a, b) => Number(b.active) - Number(a.active) || (a.nextDate < b.nextDate ? -1 : 1));
+  const list = [...data.subscriptions].sort((a, b) => Number(b.active) - Number(a.active) || (a.nextDate ?? '').localeCompare(b.nextDate ?? '') || a.name.localeCompare(b.name, 'ru'));
   const main = data.prefs.mainCurrency;
 
   // стоимость в месяц: по валютам и общий итог
@@ -55,7 +55,12 @@ export function SubscriptionsSection({ data }: { data: FinanceData }) {
         <span className="tiny faint">Регулярные платежи в месяц</span>
         <div className="fn-budget-big">{Object.keys(monthly).length > 1 && !missing ? <Money v={total} cur={main} /> : <CurTotals totals={monthly} />}</div>
         {Object.keys(monthly).length > 1 && !missing && <CurTotals totals={monthly} className="small muted" />}
-        <span className="tiny faint">≈ {fmtMoney(total * 12, main, { compact: true })} в год</span>
+        {/* в год: одна валюта — в ней же; несколько — только если все курсы известны */}
+        {(Object.keys(monthly).length <= 1 || !missing) && (
+          <span className="tiny faint">
+            ≈ {Object.keys(monthly).length === 1 ? fmtMoney(Object.values(monthly)[0] * 12, Object.keys(monthly)[0], { compact: true }) : fmtMoney(total * 12, main, { compact: true })} в год
+          </span>
+        )}
       </div>
       <div className="card fn-list">
         {list.map((s) => {
@@ -117,7 +122,9 @@ function SubSheet({ data, sub, onClose }: { data: FinanceData; sub: Subscription
     const p: SubPeriod = period === 'months' ? 'month' : period;
     const n = period === 'months' ? Math.max(1, Math.round(Number(every) || 1)) : 1;
     // день месяца сохраняем, чтобы 31-е не «сползало» после коротких месяцев
-    const anchorDay = p === 'week' ? undefined : fromYmd(nextDate).getDate();
+    // дата не менялась (например, 28 февраля при платеже 31-го) — прежний день сохраняется
+    const keepAnchor = sub && sub.nextDate === nextDate && sub.period !== 'week' && sub.anchorDay;
+    const anchorDay = p === 'week' ? undefined : keepAnchor || fromYmd(nextDate).getDate();
     saveSubscription({
       id: sub?.id ?? uid(),
       name: name.trim(),

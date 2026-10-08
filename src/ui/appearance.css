@@ -151,8 +151,8 @@
 }
 
 /* ---------- Акцент ---------- */
-:root[data-accent] { --accent: var(--accent-l, #0c9f6e); --accent-soft: color-mix(in srgb, var(--accent) 12%, #ffffff); }
-:root[data-accent][data-theme='dark'] { --accent: var(--accent-d, var(--accent-l, #ff5a3c)); --accent-soft: color-mix(in srgb, var(--accent) 22%, #1c1c1e); }
+:root[data-accent] { --accent: var(--accent-l, #007aff); --accent-soft: color-mix(in srgb, var(--accent) 12%, #ffffff); }
+:root[data-accent][data-theme='dark'] { --accent: var(--accent-d, var(--accent-l, #0a84ff)); --accent-soft: color-mix(in srgb, var(--accent) 22%, #1c1c1e); }
 
 /* ---------- Фон ---------- */
 body { background: var(--bg); }

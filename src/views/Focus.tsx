@@ -135,8 +135,8 @@ function PomodoroTab({ data }: { data: TasksData }) {
 
   const completeTask = () => {
     if (!task) return;
+    // toggleDone сам показывает уведомление с кнопкой «Отменить» (и дату следующего повтора)
     toggleDone(task.id);
-    toast('Задача выполнена');
   };
 
   return (

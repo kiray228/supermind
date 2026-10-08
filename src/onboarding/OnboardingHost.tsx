@@ -48,9 +48,12 @@ export default function OnboardingHost() {
   const wn = useWhatsNew((s) => s.open);
   // сначала вход в аккаунт (обязателен), знакомство — после
   const signedIn = useCloud((s) => !!s.account);
+  // данные аккаунта уже пришли (или сети нет): иначе на новом устройстве знакомство показалось бы
+  // пользователю с данными, а стартовые привычки задвоились бы
+  const synced = useCloud((s) => !!s.lastSync || s.status === 'error' || s.status === 'offline');
 
   useEffect(() => {
-    if (decided || !signedIn) return;
+    if (decided || !signedIn || !synced) return;
     const t = setTimeout(async () => {
       if (decided) return;
       decided = true;
@@ -73,7 +76,7 @@ export default function OnboardingHost() {
       else lsSet(WHATSNEW_KEY, APP_VERSION);
     }, 900);
     return () => clearTimeout(t);
-  }, [signedIn]);
+  }, [signedIn, synced]);
 
   const doneOnboarding = () => {
     lsSet(ONBOARDED_KEY, String(Date.now()));

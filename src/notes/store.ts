@@ -95,6 +95,8 @@ export function mutateNotes(fn: (d: NotesData) => void) {
 
 const pending = new Map<ID, { body: NoteBody; timer: ReturnType<typeof setTimeout> }>();
 const warned = new Set<ID>();
+/** Текст для поиска: без регистра, «ё» = «е» */
+const searchNorm = (s: string) => s.toLowerCase().replace(/ё/g, 'е');
 /** кэш простого текста для поиска */
 const textCache = new Map<ID, { at: number; text: string }>();
 
@@ -132,7 +134,7 @@ async function writeBody(id: ID): Promise<void> {
     toast('Не удалось сохранить заметку');
     return;
   }
-  textCache.set(id, { at: body.updatedAt, text: (body.title + '\n' + bodyPlainText(body)).toLowerCase() });
+  textCache.set(id, { at: body.updatedAt, text: searchNorm(body.title + '\n' + bodyPlainText(body)) });
   mutateNotes((d) => {
     const m = d.notes.find((n) => n.id === id);
     if (m) {
@@ -331,7 +333,7 @@ export async function duplicateNote(id: ID): Promise<NoteMeta | null> {
 
 /** Найти заметки по тексту (заголовок + содержимое). Тела читаются лениво и кэшируются */
 export async function searchNotes(query: string, notes: NoteMeta[]): Promise<Set<ID>> {
-  const q = query.trim().toLowerCase();
+  const q = searchNorm(query.trim());
   const res = new Set<ID>();
   if (!q) return res;
   const words = q.split(/\s+/);
@@ -339,7 +341,7 @@ export async function searchNotes(query: string, notes: NoteMeta[]): Promise<Set
     let c = textCache.get(n.id);
     if (!c || c.at !== n.updatedAt) {
       const body = await loadNoteBody(n.id).catch(() => null);
-      c = { at: n.updatedAt, text: ((body?.title ?? n.title) + '\n' + (body ? bodyPlainText(body) : n.preview)).toLowerCase() };
+      c = { at: n.updatedAt, text: searchNorm((body?.title ?? n.title) + '\n' + (body ? bodyPlainText(body) : n.preview)) };
       textCache.set(n.id, c);
     }
     if (words.every((w) => c.text.includes(w))) res.add(n.id);

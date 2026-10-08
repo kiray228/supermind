@@ -317,7 +317,7 @@
 }
 .qa-chip.set { color: var(--qc); background: color-mix(in srgb, var(--qc) 10%, transparent); border-color: color-mix(in srgb, var(--qc) 30%, transparent); }
 .qa-list { max-width: 150px; cursor: pointer; }
-.qa-list select { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.qa-list select { position: absolute; inset: 0; opacity: 0; cursor: pointer; font-size: 16px; } /* 16px — iPhone не приближает экран при выборе */
 .qa-x { border: none; background: none; color: inherit; display: inline-flex; padding: 0; }
 .qa-pop-anchor { position: relative; }
 .qa-send {
@@ -419,3 +419,8 @@
 
 .rm-card { border-radius: 22px; }
 .rm-ico { border-radius: 8px; }
+
+/* сенсорные экраны: поля не мельче 16px — иначе iPhone приближает страницу при фокусе */
+@media (pointer: coarse) {
+  .td-select, .td-ck-text, .td-add input, .td-tag-input, .dp-time { font-size: 16px; }
+}

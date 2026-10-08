@@ -51,6 +51,13 @@ export default function Settings() {
   const settings = useApp((s) => s.settings);
   const setSettings = useApp((s) => s.setSettings);
   const [key, setKey] = useState(settings.apiKey);
+  // настройки читаются из базы после запуска: раздел, открытый сразу, сначала видит пустой ключ —
+  // подхватить сохранённый, иначе «Сохранить»/«Проверить» стёрли бы его
+  const [seenKey, setSeenKey] = useState(settings.apiKey);
+  if (settings.apiKey !== seenKey) {
+    setSeenKey(settings.apiKey);
+    setKey(settings.apiKey);
+  }
   const [show, setShow] = useState(false);
   const [testing, setTesting] = useState(false);
 

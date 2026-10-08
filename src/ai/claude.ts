@@ -5,7 +5,7 @@ import { sheetToMarkdown } from '../io/markdown';
 export const AI_MODELS = [
   { id: 'claude-opus-5-5', name: 'Claude Opus 5.5 — самый умный' },
   { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5 — быстрый и дешевле' },
-  { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5 — самый быстрый' },
+  { id: 'claude-haiku-5-5', name: 'Claude Haiku 5.5 — самый быстрый и дешёвый' },
 ];
 
 export class AIError extends Error {}
@@ -36,8 +36,31 @@ interface StreamOpts {
   effort?: 'low' | 'medium' | 'high';
 }
 
+/** Свой ключ Claude указан — запросы идут напрямую в Claude, иначе — бесплатный ИИ на сервере SuperMind */
+export const hasOwnKey = () => !!useApp.getState().settings.apiKey.trim();
+
+/** Бесплатный ИИ на сервере (Gemini): без ключа, с дневным лимитом на пользователя */
+async function serverText({ system, messages, onText, signal }: StreamOpts): Promise<string> {
+  const { api } = await import('../store/cloud');
+  try {
+    const r = await api<{ text: string }>('/ai/chat', { method: 'POST', body: JSON.stringify({ system, messages }), signal });
+    const text = r.text ?? '';
+    onText?.(text);
+    return text;
+  } catch (e) {
+    if (signal?.aborted || (e instanceof DOMException && e.name === 'AbortError')) throw new AIError('Остановлено');
+    const status = (e as { status?: number }).status;
+    if (status === 429) throw new AIError('Бесплатный ИИ на сегодня исчерпан. Попробуйте завтра или добавьте свой ключ Claude в Настройках.');
+    if (status === 401) throw new AIError('Войдите в аккаунт, чтобы пользоваться ИИ.');
+    if (status === 503) throw new AIError('ИИ сейчас недоступен. Добавьте свой ключ Claude в Настройках или попробуйте позже.');
+    throw new AIError(e instanceof Error ? e.message : String(e));
+  }
+}
+
 /** Потоковый запрос к Claude, возвращает итоговый текст */
-export async function streamText({ system, messages, onText, signal, effort = 'medium' }: StreamOpts): Promise<string> {
+export async function streamText(opts: StreamOpts): Promise<string> {
+  if (!hasOwnKey()) return serverText(opts);
+  const { system, messages, onText, signal, effort = 'medium' } = opts;
   const { c, Anthropic } = await client();
   const model = useApp.getState().settings.model || AI_MODELS[0].id;
   const isHaiku = model.startsWith('claude-haiku');

@@ -160,7 +160,8 @@ export function BudgetTab({ data }: { data: FinanceData }) {
 function BudgetSheet({ data, edit, spentByCat, onClose }: { data: FinanceData; edit: Edit; spentByCat: Map<string, number>; onClose: () => void }) {
   const [catId, setCatId] = useState(edit.categoryId ?? '');
   const isTotal = !edit.pick && !edit.categoryId;
-  const existing = data.budgets.find((b) => (b.categoryId ?? '') === (isTotal ? '' : catId));
+  // в режиме выбора категории без выбранной категории — не общий бюджет (иначе «Убрать» удалит его)
+  const existing = isTotal ? data.budgets.find((b) => !b.categoryId) : catId ? data.budgets.find((b) => b.categoryId === catId) : undefined;
   const [val, setVal] = useState(existing ? String(existing.limit).replace('.', ',') : '');
   const main = data.prefs.mainCurrency;
   const free = sortedCategories(data, 'expense').filter((c) => c.id === catId || !data.budgets.some((b) => b.categoryId === c.id));

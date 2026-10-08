@@ -50,9 +50,18 @@ export function updateMapTask(docId: ID, topicId: ID, patch: Partial<TaskInfo>):
   const prev = queues[docId] ?? Promise.resolve();
   const viaEditor = import('../store/docStore').then(({ useDoc }) => {
     const st = useDoc.getState();
-    const sheet = st.doc?.id === docId ? st.doc.sheets.find((sh) => sh.id === st.doc!.activeSheet) : undefined;
-    if (!sheet || !findInSheet(sheet, topicId)) return false;
-    st.updateTopics([topicId], (t) => void (t.task = { status: 'todo', ...t.task, ...patch }));
+    if (st.doc?.id !== docId) return false;
+    // тема может быть и на неактивном листе: запись мимо редактора он потом перетёр бы своим сохранением
+    if (!st.doc.sheets.some((sh) => findInSheet(sh, topicId))) return false;
+    st.mutateDoc((d) => {
+      for (const sh of d.sheets) {
+        const f = findInSheet(sh, topicId);
+        if (f) {
+          f.topic.task = { status: 'todo', ...f.topic.task, ...patch };
+          return;
+        }
+      }
+    });
     return true;
   });
   const next = prev

@@ -71,7 +71,8 @@ export default function Home() {
         const t = await askText('Переименовать', { value: m.title });
         if (!t) return;
         const d = await loadDoc(id);
-        if (d && !('locked' in d)) await saveDoc({ ...d, title: t });
+        // новое время изменения — иначе синхронизация считает версии равными и название не доходит до других устройств
+        if (d && !('locked' in d)) await saveDoc({ ...d, title: t, updatedAt: Date.now() });
         else if (d) {
           // зашифрованная карта: меняем название и внутри документа
           const p = await askPassword('Введите пароль карты', 'Нужен, чтобы переименовать защищённую карту');

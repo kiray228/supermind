@@ -453,6 +453,8 @@
   .fn-donut { width: 190px; }
   .fn-filter-selects { grid-template-columns: 1fr 1fr; }
   .fn-filter-selects select:last-child { grid-column: 1 / -1; }
+  /* меньше 16px — iPhone увеличивает страницу при выборе */
+  .fn-filter-selects .select { font-size: 16px; }
   .fn-tx-title { font-size: 15px; }
 }
 @media (max-width: 420px) {

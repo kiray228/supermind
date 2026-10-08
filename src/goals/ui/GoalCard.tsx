@@ -33,7 +33,10 @@ export function GoalCard({ goal, area, look, today, hidePeriod }: { goal: Goal; 
             </>
           )}
           {(area || !hidePeriod) && <span className="gl-card-sep">·</span>}
-          <span className={'gl-due is-' + (goal.status === 'paused' ? 'paused' : dl.state)}>{goal.status === 'paused' ? 'отложена' : dl.text}</span>
+          {/* у отложенной и архивной цели срок не «горит» */}
+          <span className={'gl-due is-' + (goal.status === 'paused' ? 'paused' : goal.status === 'archived' ? 'none' : dl.state)}>
+            {goal.status === 'paused' ? 'отложена' : goal.status === 'archived' ? 'в архиве' : dl.text}
+          </span>
         </span>
         {next && (
           <span className="gl-card-next">

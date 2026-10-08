@@ -30,7 +30,7 @@
   --ios-yellow: #ffcc00;
 
   /* ---- переменные приложения (все разделы опираются на них) ---- */
-  --accent: #0c9f6e;
+  --accent: #007aff;
   --accent-2: #ff7a45;
   --accent-soft: color-mix(in srgb, var(--accent) 12%, #ffffff);
   --bg: var(--ios-bg);
@@ -107,7 +107,7 @@
   --ios-orange: #ff9f0a;
   --ios-yellow: #ffd60a;
 
-  --accent: #30d494;
+  --accent: #0a84ff;
   --accent-soft: color-mix(in srgb, var(--accent) 22%, #1c1c1e);
   --surface-2: #2c2c2e;
   --surface-3: #3a3a3c;

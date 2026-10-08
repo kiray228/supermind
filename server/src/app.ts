@@ -4,7 +4,8 @@
  *   POST /auth/register, /auth/login, /auth/logout, /auth/password · GET /auth/me · DELETE /account
  *   POST /auth/forgot (код на почту) · POST /auth/reset (код + новый пароль → вход)
  *   POST /feedback (проблема или идея → база и письмо владельцу) · GET /feedback (мои обращения)
- *   POST /ai/command — голосовая команда → действия (бесплатная модель Gemini/Groq, лимит в день)
+ *   POST /ai/command — голосовая команда → действия · POST /ai/chat — текстовый ответ без своего ключа Claude
+ *     (бесплатная модель Gemini/Groq, общий лимит запросов в день на пользователя)
  *   GET /sync?since=N · POST /sync
  *   GET /snapshots · GET /snapshots/:id · POST /snapshots — облачные копии данных (каждый час при изменениях — сами)
  *   GET /push/key · POST /devices · PUT /devices/:id/schedule · POST /devices/:id/test · DELETE /devices/:id
@@ -31,7 +32,7 @@ export interface Deps {
   supportEmail?: string;
   /** бесплатная модель для голосовых команд; null — не настроена */
   ai?: Ai | null;
-  /** запросов к модели в день на пользователя (AI_DAILY_LIMIT, по умолчанию 60) */
+  /** запросов к модели в день на пользователя (AI_DAILY_LIMIT, по умолчанию 100) */
   aiDailyLimit?: number;
 }
 
@@ -71,6 +72,8 @@ async function body<T>(request: Request): Promise<T> {
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** Строка из тела запроса: не строка (число, объект) — пустая, а не ошибка 500 */
+const str = (v: unknown) => (typeof v === 'string' ? v : '');
 
 export function createApp(deps: Deps) {
   const { sql } = deps;
@@ -81,7 +84,7 @@ export function createApp(deps: Deps) {
   /** куда приходят обращения в поддержку */
   const supportTo = deps.supportEmail ?? process.env.SUPPORT_EMAIL ?? process.env.MAIL_FROM ?? '';
   const ai = deps.ai === undefined ? envAi() : deps.ai;
-  const aiDailyLimit = deps.aiDailyLimit ?? (Number(process.env.AI_DAILY_LIMIT) || 60);
+  const aiDailyLimit = deps.aiDailyLimit ?? (Number(process.env.AI_DAILY_LIMIT) || 100);
 
   /** Записать время ближайшего неотправленного напоминания */
   async function refreshNextDue() {
@@ -143,9 +146,9 @@ export function createApp(deps: Deps) {
 
   async function register(request: Request) {
     const b = await body<{ email?: string; password?: string; name?: string }>(request);
-    const email = (b.email ?? '').trim().toLowerCase();
-    const password = b.password ?? '';
-    const name = (b.name ?? '').trim().slice(0, 80);
+    const email = str(b.email).trim().toLowerCase();
+    const password = str(b.password);
+    const name = str(b.name).trim().slice(0, 80);
     if (!EMAIL.test(email) || email.length > 200) throw new HttpError(400, 'Проверьте email');
     if (password.length < 8) throw new HttpError(400, 'Пароль — минимум 8 символов');
     if (password.length > 200) throw new HttpError(400, 'Слишком длинный пароль');
@@ -167,7 +170,7 @@ export function createApp(deps: Deps) {
 
   async function login(request: Request) {
     const b = await body<{ email?: string; password?: string }>(request);
-    const email = (b.email ?? '').trim().toLowerCase();
+    const email = str(b.email).trim().toLowerCase();
     const fails = await sql.query(
       `SELECT count(*) FROM auth_failures WHERE email = $1 AND at > now() - interval '15 minutes'`,
       [email],
@@ -175,7 +178,7 @@ export function createApp(deps: Deps) {
     if (Number(fails[0]?.[0] ?? 0) >= 10) throw new HttpError(429, 'Слишком много попыток — подождите 15 минут');
     const rows = await sql.query(`SELECT id, name, pass_hash FROM users WHERE email = $1`, [email]);
     const user = rows[0] as string[] | undefined;
-    if (!user || !(await verifyPassword(b.password ?? '', user[2]))) {
+    if (!user || !(await verifyPassword(str(b.password), user[2]))) {
       await sql.query(`INSERT INTO auth_failures (email) VALUES ($1)`, [email]);
       throw new HttpError(401, 'Неверный email или пароль');
     }
@@ -212,7 +215,39 @@ export function createApp(deps: Deps) {
     return json({ id, ok: true }, 201);
   }
 
-  // ---------- Голосовые команды: бесплатная модель разбирает фразу в действия ----------
+  // ---------- Бесплатный ИИ: голосовые команды и ИИ-функции без своего ключа Claude ----------
+
+  /** Лимит на пользователя в день: бесплатная квота модели общая на всех */
+  async function spendAi(userId: string) {
+    const used = await sql.query(
+      `INSERT INTO ai_usage (user_id, day, count) VALUES ($1, current_date, 1)
+       ON CONFLICT (user_id, day) DO UPDATE SET count = ai_usage.count + 1 RETURNING count`,
+      [userId],
+    );
+    if (Number(used[0]?.[0] ?? 0) > aiDailyLimit) throw new HttpError(429, 'Лимит ИИ на сегодня исчерпан');
+  }
+
+  /** Текстовый ответ (ассистент, карты, сводки) — для тех, у кого нет своего ключа Claude */
+  async function aiChat(request: Request) {
+    const user = await userOf(request);
+    if (!ai) throw new HttpError(503, 'ИИ на сервере не подключён');
+    const b = await body<{ system?: unknown; messages?: unknown }>(request);
+    const system = typeof b.system === 'string' ? b.system.slice(0, 120_000) : '';
+    const messages = (Array.isArray(b.messages) ? b.messages : [])
+      .filter((m): m is { role: string; content: string } => !!m && typeof m === 'object' && typeof (m as { content?: unknown }).content === 'string')
+      .slice(-40)
+      .map((m) => ({ role: m.role === 'assistant' ? ('assistant' as const) : ('user' as const), content: m.content.slice(0, 60_000) }));
+    if (!messages.length || messages[messages.length - 1].role !== 'user') throw new HttpError(400, 'Пустой запрос');
+    if (system.length + messages.reduce((n, m) => n + m.content.length, 0) > 200_000) throw new HttpError(413, 'Слишком длинный запрос');
+    await spendAi(user.id);
+    try {
+      return json({ text: await ai(system, messages, { maxTokens: 8192 }) });
+    } catch (e) {
+      console.error('ai chat', e);
+      throw new HttpError(502, 'ИИ сейчас недоступен — попробуйте через минуту');
+    }
+  }
+
 
   async function aiCommand(request: Request) {
     const user = await userOf(request);
@@ -221,13 +256,7 @@ export function createApp(deps: Deps) {
     const text = (b.text ?? '').trim().slice(0, 1000);
     if (text.length < 2) throw new HttpError(400, 'Пустая команда');
     const today = /^\d{4}-\d{2}-\d{2}$/.test(b.today ?? '') ? b.today! : new Date(now()).toISOString().slice(0, 10);
-    // лимит на пользователя в день: бесплатная квота модели общая на всех
-    const used = await sql.query(
-      `INSERT INTO ai_usage (user_id, day, count) VALUES ($1, current_date, 1)
-       ON CONFLICT (user_id, day) DO UPDATE SET count = ai_usage.count + 1 RETURNING count`,
-      [user.id],
-    );
-    if (Number(used[0]?.[0] ?? 0) > aiDailyLimit) throw new HttpError(429, 'Лимит ИИ на сегодня исчерпан');
+    await spendAi(user.id);
     const names = (x: unknown) => (Array.isArray(x) ? x.filter((s): s is string => typeof s === 'string').map((s) => s.slice(0, 60)) : []);
     const cats = Array.isArray(b.categories)
       ? b.categories.filter((c) => c && typeof c.name === 'string').map((c) => ({ name: c.name.slice(0, 60), kind: c.kind === 'income' ? 'income' : 'expense' }))
@@ -235,7 +264,7 @@ export function createApp(deps: Deps) {
     const nowMin = Number.isInteger(b.nowMin) && b.nowMin! >= 0 && b.nowMin! < 1440 ? b.nowMin : undefined;
     let out: string;
     try {
-      out = await ai(commandPrompt({ today, nowMin, categories: cats, accounts: names(b.accounts), lists: names(b.lists) }), text);
+      out = await ai(commandPrompt({ today, nowMin, categories: cats, accounts: names(b.accounts), lists: names(b.lists) }), text, { json: true });
     } catch (e) {
       console.error('ai', e);
       throw new HttpError(502, 'ИИ сейчас недоступен');
@@ -258,7 +287,7 @@ export function createApp(deps: Deps) {
 
   async function forgot(request: Request) {
     const b = await body<{ email?: string }>(request);
-    const email = (b.email ?? '').trim().toLowerCase();
+    const email = str(b.email).trim().toLowerCase();
     if (!EMAIL.test(email)) throw new HttpError(400, 'Проверьте email');
     if (!mail) throw new HttpError(503, 'Восстановление по почте пока не настроено — напишите в поддержку');
     // не чаще 3 писем за 15 минут на адрес
@@ -286,9 +315,9 @@ export function createApp(deps: Deps) {
 
   async function reset(request: Request) {
     const b = await body<{ email?: string; code?: string; password?: string }>(request);
-    const email = (b.email ?? '').trim().toLowerCase();
-    const code = (b.code ?? '').replace(/\D/g, '');
-    const password = b.password ?? '';
+    const email = str(b.email).trim().toLowerCase();
+    const code = str(b.code).replace(/\D/g, '');
+    const password = str(b.password);
     if (password.length < 8) throw new HttpError(400, 'Пароль — минимум 8 символов');
     if (password.length > 200) throw new HttpError(400, 'Слишком длинный пароль');
     const rows = await sql.query(
@@ -324,9 +353,11 @@ export function createApp(deps: Deps) {
     const user = await userOf(request);
     const b = await body<{ oldPassword?: string; newPassword?: string }>(request);
     const rows = await sql.query(`SELECT pass_hash FROM users WHERE id = $1`, [user.id]);
-    if (!(await verifyPassword(b.oldPassword ?? '', rows[0][0]!))) throw new HttpError(401, 'Текущий пароль неверный');
-    if ((b.newPassword ?? '').length < 8) throw new HttpError(400, 'Новый пароль — минимум 8 символов');
-    await sql.query(`UPDATE users SET pass_hash = $2 WHERE id = $1`, [user.id, await hashPassword(b.newPassword!)]);
+    const next = str(b.newPassword);
+    if (!(await verifyPassword(str(b.oldPassword), rows[0][0]!))) throw new HttpError(401, 'Текущий пароль неверный');
+    if (next.length < 8) throw new HttpError(400, 'Новый пароль — минимум 8 символов');
+    if (next.length > 200) throw new HttpError(400, 'Слишком длинный пароль');
+    await sql.query(`UPDATE users SET pass_hash = $2 WHERE id = $1`, [user.id, await hashPassword(next)]);
     // остальные устройства выйдут из аккаунта
     const token = tokenHash((request.headers.get('authorization') ?? '').slice(7).trim());
     await sql.query(`DELETE FROM sessions WHERE user_id = $1 AND token_hash <> $2`, [user.id, token]);
@@ -337,7 +368,7 @@ export function createApp(deps: Deps) {
     const user = await userOf(request);
     const b = await body<{ password?: string }>(request);
     const rows = await sql.query(`SELECT pass_hash FROM users WHERE id = $1`, [user.id]);
-    if (!(await verifyPassword(b.password ?? '', rows[0][0]!))) throw new HttpError(401, 'Неверный пароль');
+    if (!(await verifyPassword(str(b.password), rows[0][0]!))) throw new HttpError(401, 'Неверный пароль');
     await sql.query(`DELETE FROM users WHERE id = $1`, [user.id]);
     return json({ ok: true });
   }
@@ -382,12 +413,16 @@ export function createApp(deps: Deps) {
     );
     // перед первым за час изменением уже сохранённого — копия того, что было (защита от ошибочной синхронизации);
     // новые ключи ничего не затирают — для них копия не нужна
-    if ((b.items ?? []).some((i) => Number(i.baseSeq) > 0)) await autoSnapshot(user.id);
+    const list = (Array.isArray(b.items) ? b.items : [])
+      .slice(0, 200)
+      .filter((i) => i && typeof i.key === 'string' && i.key && i.key.length <= 300)
+      .map((item) => ({ item, value: item.deleted ? null : JSON.stringify(item.value ?? null) }));
+    // размер проверяем до записи: иначе часть пачки уже записана, а клиент повторит её как конфликт
+    const big = list.find((x) => x.value && x.value.length > MAX_ITEM_BYTES);
+    if (big) throw new HttpError(413, `Слишком большой объект: ${big.item.key}`);
+    if (list.some((x) => Number(x.item.baseSeq) > 0)) await autoSnapshot(user.id);
     const results: { key: string; ok: boolean; seq?: number }[] = [];
-    for (const item of (b.items ?? []).slice(0, 200)) {
-      if (typeof item.key !== 'string' || !item.key || item.key.length > 300) continue;
-      const value = item.deleted ? null : JSON.stringify(item.value ?? null);
-      if (value && value.length > MAX_ITEM_BYTES) throw new HttpError(413, `Слишком большой объект: ${item.key}`);
+    for (const { item, value } of list) {
       const base = Math.max(0, Number(item.baseSeq) || 0);
       // номер изменения — свой у каждого пользователя и под блокировкой его строки: номера фиксируются
       // строго по порядку, и загрузка «всё новее N» не пропустит запись, зафиксированную позже меньшего номера
@@ -512,7 +547,7 @@ export function createApp(deps: Deps) {
     await deviceOf(id, b.secret);
     const t = now();
     const items = (b.items ?? [])
-      .filter((i) => typeof i.id === 'string' && Number.isFinite(i.at) && i.at > t - 60_000)
+      .filter((i) => i && typeof i.id === 'string' && i.id.length <= 300 && Number.isFinite(i.at) && i.at > t - 60_000)
       .slice(0, MAX_SCHEDULE);
     await sql.query(`DELETE FROM push_queue WHERE device_id = $1 AND sent_at IS NULL`, [id]);
     if (items.length) {
@@ -529,7 +564,8 @@ export function createApp(deps: Deps) {
               // время входит в ключ: перенесённое напоминание — новое, уже отправленное не повторится
               i: `${i.id}@${Math.round(i.at)}`,
               a: i.at,
-              p: { title: String(i.title).slice(0, 200), body: String(i.body ?? '').slice(0, 500), data: i.data ?? {} },
+              // данные действия (id задачи, дата) — маленькие; лишнее не храним
+              p: { title: String(i.title).slice(0, 200), body: String(i.body ?? '').slice(0, 500), data: JSON.stringify(i.data ?? {}).length <= 2000 ? (i.data ?? {}) : {} },
             })),
           ),
         ],
@@ -577,7 +613,7 @@ export function createApp(deps: Deps) {
        WHERE q.device_id = d.id AND q.sent_at IS NULL AND q.fire_at <= now() AND q.fire_at > now() - interval '6 hours'
          AND (q.device_id, q.item_id) IN (
            SELECT device_id, item_id FROM push_queue
-           WHERE sent_at IS NULL AND fire_at <= now() ORDER BY fire_at LIMIT 300)
+           WHERE sent_at IS NULL AND fire_at <= now() AND fire_at > now() - interval '6 hours' ORDER BY fire_at LIMIT 300)
        RETURNING d.id, d.endpoint, d.p256dh, d.auth, q.payload`,
     );
     let sent = 0;
@@ -627,6 +663,7 @@ export function createApp(deps: Deps) {
     if (m === 'POST' && path === '/feedback') return sendFeedback(request);
     if (m === 'GET' && path === '/feedback') return myFeedback(request);
     if (m === 'POST' && path === '/ai/command') return aiCommand(request);
+    if (m === 'POST' && path === '/ai/chat') return aiChat(request);
     if (m === 'POST' && path === '/auth/reset') return reset(request);
     if (m === 'POST' && path === '/auth/password') return changePassword(request);
     if (m === 'GET' && path === '/auth/me') return json({ user: await userOf(request) });
