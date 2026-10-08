@@ -71,6 +71,7 @@ export async function updateMeta(id: string, patch: Partial<DocMeta>) {
 
 export async function deleteDoc(id: string) {
   await del(docKey(id));
+  await (await import('./mapHistory')).deleteHistory(id);
   await saveIndex((await listDocs()).filter((m) => m.id !== id));
 }
 

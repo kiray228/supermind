@@ -32,6 +32,39 @@ export function walkSheet(s: Sheet, cb: (t: Topic, parent: Topic | null, depth: 
   for (const r of sheetRoots(s)) walk(r, cb);
 }
 
+/** Сколько уровней под темой (0 — подтем нет) */
+export function treeDepth(t: Topic): number {
+  let n = 0;
+  walk(t, (_x, _p, d) => {
+    if (d > n) n = d;
+  });
+  return n;
+}
+
+/**
+ * Если ветви свёрнуты ровно «до уровня N» (видны N уровней под корнями) — N;
+ * всё развёрнуто — Infinity; свёрнуто вразнобой — null.
+ */
+export function shownLevel(roots: Topic[]): number | null {
+  let n = Infinity;
+  for (const r of roots)
+    walk(r, (t, _p, d) => {
+      if (t.children.length && t.collapsed) {
+        n = Math.min(n, d);
+        return false;
+      }
+    });
+  if (n === Infinity) return n;
+  let ok = true;
+  for (const r of roots)
+    walk(r, (t, _p, d) => {
+      if (d < n) return;
+      if (t.children.length && !t.collapsed) ok = false;
+      return false;
+    });
+  return ok ? n : null;
+}
+
 export interface Found {
   topic: Topic;
   parent: Topic | null;

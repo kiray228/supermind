@@ -39,8 +39,8 @@ interface Snapshot extends SnapshotInfo {
   data: Record<string, unknown>;
 }
 
-/** Что попадает в копию: всё, кроме настроек (там API-ключ) и служебного */
-const inBackup = (k: string) => k !== 'settings' && !k.startsWith('sync:');
+/** Что попадает в копию: всё, кроме настроек (там API-ключ), служебного и истории версий карт */
+const inBackup = (k: string) => k !== 'settings' && !k.startsWith('sync:') && !k.startsWith('hist:');
 
 /** Всё содержимое базы — одним чтением (getAll), а не по ключу: на телефоне в разы быстрее */
 export async function collectData(): Promise<Record<string, unknown>> {

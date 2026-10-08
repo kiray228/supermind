@@ -1,0 +1,53 @@
+/* История версий карты */
+.modal.mh { width: min(780px, 100%); height: min(620px, 86vh); padding: 0; display: flex; flex-direction: column; overflow: hidden; }
+.mh-head { display: flex; align-items: center; gap: 10px; padding: 14px 14px 12px 20px; border-bottom: var(--hairline) solid var(--separator); }
+.mh-head h2 { flex: 1; margin: 0; font-size: 18px; }
+.mh-head-icon { color: var(--accent); flex: none; }
+.mh-back { display: none; margin-left: -8px; }
+.mh-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 270px 1fr; }
+.mh-list { overflow: auto; border-right: var(--hairline) solid var(--separator); padding: 8px 8px 12px; }
+.mh-day { padding: 12px 10px 4px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .02em; color: var(--text-3); }
+.mh-row {
+  display: flex; align-items: baseline; gap: 10px; width: 100%; min-height: 40px; padding: 8px 10px; border: none; border-radius: 10px;
+  background: none; color: var(--text); text-align: left; font: inherit;
+}
+button.mh-row { cursor: pointer; }
+@media (hover: hover) { button.mh-row:hover { background: var(--fill-4); } }
+.mh-row.active { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.mh-row.active .mh-time { color: var(--accent); }
+.mh-now { background: var(--fill-4); }
+.mh-time { font-weight: 600; font-variant-numeric: tabular-nums; flex: none; }
+.mh-meta { font-size: 13px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mh-foot { margin: 14px 10px 0; font-size: 12px; line-height: 1.4; color: var(--text-3); }
+.mh-empty { margin: 16px 12px; font-size: 14px; line-height: 1.45; color: var(--text-2); }
+.mh-pick { margin: auto; text-align: center; max-width: 260px; }
+.mh-preview { min-height: 0; display: flex; flex-direction: column; }
+.mh-pv-head { padding: 14px 18px 10px; border-bottom: var(--hairline) solid var(--separator); }
+.mh-pv-title { font-weight: 600; font-size: 16px; }
+.mh-diff { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 4px; font-size: 13px; color: var(--text-2); }
+.mh-plus { color: var(--ios-green); }
+.mh-minus { color: var(--danger); }
+.mh-outline { flex: 1; min-height: 0; overflow: auto; padding: 10px 14px 16px; font-size: 14px; line-height: 1.35; }
+.mh-ol { position: relative; padding: 3px 4px; overflow-wrap: anywhere; }
+.mh-ol::before { content: ''; display: inline-block; width: 5px; height: 5px; margin: 0 8px 2px 0; border-radius: 50%; background: var(--text-3); vertical-align: middle; }
+.mh-ol.root { font-weight: 700; }
+.mh-ol.root::before { width: 7px; height: 7px; background: var(--accent); }
+.mh-ol.sheet { margin-top: 8px; font-size: 12px; font-weight: 600; text-transform: uppercase; color: var(--text-3); }
+.mh-ol.sheet::before, .mh-ol.more::before { display: none; }
+.mh-ol.more { color: var(--text-3); }
+.mh-ol.new { color: var(--ios-green); }
+.mh-ol.new::before { background: var(--ios-green); }
+.mh-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 16px calc(12px + var(--safe-bottom)); border-top: var(--hairline) solid var(--separator); }
+
+/* телефон: список и просмотр — по очереди */
+@media (max-width: 640px) {
+  .modal.mh { height: 88vh; border-radius: 22px 22px 0 0; }
+  .mh-body { grid-template-columns: 1fr; }
+  .mh-list { border-right: none; }
+  .mh-preview { display: none; }
+  .mh-has-sel .mh-list { display: none; }
+  .mh-has-sel .mh-preview { display: flex; }
+  .mh-has-sel .mh-back { display: inline-flex; }
+  .mh-has-sel .mh-head-icon { display: none; }
+  .mh-actions .btn { flex: 1; }
+}

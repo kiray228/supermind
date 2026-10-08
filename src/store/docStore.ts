@@ -7,6 +7,7 @@ import { saveDoc, saveLocked } from './db';
 import { mapSides } from '../layout/layout';
 import { encryptDoc } from '../utils/crypto';
 import { get as kvGet, remoteRev } from './kv';
+import { maybeSnapshot, snapshot } from './mapHistory';
 
 export function newSheet(title = 'Лист 1', rootText = 'Центральная тема', structure: StructureType = 'map'): Sheet {
   return {
@@ -76,6 +77,8 @@ interface DocState {
   deleteTopics(ids?: ID[]): void;
   toggleCollapse(id: ID, value?: boolean): void;
   collapseAll(collapsed: boolean, depth?: number): void;
+  /** Ветвь темы: показать depth уровней под ней (Infinity — развернуть целиком) */
+  collapseBranch(id: ID, depth: number): void;
   move(id: ID, newParentId: ID, index: number, side?: 'left' | 'right'): void;
   moveFloating(id: ID, x: number, y: number): void;
   detach(id: ID, x: number, y: number): void;
@@ -127,7 +130,10 @@ export async function flushSave() {
   try {
     if (!password) await keepRemoteVersion(doc);
     if (password) await saveLocked(await encryptDoc(doc, password), doc.title);
-    else await saveDoc(doc);
+    else {
+      await saveDoc(doc);
+      maybeSnapshot(doc);
+    }
     base = { id: doc.id, rev: remoteRev(`doc:${doc.id}`), updatedAt: doc.updatedAt };
   } finally {
     useDoc.setState({ saving: false });
@@ -200,6 +206,8 @@ export const useDoc = create<DocState>((set, get) => {
       // на телефоне ничего не выделяем: первый тап по теме — выбор, а не редактирование
       const touch = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
       markOpened(doc);
+      // версия «до правок» — в историю (для карт с паролем история не ведётся)
+      if (!password) void snapshot(doc).catch(() => {});
       set({ doc, password, selection: touch ? [] : [activeSheet(doc).root.id], editingId: null, pendingText: null, past: [], future: [], selectedRel: null });
     },
     close() {
@@ -437,7 +445,8 @@ export const useDoc = create<DocState>((set, get) => {
     collapseAll(collapsed, depth = 1) {
       queueMicrotask(() => {
         const d = get().doc;
-        if (d) set({ selection: cleanSelection(d, get().selection) });
+        // на телефоне без выделения — не выделять центральную тему
+        if (d && get().selection.length) set({ selection: cleanSelection(d, get().selection) });
       });
       get().mutate((s) => {
         const rec = (t: Topic, d: number) => {
@@ -447,6 +456,24 @@ export const useDoc = create<DocState>((set, get) => {
         rec(s.root, 0);
         s.floating.forEach((f) => rec(f, 0));
       });
+    },
+    collapseBranch(id, depth) {
+      get().mutate((s) => {
+        const f = findInSheet(s, id);
+        if (!f) return;
+        const rec = (t: Topic, d: number) => {
+          if (t.children.length) t.collapsed = d >= depth;
+          t.children.forEach((c) => rec(c, d + 1));
+        };
+        rec(f.topic, 0);
+      });
+      const d = get().doc;
+      const cur = get().selection;
+      if (d && cur.length) {
+        // скрытые темы — снять выделение, выделить саму ветвь
+        const visible = cleanSelection(d, cur).filter((x) => cur.includes(x));
+        if (visible.length !== cur.length) set({ selection: [...new Set([...visible, id])] });
+      }
     },
     move(id, newParentId, index, side) {
       const s = get().sheet();

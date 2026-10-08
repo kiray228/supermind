@@ -147,6 +147,7 @@ async function startSession(a: Account) {
     for (const f of flushers) await f();
     await clearAllDirty();
     for (const k of await keys()) if (typeof k === 'string' && isSynced(k)) await delFromSync(k);
+    await (await import('./mapHistory')).clearAllHistory();
     await safety.reloadAll();
   }
   if (meta.userId !== a.user.id) meta = { cursor: 0, seqs: {}, userId: a.user.id };

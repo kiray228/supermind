@@ -1,5 +1,5 @@
 /** «Что нового»: главное в каждой версии. Новые версии — сверху. */
-import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic } from 'lucide-react';
+import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History } from 'lucide-react';
 
 export interface ChangeItem {
   icon: typeof Sparkles;
@@ -15,6 +15,14 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.19',
+    title: 'Уровни карты и история версий',
+    items: [
+      { icon: Layers, title: 'Свернуть до уровня', text: '«⋯» → «Уровни…» (или нажмите на пустое место карты): покажите 1, 2, 3 уровня или всё — карта сразу впишется в экран. Для отдельной ветви — «Уровни ветви…» в меню темы. На компьютере — Alt+1…9 и Alt+0.' },
+      { icon: History, title: 'История версий', text: '«⋯» → «История версий»: какой была карта час назад или вчера — с подсветкой тем, которых сейчас нет. Восстановите версию (можно отменить) или сохраните её отдельной картой.' },
+    ],
+  },
   {
     version: '1.18',
     title: 'Копилки, заморозка серии и статус облака',

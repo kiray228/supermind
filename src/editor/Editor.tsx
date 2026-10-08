@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   CaretLeft, ArrowCounterClockwise, ArrowClockwise, Sparkle, SlidersHorizontal, MagnifyingGlass, DotsThree, Plus, ArrowElbowDownRight, Trash, BezierCurve, Selection,
   BracketsCurly, Minus, CornersOut, PresentationChart, ArrowsOutSimple, DownloadSimple, Lock, LockOpen, Graph, TreeView, ChartBarHorizontal, X, CaretRight,
   Keyboard, Copy, Scissors, ClipboardText, FilePlus, PencilSimple, ArrowsInLineVertical, ArrowLineUp, CopySimple, NotePencil, CloudArrowUp, Check, Palette, ArrowsLeftRight,
-  Export, CaretDown, type Icon,
+  Export, CaretDown, Stack, ClockCounterClockwise, type Icon,
 } from '@phosphor-icons/react';
 import { useDoc, topicSide } from '../store/docStore';
 import { toast } from '../store/appStore';
@@ -16,7 +16,7 @@ import { Gantt } from './Gantt';
 import { StructureIcon } from './StructureIcon';
 import { askText, confirmDialog, hasOverlay, onBack } from '../ui/dialogs';
 import { primeKeyboard } from '../ui/keyboard';
-import { findInSheet, walkSheet } from '../utils/tree';
+import { findInSheet, sheetRoots, shownLevel, treeDepth, walkSheet } from '../utils/tree';
 import { subtreeBounds } from '../layout/layout';
 import { downloadBlob, downloadText, safeFilename } from '../io/download';
 import { sheetToMarkdown } from '../io/markdown';
@@ -28,6 +28,10 @@ import { exportNative } from '../io/index';
 import { getTheme } from '../themes';
 import { haptic, isTouchUI, useKeyboardInset } from './touch';
 import './editor.css';
+
+const MapHistory = lazy(() => import('./MapHistory'));
+
+const levelWord = (n: number) => `${n} ${n === 1 ? 'уровень' : n < 5 ? 'уровня' : 'уровней'}`;
 
 type Mode = 'map' | 'outline' | 'gantt';
 type Panel = null | 'inspector' | 'ai';
@@ -87,6 +91,7 @@ export default function Editor() {
     if (zoomLabel.current) zoomLabel.current.textContent = Math.round(v.k * 100) + '%';
   }, []);
   const [showKeys, setShowKeys] = useState(false);
+  const [history, setHistory] = useState(false);
   const [isMobileView, setIsMobileView] = useState(isMobile);
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 760px)');
@@ -282,6 +287,33 @@ export default function Editor() {
       ],
     });
 
+  /** «Показать уровни»: свернуть карту (или ветвь темы) так, чтобы было видно N уровней */
+  const openLevelsMenu = (x: number, y: number, branchId?: string) => {
+    const s = useDoc.getState().sheet();
+    if (!s) return;
+    const f = branchId ? findInSheet(s, branchId) : null;
+    const roots = f ? [f.topic] : sheetRoots(s);
+    const deep = Math.max(0, ...roots.map(treeDepth));
+    if (deep < 2) {
+      toast(f ? 'В этой ветви один уровень подтем' : 'В карте пока один уровень тем');
+      return;
+    }
+    const cur = shownLevel(roots);
+    const kb = !branchId && !window.matchMedia('(pointer: coarse)').matches;
+    const apply = (n: number) => {
+      if (branchId) st.collapseBranch(branchId, n);
+      else if (n === Infinity) st.collapseAll(false);
+      else st.collapseAll(true, n);
+      // карта стала меньше/больше — вписать её в экран
+      if (!branchId) requestAnimationFrame(() => requestAnimationFrame(() => canvas.current?.fit()));
+      haptic();
+    };
+    const items: MenuItem[] = [];
+    for (let n = 1; n < Math.min(deep, 10); n++) items.push({ label: levelWord(n), kbd: kb ? `Alt+${n}` : undefined, checked: cur === n, onClick: () => apply(n) });
+    items.push({ label: 'Все уровни', kbd: kb ? 'Alt+0' : undefined, checked: cur === Infinity, onClick: () => apply(Infinity) });
+    setMenu({ x, y, title: branchId ? 'Сколько уровней показать в ветви' : 'Сколько уровней показать', single: true, items });
+  };
+
   const openMoreMenu = (e: React.MouseEvent) => {
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const x = Math.max(8, Math.min(r.right - 240, window.innerWidth - 256));
@@ -301,6 +333,8 @@ export default function Editor() {
           : []),
         { icon: <PresentationChart size={16} />, label: 'Презентация', onClick: startPitch },
         { icon: <ArrowsOutSimple size={16} />, label: 'Режим Zen', kbd: 'Ctrl+E', onClick: () => setZen(true) },
+        { icon: <Stack size={16} />, label: 'Уровни…', onClick: () => openLevelsMenu(x, y) },
+        { icon: <ClockCounterClockwise size={16} />, label: 'История версий', onClick: () => setHistory(true) },
         { icon: <Export size={16} />, label: 'Экспорт…', onClick: () => openExportMenu(x, y) },
         'sep',
         { icon: password ? <LockOpen size={16} /> : <Lock size={16} />, label: password ? 'Снять пароль' : 'Защитить паролем', onClick: togglePassword },
@@ -320,7 +354,7 @@ export default function Editor() {
           { icon: <ClipboardText size={16} />, label: 'Вставить в центральную', kbd: 'Ctrl+V', onClick: () => st.paste(sheet.root.id) },
           'sep',
           { icon: <CornersOut size={16} />, label: 'Вписать в экран', kbd: 'Ctrl+0', onClick: () => canvas.current?.fit() },
-          { icon: <ArrowsInLineVertical size={16} />, label: 'Свернуть все ветви', onClick: () => st.collapseAll(true, 1) },
+          { icon: <Stack size={16} />, label: 'Показать уровни…', onClick: () => openLevelsMenu(x, y) },
           { icon: <ArrowsOutSimple size={16} />, label: 'Развернуть всё', onClick: () => st.collapseAll(false) },
         ],
       });
@@ -352,6 +386,7 @@ export default function Editor() {
         { icon: <ClipboardText size={16} />, label: 'Вставить', kbd: 'Ctrl+V', onClick: () => st.paste(topicId) },
         ...(!isRoot && f?.parent ? [{ icon: <CopySimple size={16} />, label: 'Дублировать', kbd: 'Ctrl+D', onClick: () => st.duplicate(topicId) }] : []),
         ...(f?.topic.children.length ? [{ icon: <ArrowsInLineVertical size={16} />, label: f.topic.collapsed ? 'Развернуть' : 'Свернуть', kbd: 'Ctrl+/', onClick: () => st.toggleCollapse(topicId) }] : []),
+        ...(f && treeDepth(f.topic) >= 2 ? [{ icon: <Stack size={16} />, label: 'Уровни ветви…', onClick: () => openLevelsMenu(x, y, topicId) }] : []),
         ...(!isRoot ? ['sep' as const, { icon: <Trash size={16} />, label: 'Удалить', kbd: 'Del', danger: true, onClick: () => removeTopics([topicId]) }] : []),
       ],
     });
@@ -415,6 +450,14 @@ export default function Editor() {
         if (relMode) setRelMode(false);
         else if (zen) setZen(false);
         else s.select(null);
+        return;
+      }
+      if (e.altKey && !mod && /^Digit\d$/.test(e.code)) {
+        e.preventDefault();
+        const n = Number(e.code.slice(5));
+        if (n === 0) s.collapseAll(false);
+        else s.collapseAll(true, n);
+        requestAnimationFrame(() => requestAnimationFrame(() => canvas.current?.fit()));
         return;
       }
       if (mode !== 'map') return;
@@ -741,6 +784,11 @@ export default function Editor() {
 
       {menu && <ContextMenu menu={menu} onClose={() => setMenu(null)} />}
       {showKeys && <KeysHelp onClose={() => setShowKeys(false)} />}
+      {history && (
+        <Suspense fallback={null}>
+          <MapHistory onClose={() => setHistory(false)} />
+        </Suspense>
+      )}
     </div>
   );
 }
@@ -864,6 +912,7 @@ const KEYS: [string, string][] = [
   ['Стрелки', 'Перемещение по карте'],
   ['Ctrl+↑/↓', 'Переместить тему выше/ниже'],
   ['Ctrl+/', 'Свернуть / развернуть'],
+  ['Alt+1…9 / Alt+0', 'Показать 1…9 уровней / все'],
   ['Ctrl+C / X / V / D', 'Копировать / вырезать / вставить / дублировать'],
   ['Ctrl+Z / Ctrl+Shift+Z', 'Отменить / повторить'],
   ['Ctrl+B / Ctrl+I', 'Жирный / курсив'],

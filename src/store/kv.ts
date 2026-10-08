@@ -10,9 +10,9 @@ import { clear as idbClear, createStore, del as idbDel, get as idbGet, keys as i
 export const DIRTY_KEY = 'sync:dirty';
 export const META_KEY = 'sync:meta';
 
-/** Что синхронизируется между устройствами (API-ключ из настроек — никогда). */
+/** Что синхронизируется между устройствами (API-ключ из настроек — никогда; история версий карт — только на устройстве). */
 export function isSynced(key: string): boolean {
-  if (key.startsWith('sync:')) return false;
+  if (key.startsWith('sync:') || key.startsWith('hist:')) return false;
   return !['settings', 'calsync', 'welcomed'].includes(key);
 }
 
