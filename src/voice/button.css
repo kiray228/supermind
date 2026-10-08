@@ -1,0 +1,19 @@
+/* ================= Кнопка микрофона ================= */
+.vc-nav .nav-ico { color: var(--accent); }
+.vc-fab { display: none; }
+@media (max-width: 760px) {
+  .sidebar .vc-nav { display: none; }
+  /* как в iOS 26: панель вкладок — капсула, рядом отдельная круглая стеклянная кнопка */
+  .app > .sidebar { left: 10px; right: calc(10px + 64px + 8px); }
+  .app > .sidebar > .nav-item { font-size: 10px; letter-spacing: -0.02em; }
+  .vc-fab {
+    display: grid; place-items: center; position: fixed; z-index: 50; right: 10px; bottom: calc(6px + var(--safe-bottom));
+    width: 64px; height: 64px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; color: var(--accent);
+    background: var(--lg-bg);
+    -webkit-backdrop-filter: var(--lg-blur); backdrop-filter: var(--lg-blur);
+    box-shadow: var(--lg-highlight), 0 0 0 0.5px var(--lg-edge), 0 10px 34px rgba(0, 0, 0, 0.16), 0 1px 4px rgba(0, 0, 0, 0.06);
+    transition: transform .25s cubic-bezier(.3, 1.6, .5, 1);
+  }
+  :root[data-theme='dark'] .vc-fab { box-shadow: var(--lg-highlight), 0 0 0 0.5px var(--lg-edge), 0 10px 34px rgba(0, 0, 0, 0.55); }
+  .vc-fab:active { transform: scale(.9); }
+}

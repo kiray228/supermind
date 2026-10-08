@@ -12,6 +12,8 @@
     <string name="sc_task_long">Новая задача</string>
     <string name="sc_habits_short">Привычки</string>
     <string name="sc_habits_long">Отметить привычки</string>
+    <string name="sc_voice_short">Голосом</string>
+    <string name="sc_voice_long">Голосовая команда</string>
     <string name="sc_search_short">Поиск</string>
     <string name="sc_search_long">Поиск по SuperMind</string>
     <string name="sc_note_short">Новая заметка</string>

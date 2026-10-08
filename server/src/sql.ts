@@ -126,6 +126,12 @@ export const SCHEMA = [
     created_at timestamptz NOT NULL DEFAULT now()
   )`,
   `CREATE INDEX IF NOT EXISTS feedback_user ON feedback (user_id, created_at DESC)`,
+  `CREATE TABLE IF NOT EXISTS ai_usage (
+    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    day date NOT NULL,
+    count integer NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, day)
+  )`,
   `CREATE TABLE IF NOT EXISTS meta (
     key text PRIMARY KEY,
     value jsonb NOT NULL

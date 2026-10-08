@@ -135,3 +135,31 @@ test('поддержка: обращение сохраняется, письм�
   const list = await call<{ items: { text: string; kind: string }[] }>('GET', '/feedback', undefined, t);
   assert.equal(list.data.items[0].text, 'Не открывается карта');
 });
+
+test('голосовая команда: модель на сервере, лимит в день, без ключа — 503', async () => {
+  const prompts: string[] = [];
+  const aiApp = createApp({
+    sql,
+    mail: null,
+    aiDailyLimit: 2,
+    ai: async (system, user) => {
+      prompts.push(system);
+      return '```json\n{"actions":[{"type":"add_task","title":"' + user + '","repeat":{"freq":"daily","interval":1}}]}\n```';
+    },
+  });
+  const req = (path: string, b: unknown, token?: string) =>
+    aiApp.fetch(new Request('http://x' + path, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(b) }));
+  const reg = await call<{ token: string }>('POST', '/auth/register', { email: 'voice@b.cd', password: '12345678' });
+  const t = reg.data.token;
+  assert.equal((await req('/ai/command', { text: 'пить воду' })).status, 401);
+  const r = await req('/ai/command', { text: 'Пить воду', today: '2026-10-08', nowMin: 600, categories: [{ name: 'Одежда', kind: 'expense' }] }, t);
+  assert.equal(r.status, 200);
+  const d = (await r.json()) as { actions: { type: string; title: string }[] };
+  assert.equal(d.actions[0].title, 'Пить воду');
+  assert.match(prompts[0], /2026-10-08 \(четверг\), сейчас 10:00/);
+  assert.match(prompts[0], /Одежда/);
+  assert.equal((await req('/ai/command', { text: 'ещё раз' }, t)).status, 200);
+  assert.equal((await req('/ai/command', { text: 'и ещё' }, t)).status, 429);
+  // без ключа модели
+  assert.equal((await call('POST', '/ai/command', { text: 'тест' }, t)).status, 503);
+});

@@ -33,7 +33,8 @@ type PendingAction =
   | { type: 'open_map'; id: string }
   | { type: 'open_goal'; id: string }
   | { type: 'search' }
-  | { type: 'new_note' };
+  | { type: 'new_note' }
+  | { type: 'voice' };
 
 interface WidgetBridgePlugin {
   update(o: { json: string }): Promise<void>;
@@ -183,6 +184,11 @@ async function applyPending() {
         case 'new_note':
           await newNote();
           break;
+        case 'voice': {
+          const { openVoice } = await import('../voice/state');
+          setTimeout(() => openVoice(), 150);
+          break;
+        }
         case 'share':
           openShare({ text: a.text, title: a.title });
           break;

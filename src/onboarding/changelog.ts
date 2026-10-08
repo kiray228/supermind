@@ -1,5 +1,5 @@
 /** «Что нового»: главное в каждой версии. Новые версии — сверху. */
-import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise } from 'lucide-react';
+import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic } from 'lucide-react';
 
 export interface ChangeItem {
   icon: typeof Sparkles;
@@ -15,6 +15,15 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.14',
+    title: 'Голосовые команды',
+    items: [
+      { icon: Mic, title: 'Скажите — и готово', text: 'Кнопка микрофона рядом с вкладками: «Каждый день выпивать 2 л воды» — появится задача с повтором, «Потратил 4500 тенге на одежду» — расход в нужной категории.' },
+      { icon: Repeat, title: 'Задачи, привычки, финансы, заметки', text: 'Понимает даты и время («завтра в 9», «15 числа», «каждый понедельник»), доходы, привычки и заметки. Любое действие можно сразу отменить.' },
+      { icon: Sparkles, title: 'Бесплатно', text: 'Простые команды разбираются прямо на телефоне, сложные — бесплатным ИИ на сервере. На Android — ярлык «Голосом» на значке приложения.' },
+    ],
+  },
   {
     version: '1.13',
     title: 'Долги, поддержка и быстрый запуск',

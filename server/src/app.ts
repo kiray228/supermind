@@ -4,6 +4,7 @@
  *   POST /auth/register, /auth/login, /auth/logout, /auth/password · GET /auth/me · DELETE /account
  *   POST /auth/forgot (код на почту) · POST /auth/reset (код + новый пароль → вход)
  *   POST /feedback (проблема или идея → база и письмо владельцу) · GET /feedback (мои обращения)
+ *   POST /ai/command — голосовая команда → действия (бесплатная модель Gemini/Groq, лимит в день)
  *   GET /sync?since=N · POST /sync
  *   GET /snapshots · GET /snapshots/:id · POST /snapshots — облачные копии данных (каждый час при изменениях — сами)
  *   GET /push/key · POST /devices · PUT /devices/:id/schedule · POST /devices/:id/test · DELETE /devices/:id
@@ -14,6 +15,7 @@ import { ensureSchema, type Row, type Sql } from './sql.ts';
 import { generateVapidKeys, sendPush, type PushResult, type PushSubscription, type VapidKeys } from './webpush.ts';
 import type { NextDueStore } from './objectStore.ts';
 import { envMailer, feedbackMail, resetMail, type Mailer } from './mail.ts';
+import { commandPrompt, envAi, parseAiJson, type Ai } from './ai.ts';
 import { randomInt } from 'node:crypto';
 
 export interface Deps {
@@ -27,6 +29,10 @@ export interface Deps {
   mail?: Mailer | null;
   /** адрес поддержки (по умолчанию SUPPORT_EMAIL или MAIL_FROM) */
   supportEmail?: string;
+  /** бесплатная модель для голосовых команд; null — не настроена */
+  ai?: Ai | null;
+  /** запросов к модели в день на пользователя (AI_DAILY_LIMIT, по умолчанию 60) */
+  aiDailyLimit?: number;
 }
 
 const VAPID_SUBJECT = 'https://kiray228.github.io/2mind/';
@@ -74,6 +80,8 @@ export function createApp(deps: Deps) {
   const mail = deps.mail === undefined ? envMailer() : deps.mail;
   /** куда приходят обращения в поддержку */
   const supportTo = deps.supportEmail ?? process.env.SUPPORT_EMAIL ?? process.env.MAIL_FROM ?? '';
+  const ai = deps.ai === undefined ? envAi() : deps.ai;
+  const aiDailyLimit = deps.aiDailyLimit ?? (Number(process.env.AI_DAILY_LIMIT) || 60);
 
   /** Записать время ближайшего неотправленного напоминания */
   async function refreshNextDue() {
@@ -202,6 +210,39 @@ export function createApp(deps: Deps) {
       }
     }
     return json({ id, ok: true }, 201);
+  }
+
+  // ---------- Голосовые команды: бесплатная модель разбирает фразу в действия ----------
+
+  async function aiCommand(request: Request) {
+    const user = await userOf(request);
+    if (!ai) throw new HttpError(503, 'ИИ на сервере не подключён');
+    const b = await body<{ text?: string; today?: string; nowMin?: number; categories?: { name: string; kind: string }[]; accounts?: string[]; lists?: string[] }>(request);
+    const text = (b.text ?? '').trim().slice(0, 1000);
+    if (text.length < 2) throw new HttpError(400, 'Пустая команда');
+    const today = /^\d{4}-\d{2}-\d{2}$/.test(b.today ?? '') ? b.today! : new Date(now()).toISOString().slice(0, 10);
+    // лимит на пользователя в день: бесплатная квота модели общая на всех
+    const used = await sql.query(
+      `INSERT INTO ai_usage (user_id, day, count) VALUES ($1, current_date, 1)
+       ON CONFLICT (user_id, day) DO UPDATE SET count = ai_usage.count + 1 RETURNING count`,
+      [user.id],
+    );
+    if (Number(used[0]?.[0] ?? 0) > aiDailyLimit) throw new HttpError(429, 'Лимит ИИ на сегодня исчерпан');
+    const names = (x: unknown) => (Array.isArray(x) ? x.filter((s): s is string => typeof s === 'string').map((s) => s.slice(0, 60)) : []);
+    const cats = Array.isArray(b.categories)
+      ? b.categories.filter((c) => c && typeof c.name === 'string').map((c) => ({ name: c.name.slice(0, 60), kind: c.kind === 'income' ? 'income' : 'expense' }))
+      : [];
+    const nowMin = Number.isInteger(b.nowMin) && b.nowMin! >= 0 && b.nowMin! < 1440 ? b.nowMin : undefined;
+    let out: string;
+    try {
+      out = await ai(commandPrompt({ today, nowMin, categories: cats, accounts: names(b.accounts), lists: names(b.lists) }), text);
+    } catch (e) {
+      console.error('ai', e);
+      throw new HttpError(502, 'ИИ сейчас недоступен');
+    }
+    const parsed = parseAiJson(out) as { actions?: unknown } | unknown[] | null;
+    const actions = Array.isArray(parsed) ? parsed : parsed && Array.isArray(parsed.actions) ? parsed.actions : [];
+    return json({ actions: actions.slice(0, 10) });
   }
 
   async function myFeedback(request: Request) {
@@ -585,6 +626,7 @@ export function createApp(deps: Deps) {
     if (m === 'POST' && path === '/auth/forgot') return forgot(request);
     if (m === 'POST' && path === '/feedback') return sendFeedback(request);
     if (m === 'GET' && path === '/feedback') return myFeedback(request);
+    if (m === 'POST' && path === '/ai/command') return aiCommand(request);
     if (m === 'POST' && path === '/auth/reset') return reset(request);
     if (m === 'POST' && path === '/auth/password') return changePassword(request);
     if (m === 'GET' && path === '/auth/me') return json({ user: await userOf(request) });

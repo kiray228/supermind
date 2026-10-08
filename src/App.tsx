@@ -13,6 +13,8 @@ import { todayYmd } from './utils/mapTasks';
 import { SearchHost, SearchNavButton, SearchSheetButton } from './search/SearchHost';
 import { applyAppearance } from './ui/appearance';
 import { initLargeTitles } from './ui/navbar';
+import { VoiceFab, VoiceNavButton } from './voice/VoiceButton';
+import { useVoice } from './voice/state';
 import { IconTile, SectionIcon, type SectionId } from './ui/icons';
 import './ui/appearance.css';
 import './app.css';
@@ -32,6 +34,7 @@ const Finance = lazy(() => import('./views/Finance'));
 const Assistant = lazy(() => import('./views/Assistant'));
 const Progress = lazy(() => import('./views/Progress'));
 const LevelBadge = lazy(() => import('./progress/LevelBadge').then((m) => ({ default: m.LevelBadge })));
+const VoiceHost = lazy(() => import('./voice/VoiceSheet'));
 const OnboardingHost = lazy(() => import('./onboarding/OnboardingHost'));
 // окна задач и напоминаний — отдельными модулями: при запуске не нужны
 const TaskDetailHost = lazy(() => import('./tasks/ui/TaskDetail').then((m) => ({ default: m.TaskDetailHost })));
@@ -70,6 +73,7 @@ let deferredStarted = false;
 export default function App() {
   const view = useApp((s) => s.view);
   const go = useApp((s) => s.go);
+  const voiceOpen = useVoice((s) => s.open);
   const theme = useApp((s) => s.settings.theme);
   const accent = useApp((s) => s.settings.accent);
   const glass = useApp((s) => s.settings.glass);
@@ -189,6 +193,7 @@ export default function App() {
             </Suspense>
           )}
           <SearchNavButton />
+          <VoiceNavButton />
           {NAV.map((n) => (
             <button key={n.id} className={`nav-item ${view === n.id ? 'active' : ''}${n.phone ? '' : ' nav-desk'}`} onClick={() => go(n.id)}>
               <span className="nav-ico">
@@ -206,6 +211,7 @@ export default function App() {
           </button>
         </nav>
       )}
+      {view !== 'editor' && <VoiceFab />}
       <main className="app-main">
         <Suspense fallback={<div className="loading"><div className="spinner" /></div>}>
           {view === 'home' && <Home />}
@@ -264,6 +270,11 @@ export default function App() {
         </Suspense>
       )}
       <SearchHost />
+      {voiceOpen && (
+        <Suspense fallback={null}>
+          <VoiceHost />
+        </Suspense>
+      )}
       <AuthGate />
       <DialogHost />
       {deferred && (
