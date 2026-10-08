@@ -26,8 +26,9 @@ export function envAi(env: Record<string, string | undefined> = process.env): Ai
             generationConfig: { responseMimeType: 'application/json', temperature: 0, maxOutputTokens: 1024 },
           }),
         });
-        if (r.status === 404) {
-          last = `Gemini: модели ${model} нет`;
+        // модели нет (404), перегружена (503/500) или исчерпана её квота (429) — у других моделей свои лимиты
+        if (r.status === 404 || r.status === 429 || r.status >= 500) {
+          last = `Gemini ${r.status} (${model}): ${(await r.text()).slice(0, 160)}`;
           continue;
         }
         if (!r.ok) throw new Error(`Gemini ${r.status}: ${(await r.text()).slice(0, 200)}`);
