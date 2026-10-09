@@ -24,6 +24,7 @@ import {
   Sparkle,
   Sun,
   SunHorizon,
+  Trash,
   Trophy,
 } from '@phosphor-icons/react';
 import type { Icon } from '@phosphor-icons/react';
@@ -411,6 +412,37 @@ export default function Habits() {
     syncSoon(300);
   };
 
+  /** Удалить сразу (свайп, меню) — с возможностью вернуть в течение нескольких секунд */
+  const removeHabit = (h: Habit) => {
+    const p = ref.current;
+    const orig = p?.habits.find((x) => x.id === h.id);
+    if (!p || !orig) return;
+    const touched: Record<string, PlannerDay> = {};
+    const nextDays = { ...p.days };
+    for (const [k, d] of Object.entries(p.days)) {
+      if (!d.habits?.includes(h.id) && !d.skipped?.includes(h.id) && d.habitCounts?.[h.id] == null) continue;
+      touched[k] = d;
+      nextDays[k] = withoutHabit(d, h.id);
+    }
+    const tomb: Habit = { id: h.id, name: h.name, color: h.color, deleted: true, archived: true, updatedAt: Date.now() };
+    commit({ ...p, habits: p.habits.map((x) => (x.id === h.id ? tomb : x)), days: nextDays });
+    if (detailId === h.id) setDetailId(null);
+    haptic();
+    syncSoon(300);
+    toast(`«${h.name}» удалена`, {
+      label: 'Вернуть',
+      run: () => {
+        const c = ref.current;
+        if (!c) return;
+        const days = { ...c.days };
+        for (const [k, old] of Object.entries(touched)) days[k] = withHabitMarks(days[k] ?? emptyDay(), old, h.id);
+        // свежая отметка времени — восстановленная привычка побеждает удаление и на других устройствах
+        commit({ ...c, habits: c.habits.map((x) => (x.id === h.id ? { ...orig, updatedAt: Date.now() } : x)), days });
+        syncSoon(300);
+      },
+    });
+  };
+
   if (!data) {
     return (
       <div className="page hp-page">
@@ -445,6 +477,7 @@ export default function Habits() {
       onMinus={() => tap(h, -1)}
       onOpen={() => setDetailId(h.id)}
       onMenu={() => setSheet({ id: h.id, stage: 'menu' })}
+      onDelete={() => removeHabit(h)}
     />
   );
 
@@ -456,88 +489,20 @@ export default function Habits() {
       </div>
       <div className="page-body hp-body">
         <div className="hp-wrap">
-          {/* ----- шапка ----- */}
-          <header className={`hp-hero${due.length > 0 && doneCount === due.length ? ' full' : ''}`}>
-            <div className="hp-eyebrow">
-              <span className={isToday ? 'hp-eyebrow-today' : ''}>{relLabel(date, today)}</span> · {dateLine(date)}
+          {/* ----- шапка: заголовок и кнопки ----- */}
+          <header className="hp-top">
+            <h1 className="hp-title">Привычки</h1>
+            <div className="hp-hero-actions">
+              <button className="hp-round" onClick={() => setManager('library')} aria-label="Библиотека привычек" title="Библиотека привычек">
+                <Sparkle size={20} weight="duotone" />
+              </button>
+              <button className="hp-round" onClick={() => setManager('mine')} aria-label="Мои привычки и архив" title="Мои привычки и архив">
+                <SlidersHorizontal size={20} weight="duotone" />
+              </button>
+              <button className="hp-round hp-round-accent" onClick={() => setEditing('new')} aria-label="Новая привычка" title="Новая привычка">
+                <Plus size={20} weight="bold" />
+              </button>
             </div>
-            <div className="hp-hero-top">
-              <h1 className="hp-title">Привычки</h1>
-              <div className="hp-hero-actions">
-                <button className="hp-round" onClick={() => setManager('library')} aria-label="Библиотека привычек" title="Библиотека привычек">
-                  <Sparkle size={22} weight="duotone" />
-                </button>
-                <button className="hp-round" onClick={() => setManager('mine')} aria-label="Мои привычки и архив" title="Мои привычки и архив">
-                  <SlidersHorizontal size={22} weight="duotone" />
-                </button>
-                <button className="hp-round hp-round-accent" onClick={() => setEditing('new')} aria-label="Новая привычка" title="Новая привычка">
-                  <Plus size={22} weight="bold" />
-                </button>
-              </div>
-            </div>
-
-            {habits.length > 0 && (
-              <div className="hp-hero-stats">
-                <BigRing done={doneCount} total={due.length} />
-                <div className="hp-hero-text">
-                  <div className="hp-hero-big">
-                    {due.length === 0 ? (
-                      frozen.length > 0 ? (
-                        'Пауза ❄️'
-                      ) : (
-                        'Свободный день'
-                      )
-                    ) : (
-                      <>
-                        {doneCount} из {due.length} {isToday ? 'сегодня' : future ? 'по плану' : 'за день'}
-                      </>
-                    )}
-                  </div>
-                  <div className="hp-hero-sub">
-                    {due.length === 0 && frozen.length > 0 ? 'Серии заморожены — они не прервутся' : heroHint(doneCount, due.length, isToday, future)}
-                  </div>
-                </div>
-              </div>
-            )}
-            {habits.length > 0 && (
-              <div className="hp-hero-chips">
-                <span className={`hp-chip${bestNow ? ' fire' : ''}`} title={bestNow ? `Лучшая текущая серия: «${bestNow.h.name}»` : undefined}>
-                  <Fire size={18} weight="fill" />
-                  {bestNow ? (
-                    <>
-                      <b>{streakText(bestNow.s)}</b>
-                      <span className="hp-chip-dim ellipsis">{bestNow.h.name}</span>
-                    </>
-                  ) : (
-                    <span>Серия начнётся с первой отметки</span>
-                  )}
-                </span>
-                {weekRate !== null && (
-                  <span className="hp-chip">
-                    <Trophy size={18} weight="duotone" />
-                    <b>{Math.round(weekRate * 100)}%</b>
-                    <span className="hp-chip-dim">за неделю</span>
-                  </span>
-                )}
-                {pausedNow.length > 0 && (
-                  <button
-                    className="hp-chip hp-chip-pause"
-                    onClick={() => (pausedNow.length === 1 ? setSheet({ id: pausedNow[0].id, stage: 'menu' }) : freeze.resume('all'))}
-                    title={pausedNow.length === 1 ? 'Пауза: возобновить или продлить' : 'Снять паузу со всех привычек'}
-                  >
-                    <Pause size={18} weight="fill" />
-                    <b className="ellipsis">
-                      {pausedNow.length === 1
-                        ? pausedNow[0].name
-                        : pausedNow.length === habits.length
-                          ? 'Все на паузе'
-                          : `${pausedNow.length} ${plural(pausedNow.length, ['привычка', 'привычки', 'привычек'])} на паузе`}
-                    </b>
-                    <span className="hp-chip-dim">{pausedNow.length === 1 ? 'на паузе' : 'Возобновить'}</span>
-                  </button>
-                )}
-              </div>
-            )}
           </header>
 
           {habits.length === 0 ? (
@@ -549,16 +514,78 @@ export default function Habits() {
             />
           ) : (
             <>
-              {/* ----- неделя ----- */}
-              <WeekStrip
-                weekStart={weekStart}
-                dir={weekDir}
-                date={date}
-                today={today}
-                score={(ymd) => dayScore(days, habits, ymd)}
-                onPick={pick}
-                onShift={shiftWeek}
-              />
+              {/* ----- сводка дня и неделя — одна компактная карточка ----- */}
+              <section className={`hp-sum${due.length > 0 && doneCount === due.length ? ' full' : ''}`}>
+                <div className="hp-sum-row">
+                  <BigRing done={doneCount} total={due.length} size={58} />
+                  <div className="hp-sum-text">
+                    <div className="hp-sum-big">
+                      {due.length === 0 ? (
+                        frozen.length > 0 ? (
+                          'Пауза ❄️'
+                        ) : (
+                          'Свободный день'
+                        )
+                      ) : (
+                        <>
+                          {doneCount} из {due.length} {isToday ? 'сегодня' : future ? 'по плану' : 'за день'}
+                        </>
+                      )}
+                      {!isToday && <span className="hp-sum-date"> · {relLabel(date, today).toLowerCase()}</span>}
+                    </div>
+                    <div className="hp-sum-chips">
+                      {bestNow && (
+                        <span className="hp-chip fire" title={`Лучшая текущая серия: «${bestNow.h.name}»`}>
+                          <Fire size={14} weight="fill" />
+                          <b>{streakText(bestNow.s)}</b>
+                        </span>
+                      )}
+                      {weekRate !== null && (bestNow || weekRate > 0) && (
+                        <span className="hp-chip" title="Выполнено за эту неделю">
+                          <Trophy size={14} weight="duotone" />
+                          <b>{Math.round(weekRate * 100)}%</b>
+                          <span className="hp-chip-dim">за неделю</span>
+                        </span>
+                      )}
+                      {pausedNow.length > 0 && (
+                        <button
+                          className="hp-chip hp-chip-pause"
+                          onClick={() => (pausedNow.length === 1 ? setSheet({ id: pausedNow[0].id, stage: 'menu' }) : freeze.resume('all'))}
+                          title={pausedNow.length === 1 ? 'Пауза: возобновить или продлить' : 'Снять паузу со всех привычек'}
+                        >
+                          <Pause size={14} weight="fill" />
+                          <b className="ellipsis">
+                            {pausedNow.length === 1
+                              ? pausedNow[0].name
+                              : pausedNow.length === habits.length
+                                ? 'Все на паузе'
+                                : `${pausedNow.length} на паузе`}
+                          </b>
+                        </button>
+                      )}
+                      {!bestNow && !(weekRate !== null && weekRate > 0) && pausedNow.length === 0 && (
+                        <span className="hp-sum-hint">
+                          {due.length === 0 && frozen.length > 0 ? 'Серии заморожены — они не прервутся' : heroHint(doneCount, due.length, isToday, future)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {(date !== today || weekStart < mondayOf(today)) && (
+                    <button className="hp-today-btn" onClick={() => pick(today)}>
+                      Сегодня
+                    </button>
+                  )}
+                </div>
+                <WeekStrip
+                  weekStart={weekStart}
+                  dir={weekDir}
+                  date={date}
+                  today={today}
+                  score={(ymd) => dayScore(days, habits, ymd)}
+                  onPick={pick}
+                  onShift={shiftWeek}
+                />
+              </section>
 
               <div className="hp-layout">
                 <main className="hp-main">
@@ -672,6 +699,7 @@ export default function Habits() {
           initial={sheet.stage}
           handlers={freeze}
           onOpen={detail ? undefined : () => setDetailId(sheetHabit.id)}
+          onDelete={detail ? undefined : () => removeHabit(sheetHabit)}
           onDone={() => {
             const ymd = detail ? today : date;
             updateDay(ymd, (d) => withDone(d, sheetHabit, true));
@@ -696,6 +724,16 @@ export default function Habits() {
       )}
     </div>
   );
+}
+
+/** Вернуть отметки привычки из старой версии дня в текущую */
+function withHabitMarks(cur: PlannerDay, old: PlannerDay, id: string): PlannerDay {
+  const out: PlannerDay = { ...cur };
+  if (old.habits?.includes(id)) out.habits = [...new Set([...(cur.habits ?? []), id])];
+  if (old.skipped?.includes(id)) out.skipped = [...new Set([...(cur.skipped ?? []), id])];
+  const n = old.habitCounts?.[id];
+  if (n != null) out.habitCounts = { ...cur.habitCounts, [id]: n };
+  return out;
 }
 
 function heroHint(done: number, total: number, isToday: boolean, future: boolean): string {
@@ -737,16 +775,15 @@ function Ring({ size, stroke, value, className, children }: { size: number; stro
   );
 }
 
-function BigRing({ done, total }: { done: number; total: number }) {
+function BigRing({ done, total, size = 96 }: { done: number; total: number; size?: number }) {
   const gid = `hpg${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
-  const size = 96;
-  const stroke = 10;
+  const stroke = Math.max(6, Math.round(size / 9.6));
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
   const v = total ? done / total : 0;
   const full = total > 0 && done === total;
   return (
-    <span className={`hp-big-ring${full ? ' full' : ''}`} role="img" aria-label={`Выполнено ${done} из ${total}`}>
+    <span className={`hp-big-ring${full ? ' full' : ''}`} style={{ width: size, height: size }} role="img" aria-label={`Выполнено ${done} из ${total}`}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden>
         <defs>
           <linearGradient id={gid} x1="0" y1="0" x2="1" y2="1">
@@ -773,7 +810,7 @@ function BigRing({ done, total }: { done: number; total: number }) {
       </svg>
       <span className="hp-big-ring-in">
         {full ? (
-          <Check size={40} weight="bold" />
+          <Check size={Math.round(size * 0.42)} weight="bold" />
         ) : (
           <>
             <b>{done}</b>
@@ -820,21 +857,12 @@ function WeekStrip({
     if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.4) onShift(dx > 0 ? -1 : 1);
   };
   return (
-    <section className="hp-week" aria-label="Неделя">
-      <div className="hp-week-head">
+    <div className="hp-week" aria-label="Неделя">
+      {!atCurrent && <div className="hp-week-title">{weekLabel(weekStart, today)}</div>}
+      <div className="hp-week-row">
         <button className="hp-week-nav" onClick={() => onShift(-1)} aria-label="Предыдущая неделя">
-          <CaretLeft size={20} weight="bold" />
+          <CaretLeft size={16} weight="bold" />
         </button>
-        <span className="grow hp-week-title">{weekLabel(weekStart, today)}</span>
-        {(date !== today || !atCurrent) && (
-          <button className="hp-today-btn" onClick={() => onPick(today)}>
-            Сегодня
-          </button>
-        )}
-        <button className="hp-week-nav" onClick={() => onShift(1)} disabled={atCurrent} aria-label="Следующая неделя">
-          <CaretRight size={20} weight="bold" />
-        </button>
-      </div>
       <div key={weekStart} className={`hp-week-days${dir ? ` slide-${dir}` : ''}`} onTouchStart={onStart} onTouchEnd={onEnd}>
         {Array.from({ length: 7 }, (_, i) => {
           const ymd = addDaysYmd(weekStart, i);
@@ -854,8 +882,8 @@ function WeekStrip({
               aria-label={`${dateLine(ymd)}${s.due && !fut ? `: ${s.done} из ${s.due}` : ''}${iced ? ' — пауза' : s.frozen ? ` (на паузе: ${s.frozen})` : ''}`}
             >
               <span className="hp-day-wd">{WD_SHORT[d.getDay()]}</span>
-              <Ring size={44} stroke={4} value={fut ? 0 : v} className="hp-day-ring">
-                {full ? <Check size={18} weight="bold" /> : d.getDate()}
+              <Ring size={36} stroke={3.5} value={fut ? 0 : v} className="hp-day-ring">
+                {full ? <Check size={15} weight="bold" /> : d.getDate()}
               </Ring>
               {s.frozen > 0 && (
                 <span className="hp-day-ice" aria-hidden>
@@ -866,7 +894,11 @@ function WeekStrip({
           );
         })}
       </div>
-    </section>
+        <button className="hp-week-nav" onClick={() => onShift(1)} disabled={atCurrent} aria-label="Следующая неделя">
+          <CaretRight size={16} weight="bold" />
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -882,6 +914,7 @@ function HabitCard({
   onMinus,
   onOpen,
   onMenu,
+  onDelete,
 }: {
   h: Habit;
   days: Days;
@@ -891,10 +924,13 @@ function HabitCard({
   onTap: () => void;
   onMinus: () => void;
   onOpen: () => void;
-  /** долгое нажатие / правая кнопка: пропуск, пауза */
+  /** долгое нажатие / правая кнопка: пропуск, пауза, удаление */
   onMenu: () => void;
+  /** свайп в сторону — «Удалить» */
+  onDelete: () => void;
 }) {
   const press = useLongPress(onMenu);
+  const swipe = useSwipeDelete(onDelete);
   const ice = freezeStatus(days, h, date);
   const fz = frozenOn(days, h, date);
   const on = doneOn(days, h, date);
@@ -906,10 +942,39 @@ function HabitCard({
   const time = timeRangeLabel(h) || (h.duration ? durationLabel(h.duration) : '');
   const freq = f === 'weekly' ? `${weekCount(days, h, date)} из ${weekGoal(days, h, date)} за неделю` : f === 'weekdays' ? freqLabel(h) : '';
   return (
+    <div ref={swipe.wrap} className={`hp-swipe${swipe.dx ? ' swiping' : ''}${swipe.dx > 0 ? ' to-right' : ''}${swipe.dragging ? ' dragging' : ''}${swipe.gone ? ' gone' : ''}`}>
+      {swipe.dx !== 0 && (
+        <div className="hp-swipe-bg">
+          <button className={`hp-swipe-del${swipe.armed ? ' armed' : ''}`} onClick={swipe.confirm} aria-label={`Удалить «${h.name}»`}>
+            <Trash size={22} weight="bold" />
+            <span>Удалить</span>
+          </button>
+        </div>
+      )}
     <div
       className={`hp-card${on ? ' on' : ''}${off ? ' off' : ''}${fz ? ` frozen ${fz}` : ''}${burst ? ' burst' : ''}`}
-      style={{ '--hc': h.color } as CSSProperties}
-      {...press}
+      style={{ '--hc': h.color, ...(swipe.dx ? { transform: `translateX(${swipe.dx}px)` } : null) } as CSSProperties}
+      onPointerDown={(e) => {
+        press.onPointerDown(e);
+        swipe.onPointerDown(e);
+      }}
+      onPointerMove={(e) => {
+        press.onPointerMove(e);
+        swipe.onPointerMove(e);
+      }}
+      onPointerUp={() => {
+        press.onPointerUp();
+        swipe.onPointerUp();
+      }}
+      onPointerCancel={() => {
+        press.onPointerCancel();
+        swipe.onPointerUp();
+      }}
+      onClickCapture={(e) => {
+        press.onClickCapture(e);
+        swipe.onClickCapture(e);
+      }}
+      onContextMenu={press.onContextMenu}
     >
       <button className="hp-card-main" onClick={onOpen} aria-label={`${h.name}: статистика и настройки`}>
         <span className="hp-tile" aria-hidden>
@@ -974,7 +1039,92 @@ function HabitCard({
       </button>
       )}
     </div>
+    </div>
   );
+}
+
+/**
+ * Свайп карточки влево или вправо: открывается кнопка «Удалить»; длинный свайп (больше половины ширины) — удаляет сразу.
+ * Только палец — мышью удаляют через меню (правая кнопка).
+ */
+function useSwipeDelete(onDelete: () => void) {
+  const OPEN = 96;
+  const [dx, setDx] = useState(0);
+  const [gone, setGone] = useState(false);
+  /** палец ведёт карточку — без анимации сдвига */
+  const [dragging, setDragging] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ x: number; y: number; id: number; horiz: boolean | null; base: number } | null>(null);
+  const moved = useRef(false);
+  /** сдвиг на последнем движении пальца (состояние могло ещё не обновиться) */
+  const last = useRef(0);
+  const width = () => wrap.current?.offsetWidth ?? 360;
+  const armed = Math.abs(dx) > width() * 0.5;
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  // открытая кнопка закрывается касанием в любом другом месте
+  useEffect(() => {
+    if (!dx || drag.current) return;
+    const close = (e: PointerEvent) => {
+      if (!wrap.current?.contains(e.target as Node)) setDx(0);
+    };
+    document.addEventListener('pointerdown', close, true);
+    return () => document.removeEventListener('pointerdown', close, true);
+  }, [dx]);
+
+  const remove = () => {
+    setGone(true);
+    setDx((v) => (v >= 0 ? width() : -width()));
+    timer.current = setTimeout(onDelete, 180);
+  };
+  return {
+    wrap,
+    dx,
+    gone,
+    armed,
+    dragging,
+    confirm: (e: ReactMouseEvent) => {
+      e.stopPropagation();
+      remove();
+    },
+    onPointerDown: (e: ReactPointerEvent) => {
+      moved.current = false;
+      if (e.pointerType === 'mouse' || gone) return;
+      drag.current = { x: e.clientX, y: e.clientY, id: e.pointerId, horiz: null, base: dx };
+    },
+    onPointerMove: (e: ReactPointerEvent) => {
+      const d = drag.current;
+      if (!d || d.id !== e.pointerId) return;
+      const mx = e.clientX - d.x;
+      const my = e.clientY - d.y;
+      if (d.horiz === null && Math.abs(mx) + Math.abs(my) > 10) d.horiz = Math.abs(mx) > Math.abs(my) * 1.3;
+      if (!d.horiz) return;
+      moved.current = true;
+      setDragging(true);
+      const w = width();
+      last.current = Math.max(-w, Math.min(w, d.base + mx));
+      setDx(last.current);
+    },
+    onPointerUp: () => {
+      const d = drag.current;
+      drag.current = null;
+      setDragging(false);
+      if (!d?.horiz) return;
+      const v = last.current;
+      if (Math.abs(v) > width() * 0.5) remove();
+      else setDx(Math.abs(v) > 56 ? (v > 0 ? OPEN : -OPEN) : 0);
+    },
+    onClickCapture: (e: ReactMouseEvent) => {
+      // после свайпа — не нажатие; открытая кнопка — касание закрывает её
+      if (moved.current || dx) {
+        moved.current = false;
+        e.stopPropagation();
+        e.preventDefault();
+        if (dx && !drag.current) setDx(0);
+      }
+    },
+  };
 }
 
 /** Долгое нажатие (палец ~0.5 с без сдвига) и правая кнопка мыши; клик после долгого нажатия гасится */
@@ -1004,8 +1154,8 @@ function useLongPress(fn: () => void) {
       const s = start.current;
       if (s && Math.hypot(e.clientX - s.x, e.clientY - s.y) > 10) cancel();
     },
-    onPointerUp: cancel,
-    onPointerCancel: cancel,
+    onPointerUp: () => cancel(),
+    onPointerCancel: () => cancel(),
     onClickCapture: (e: ReactMouseEvent) => {
       if (!fired.current) return;
       fired.current = false;

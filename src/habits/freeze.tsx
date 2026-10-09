@@ -23,6 +23,7 @@ export function FreezeSheet({
   handlers,
   onOpen,
   onDone,
+  onDelete,
   onClose,
 }: {
   h: Habit;
@@ -36,6 +37,8 @@ export function FreezeSheet({
   onOpen?: () => void;
   /** «Всё-таки выполнено» для замороженного дня; нет — пункта нет */
   onDone?: () => void;
+  /** «Удалить привычку»; нет — пункта нет */
+  onDelete?: () => void;
   onClose: () => void;
 }) {
   const [stage, setStage] = useState(initial);
@@ -146,6 +149,11 @@ export function FreezeSheet({
       {onOpen && (
         <button className="dlg-as-btn" onClick={() => act(onOpen)}>
           Статистика и настройки
+        </button>
+      )}
+      {onDelete && (
+        <button className="dlg-as-btn danger" onClick={() => act(onDelete)}>
+          Удалить привычку
         </button>
       )}
     </div>,
