@@ -190,8 +190,12 @@ if (typeof document !== 'undefined') {
 
 let undo: NoteBody[] = [];
 let lastTypeAt = 0;
+/** Цепочка переходов по связанным заметкам: «назад» возвращает к предыдущей, а не к списку */
+let trail: ID[] = [];
 
-export async function openNote(id: ID | null) {
+/** keepTrail — переход по цепочке связей (иначе цепочка начинается заново) */
+export async function openNote(id: ID | null, keepTrail = false) {
+  if (!keepTrail) trail = [];
   const s = useNotes.getState();
   if (s.openId && s.openId !== id) closeCurrent();
   undo = [];
@@ -203,6 +207,31 @@ export async function openNote(id: ID | null) {
   useNotes.setState({ openId: id, openBody: null, canUndo: false });
   const body = await loadNoteBody(id).catch(() => emptyBody());
   if (useNotes.getState().openId === id) useNotes.setState({ openBody: body });
+}
+
+/** Открыть связанную заметку: текущая запоминается, «назад» вернёт к ней */
+export function openLinkedNote(id: ID) {
+  const cur = useNotes.getState().openId;
+  if (cur === id) return;
+  if (cur) trail.push(cur);
+  if (trail.length > 50) trail.shift();
+  void openNote(id, true);
+}
+
+/** Есть ли куда вернуться по цепочке связей */
+export const hasNoteTrail = () => trail.length > 0;
+
+/** Вернуться к предыдущей заметке цепочки. false — возвращаться некуда (заметки удалены или цепочки нет) */
+export function backInTrail(): boolean {
+  const notes = useNotes.getState().data?.notes ?? [];
+  while (trail.length) {
+    const id = trail.pop()!;
+    if (notes.some((n) => n.id === id && !n.trashed)) {
+      void openNote(id, true);
+      return true;
+    }
+  }
+  return false;
 }
 
 /** Закрыть заметку: пустая удаляется без следа, иначе — сохраняется сразу */

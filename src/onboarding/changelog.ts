@@ -1,5 +1,5 @@
 /** «Что нового»: главное в каждой версии. Новые версии — сверху. */
-import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History } from 'lucide-react';
+import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints } from 'lucide-react';
 
 export interface ChangeItem {
   icon: typeof Sparkles;
@@ -15,6 +15,14 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.20',
+    title: 'Второй мозг: связанные заметки',
+    items: [
+      { icon: Waypoints, title: 'Заметки связываются сами', text: 'Внизу заметки — «Связанные заметки»: приложение само находит важные слова и темы и соединяет заметки, где они встречаются. Ничего выделять не нужно — видно и почему связаны: «бюджет · расходы · подушка безопасности».' },
+      { icon: Search, title: 'Темы и упоминания', text: 'Над списком — главные темы заметки. Если одна заметка упоминает название другой, связь помечена «упоминание». Переходите по цепочке — «Назад» вернёт к предыдущей заметке.' },
+    ],
+  },
   {
     version: '1.19.1',
     title: 'Привычки удобнее',

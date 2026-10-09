@@ -30,13 +30,14 @@ import { downloadText, pickFile, safeFilename, isIOS } from '../../io/download';
 import { askText, onBack } from '../../ui/dialogs';
 import { addTask, ensureTasks, openTask } from '../../tasks/store';
 import { type Block, type BlockType, fmtDuration, isBodyEmpty, isTextBlock, LIST_TYPES, markdownToBlocks, MAX_AUDIO_SEC, newBlock, noteDate, noteToMarkdown, stripInline } from '../model';
-import { addFolder, duplicateNote, editOpenBody, moveNote, openNote, sortedFolders, togglePin, trashNote, undoOpenBody, useNotes } from '../store';
+import { addFolder, backInTrail, duplicateNote, editOpenBody, hasNoteTrail, moveNote, openNote, sortedFolders, togglePin, trashNote, undoOpenBody, useNotes } from '../store';
 import { imageFileToDataUrl, type Recognizer, type Recording, recordingSupported, speechSupported, startRecognition, startRecording } from '../media';
 import { applyNoteAI, NOTE_AI_LABELS, type NoteAIKind, runNoteAI } from '../ai';
 import { autosize, BlockView, type BlockCtx } from './BlockView';
 import { cloneBlocks, convertBlock, detectShortcut, listNumbers, nextTypeAfter, wrapSelection } from './editorOps';
 import { BlockMenuItems, FORMAT_MARKS, FormatMenuItems, type FormatKind, TypeMenuItems } from './EditorMenus';
 import { MenuItem, MenuLabel, MenuSep, NtMenu, type MenuAnchor } from './Menu';
+import { RelatedNotes } from './RelatedNotes';
 
 type MenuState = { kind: 'type' | 'format' | 'block' | 'note' | 'folder'; anchor: MenuAnchor; blockId?: ID; replace?: boolean } | null;
 type RecState = { r: Recording; after: ID | null; final: string; recog: Recognizer | null; ended?: () => void };
@@ -138,7 +139,8 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
   async function close() {
     if (recRef.current) await stopRec();
     dictRef.current?.recog?.stop();
-    onClose();
+    // пришли сюда по связи — «назад» возвращает к предыдущей заметке
+    if (!backInTrail()) onClose();
   }
 
   // ---------- Операции с блоками ----------
@@ -717,9 +719,9 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
   return (
     <div className={`nt-editor${kb ? ' kb-open' : ''}`}>
       <div className="nt-ed-head">
-        <button className="icon-btn nt-back" onClick={() => void close()} aria-label="Назад к заметкам">
+        <button className="icon-btn nt-back" onClick={() => void close()} aria-label={hasNoteTrail() ? 'Назад к предыдущей заметке' : 'Назад к заметкам'}>
           <ChevronLeft />
-          <span className="nt-back-text">Заметки</span>
+          <span className="nt-back-text">{hasNoteTrail() ? 'Назад' : 'Заметки'}</span>
         </button>
         <button className="nt-folder-chip" onClick={(e) => setMenu({ kind: 'folder', anchor: e.currentTarget })} style={folder ? ({ '--fc': folder.color } as CSSProperties) : undefined}>
           {folder ? (folder.emoji ? folder.emoji + ' ' : '') + folder.name : 'Без папки'}
@@ -780,6 +782,7 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
               focusBlock(p.id, 0);
             }}
           />
+          <RelatedNotes id={meta.id} />
         </div>
       </div>
 
