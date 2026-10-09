@@ -5,8 +5,8 @@ import { leaveEditor } from './actions';
 import { runBack } from './ui/dialogs';
 
 export const isNative = () => Capacitor.isNativePlatform();
-/** Запущено в приложении для Windows (Electron-оболочка добавляет метку в User-Agent) */
-export const isDesktopApp = () => navigator.userAgent.includes('SuperMind-Desktop');
+/** Запущено в программе для Windows: метку ставит программа (прежняя версия на Electron — в User-Agent) */
+export const isDesktopApp = () => '__SUPERMIND_DESKTOP__' in window || navigator.userAgent.includes('SuperMind-Desktop');
 export const WINDOWS_SETUP_URL = 'https://github.com/kiray228/supermind/releases/download/windows/SuperMind-Setup.exe';
 
 type InstallPrompt = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };

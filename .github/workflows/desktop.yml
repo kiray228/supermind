@@ -1,6 +1,6 @@
 name: Build Windows app
 
-# Установщик SuperMind-Setup.exe прикрепляется к каждому релизу и к постоянному релизу «windows».
+# Установщик SuperMind-Setup.exe (Tauri, WebView2) прикрепляется к каждому релизу и к постоянному релизу «windows».
 # Ссылка в приложении ведёт на releases/download/windows/SuperMind-Setup.exe —
 # она работает и в первые минуты после нового релиза, пока установщик ещё собирается
 on:
@@ -9,8 +9,8 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Релиз, к которому прикрепить установщик (например v1.20)'
-        required: true
+        description: 'Релиз, к которому прикрепить установщик (например v1.20). Пусто — только собрать для проверки'
+        required: false
 
 permissions:
   contents: write
@@ -34,18 +34,30 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: desktop/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri -> target
       - run: npm ci
-      # версия программы = версия релиза (v1.20 → 1.20.0)
+      # версия программы = версия релиза (v1.20 → 1.20.0); без релиза — из package.json сайта
       - run: |
           v="${TAG#v}"
+          [ -z "$v" ] && v=$(node -p "require('../package.json').version")
           [[ "$v" =~ ^[0-9]+\.[0-9]+$ ]] && v="$v.0"
-          npm pkg set version="$v"
+          node -e "const f='src-tauri/tauri.conf.json',c=require('./'+f);c.version='$v';require('fs').writeFileSync(f,JSON.stringify(c,null,2))"
       - run: npm run dist
-      - run: gh release upload "$TAG" out/SuperMind-Setup.exe --clobber
+      - run: cp src-tauri/target/release/bundle/nsis/*-setup.exe SuperMind-Setup.exe && ls -la SuperMind-Setup.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SuperMind-Setup
+          path: desktop/SuperMind-Setup.exe
+      - if: env.TAG != ''
+        run: gh release upload "$TAG" SuperMind-Setup.exe --clobber
       # постоянная ссылка: сначала загрузить под временным именем, потом подменить — файл доступен всё время
-      - run: |
-          cp out/SuperMind-Setup.exe out/SuperMind-Setup-next.exe
-          gh release upload windows out/SuperMind-Setup-next.exe --clobber
+      - if: env.TAG != ''
+        run: |
+          cp SuperMind-Setup.exe SuperMind-Setup-next.exe
+          gh release upload windows SuperMind-Setup-next.exe --clobber
           gh release delete-asset windows SuperMind-Setup.exe -y || true
           id=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/windows" --jq '.assets[] | select(.name == "SuperMind-Setup-next.exe") | .id')
           gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/assets/$id" -f name=SuperMind-Setup.exe > /dev/null

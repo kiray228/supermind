@@ -32,3 +32,4 @@ release/
 
 # Сборка приложения для Windows
 desktop/out/
+desktop/src-tauri/target/
