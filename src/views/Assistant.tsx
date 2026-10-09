@@ -4,6 +4,8 @@ import { AIError, streamText, type ChatTurn } from '../ai/claude';
 import { confirmDialog } from '../ui/dialogs';
 import { uid } from '../utils/tree';
 import { BriefingCard } from '../assistant/BriefingCard';
+import { FirstSteps } from '../onboarding/FirstSteps';
+import { WeeklyReviewCard } from '../review/WeeklyEntry';
 import { MessageView, StreamingView } from '../assistant/ChatParts';
 import { buildContext, systemPrompt } from '../assistant/context';
 import { describeAction, parseActions, toItems } from '../assistant/actions';
@@ -214,6 +216,8 @@ export default function Assistant() {
       >
         <div className="as-inner">
           <BriefingCard hasKey={hasKey} />
+          <FirstSteps />
+          <WeeklyReviewCard />
 
           {empty ? (
             <div className="as-welcome">

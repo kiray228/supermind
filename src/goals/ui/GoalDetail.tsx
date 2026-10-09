@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { Archive, ArrowCounterClockwise, CheckCircle, LinkSimple, MagnifyingGlass, Minus, Pause, PencilSimple, Play, Plus, Quotes, Trash } from '@phosphor-icons/react';
-import { confirmDialog } from '../../ui/dialogs';
 import { dayLabel, isActive } from '../../tasks/model';
 import { useTasks } from '../../tasks/store';
 import { todayYmd } from '../../utils/mapTasks';
@@ -43,9 +42,8 @@ export function GoalDetail({ data, goal, onClose, onEdit }: { data: GoalsData; g
   const elapsed = goal.status === 'active' ? timeElapsed(goal, today) : null;
   const prio = GOAL_PRIORITIES.find((p) => p.v === goal.priority);
 
-  const remove = async () => {
-    if (await confirmDialog('Удалить цель?', `«${goal.title}» со всеми этапами будет удалена. Связанные задачи останутся.`, { okText: 'Удалить', danger: true })) deleteGoal(goal.id);
-  };
+  // без подтверждения: после удаления есть «Отменить» во всплывашке
+  const remove = () => deleteGoal(goal.id);
 
   const head = (
     <div className="gl-detail-head grow">
@@ -175,7 +173,7 @@ export function GoalDetail({ data, goal, onClose, onEdit }: { data: GoalsData; g
           <button className="btn btn-ghost" onClick={onEdit}>
             <PencilSimple size={16} /> Изменить
           </button>
-          <button className="btn btn-ghost btn-danger" onClick={() => void remove()} aria-label="Удалить цель">
+          <button className="btn btn-ghost btn-danger" onClick={remove} aria-label="Удалить цель">
             <Trash size={16} />
           </button>
         </div>

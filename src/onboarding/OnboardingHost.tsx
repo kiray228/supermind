@@ -1,17 +1,19 @@
 /**
  * Первый запуск и обновления:
  * — новое устройство без данных → знакомство (Onboarding);
- * — версия изменилась → «Что нового».
- * Для проверки: ?onboarding=1 и ?whatsnew=1 показывают окна принудительно.
+ * — версия изменилась → «Что нового»;
+ * — не открывали 3+ дня → «С возвращением!» (не в один запуск со знакомством или «Что нового»).
+ * Для проверки: ?onboarding=1, ?whatsnew=1 и ?welcomeback=1 показывают окна принудительно.
  */
 import { useEffect, useState } from 'react';
 import { APP_VERSION } from '../store/safety';
 import { useCloud } from '../store/cloud';
 import { get } from '../store/kv';
-import { useWhatsNew, lsGet, lsSet, ONBOARDED_KEY, WHATSNEW_KEY } from './state';
+import { useWhatsNew, lsGet, lsSet, touchLastOpen, AWAY_DAYS, ONBOARDED_KEY, WHATSNEW_KEY } from './state';
 import { entriesFor, isRealVersion } from './changelog';
 import Onboarding from './Onboarding';
 import WhatsNew from './WhatsNew';
+import WelcomeBack from './WelcomeBack';
 import './onboarding.css';
 
 /** Есть ли уже данные: карты (кроме приветственной), задачи или привычки */
@@ -42,9 +44,12 @@ function takeParam(name: string): boolean {
 }
 
 let decided = false;
+/** сколько дней не открывали приложение — на момент запуска */
+const awayAtLaunch = touchLastOpen();
 
 export default function OnboardingHost() {
   const [onboarding, setOnboarding] = useState(false);
+  const [welcome, setWelcome] = useState(false);
   const wn = useWhatsNew((s) => s.open);
   // сначала вход в аккаунт (обязателен), знакомство — после
   const signedIn = useCloud((s) => !!s.account);
@@ -59,8 +64,10 @@ export default function OnboardingHost() {
       decided = true;
       const forceOb = takeParam('onboarding');
       const forceWn = takeParam('whatsnew');
+      const forceWb = takeParam('welcomeback');
       if (forceOb) return setOnboarding(true);
       if (forceWn) return useWhatsNew.setState({ open: 'auto', since: null });
+      if (forceWb) return setWelcome(true);
       const seen = lsGet(WHATSNEW_KEY);
       if (!lsGet(ONBOARDED_KEY)) {
         if (!(await hasUserData())) {
@@ -71,9 +78,12 @@ export default function OnboardingHost() {
         }
         lsSet(ONBOARDED_KEY, 'existing');
       }
-      if (seen === APP_VERSION || !isRealVersion(APP_VERSION)) return;
-      if (entriesFor(APP_VERSION, seen, false).length) useWhatsNew.setState({ open: 'auto', since: seen });
-      else lsSet(WHATSNEW_KEY, APP_VERSION);
+      if (seen !== APP_VERSION && isRealVersion(APP_VERSION)) {
+        if (entriesFor(APP_VERSION, seen, false).length) return useWhatsNew.setState({ open: 'auto', since: seen });
+        lsSet(WHATSNEW_KEY, APP_VERSION);
+      }
+      // после перерыва — тёплое «С возвращением!» (только если в этот запуск других окон нет)
+      if (awayAtLaunch >= AWAY_DAYS) setWelcome(true);
     }, 900);
     return () => clearTimeout(t);
   }, [signedIn, synced]);
@@ -83,6 +93,17 @@ export default function OnboardingHost() {
     lsSet(WHATSNEW_KEY, APP_VERSION);
     setOnboarding(false);
   };
+  // приложение на iPhone может днями «спать» в памяти — перерыв считаем и при возвращении
+  useEffect(() => {
+    const onShow = () => {
+      if (document.visibilityState !== 'visible') return;
+      const away = touchLastOpen();
+      if (decided && away >= AWAY_DAYS && !useWhatsNew.getState().open) setWelcome(true);
+    };
+    document.addEventListener('visibilitychange', onShow);
+    return () => document.removeEventListener('visibilitychange', onShow);
+  }, []);
+
   const closeWhatsNew = () => {
     lsSet(WHATSNEW_KEY, APP_VERSION);
     useWhatsNew.setState({ open: null, since: null });
@@ -93,6 +114,7 @@ export default function OnboardingHost() {
     <>
       {onboarding && <Onboarding onDone={doneOnboarding} />}
       {wn && !onboarding && <WhatsNew onClose={closeWhatsNew} />}
+      {welcome && !wn && !onboarding && <WelcomeBack onClose={() => setWelcome(false)} />}
     </>
   );
 }

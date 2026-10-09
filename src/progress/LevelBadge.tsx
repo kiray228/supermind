@@ -1,7 +1,9 @@
 import { useId } from 'react';
 import type { ReactNode } from 'react';
 import { useApp } from '../store/appStore';
-import { useLevel } from './hooks';
+import { Flame } from '@phosphor-icons/react';
+import { plural } from '../tasks/model';
+import { useProgress } from './hooks';
 import './level.css';
 
 /** Кольцо прогресса уровня (градиент акцентного цвета) */
@@ -40,18 +42,20 @@ export function LevelRing({ pct, size = 96, stroke = 8, children }: { pct: numbe
 }
 
 /**
- * Значок уровня: кольцо с номером и (необязательно) звание.
+ * Значок уровня: кольцо с номером, (необязательно) звание и огонёк серии активных дней.
  * По нажатию открывает раздел «Прогресс». Пока данные загружаются — ничего не показывает.
  */
 export function LevelBadge({ compact = false, onClick, className = '' }: { compact?: boolean; onClick?: () => void; className?: string }) {
-  const lv = useLevel();
-  if (!lv) return null;
+  const p = useProgress();
+  if (!p) return null;
+  const lv = p.level;
+  const streak = p.counters.streak;
   return (
     <button
       type="button"
       className={`lvl-badge${compact ? ' compact' : ''} ${className}`}
       onClick={onClick ?? (() => useApp.getState().go('progress'))}
-      title={`Уровень ${lv.level} · ${lv.title} · ${lv.xp.toLocaleString('ru-RU')} XP`}
+      title={`Уровень ${lv.level} · ${lv.title} · ${lv.xp.toLocaleString('ru-RU')} XP${streak ? ` · серия ${streak} ${plural(streak, 'день', 'дня', 'дней')}` : ''}`}
     >
       <LevelRing pct={lv.pct} size={compact ? 24 : 28} stroke={3}>
         <b>{lv.level}</b>
@@ -60,6 +64,12 @@ export function LevelBadge({ compact = false, onClick, className = '' }: { compa
         <span className="lvl-badge-text">
           <span className="lvl-badge-title">{lv.title}</span>
           <span className="lvl-badge-xp">{lv.cur.toLocaleString('ru-RU')} / {lv.need.toLocaleString('ru-RU')} XP</span>
+        </span>
+      )}
+      {streak > 0 && (
+        <span className="lvl-badge-streak" aria-label={`Серия ${streak} ${plural(streak, 'день', 'дня', 'дней')}`}>
+          <Flame size={13} weight="fill" />
+          {streak}
         </span>
       )}
     </button>

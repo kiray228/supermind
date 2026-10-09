@@ -17,3 +17,9 @@
 .lvl-badge-text { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; line-height: 1.1; }
 .lvl-badge-title { font-size: 12.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
 .lvl-badge-xp { font-size: 10.5px; color: var(--text-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lvl-badge-streak {
+  display: inline-flex; align-items: center; gap: 2px; margin-left: auto; padding: 2px 7px 2px 5px; border-radius: 999px;
+  font-size: 12px; font-weight: 750; font-variant-numeric: tabular-nums; line-height: 1;
+  color: var(--ios-orange, #ff9f0a); background: color-mix(in srgb, var(--ios-orange, #ff9f0a) 14%, transparent);
+}
+.lvl-badge.compact .lvl-badge-streak { margin-left: 2px; padding: 2px 5px 2px 3px; }

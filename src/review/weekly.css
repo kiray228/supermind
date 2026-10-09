@@ -1,0 +1,128 @@
+/* ================= Итоги недели ================= */
+
+/* ---------- Лист ---------- */
+.modal-backdrop.wr-backdrop > .modal.wr-sheet {
+  width: min(560px, 100%); height: min(88vh, 900px); padding: 6px 16px calc(20px + var(--safe-bottom));
+  background: var(--bg); overscroll-behavior: contain;
+}
+@media (max-width: 640px) {
+  .modal-backdrop.wr-backdrop > .modal.wr-sheet { height: calc(var(--vvh, 100vh) - var(--safe-top) - 10px); padding-top: 14px; }
+}
+.wr-bar { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; min-height: 44px; }
+.wr-bar-title { text-align: center; font-size: 17px; font-weight: 600; letter-spacing: -0.024em; }
+.wr-close { justify-self: end; background: var(--fill-3); width: 30px; height: 30px; color: var(--text-2); }
+.wr-close svg { width: 17px; height: 17px; }
+
+.wr-switch { display: flex; align-items: center; gap: 6px; margin: 4px 0 12px; }
+.wr-switch .icon-btn { color: var(--accent); }
+.wr-switch-mid { flex: 1; min-width: 0; text-align: center; display: flex; flex-direction: column; gap: 1px; }
+.wr-switch-mid b { font-size: 22px; font-weight: 750; letter-spacing: -0.02em; line-height: 1.2; }
+.wr-switch-mid span { font-size: 13px; color: var(--text-2); }
+
+.wr-stats { display: flex; flex-direction: column; gap: 12px; }
+
+/* ---------- Сводка ---------- */
+.wr-hero {
+  border-radius: 22px; padding: 14px 16px;
+  background:
+    radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--accent-2) 18%, transparent), transparent 60%),
+    var(--surface);
+  border: var(--hairline) solid color-mix(in srgb, var(--accent) 16%, var(--separator));
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 8px 24px -16px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.wr-hero.full { background: radial-gradient(120% 140% at 100% 0%, rgba(52, 211, 153, 0.22), transparent 60%), var(--surface); }
+.wr-hero-big { font-size: 19px; font-weight: 800; letter-spacing: -0.01em; line-height: 1.25; font-variant-numeric: tabular-nums; }
+.wr-hero-sub { margin-top: 3px; font-size: 13.5px; color: var(--text-2); }
+
+.wr-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (min-width: 520px) { .wr-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.wr-tile {
+  min-width: 0; display: flex; flex-direction: column; gap: 2px; padding: 11px 12px 10px; border-radius: 16px; background: var(--surface);
+}
+.wr-tile-ic { font-size: 18px; line-height: 1; margin-bottom: 4px; }
+.wr-tile-v { font-size: 20px; font-weight: 780; letter-spacing: -0.015em; line-height: 1.15; font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wr-tile-l { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; font-size: 12.5px; line-height: 1.25; color: var(--text-2); }
+.wr-tile-l em { font-style: normal; font-weight: 650; font-variant-numeric: tabular-nums; }
+.wr-tile-l em.up { color: var(--ok); }
+.wr-tile-l em.down { color: var(--warn); }
+
+/* ---------- Карточки ---------- */
+.wr-card { border-radius: 16px; background: var(--surface); padding: 12px 14px; }
+.wr-card-title {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 8px;
+  font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--text-2);
+}
+.wr-card-aside { margin-left: auto; font-size: 13px; font-weight: 650; letter-spacing: 0; text-transform: none; color: var(--text); font-variant-numeric: tabular-nums; }
+
+.wr-mood-strip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.wr-mood-day { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 0 5px; border-radius: 12px; }
+.wr-mood-day.today { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.wr-mood-day.today .wr-mood-wd { color: var(--accent); font-weight: 700; }
+.wr-mood-day.future { opacity: .45; }
+.wr-mood-e { height: 28px; display: inline-flex; align-items: center; justify-content: center; font-size: 24px; line-height: 1; }
+.wr-mood-e i { width: 8px; height: 8px; border-radius: 50%; background: var(--fill); }
+.wr-mood-wd { font-size: 11.5px; color: var(--text-2); }
+.wr-hint { margin-top: 8px; font-size: 13px; line-height: 1.35; color: var(--text-2); }
+
+.wr-rows { padding: 0 14px; }
+.wr-row { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 8px 0; }
+.wr-row + .wr-row { border-top: var(--hairline) solid var(--separator); }
+.wr-row-ic { width: 32px; height: 32px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 18px; border-radius: 9px; background: var(--fill-3); }
+.wr-row .grow { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.wr-row-t { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+.wr-row-s { font-size: 13px; color: var(--text-2); }
+.wr-row-v { flex-shrink: 0; max-width: 45%; text-align: right; font-size: 14px; font-weight: 600; color: var(--text-2); }
+
+.wr-insights { display: flex; flex-direction: column; gap: 10px; }
+.wr-insight { display: flex; gap: 10px; align-items: flex-start; font-size: 14.5px; line-height: 1.38; }
+.wr-insight svg { flex-shrink: 0; margin-top: 2px; color: var(--warn); }
+
+/* ---------- Вопросы ---------- */
+.wr-form { display: flex; flex-direction: column; gap: 12px; margin-top: 22px; }
+.wr-form-title { font-size: 20px; font-weight: 750; letter-spacing: -0.02em; margin: 0 2px; }
+.wr-q { display: flex; flex-direction: column; gap: 6px; }
+.wr-q-t { font-size: 13px; color: var(--text-2); margin-left: 4px; text-transform: uppercase; letter-spacing: -0.003em; }
+.modal.wr-sheet .wr-q-ta { background: var(--surface); min-height: 84px; border-radius: 14px; resize: none; }
+.wr-form .wr-hint { margin: -4px 4px 0; }
+.wr-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
+.wr-actions .btn { height: 50px; font-size: 17px; font-weight: 600; }
+.wr-foot { font-size: 12.5px; color: var(--text-3); text-align: center; }
+
+/* ---------- Карточка на экране Ассистента ---------- */
+.card.wr-entry-card {
+  position: relative; display: flex; align-items: center; padding: 0; overflow: hidden;
+  background:
+    radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--accent-2) 16%, transparent), transparent 60%),
+    var(--lg-solid);
+  animation: fade .25s ease;
+}
+.wr-entry-main {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 12px 6px 12px 14px;
+  border: none; background: none; text-align: left; color: var(--text);
+}
+.wr-entry-main:active { opacity: .7; }
+.wr-entry-ic {
+  width: 42px; height: 42px; border-radius: 13px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 22px;
+  background: var(--lg-solid); border: 1px solid var(--lg-border); box-shadow: var(--lg-highlight), 0 4px 14px rgba(15, 23, 42, 0.08);
+}
+.wr-entry-main .grow, .wr-entry-row .grow { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.wr-entry-t { font-size: 16px; font-weight: 700; letter-spacing: -0.015em; line-height: 1.25; }
+.wr-entry-s { font-size: 13px; color: var(--text-2); line-height: 1.3; }
+.wr-entry-chev { flex-shrink: 0; color: var(--text-3); }
+.wr-entry-x {
+  flex-shrink: 0; width: 36px; height: 36px; margin-right: 6px; border: none; border-radius: 50%; background: none;
+  display: inline-flex; align-items: center; justify-content: center; color: var(--text-3);
+}
+.wr-entry-x:active { background: var(--fill-3); }
+
+/* ---------- Строка в разделе «Прогресс» ---------- */
+.wr-entry-row {
+  display: flex; align-items: center; gap: 12px; width: 100%; padding: 11px 12px 11px 14px; border: none; border-radius: 16px;
+  background: var(--surface); box-shadow: var(--shadow); text-align: left; color: var(--text); transition: background .2s;
+}
+.wr-entry-row:active { background: var(--fill-3); transition: none; }
+.wr-entry-row-ic {
+  width: 32px; height: 32px; flex-shrink: 0; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center;
+  color: #fff; background: linear-gradient(160deg, #ff9f45, var(--accent-2));
+}
+.wr-entry-row .wr-entry-t { font-size: 15.5px; font-weight: 600; }

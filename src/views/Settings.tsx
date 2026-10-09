@@ -15,6 +15,7 @@ import {
   notifyPermission,
   openExactAlarmSettings,
   requestNotifyPermission,
+  STREAK_SAVER_DEFAULT,
   syncCalendar,
   type NotifyPermission,
   type PhoneCalendar,
@@ -27,6 +28,7 @@ import { Bug, Lightbulb } from '@phosphor-icons/react';
 import { APP_VERSION } from '../store/safety';
 import { IconTile } from '../ui/icons';
 import { ListCell, ListRow, ListSection, SelectRow, SwitchRow } from '../ui/list';
+import { celebrate, celebrationsOn, setCelebrations } from '../ui/celebrate';
 import {
   Alarm,
   AndroidLogo,
@@ -45,6 +47,7 @@ import {
   SunHorizon,
   Image as ImageIcon,
   CircleHalf,
+  Confetti,
 } from '@phosphor-icons/react';
 
 export default function Settings() {
@@ -60,6 +63,7 @@ export default function Settings() {
   }
   const [show, setShow] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [cheers, setCheers] = useState(celebrationsOn);
 
   const saveKey = () => {
     setSettings({ apiKey: key.trim() });
@@ -173,6 +177,17 @@ export default function Settings() {
                 { value: 'plain', label: 'Однотонный' },
               ]}
               onChange={(v) => setSettings({ backdrop: v as 'aurora' | 'gradient' | 'plain' })}
+            />
+            <SwitchRow
+              icon={<IconTile icon={Confetti} tone="rose" size="list" />}
+              title="Анимации успехов"
+              subtitle="Конфетти за новый уровень, серию и выполненные привычки"
+              checked={cheers}
+              onChange={(v) => {
+                setCelebrations(v);
+                setCheers(v);
+                if (v) celebrate();
+              }}
             />
           </ListSection>
 
@@ -307,7 +322,10 @@ function TaskSettings() {
 
       <PushCard />
 
-      <ListSection header="По умолчанию" footer="Настойчивое напоминание повторяется 3 раза, пока задача не выполнена. Утренний брифинг — план на день в уведомлении.">
+      <ListSection
+        header="По умолчанию"
+        footer="Настойчивое напоминание повторяется 3 раза, пока задача не выполнена. Утренний брифинг — план на день в уведомлении. «Серия под угрозой» — одно вечернее напоминание, если серия активных дней от 2 дней, а сегодня ещё ничего не отмечено."
+      >
         <SelectRow
           title="Задачи со временем"
           value={one(p.timedReminders)}
@@ -334,6 +352,15 @@ function TaskSettings() {
             ...['06:00', '06:30', '07:00', '07:30', '08:00', '08:30', '09:00', '09:30', '10:00'].map((t) => ({ value: t, label: `В ${t}` })),
           ]}
           onChange={(v) => setPrefs({ briefing: v })}
+        />
+        <SelectRow
+          title="Серия под угрозой"
+          value={p.streakSaver ?? (perm === 'granted' ? STREAK_SAVER_DEFAULT : '')}
+          options={[
+            { value: '', label: 'Выключено' },
+            ...['19:00', '19:30', '20:00', '20:30', '21:00', '21:30', '22:00'].map((t) => ({ value: t, label: `В ${t}` })),
+          ]}
+          onChange={(v) => setPrefs({ streakSaver: v })}
         />
       </ListSection>
 

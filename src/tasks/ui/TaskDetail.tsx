@@ -213,7 +213,7 @@ function TaskDetail({ task, onClose }: { task: TaskItem; onClose: () => void }) 
                     onClick={() => {
                       onClose();
                       trashTask(task.id);
-                      toast('Задача в корзине');
+                      toast('Задача удалена', { label: 'Вернуть', run: () => restoreTask(task.id) });
                     }}
                   >
                     <Trash2 size={16} /> Удалить

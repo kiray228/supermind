@@ -63,6 +63,8 @@ export interface InAppReminder {
   /** платёж или утренний брифинг — только «Открыть» */
   payId?: string;
   briefing?: boolean;
+  /** вечернее «серия под угрозой» (без привычки — «Открыть» ведёт в «Привычки») */
+  saver?: boolean;
 }
 export const useReminders = create<{ items: InAppReminder[] }>(() => ({ items: [] }));
 export const dismissReminder = (key: string) => useReminders.setState((s) => ({ items: s.items.filter((i) => i.key !== key) }));
@@ -250,7 +252,51 @@ async function plan(fromMs: number, toMs: number): Promise<Planned[]> {
       }
     }
   }
+  await planStreakSaver(d.prefs.streakSaver, p, fromMs, toMs, out);
   return out.sort((a, b) => a.at - b.at);
+}
+
+export const STREAK_SAVER_DEFAULT = '20:30';
+
+/** Время «серия под угрозой» ('' — выключено): по умолчанию включено, только если уведомления уже разрешены */
+export async function streakSaverTime(pref: string | undefined): Promise<string> {
+  if (pref !== undefined) return pref;
+  return (await notifyPermission().catch(() => 'unsupported')) === 'granted' ? STREAK_SAVER_DEFAULT : '';
+}
+
+/**
+ * Вечернее «серия под угрозой»: не больше одного в день, только при общей серии от 2 дней
+ * и пока сегодня нет активности. Сегодня — по факту; завтра — если сегодня уже активны
+ * (с первой активностью завтра расписание пересчитается и напоминание исчезнет).
+ */
+async function planStreakSaver(pref: string | undefined, p: PlannerData | undefined, fromMs: number, toMs: number, out: Planned[]) {
+  const time = await streakSaverTime(pref);
+  if (!time) return;
+  const today = todayYmd();
+  const days = [today, addDaysYmd(today, 1)].filter((day) => {
+    const at = fromYmd(day).getTime() + minutesOf(time) * 60000;
+    return at >= fromMs && at <= toMs;
+  });
+  if (!days.length) return;
+  const { progressNow } = await import('../progress/hooks');
+  const stats = await progressNow(p ?? null).catch(() => null);
+  if (!stats) return;
+  const activeToday = (stats.dayTotal.get(today) ?? 0) > 0;
+  const streak = stats.counters.streak;
+  if (streak < 2) return;
+  for (const day of days) {
+    if ((day === today) === activeToday) continue;
+    const pdays = p?.days ?? {};
+    const h = hm.activeHabits(p?.habits).find((x) => hm.dueOn(pdays, x, day) && !hm.doneOn(pdays, x, day));
+    const n = `${streak} ${hm.plural(streak, ['день', 'дня', 'дней'])}`;
+    out.push({
+      id: hash(`saver|${day}`),
+      at: fromYmd(day).getTime() + minutesOf(time) * 60000,
+      title: '🔥 Сохраните серию',
+      body: h ? `Серия ${n} 🔥 — отметьте «${h.name}», это 10 секунд` : `Серия ${n} 🔥 — отметьте одну привычку или задачу, это 10 секунд`,
+      extra: h ? { habitId: h.id, saver: 1, date: day, sm: 1 } : { saver: 1, date: day, sm: 1 },
+    });
+  }
 }
 
 /** Текст утреннего уведомления на день */
@@ -330,6 +376,10 @@ async function handleAction(action: string, ex: Record<string, string>) {
     } else useApp.getState().go('planner');
     return;
   }
+  if (ex.saver) {
+    useApp.getState().go('habits');
+    return;
+  }
   if (ex.payId) {
     useApp.getState().go('finance');
     return;
@@ -407,7 +457,7 @@ async function syncNative() {
         largeBody: w.body,
         schedule: { at: new Date(w.at), allowWhileIdle: true },
         channelId: 'sm-reminders',
-        actionTypeId: w.extra.habitId ? 'sm-habit' : w.extra.payId || w.extra.briefing ? undefined : 'sm-task',
+        actionTypeId: w.extra.habitId ? 'sm-habit' : w.extra.payId || w.extra.briefing || w.extra.saver ? undefined : 'sm-task',
         autoCancel: true,
         extra: { ...w.extra, sig: sig(w) },
       })),
@@ -431,7 +481,7 @@ function saveWebSnoozes() {
 async function showWeb(title: string, body: string, data: Record<string, string>) {
   const key = `${data.taskId ?? data.habitId ?? data.payId ?? 'brief'}|${data.date ?? ''}|${Date.now()}`;
   if (document.visibilityState === 'visible') {
-    useReminders.setState((s) => ({ items: [...s.items.filter((i) => i.taskId !== data.taskId || !data.taskId), { key, taskId: data.taskId, habitId: data.habitId, payId: data.payId, briefing: !!data.briefing, date: data.date || undefined, title, body }] }));
+    useReminders.setState((s) => ({ items: [...s.items.filter((i) => i.taskId !== data.taskId || !data.taskId), { key, taskId: data.taskId, habitId: data.habitId, payId: data.payId, briefing: !!data.briefing, saver: !!data.saver, date: data.date || undefined, title, body }] }));
     playChime();
   }
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
@@ -740,6 +790,10 @@ export function reminderAction(r: InAppReminder, action: 'done' | 'snooze' | 'op
   dismissReminder(r.key);
   if (r.payId || r.briefing) {
     if (action === 'open') useApp.getState().go(r.payId ? 'finance' : 'assistant');
+    return;
+  }
+  if (r.saver && (!r.habitId || action === 'open')) {
+    if (action === 'open') useApp.getState().go('habits');
     return;
   }
   if (r.habitId) {

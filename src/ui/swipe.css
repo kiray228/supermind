@@ -1,0 +1,17 @@
+/* Свайп строк и карточек (src/ui/gestures.ts useSwipeActions + SwipeBg) */
+.sw-wrap { position: relative; border-radius: inherit; }
+.sw-bg { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; display: flex; align-items: stretch; }
+.sw-bg-del { justify-content: flex-end; background: var(--ios-red); }
+.sw-bg-right { justify-content: flex-start; background: var(--ios-green); }
+.sw-act {
+  width: 96px; border: none; background: none; color: #fff; display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; font-size: 13px; font-weight: 650; padding: 0;
+}
+.sw-act svg { transition: transform .15s; }
+.sw-act.armed svg { transform: scale(1.22); }
+.sw-wrap > .sw-row { position: relative; transition: transform .24s cubic-bezier(.2, .9, .3, 1), opacity .2s; touch-action: pan-y; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.sw-wrap.dragging > .sw-row { transition: none; }
+.sw-wrap.gone > .sw-row { opacity: 0; }
+.sw-wrap.gone { animation: sw-fade .2s ease .12s forwards; }
+@keyframes sw-fade { to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .sw-wrap > .sw-row { transition: none; } }

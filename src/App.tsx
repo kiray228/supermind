@@ -37,6 +37,8 @@ const Progress = lazy(() => import('./views/Progress'));
 const LevelBadge = lazy(() => import('./progress/LevelBadge').then((m) => ({ default: m.LevelBadge })));
 const VoiceHost = lazy(() => import('./voice/VoiceSheet'));
 const OnboardingHost = lazy(() => import('./onboarding/OnboardingHost'));
+// поздравления с уровнем, достижениями и серией — в любом разделе
+const ProgressWatcher = lazy(() => import('./progress/ProgressWatcher'));
 // окна задач и напоминаний — отдельными модулями: при запуске не нужны
 const TaskDetailHost = lazy(() => import('./tasks/ui/TaskDetail').then((m) => ({ default: m.TaskDetailHost })));
 const QuickAddHost = lazy(() => import('./tasks/ui/QuickAdd').then((m) => ({ default: m.QuickAddHost })));
@@ -285,6 +287,11 @@ export default function App() {
       {deferred && (
         <Suspense fallback={null}>
           <OnboardingHost />
+        </Suspense>
+      )}
+      {deferred && (
+        <Suspense fallback={null}>
+          <ProgressWatcher />
         </Suspense>
       )}
       {toastMsg && (

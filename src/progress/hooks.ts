@@ -13,7 +13,7 @@ import { ensureGoals, useGoals } from '../goals/store';
 import { ensureFinance, useFinance } from '../finance/store';
 import { ensureNotes, useNotes } from '../notes/store';
 import { todayYmd } from '../utils/mapTasks';
-import { computeProgressCached, type LevelInfo, type ProgressStats } from './model';
+import { computeProgress, computeProgressCached, type LevelInfo, type ProgressStats } from './model';
 
 interface ExtraState {
   planner: PlannerData | null;
@@ -80,6 +80,37 @@ export function ensureProgressSources() {
   setInterval(() => {
     if (useProgressExtra.getState().day !== todayYmd()) useProgressExtra.setState({ day: todayYmd() });
   }, 60_000);
+}
+
+const settle = (load: () => Promise<unknown>) => {
+  try {
+    return load().catch(() => undefined);
+  } catch {
+    return Promise.resolve();
+  }
+};
+
+/**
+ * Подсчёт вне компонентов (расписание уведомлений): дожидается загрузки данных.
+ * planner — свежий ежедневник, если он уже прочитан (тогда считается без общего кэша).
+ */
+export async function progressNow(planner?: PlannerData | null): Promise<ProgressStats> {
+  ensureProgressSources();
+  await Promise.all([ensureTasks, ensureGoals, ensureFinance, ensureNotes].map(settle));
+  let x = useProgressExtra.getState();
+  if (x.planner === null || x.docs === null) {
+    await refreshProgressSources().catch(() => undefined);
+    x = useProgressExtra.getState();
+  }
+  const src = {
+    tasks: useTasks.getState().data,
+    goals: useGoals.getState().data,
+    finance: useFinance.getState().data,
+    notes: useNotes.getState().data,
+    planner: planner ?? x.planner,
+    docs: x.docs,
+  };
+  return planner ? computeProgress(src, todayYmd()) : computeProgressCached(src, todayYmd());
 }
 
 /** Весь подсчёт опыта. null — пока данные загружаются */

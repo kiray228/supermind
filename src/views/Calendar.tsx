@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, MouseEvent as RMouseEvent, PointerEvent as RPointerEvent, RefObject, TouchEvent as RTouchEvent } from 'react';
 import { CalendarDays, Check, ChevronLeft, ChevronRight, Download, MoreHorizontal, Network, Plus, Repeat } from 'lucide-react';
-import { ensureTasks, openQuickAdd, openTask, toggleDone, updateTask, useTasks } from '../tasks/store';
+import { ensureTasks, openQuickAdd, openTask, updateTask, useTasks } from '../tasks/store';
 import { dayLabel, isActive, isOverdue, longDate, minutesOf, mondayOf, MONTHS, occurrences, pad2, timeOf, WD_SHORT } from '../tasks/model';
 import type { TasksData, TaskItem } from '../tasks/model';
 import { exportTasksIcs, phoneEvents } from '../tasks/sync';
@@ -15,6 +15,7 @@ import type { Habit, PlannerData } from '../types';
 import type { GoalDue, GoalsData } from '../goals/model';
 import { activeHabits, doneOn, dueOn, isCounter } from '../habits/model';
 import { toggleHabitOn } from '../habits/store';
+import { useTaskActions } from '../tasks/ui/TaskRow';
 import './calendar.css';
 import { IconTile } from '../ui/icons';
 
@@ -242,7 +243,10 @@ function rangeOf(view: CalView, cursor: string): string[] {
   if (view === 'month') {
     const d = fromYmd(cursor);
     from = mondayOf(toYmd(new Date(d.getFullYear(), d.getMonth(), 1)));
-    n = 42;
+    // только недели этого месяца (4–6), без пустой строки следующего
+    const last = toYmd(new Date(d.getFullYear(), d.getMonth() + 1, 0));
+    n = 7;
+    while (addDaysYmd(from, n) <= last) n += 7;
   } else if (view === 'week') {
     from = mondayOf(cursor);
     n = 7;
@@ -281,7 +285,7 @@ async function tapHabit(it: Item) {
     return;
   }
   if (isCounter(h)) {
-    useApp.getState().go('planner');
+    useApp.getState().go('habits');
     return;
   }
   try {
@@ -416,7 +420,9 @@ export default function Calendar() {
   // свайп влево/вправо — следующий/предыдущий период
   const onTouchStart = (e: RTouchEvent) => {
     const t = e.touches[0];
-    swipe.current = e.touches.length === 1 ? { x: t.clientX, y: t.clientY } : null;
+    // строки со свайпом (задачи) листают сами себя, а не период
+    const own = (e.target as HTMLElement).closest('.sw-wrap');
+    swipe.current = e.touches.length === 1 && !own ? { x: t.clientX, y: t.clientY } : null;
   };
   const onTouchEnd = (e: RTouchEvent) => {
     const s = swipe.current;
@@ -514,9 +520,9 @@ function Chip({ it, onDown, onOpen }: { it: Item; onDown?: (e: RPointerEvent, it
 
 /** Строка списка: флажок, название, цвет списка, время */
 function Row({ it }: { it: Item }) {
-  const t = it.task;
-  // строка привычки открывает Ежедневник (отметка — кружком)
-  const open = () => (it.habit ? useApp.getState().go('planner') : activate(it));
+  if (it.task) return <TaskLine it={it} t={it.task} />;
+  // строка привычки открывает раздел «Привычки» (отметка — кружком)
+  const open = () => (it.habit ? useApp.getState().go('habits') : activate(it));
   return (
     <div className={`cv-row cv-row-${it.kind}${it.done ? ' done' : ''}${it.overdue ? ' overdue' : ''}`} onClick={open}>
       {it.habit ? (
@@ -531,20 +537,6 @@ function Row({ it }: { it: Item }) {
         >
           {it.done && <Check size={13} strokeWidth={3} />}
         </button>
-      ) : t ? (
-        <button
-          className={`cv-check${it.done ? ' on' : ''}`}
-          style={{ '--c': t.priority ? it.color : 'var(--text-3)' } as CSSProperties}
-          disabled={!it.base}
-          title={it.base ? undefined : 'Будущий повтор'}
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleDone(t.id);
-          }}
-          aria-label="Выполнено"
-        >
-          {it.done && <Check size={13} strokeWidth={3} />}
-        </button>
       ) : (
         <span className="cv-row-icon" style={{ color: it.color }}>
           {kindIcon(it, 16)}
@@ -553,6 +545,41 @@ function Row({ it }: { it: Item }) {
       <span className="grow ellipsis cv-row-title">{it.title}</span>
       {it.listColor && <i className="cv-row-dot" style={{ background: it.listColor }} />}
       <span className="cv-row-time">{timeLabel(it)}</span>
+    </div>
+  );
+}
+
+/** Задача: свайп вправо — выполнить, влево — удалить, долгое нажатие — меню (как в «Задачах») */
+function TaskLine({ it, t }: { it: Item; t: TaskItem }) {
+  const { swipe, handlers, bg, overlays, done, completing } = useTaskActions(t, it.date);
+  const on = it.done || completing;
+  return (
+    <div ref={swipe.wrap} className={`cv-row-wrap ${swipe.wrapClass}`}>
+      {bg}
+      <div
+        className={`cv-row cv-row-task sw-row${on ? ' done' : ''}${it.overdue ? ' overdue' : ''}`}
+        style={swipe.style}
+        onClick={() => openTask(t.id)}
+        {...handlers}
+      >
+        <button
+          className={`cv-check${on ? ' on' : ''}`}
+          style={{ '--c': t.priority ? it.color : 'var(--text-3)' } as CSSProperties}
+          disabled={!it.base}
+          title={it.base ? undefined : 'Будущий повтор'}
+          onClick={(e) => {
+            e.stopPropagation();
+            done();
+          }}
+          aria-label="Выполнено"
+        >
+          {on && <Check size={13} strokeWidth={3} />}
+        </button>
+        <span className="grow ellipsis cv-row-title">{it.title}</span>
+        {it.listColor && <i className="cv-row-dot" style={{ background: it.listColor }} />}
+        <span className="cv-row-time">{timeLabel(it)}</span>
+      </div>
+      {overlays}
     </div>
   );
 }

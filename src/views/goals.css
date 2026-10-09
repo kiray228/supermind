@@ -23,6 +23,8 @@
 .gl-mini-btn { width: 30px; height: 30px; border-radius: 8px; color: var(--text-3); }
 .gl-mini-btn:hover { color: var(--text); }
 .gl-mini-btn.active { color: var(--accent); }
+/* палец — цель не меньше 40px */
+@media (pointer: coarse) { .gl-mini-btn { width: 40px; height: 40px; } }
 .gl-spin { animation: spin 1s linear infinite; }
 
 /* ---------- Кнопка «+» ---------- */
@@ -44,25 +46,38 @@
 .gl-view-seg button { flex: 1 1 0; padding: 0 8px; }
 @media (max-width: 480px) {
   .gl-view-seg button { padding: 0 4px; font-size: 13px; }
+  .gl-list-page { gap: 14px; }
 }
 
-/* сводка: кольцо среднего прогресса и три числа под ним — одна поверхность без вложенных плашек */
-.gl-summary { display: flex; flex-direction: column; background: var(--surface); border-radius: var(--radius-group); overflow: hidden; }
-.gl-sum-top { display: flex; align-items: center; gap: 16px; padding: 16px; }
+/* сводка: одна строка — небольшое кольцо среднего прогресса и числа рядом (как в «Привычках») */
+.gl-summary { display: flex; align-items: center; gap: 12px; padding: 10px 14px 10px 12px; background: var(--surface); border-radius: var(--radius-group); }
+.gl-sum-ring { flex-shrink: 0; }
 .gl-sum-ring .gl-ring-bg { stroke: color-mix(in srgb, var(--rc) 18%, transparent); }
-.gl-sum-pct { font-family: var(--font-display); font-size: 17px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
-.gl-sum-text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.gl-sum-label { font-family: var(--font-display); font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
-.gl-sum-sub { font-size: 14px; color: var(--text-2); line-height: 1.35; }
-.gl-sum-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: var(--hairline) solid var(--separator); }
-.gl-sum { display: flex; flex-direction: column; gap: 1px; padding: 11px 16px 12px; min-width: 0; }
-.gl-sum + .gl-sum { box-shadow: inset var(--hairline) 0 0 var(--separator); }
-.gl-sum b { font-family: var(--font-display); font-size: 22px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; font-variant-numeric: tabular-nums; }
-.gl-sum span { font-size: 13px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.gl-sum.is-danger b { color: var(--danger); }
+.gl-sum-pct { font-family: var(--font-display); font-size: 14px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.gl-sum-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.gl-sum-label { font-size: 17px; font-weight: 600; letter-spacing: -0.024em; line-height: 1.2; }
+.gl-sum-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.gl-sum-chip {
+  display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 9px; border-radius: 999px;
+  background: var(--fill-3); font-size: 13px; color: var(--text-2); white-space: nowrap;
+}
+.gl-sum-chip b { color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; }
+.gl-sum-chip.is-danger, .gl-sum-chip.is-danger b { color: var(--danger); }
+.gl-sum-chip.is-danger { background: color-mix(in srgb, var(--danger) 12%, transparent); }
 
-.gl-banner { width: 100%; }
-.gl-banner .ls-sub { color: var(--text-2); }
+/* напоминание о колесе баланса — компактная строка с крестиком */
+.gl-wheel-tip { display: flex; align-items: center; min-height: 44px; background: var(--surface); border-radius: var(--radius-group); overflow: hidden; }
+.gl-wheel-tip-main {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; align-self: stretch; padding: 0 4px 0 14px; border: none; background: none;
+  color: var(--text); font-size: 15px; letter-spacing: -0.01em; text-align: left;
+}
+.gl-wheel-tip-main:active { background: var(--fill-3); }
+.gl-wheel-tip-ic { flex-shrink: 0; color: #af52de; }
+.gl-wheel-tip-chev { flex-shrink: 0; color: var(--text-3); }
+.gl-wheel-tip-x {
+  flex-shrink: 0; width: 44px; align-self: stretch; display: inline-flex; align-items: center; justify-content: center; border: none; background: none; color: var(--text-3);
+}
+.gl-wheel-tip-x:active { color: var(--text); }
 
 /* баннер колеса на вкладке «Колесо» */
 .gl-banner-card { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px 14px; padding: 14px 16px; text-align: left; color: var(--text); width: 100%; background: var(--surface); border-radius: var(--radius-group); }
@@ -99,8 +114,13 @@
   --c: var(--accent); position: relative; display: flex; align-items: flex-start; gap: 14px; padding: 13px 14px 13px 16px; width: 100%; min-width: 0;
   border: none; border-radius: 0; background: none; text-align: left; color: var(--text); font: inherit;
   transition: background .2s; -webkit-tap-highlight-color: transparent;
+  /* долгое нажатие — меню, а не выделение текста */
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
 }
-.gl-card + .gl-card::before { content: ''; position: absolute; top: 0; left: 76px; right: 0; height: var(--hairline); background: var(--separator); }
+.gl-card-sw + .gl-card-sw > .gl-card::before { content: ''; position: absolute; top: 0; left: 76px; right: 0; height: var(--hairline); background: var(--separator); }
+/* свайп строки: фон без скруглений (их даёт список), строка непрозрачна, пока сдвинута */
+.gl-card-sw { border-radius: 0; }
+.gl-card-sw.swiping > .gl-card { background: var(--surface); }
 .gl-card:active { background: var(--fill-3); transition: none; }
 @media (hover: hover) { .gl-card:hover { background: var(--fill-4); } }
 .gl-card.is-paused .gl-card-main, .gl-card.is-archived .gl-card-main, .gl-card.is-paused .gl-ring, .gl-card.is-archived .gl-ring { opacity: .6; }

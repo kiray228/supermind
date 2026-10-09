@@ -1,5 +1,5 @@
 /** «Что нового»: главное в каждой версии. Новые версии — сверху. */
-import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints } from 'lucide-react';
+import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList } from 'lucide-react';
 
 export interface ChangeItem {
   icon: typeof Sparkles;
@@ -15,6 +15,17 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.21',
+    title: 'Удобнее каждый день',
+    items: [
+      { icon: LayoutGrid, title: 'Мои карты — по-новому', text: 'У каждой карты настоящая миниатюра с её темами, последняя — крупно в «Продолжить». Шаблоны, ИИ и импорт — в одной строке сверху; сортировка и поиск по темам. Удерживайте карту — меню; «В корзину» можно вернуть.' },
+      { icon: Hand, title: 'Свайпы везде одинаково', text: 'Задачи, привычки, операции, цели, заметки: вправо — выполнить, влево — удалить (длинный свайп — сразу). Удержание — меню действий. Удалили по ошибке — «Вернуть».' },
+      { icon: Flame, title: 'Серия, которая прощает', text: 'Огонёк серии рядом с уровнем. Каждые 7 дней подряд дают «заморозку» на пропущенный день. Вечером — мягкое напоминание, если серия под угрозой (время — в Настройках). Конфетти за уровни и рекорды — отключается в Оформлении.' },
+      { icon: ClipboardList, title: 'Итоги недели', text: 'В воскресенье и понедельник — «Итоги недели»: задачи, привычки, фокус, траты, настроение и подсказки. Запишите, что получилось и что дальше, — планы станут задачами, а неделю можно сохранить картой.' },
+      { icon: Wallet, title: 'Финансы, цели, календарь', text: 'Последние операции видны сразу, фильтры — в одной кнопке. Цели и копилки — компактнее, с меню по удержанию. В календаре — только нужные недели месяца.' },
+    ],
+  },
   {
     version: '1.20',
     title: 'Второй мозг: связанные заметки',

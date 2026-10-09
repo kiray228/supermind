@@ -60,6 +60,8 @@
   display: inline-flex; align-items: center; justify-content: center; color: var(--text-2); padding: 0;
 }
 .pl-habit-minus:active { transform: scale(.92); }
+.pl-habit-minus { position: relative; }
+@media (pointer: coarse) { .pl-habit-minus::after { content: ''; position: absolute; inset: -5px; border-radius: 50%; } }
 .pl-streak {
   display: inline-flex; align-items: center; gap: 3px; flex-shrink: 0; padding: 4px 8px; border-radius: 999px;
   font-size: 13px; font-weight: 700; color: var(--text-3); background: var(--surface); font-variant-numeric: tabular-nums;

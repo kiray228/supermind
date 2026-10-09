@@ -208,3 +208,14 @@
 @media (prefers-reduced-motion: reduce) {
   .pg-ach.new { animation: none; }
 }
+
+/* ---------- Серия: заморозки и активность за 30 дней ---------- */
+.pg-streak-note {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-top: 10px; padding: 9px 12px; border-radius: 12px;
+  background: color-mix(in srgb, var(--ios-orange) 9%, var(--surface-2)); font-size: 13px; color: var(--text-2); line-height: 1.35;
+}
+.pg-streak-note > span:first-child { flex: 1; min-width: 160px; }
+.pg-streak-30 { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pg-streak-30 b { color: var(--text); }
+.pg-cell.frozen { background: color-mix(in srgb, #64d2ff 45%, var(--fill-3)); }

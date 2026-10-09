@@ -32,3 +32,18 @@ export function lsSet(key: string, value: string) {
     /* хранилище недоступно */
   }
 }
+
+const LAST_OPEN_KEY = 'sm-last-open';
+/** через сколько дней без приложения показывать окно */
+export const AWAY_DAYS = 3;
+
+/** Сколько дней приложение не открывали (и отметить сегодняшний день) */
+export function touchLastOpen(): number {
+  const n = new Date();
+  const today = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+  const prev = lsGet(LAST_OPEN_KEY);
+  if (prev !== today) lsSet(LAST_OPEN_KEY, today);
+  if (!prev || !/^\d{4}-\d{2}-\d{2}$/.test(prev) || prev >= today) return 0;
+  const [a, b] = [prev, today].map((d) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10)));
+  return Math.round((b - a) / 86400000);
+}

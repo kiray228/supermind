@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { DownloadSimple, MagnifyingGlass, X } from '@phosphor-icons/react';
+import { DownloadSimple, FunnelSimple, MagnifyingGlass, X } from '@phosphor-icons/react';
 import { todayYmd } from '../../utils/mapTasks';
 import { downloadText } from '../../io/download';
 import { toast } from '../../store/appStore';
@@ -20,7 +20,7 @@ import {
   type Transaction,
 } from '../model';
 import { exportCsv } from '../csv';
-import { dayTitle, TxRow } from './common';
+import { dayTitle, Sheet, TxRow } from './common';
 import { DEFAULT_FILTER, openTxSheet, setFilter, useFinUi, type OpsFilter } from './state';
 
 const PAGE = 150;
@@ -65,6 +65,7 @@ export function applyFilter(d: FinanceData, f: OpsFilter): Transaction[] {
 export function Operations({ data }: { data: FinanceData }) {
   const f = useFinUi((s) => s.filter);
   const [limit, setLimit] = useState(PAGE);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const accs = useMemo(() => accountMap(data), [data]);
   const cats = useMemo(() => categoryMap(data), [data]);
   const list = useMemo(() => applyFilter(data, f), [data, f]);
@@ -92,7 +93,8 @@ export function Operations({ data }: { data: FinanceData }) {
   }, [list, limit, data, accs]);
 
   const filtered = JSON.stringify({ ...f, q: '' }) !== JSON.stringify({ ...DEFAULT_FILTER, q: '' });
-  const catOptions = [...sortedCategories(data, 'expense'), ...sortedCategories(data, 'income')];
+  // счёт, категория и период — в окне «Фильтры», на экране только их число
+  const nFilters = (f.accountId ? 1 : 0) + (f.categoryId ? 1 : 0) + (f.period !== 'all' ? 1 : 0);
 
   const exportList = () => {
     if (!list.length) return toast('Нет операций для выгрузки');
@@ -115,58 +117,25 @@ export function Operations({ data }: { data: FinanceData }) {
           <DownloadSimple />
         </button>
       </div>
-      <div className="fn-filters">
-        <div className="segmented fn-seg-wide">
-          {(
-            [
-              ['all', 'Все'],
-              ['expense', 'Расходы'],
-              ['income', 'Доходы'],
-              ['transfer', 'Переводы'],
-            ] as const
-          ).map(([v, l]) => (
-            <button key={v} className={f.type === v ? 'active' : ''} onClick={() => setFilter({ type: v })}>
-              {l}
-            </button>
-          ))}
-        </div>
-        <div className="fn-filter-selects">
-          <select className="select" value={f.accountId} onChange={(e) => setFilter({ accountId: e.target.value })}>
-            <option value="">Все счета</option>
-            {sortedAccounts(data, true).map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.emoji} {a.name}
-              </option>
-            ))}
-          </select>
-          <select className="select" value={f.categoryId} onChange={(e) => setFilter({ categoryId: e.target.value })}>
-            <option value="">Все категории</option>
-            <option value="-">Без категории</option>
-            {catOptions.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.emoji} {c.name}
-                {c.kind === 'income' ? ' (доход)' : ''}
-              </option>
-            ))}
-          </select>
-          <select className="select" value={f.period} onChange={(e) => setFilter({ period: e.target.value as OpsFilter['period'] })}>
-            <option value="all">За всё время</option>
-            <option value="month">Этот месяц</option>
-            <option value="prev">Прошлый месяц</option>
-            <option value="year">Этот год</option>
-            <option value="custom">Свой период…</option>
-          </select>
-        </div>
-        {f.period === 'custom' && (
-          <div className="fn-filter-dates">
-            <input type="date" className="input" value={f.from} onChange={(e) => setFilter({ from: e.target.value })} aria-label="С" />
-            <span className="faint">—</span>
-            <input type="date" className="input" value={f.to} onChange={(e) => setFilter({ to: e.target.value })} aria-label="По" />
-          </div>
-        )}
+      <div className="segmented fn-seg-wide">
+        {(
+          [
+            ['all', 'Все'],
+            ['expense', 'Расходы'],
+            ['income', 'Доходы'],
+            ['transfer', 'Переводы'],
+          ] as const
+        ).map(([v, l]) => (
+          <button key={v} className={f.type === v ? 'active' : ''} onClick={() => setFilter({ type: v })}>
+            {l}
+          </button>
+        ))}
       </div>
-
       <div className="fn-ops-sum small">
+        <button className={'chip fn-filter-chip' + (nFilters ? ' active' : '')} onClick={() => setFiltersOpen(true)}>
+          <FunnelSimple size={15} weight={nFilters ? 'fill' : 'bold'} />
+          Фильтры{nFilters ? ` (${nFilters})` : ''}
+        </button>
         <span className="muted">
           {list.length} опер.
         </span>
@@ -175,10 +144,11 @@ export function Operations({ data }: { data: FinanceData }) {
         <span className="grow" />
         {(filtered || f.q) && (
           <button className="fn-link small" onClick={() => useFinUi.setState({ filter: DEFAULT_FILTER })}>
-            Сбросить фильтры
+            Сбросить
           </button>
         )}
       </div>
+      {filtersOpen && <FiltersSheet data={data} f={f} onClose={() => setFiltersOpen(false)} />}
 
       {!list.length ? (
         <div className="empty">{data.transactions.length ? 'Ничего не найдено' : 'Операций пока нет. Нажмите «+», чтобы добавить.'}</div>
@@ -204,5 +174,63 @@ export function Operations({ data }: { data: FinanceData }) {
         </button>
       )}
     </div>
+  );
+}
+
+/** Окно фильтров: счёт, категория, период — применяются сразу */
+function FiltersSheet({ data, f, onClose }: { data: FinanceData; f: OpsFilter; onClose: () => void }) {
+  const catOptions = [...sortedCategories(data, 'expense'), ...sortedCategories(data, 'income')];
+  return (
+    <Sheet
+      title="Фильтры"
+      onClose={onClose}
+      className="fn-filter-sheet"
+      actions={
+        <>
+          <button className="btn" onClick={() => setFilter({ accountId: '', categoryId: '', period: 'all', from: '', to: '' })}>
+            Сбросить
+          </button>
+          <button className="btn btn-primary" onClick={onClose}>
+            Готово
+          </button>
+        </>
+      }
+    >
+      <label className="label">Счёт</label>
+      <select className="select" value={f.accountId} onChange={(e) => setFilter({ accountId: e.target.value })}>
+        <option value="">Все счета</option>
+        {sortedAccounts(data, true).map((a) => (
+          <option key={a.id} value={a.id}>
+            {a.emoji} {a.name}
+          </option>
+        ))}
+      </select>
+      <label className="label">Категория</label>
+      <select className="select" value={f.categoryId} onChange={(e) => setFilter({ categoryId: e.target.value })}>
+        <option value="">Все категории</option>
+        <option value="-">Без категории</option>
+        {catOptions.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.emoji} {c.name}
+            {c.kind === 'income' ? ' (доход)' : ''}
+          </option>
+        ))}
+      </select>
+      <label className="label">Период</label>
+      <select className="select" value={f.period} onChange={(e) => setFilter({ period: e.target.value as OpsFilter['period'] })}>
+        <option value="all">За всё время</option>
+        <option value="month">Этот месяц</option>
+        <option value="prev">Прошлый месяц</option>
+        <option value="year">Этот год</option>
+        <option value="custom">Свой период…</option>
+      </select>
+      {f.period === 'custom' && (
+        <div className="fn-filter-dates">
+          <input type="date" className="input" value={f.from} onChange={(e) => setFilter({ from: e.target.value })} aria-label="С" />
+          <span className="faint">—</span>
+          <input type="date" className="input" value={f.to} onChange={(e) => setFilter({ to: e.target.value })} aria-label="По" />
+        </div>
+      )}
+    </Sheet>
   );
 }

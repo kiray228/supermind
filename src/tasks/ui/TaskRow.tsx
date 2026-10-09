@@ -1,10 +1,17 @@
-import { useRef, useState, type CSSProperties } from 'react';
-import { Bell, Check, CalendarDays, ListChecks, Network, Pin, Repeat, Trash2, Timer, AlignLeft } from 'lucide-react';
-import { PRIORITY_META, todayYmd } from '../../utils/mapTasks';
+import { useState, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
+import { Bell, Check, ListChecks, Network, Pin, Repeat, Timer, AlignLeft, Undo2 } from 'lucide-react';
+import { PRIORITY_META, addDaysYmd, todayYmd } from '../../utils/mapTasks';
 import { dayLabel, isOverdue, whenLabel, type TaskItem, type TaskList } from '../model';
 import { toast } from '../../store/appStore';
-import { openTask, toggleDone, trashTask, updateTask } from '../store';
+import { openTask, purgeTask, restoreTask, toggleDone, trashTask, updateTask } from '../store';
+import { mergeHandlers, useLongPress, useSwipeActions } from '../../ui/gestures';
+import { SwipeBg } from '../../ui/SwipeBg';
 import { DatePicker } from './DatePicker';
+import '../../ui/dialogs.css';
+import './tasks.css';
+
+const finePointer = typeof matchMedia === 'function' && matchMedia('(pointer: fine)').matches;
 
 /** Кружок-чекбокс в цвете приоритета */
 export function TaskCheck({ task, onToggle }: { task: Pick<TaskItem, 'done' | 'priority' | 'wontDo'>; onToggle: () => void }) {
@@ -22,6 +29,135 @@ export function TaskCheck({ task, onToggle }: { task: Pick<TaskItem, 'done' | 'p
       {task.done && <Check size={13} strokeWidth={3.2} />}
     </button>
   );
+}
+
+/**
+ * Жесты и меню задачи (строки списков, ежедневника и календаря): свайп вправо — выполнить (в корзине — вернуть),
+ * влево — удалить с «Вернуть» (в корзине — навсегда), долгое нажатие / правая кнопка — лист действий.
+ * Разметка: обёртка ref={swipe.wrap} className={swipe.wrapClass}, первым — bg, строка — класс sw-row, style={swipe.style}, {...handlers}; overlays — после строки.
+ */
+export function useTaskActions(task: TaskItem, occurrence?: string) {
+  const [picking, setPicking] = useState(false);
+  const [completing, setCompleting] = useState(false);
+  const [menu, setMenu] = useState(false);
+  const today = todayYmd();
+  const tomorrow = addDaysYmd(today, 1);
+
+  const future = !!occurrence && !!task.date && occurrence !== task.date;
+  const trashed = !!task.deleted;
+  const done = () => {
+    if (completing) return;
+    if (future) {
+      toast(`Сначала отметьте повтор ${dayLabel(task.date!).toLowerCase()}`);
+      return;
+    }
+    if (task.done) return toggleDone(task.id);
+    // короткая анимация «вычёркивания» перед исчезновением из списка
+    setCompleting(true);
+    setTimeout(() => {
+      setCompleting(false);
+      toggleDone(task.id);
+    }, 260);
+  };
+  const remove = () => {
+    if (trashed) {
+      purgeTask(task.id);
+      toast('Задача удалена навсегда');
+      return;
+    }
+    trashTask(task.id);
+    toast('Задача удалена', { label: 'Вернуть', run: () => restoreTask(task.id) });
+  };
+
+  // сенсорный экран: вправо — выполнить (в корзине — восстановить), влево — удалить; долгое нажатие — меню
+  const press = useLongPress(() => setMenu(true));
+  const swipe = useSwipeActions({ onDelete: remove, onRight: trashed ? () => restoreTask(task.id) : future ? undefined : done });
+  const handlers = mergeHandlers(press, swipe.bind);
+  const act = (fn: () => void) => () => {
+    setMenu(false);
+    fn();
+  };
+
+  const bg = (
+    <SwipeBg
+      dx={swipe.dx}
+      armed={swipe.armed}
+      onDelete={swipe.confirmDelete}
+      rightLabel={trashed ? 'Вернуть' : task.done ? 'Не готово' : 'Выполнить'}
+      rightIcon={trashed || task.done ? <Undo2 size={22} strokeWidth={2.4} /> : undefined}
+      deleteLabel={trashed ? 'Навсегда' : 'Удалить'}
+    />
+  );
+  const overlays = (
+    <>
+      {menu &&
+        createPortal(
+          // события листа не должны доходить до строки и списка (React пробрасывает их через портал)
+          <div
+            className="modal-backdrop dlg-as-backdrop"
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              if (e.target === e.currentTarget) setMenu(false);
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onContextMenu={(e) => e.stopPropagation()}
+          >
+            <div className="dlg-as" role="menu" onKeyDown={(e) => e.key === 'Escape' && setMenu(false)}>
+              <div className="dlg-as-group">
+                <div className="dlg-as-head">
+                  <div className="dlg-as-title">{task.title || 'Без названия'}</div>
+                </div>
+                {trashed ? (
+                  <>
+                    <button className="dlg-as-btn" onClick={act(() => restoreTask(task.id))}>
+                      Восстановить
+                    </button>
+                    <button className="dlg-as-btn danger" onClick={act(remove)}>
+                      Удалить навсегда
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button className="dlg-as-btn" onClick={act(done)}>
+                      {task.done ? 'Отметить невыполненной' : 'Выполнить'}
+                    </button>
+                    {!task.done && task.date !== tomorrow && (
+                      <button className="dlg-as-btn" onClick={act(() => updateTask(task.id, { date: tomorrow }))}>
+                        Перенести на завтра
+                      </button>
+                    )}
+                    <button className="dlg-as-btn" onClick={act(() => setPicking(true))}>
+                      Выбрать дату
+                    </button>
+                    <button className="dlg-as-btn" onClick={act(() => updateTask(task.id, { pinned: !task.pinned }))}>
+                      {task.pinned ? 'Открепить' : 'Закрепить'}
+                    </button>
+                    <button className="dlg-as-btn danger" onClick={act(remove)}>
+                      Удалить
+                    </button>
+                  </>
+                )}
+              </div>
+              <button className="dlg-as-btn dlg-as-cancel" autoFocus onClick={() => setMenu(false)}>
+                Отмена
+              </button>
+            </div>
+          </div>,
+          document.body,
+        )}
+      {picking && (
+        <DatePicker
+          value={task}
+          onClose={() => setPicking(false)}
+          onDone={(v) => {
+            setPicking(false);
+            updateTask(task.id, { date: v.date, time: v.time, duration: v.duration, reminders: v.reminders, repeat: v.repeat });
+          }}
+        />
+      )}
+    </>
+  );
+  return { swipe, handlers, bg, overlays, done, completing, future };
 }
 
 export function TaskRow({
@@ -45,10 +181,6 @@ export function TaskRow({
   tagColors?: Record<string, string>;
   draggable?: boolean;
 }) {
-  const [dx, setDx] = useState(0);
-  const [picking, setPicking] = useState(false);
-  const [completing, setCompleting] = useState(false);
-  const drag = useRef<{ x: number; y: number; id: number; horiz: boolean | null; base: number } | null>(null);
   const today = todayYmd();
   const overdue = isOverdue(task, today);
   // сегодняшним задачам достаточно времени: «10:00–11:00» вместо «Сегодня, 10:00–11:00»
@@ -62,82 +194,18 @@ export function TaskRow({
         ? whenLabel(task, today).replace(/^Сегодня, /, '')
         : whenLabel(task, today);
   const checklistDone = task.checklist.filter((c) => c.done).length;
-
-  const future = !!occurrence && !!task.date && occurrence !== task.date;
-  const done = () => {
-    if (completing) return;
-    if (future) {
-      toast(`Сначала отметьте повтор ${dayLabel(task.date!).toLowerCase()}`);
-      return;
-    }
-    if (task.done) return toggleDone(task.id);
-    // короткая анимация «вычёркивания» перед исчезновением из списка
-    setCompleting(true);
-    setTimeout(() => {
-      setCompleting(false);
-      toggleDone(task.id);
-    }, 260);
-  };
-
-  // свайпы на сенсорном экране: вправо — выполнить, влево — дата и удаление
-  const onPointerDown = (e: React.PointerEvent) => {
-    if (e.pointerType === 'mouse') return;
-    drag.current = { x: e.clientX, y: e.clientY, id: e.pointerId, horiz: null, base: dx };
-  };
-  const onPointerMove = (e: React.PointerEvent) => {
-    const d = drag.current;
-    if (!d || d.id !== e.pointerId) return;
-    const mx = e.clientX - d.x;
-    const my = e.clientY - d.y;
-    if (d.horiz === null && Math.abs(mx) + Math.abs(my) > 10) d.horiz = Math.abs(mx) > Math.abs(my) * 1.3;
-    if (d.horiz) setDx(Math.max(-150, Math.min(110, d.base + mx)));
-  };
-  const onPointerUp = () => {
-    const d = drag.current;
-    drag.current = null;
-    if (!d?.horiz) return;
-    if (dx > 80) {
-      setDx(0);
-      if (!future) done();
-    } else if (dx < -60) setDx(-132);
-    else setDx(0);
-  };
+  const { swipe, handlers, bg, overlays, done, completing, future } = useTaskActions(task, occurrence);
 
   return (
-    <div className={`tk-row-wrap${dx ? ' swiping' : ''}`}>
-      <div className="tk-swipe-bg">
-        <span className="tk-swipe-done">
-          <Check size={18} /> Выполнить
-        </span>
-        <div className="grow" />
-        <button
-          className="tk-swipe-btn date"
-          onClick={() => {
-            setDx(0);
-            setPicking(true);
-          }}
-        >
-          <CalendarDays size={18} />
-        </button>
-        <button
-          className="tk-swipe-btn del"
-          onClick={() => {
-            setDx(0);
-            trashTask(task.id);
-          }}
-        >
-          <Trash2 size={18} />
-        </button>
-      </div>
+    <div ref={swipe.wrap} className={`tk-row-wrap ${swipe.wrapClass}`}>
+      {bg}
       <div
-        className={`tk-row${task.done ? ' is-done' : ''}${completing ? ' completing' : ''}`}
-        style={dx ? { transform: `translateX(${dx}px)` } : undefined}
-        onClick={() => (dx ? setDx(0) : openTask(task.id))}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-        draggable={draggable}
+        className={`tk-row sw-row${task.done ? ' is-done' : ''}${completing ? ' completing' : ''}`}
+        style={swipe.style}
+        onClick={() => openTask(task.id)}
+        {...handlers}
+        // на iPhone долгое нажатие перетаскивало бы строку вместо меню — перетаскивание только мышью
+        draggable={draggable && finePointer}
         onDragStart={(e) => {
           e.dataTransfer.setData('text/sm-task', task.id);
           e.dataTransfer.effectAllowed = 'move';
@@ -183,16 +251,7 @@ export function TaskRow({
           </span>
         )}
       </div>
-      {picking && (
-        <DatePicker
-          value={task}
-          onClose={() => setPicking(false)}
-          onDone={(v) => {
-            setPicking(false);
-            updateTask(task.id, { date: v.date, time: v.time, duration: v.duration, reminders: v.reminders, repeat: v.repeat });
-          }}
-        />
-      )}
+      {overlays}
     </div>
   );
 }

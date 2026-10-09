@@ -250,3 +250,37 @@
 @media (prefers-reduced-motion: reduce) {
   .ob-root, .ob-root *, .wn-sheet { animation: none !important; transition: none !important; }
 }
+
+/* ===================== Первые шаги ===================== */
+.card.fs-card { padding: 14px 14px 8px; }
+.fs-head { display: flex; align-items: flex-start; gap: 8px; }
+.fs-title { font-size: 16px; font-weight: 750; letter-spacing: -.01em; }
+.fs-sub { margin-top: 1px; font-size: 12.5px; color: var(--text-2); }
+.fs-close { margin: -6px -6px 0 0; color: var(--text-3); }
+.fs-bar { height: 5px; margin: 10px 0 6px; border-radius: 99px; background: var(--fill-3); overflow: hidden; }
+.fs-bar span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .4s ease; }
+.fs-list { list-style: none; margin: 0; padding: 0; }
+.fs-step {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 2px; border: none; background: none;
+  color: var(--text); font: inherit; text-align: left; cursor: pointer; border-radius: 10px;
+}
+.fs-step:not(:disabled):active { background: var(--fill-3); }
+.fs-step:disabled { cursor: default; opacity: 1; }
+.fs-check {
+  flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
+  border: 1.5px solid var(--text-3); color: #fff;
+}
+.fs-step.done .fs-check { border-color: transparent; background: var(--ios-green, #30d158); }
+.fs-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.fs-text b { font-size: 14px; font-weight: 600; }
+.fs-step.done .fs-text b { color: var(--text-2); font-weight: 500; text-decoration: line-through; text-decoration-color: var(--text-3); }
+.fs-text small { font-size: 12.5px; color: var(--text-2); }
+.fs-chev { color: var(--text-3); flex-shrink: 0; }
+@media (prefers-reduced-motion: reduce) { .fs-bar span { transition: none; } }
+
+/* ===================== С возвращением ===================== */
+.wb-wave { font-size: 24px; line-height: 1; }
+.wb-items { margin: 18px 0 16px; }
+.wb-actions { display: grid; gap: 8px; }
+.wb-btn { height: 46px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.wb-later { height: 40px; color: var(--text-2); }

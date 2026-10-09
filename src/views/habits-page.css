@@ -488,24 +488,8 @@
 .hp-page .hp-week-row .hp-day-ring { width: 36px !important; height: 36px !important; }
 .hp-page .hp-week-row .hp-day-ring .hp-ring-in { font-size: 14px; }
 
-/* ---------- Свайп карточки: «Удалить» ---------- */
-.hp-swipe { position: relative; border-radius: 24px; }
-.hp-swipe-bg {
-  position: absolute; inset: 0; border-radius: inherit; overflow: hidden; display: flex; align-items: stretch; justify-content: flex-end;
-  background: var(--ios-red);
-}
-.hp-swipe.to-right .hp-swipe-bg { justify-content: flex-start; }
-.hp-swipe-del {
-  width: 96px; border: none; background: none; color: #fff; display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 3px; font-size: 13px; font-weight: 650; padding: 0;
-}
-.hp-swipe-del svg { transition: transform 0.15s; }
-.hp-swipe-del.armed svg { transform: scale(1.2); }
-.hp-swipe .hp-card { transition: transform 0.24s cubic-bezier(0.2, 0.9, 0.3, 1), background 0.25s, border-color 0.25s, opacity 0.2s; }
-.hp-swipe.dragging .hp-card { transition: background 0.25s, border-color 0.25s; }
-.hp-swipe.gone .hp-card { opacity: 0; }
-.hp-swipe.gone { animation: hp-collapse 0.2s ease 0.12s forwards; }
-@keyframes hp-collapse { to { opacity: 0; } }
+/* свайп — общий: src/ui/swipe.css */
+.hp-swipe { border-radius: 24px; }
 
 /* долгое нажатие — меню, а не выделение текста (iPhone) */
 .hp-card { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: pan-y; }

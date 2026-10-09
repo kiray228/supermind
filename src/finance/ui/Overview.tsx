@@ -37,7 +37,9 @@ export function Overview({ data }: { data: FinanceData }) {
   const month = useMemo(() => summarize(data, { from: monthStart(today), to: monthEnd(today) }), [data, today]);
   const accs = useMemo(() => accountMap(data), [data]);
   const cats = useMemo(() => categoryMap(data), [data]);
-  const recent = useMemo(() => [...data.transactions].sort(sortTx).slice(0, 8), [data.transactions]);
+  const recent = useMemo(() => [...data.transactions].sort(sortTx).slice(0, 6), [data.transactions]);
+  // блок «Долги» — только когда есть открытые долги (записать новый можно на вкладке «Долги»)
+  const hasDebts = data.debts.some((d) => !d.closed);
   const upcoming = useMemo(() => upcomingPayments(data, '0000-01-01', addDaysYmd(today, 14)).slice(0, 8), [data, today]);
   const tb = totalBudget(data);
   const catBudgets = data.budgets.filter((b) => b.categoryId && cats.has(b.categoryId));
@@ -105,14 +107,29 @@ export function Overview({ data }: { data: FinanceData }) {
         </div>
       </section>
 
-      <section className="card fn-panel fn-debt-panel">
+      <section className="card fn-panel">
         <div className="fn-panel-head">
-          <h3>Долги</h3>
-          <button className="fn-link small" onClick={() => setFinTab('debts')}>
-            {data.debts.length ? 'Все' : 'Записать'} <CaretRight size={13} weight="bold" />
-          </button>
+          <h3>Последние операции</h3>
+          {recent.length > 0 && (
+            <button className="fn-link small" onClick={() => showOps({})}>
+              Все <CaretRight size={13} weight="bold" />
+            </button>
+          )}
         </div>
-        <DebtSummary data={data} onClick={() => setFinTab('debts')} />
+        {recent.length ? (
+          <div className="fn-list fn-recent">
+            {recent.map((t) => (
+              <TxRow key={t.id} tx={t} accs={accs} cats={cats} showDate onClick={() => openTxSheet({ tx: t })} />
+            ))}
+          </div>
+        ) : (
+          <div className="fn-empty-inline">
+            <p className="muted small fn-m0">Операций пока нет. Нажмите «+», чтобы добавить первый расход или доход.</p>
+            <button className="btn btn-primary btn-sm" onClick={() => openTxSheet()}>
+              <Plus size={15} weight="bold" /> Добавить
+            </button>
+          </div>
+        )}
       </section>
 
       <section className="card fn-panel">
@@ -182,30 +199,17 @@ export function Overview({ data }: { data: FinanceData }) {
         </section>
       )}
 
-      <section className="card fn-panel">
-        <div className="fn-panel-head">
-          <h3>Последние операции</h3>
-          {recent.length > 0 && (
-            <button className="fn-link small" onClick={() => showOps({})}>
+      {hasDebts && (
+        <section className="card fn-panel fn-debt-panel">
+          <div className="fn-panel-head">
+            <h3>Долги</h3>
+            <button className="fn-link small" onClick={() => setFinTab('debts')}>
               Все <CaretRight size={13} weight="bold" />
             </button>
-          )}
-        </div>
-        {recent.length ? (
-          <div className="fn-list">
-            {recent.map((t) => (
-              <TxRow key={t.id} tx={t} accs={accs} cats={cats} showDate onClick={() => openTxSheet({ tx: t })} />
-            ))}
           </div>
-        ) : (
-          <div className="fn-empty-inline">
-            <p className="muted small fn-m0">Операций пока нет. Нажмите «+», чтобы добавить первый расход или доход.</p>
-            <button className="btn btn-primary btn-sm" onClick={() => openTxSheet()}>
-              <Plus size={15} weight="bold" /> Добавить
-            </button>
-          </div>
-        )}
-      </section>
+          <DebtSummary data={data} onClick={() => setFinTab('debts')} />
+        </section>
+      )}
     </div>
   );
 }

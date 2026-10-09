@@ -103,6 +103,11 @@
 }
 .kb-card-btn:hover, .kb-handle:hover { background: var(--fill-3); color: var(--text); }
 .kb-handle { cursor: grab; touch-action: none; }
+@media (pointer: coarse) {
+  /* кнопки карточки и колонки — не меньше 40px под палец */
+  .kb-card-side { gap: 0; margin: -10px -6px -10px 0; }
+  .kb-card-btn, .kb-handle, .kb-col-btn { width: 40px; height: 40px; }
+}
 .kb-labels { display: flex; flex-wrap: wrap; gap: 4px; }
 .kb-label {
   font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px;
@@ -288,6 +293,10 @@
 .pl-sec-meta { font-size: 12.5px; font-weight: 600; color: var(--text-3); }
 .pl-sec-btn { width: 30px; height: 30px; margin: -4px -6px -4px 0; color: var(--text-2); }
 .pl-sec-btn svg { width: 18px; height: 18px; }
+@media (pointer: coarse) {
+  .pl-sec-btn { position: relative; }
+  .pl-sec-btn::after { content: ''; position: absolute; inset: -5px; }
+}
 .pl-empty-line { color: var(--text-3); font-size: 13.5px; padding: 4px 0; }
 .pl-progress { height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; margin-bottom: 8px; }
 .pl-progress > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .3s; }
@@ -382,8 +391,9 @@
   .pl-day-title h2 { font-size: 22px; }
   .pl-section { padding: 12px 14px 14px; border-radius: 16px; }
   .pl-sections, .pl-col { gap: 12px; }
-  .pl-moods { grid-template-columns: repeat(4, 1fr); }
-  .pl-mood { max-height: 56px; font-size: 26px; }
+  /* все 8 смайлов в один ряд */
+  .pl-moods { grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 4px; }
+  .pl-mood { font-size: 21px; border-radius: 10px; }
   .pl-task { gap: 8px; }
   .pl-task-btn { width: 30px; height: 30px; }
   .pl-time { min-width: 64px; padding: 0 4px; }

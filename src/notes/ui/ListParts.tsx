@@ -1,9 +1,11 @@
 import { memo, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent } from 'react';
-import { Image as ImageIcon, Mic, MoreHorizontal, Pin, SquareCheck, Trash2 } from 'lucide-react';
+import { Image as ImageIcon, Mic, MoreHorizontal, Pin, RotateCcw, SquareCheck, Trash2 } from 'lucide-react';
 import type { ID } from '../../types';
 import { confirmDialog } from '../../ui/dialogs';
 import { type Folder, FOLDER_COLORS, FOLDER_EMOJIS, type NoteMeta, noteDate } from '../model';
-import { addFolder, deleteFolder, updateFolder } from '../store';
+import { addFolder, deleteFolder, restoreNote, trashNote, updateFolder } from '../store';
+import { mergeHandlers, useSwipeActions } from '../../ui/gestures';
+import { SwipeBg } from '../../ui/SwipeBg';
 
 /** Долгое нажатие (iOS не присылает contextmenu) */
 export function useLongPress(onLong: (p: { x: number; y: number }) => void, ms = 480) {
@@ -57,50 +59,58 @@ export const NoteCard = memo(function NoteCard({
   onMenu: (id: ID, anchor: HTMLElement | { x: number; y: number }) => void;
 }) {
   const lp = useLongPress((p) => onMenu(n.id, p));
+  // свайп влево — в корзину (с «Отменить»), в корзине вправо — восстановить; удалить навсегда — только из меню
+  const swipe = useSwipeActions({ onDelete: n.trashed ? undefined : () => trashNote(n.id), onRight: n.trashed ? () => restoreNote(n.id) : undefined });
+  const g = mergeHandlers(lp.handlers, swipe.bind);
   return (
-    <div
-      className={`nt-card${n.trashed ? ' is-trashed' : ''}`}
-      role="button"
-      tabIndex={0}
-      {...lp.handlers}
-      onClick={() => {
-        if (lp.fired.current) return;
-        onOpen(n.id);
-      }}
-      onKeyDown={(e) => e.key === 'Enter' && onOpen(n.id)}
-    >
-      <div className="nt-card-top">
-        <div className={`nt-card-title${n.title ? '' : ' is-empty'}`}>{n.title || 'Без названия'}</div>
-        {n.pinned && !n.trashed && <Pin size={14} className="nt-card-pin" />}
-        <button
-          className="nt-card-more"
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            onMenu(n.id, e.currentTarget);
-          }}
-          aria-label="Действия"
-        >
-          <MoreHorizontal size={16} />
-        </button>
-      </div>
-      {n.preview && <div className="nt-card-prev">{n.preview}</div>}
-      <div className="nt-card-meta">
-        <span>{noteDate(n.updatedAt)}</span>
-        {folder && (
-          <span className="nt-card-folder" style={{ '--fc': folder.color } as CSSProperties}>
-            {folder.emoji ? folder.emoji + ' ' : ''}
-            {folder.name}
-          </span>
-        )}
-        <span className="grow" />
-        {n.hasAudio && <Mic size={14} aria-label="Есть голосовая запись" />}
-        {n.hasImage && <ImageIcon size={14} aria-label="Есть изображения" />}
-        {!!n.todoTotal && (
-          <span className={`nt-card-todo${n.todoDone === n.todoTotal ? ' done' : ''}`}>
-            <SquareCheck size={14} /> {n.todoDone ?? 0}/{n.todoTotal}
-          </span>
-        )}
+    <div ref={swipe.wrap} className={`nt-swipe ${swipe.wrapClass}`}>
+      <SwipeBg dx={swipe.dx} armed={swipe.armed} onDelete={swipe.confirmDelete} rightLabel="Вернуть" rightIcon={<RotateCcw size={21} strokeWidth={2.4} />} />
+      <div
+        className={`nt-card sw-row${n.trashed ? ' is-trashed' : ''}`}
+        style={swipe.style}
+        role="button"
+        tabIndex={0}
+        {...g}
+        onPointerLeave={lp.handlers.onPointerLeave}
+        onClick={() => {
+          if (lp.fired.current) return;
+          onOpen(n.id);
+        }}
+        onKeyDown={(e) => e.key === 'Enter' && onOpen(n.id)}
+      >
+        <div className="nt-card-top">
+          <div className={`nt-card-title${n.title ? '' : ' is-empty'}`}>{n.title || 'Без названия'}</div>
+          {n.pinned && !n.trashed && <Pin size={14} className="nt-card-pin" />}
+          <button
+            className="nt-card-more"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onMenu(n.id, e.currentTarget);
+            }}
+            aria-label="Действия"
+          >
+            <MoreHorizontal size={16} />
+          </button>
+        </div>
+        {n.preview && <div className="nt-card-prev">{n.preview}</div>}
+        <div className="nt-card-meta">
+          <span>{noteDate(n.updatedAt)}</span>
+          {folder && (
+            <span className="nt-card-folder" style={{ '--fc': folder.color } as CSSProperties}>
+              {folder.emoji ? folder.emoji + ' ' : ''}
+              {folder.name}
+            </span>
+          )}
+          <span className="grow" />
+          {n.hasAudio && <Mic size={14} aria-label="Есть голосовая запись" />}
+          {n.hasImage && <ImageIcon size={14} aria-label="Есть изображения" />}
+          {!!n.todoTotal && (
+            <span className={`nt-card-todo${n.todoDone === n.todoTotal ? ' done' : ''}`}>
+              <SquareCheck size={14} /> {n.todoDone ?? 0}/{n.todoTotal}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

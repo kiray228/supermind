@@ -325,7 +325,10 @@ export function trashTask(id: ID) {
 export function restoreTask(id: ID) {
   mutateTasks((d) => {
     const x = d.tasks.find((y) => y.id === id);
-    if (x) delete x.deleted;
+    if (!x) return;
+    delete x.deleted;
+    // свежая отметка — восстановление побеждает удаление и на других устройствах
+    x.updatedAt = Date.now();
   });
 }
 /** Убрать последнюю запись журнала о выполнении задачи (с отметкой об удалении — синхронизация её не вернёт) */

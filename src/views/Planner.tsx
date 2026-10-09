@@ -27,7 +27,6 @@ import { loadAllDocs, loadPlanner, savePlanner } from '../store/db';
 import { addDaysYmd, collectMapTasks, fromYmd, PRIORITY_META, todayYmd, toYmd, updateMapTask } from '../utils/mapTasks';
 import type { MapTask } from '../utils/mapTasks';
 import { openDoc } from '../actions';
-import { confirmDialog } from '../ui/dialogs';
 import { toast } from '../store/appStore';
 import { activeHabits, cleanHabit, countOn, doneOn, dueOn, isCounter, reminderTimeOf, withCount, withDone, withoutHabit } from '../habits/model';
 import { HabitDetail, HabitEditor, HabitsManager, HabitsToday } from '../habits/ui';
@@ -312,15 +311,16 @@ export default function Planner() {
     toast(archived ? 'Привычка в архиве — история сохранена' : 'Привычка снова активна');
     if (archived) setDetailId(null);
   };
-  const deleteHabit = async (h: Habit) => {
-    const ok = await confirmDialog(`Удалить привычку «${h.name}»?`, 'История отметок этой привычки тоже будет удалена. Чтобы сохранить историю, отправьте привычку в архив.', {
-      okText: 'Удалить',
-      danger: true,
-    });
-    if (!ok) return;
+  /** Удалить сразу — с «Вернуть» в течение нескольких секунд (как в разделе «Привычки») */
+  const deleteHabit = (h: Habit) => {
     const p = dataRef.current!;
-    const days: Record<string, PlannerDay> = {};
+    const orig = p.habits.find((x) => x.id === h.id);
+    if (!orig) return;
+    const touched: Record<string, PlannerDay> = {};
+    const days = { ...p.days };
     for (const [k, d] of Object.entries(p.days)) {
+      if (!d.habits?.includes(h.id) && !d.skipped?.includes(h.id) && d.habitCounts?.[h.id] == null) continue;
+      touched[k] = d;
       days[k] = withoutHabit(d, h.id);
     }
     // отметка об удалении остаётся в списке — чтобы привычка не вернулась при синхронизации с другого устройства
@@ -329,6 +329,25 @@ export default function Planner() {
     setDetailId(null);
     setEditing(null);
     syncSoon(300);
+    toast(`«${h.name}» удалена`, {
+      label: 'Вернуть',
+      run: () => {
+        const c = dataRef.current;
+        if (!c) return;
+        const next = { ...c.days };
+        for (const [k, old] of Object.entries(touched)) {
+          const cur: PlannerDay = { ...(next[k] ?? { journal: '', tasks: [] }) };
+          if (old.habits?.includes(h.id)) cur.habits = [...new Set([...(cur.habits ?? []), h.id])];
+          if (old.skipped?.includes(h.id)) cur.skipped = [...new Set([...(cur.skipped ?? []), h.id])];
+          const n = old.habitCounts?.[h.id];
+          if (n != null) cur.habitCounts = { ...cur.habitCounts, [h.id]: n };
+          next[k] = cur;
+        }
+        // свежая отметка времени — восстановленная привычка побеждает удаление и на других устройствах
+        commit({ ...c, habits: c.habits.map((x) => (x.id === h.id ? { ...orig, updatedAt: Date.now() } : x)), days: next });
+        syncSoon(300);
+      },
+    });
   };
   const detail = detailId ? data.habits.find((h) => h.id === detailId && !h.deleted) : undefined;
   const freeze = freezeHandlers(() => ({ updateHabits, updateDay, today }));
@@ -411,17 +430,15 @@ export default function Planner() {
                   <AddTaskInput key={date} onAdd={addDayTask} />
                 </section>
 
-                {/* b) Из карт */}
-                <section className="card pl-section">
-                  <header className="pl-sec-head">
-                    <Network size={18} className="pl-sec-icon" />
-                    <h3>Из карт</h3>
-                    <div className="grow" />
-                    {dueMaps.length + overdueMaps.length > 0 && <span className="pl-sec-meta">{dueMaps.length + overdueMaps.length}</span>}
-                  </header>
-                  {dueMaps.length + overdueMaps.length === 0 ? (
-                    <div className="pl-empty-line">Нет задач из карт со сроком на этот день</div>
-                  ) : (
+                {/* b) Из карт — только если есть задачи на этот день */}
+                {dueMaps.length + overdueMaps.length > 0 && (
+                  <section className="card pl-section">
+                    <header className="pl-sec-head">
+                      <Network size={18} className="pl-sec-icon" />
+                      <h3>Из карт</h3>
+                      <div className="grow" />
+                      <span className="pl-sec-meta">{dueMaps.length + overdueMaps.length}</span>
+                    </header>
                     <div className="pl-tasks">
                       {overdueMaps.map((t) => (
                         <MapTaskRow key={`o-${t.docId}-${t.topicId}`} task={t} overdue onToggle={() => toggleMap(t)} />
@@ -430,8 +447,8 @@ export default function Planner() {
                         <MapTaskRow key={`${t.docId}-${t.topicId}`} task={t} onToggle={() => toggleMap(t)} />
                       ))}
                     </div>
-                  )}
-                </section>
+                  </section>
+                )}
               </div>
 
               <div className="pl-col">
@@ -562,7 +579,7 @@ export default function Planner() {
           onClose={() => setDetailId(null)}
           onEdit={() => setEditing(detail)}
           onArchive={(a) => archiveHabit(detail, a)}
-          onDelete={() => void deleteHabit(detail)}
+          onDelete={() => deleteHabit(detail)}
           onToggleDay={(ymd) => toggleHabitDay(detail, ymd)}
           freeze={{
             onSkip: (on) => freeze.skip(detail, today, on),
@@ -584,7 +601,7 @@ export default function Planner() {
             setEditing(null);
             if (editing === 'new') toast(`Привычка «${h.name}» добавлена`);
           }}
-          onDelete={editing === 'new' ? undefined : () => void deleteHabit(editing)}
+          onDelete={editing === 'new' ? undefined : () => deleteHabit(editing)}
           onClose={() => setEditing(null)}
         />
       )}

@@ -1,5 +1,5 @@
 import { get, set, del } from './kv';
-import type { BoardData, DocMeta, LockedDoc, MindDoc, PlannerData, PlannerDay, Settings } from '../types';
+import type { BoardData, DocMeta, DocPreview, LockedDoc, MindDoc, PlannerData, PlannerDay, Settings } from '../types';
 import { countTopics } from '../utils/tree';
 import { getTheme } from '../themes';
 
@@ -29,7 +29,48 @@ export function metaFor(doc: MindDoc, prev?: DocMeta): DocMeta {
     topicCount: doc.sheets.reduce((n, s) => n + countTopics(s), 0),
     accent: sheet ? accentOf(sheet.themeId) : undefined,
     locked: false,
+    preview: sheet ? previewOf(doc) : undefined,
   };
+}
+
+const PREVIEW_KIDS = 8;
+const cut = (s: string, n: number) => {
+  const t = s.replace(/\s+/g, ' ').trim();
+  return t.length > n ? t.slice(0, n - 1) + '…' : t;
+};
+
+/** Миниатюра первого листа: центральная тема и до 8 основных ветвей (стороны — как в раскладке карты) */
+export function previewOf(doc: MindDoc): DocPreview {
+  const sheet = doc.sheets[0];
+  const th = getTheme(sheet.themeId);
+  const kids = sheet.root.children;
+  const explicitRight = kids.filter((c) => c.side === 'right').length;
+  const needRight = Math.max(0, Math.ceil(kids.length / 2) - explicitRight);
+  let free = 0;
+  const shown = kids.slice(0, PREVIEW_KIDS).map((c, i) => {
+    const left = c.side ? c.side === 'left' : free++ >= needRight;
+    const color = c.style?.fill || (sheet.rainbow === false ? th.palette[0] : th.palette[i % th.palette.length]);
+    return { t: cut(c.text || 'Тема', 22), c: color, ...(left && sheet.structure === 'map' ? { l: 1 as const } : {}), ...(c.children.length ? { d: 1 as const } : {}) };
+  });
+  return { r: cut(sheet.root.text || doc.title || 'Карта', 28), s: sheet.structure, k: shown, ...(kids.length > PREVIEW_KIDS ? { more: kids.length - PREVIEW_KIDS } : {}) };
+}
+
+/** У старых карт миниатюры нет — построить один раз (зашифрованные пропускаются) */
+export async function fillPreviews(list: DocMeta[]): Promise<boolean> {
+  const missing = list.filter((m) => !m.preview && !m.locked && !m.trashed);
+  if (!missing.length) return false;
+  const fresh = await listDocs();
+  let changed = false;
+  for (const m of missing) {
+    const d = await loadDoc(m.id);
+    if (!d || 'locked' in d) continue;
+    const i = fresh.findIndex((x) => x.id === m.id);
+    if (i < 0) continue;
+    fresh[i] = { ...fresh[i], preview: previewOf(d) };
+    changed = true;
+  }
+  if (changed) await saveIndex(fresh);
+  return changed;
 }
 
 /** Цвет превью карты: заметный и на светлом, и на тёмном фоне */

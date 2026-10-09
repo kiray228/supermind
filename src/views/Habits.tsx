@@ -5,7 +5,7 @@
  * Данные — те же, что у Ежедневника (IDB 'planner').
  */
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactNode, TouchEvent as ReactTouchEvent } from 'react';
+import type { CSSProperties, ReactNode, TouchEvent as ReactTouchEvent } from 'react';
 import {
   CaretDown,
   CaretLeft,
@@ -24,7 +24,6 @@ import {
   Sparkle,
   Sun,
   SunHorizon,
-  Trash,
   Trophy,
 } from '@phosphor-icons/react';
 import type { Icon } from '@phosphor-icons/react';
@@ -32,6 +31,7 @@ import type { Habit, HabitPart, PlannerData, PlannerDay } from '../types';
 import { loadPlanner, savePlanner } from '../store/db';
 import { toast } from '../store/appStore';
 import { askNotifyIfNeeded, syncSoon } from '../tasks/sync';
+import { celebrate } from '../ui/celebrate';
 import { confirmDialog } from '../ui/dialogs';
 import { addDaysYmd, fromYmd, todayYmd, toYmd } from '../utils/mapTasks';
 import {
@@ -66,6 +66,8 @@ import { HABIT_LIBRARY, habitFromPreset } from '../habits/library';
 import { HabitDetail, HabitEditor, HabitsManager } from '../habits/ui';
 import { FreezeSheet } from '../habits/freeze';
 import { freezeHandlers, freezeStatus, hasPauseAhead } from '../habits/freezeActions';
+import { mergeHandlers, useLongPress, useSwipeActions } from '../ui/gestures';
+import { SwipeBg } from '../ui/SwipeBg';
 import './habits-page.css';
 
 type Days = PlannerData['days'];
@@ -365,7 +367,10 @@ export default function Habits() {
       const list = habits.filter((x) => isDue(after.days, x, date));
       const allNow = list.length > 0 && list.every((x) => doneOn(after.days, x, date));
       const allBefore = list.every((x) => doneOn(before.days, x, date));
-      if (allNow && !allBefore) toast(date === today ? '🎉 Все привычки на сегодня выполнены!' : '🎉 Все привычки за этот день выполнены');
+      if (allNow && !allBefore) {
+        toast(date === today ? '🎉 Все привычки на сегодня выполнены!' : '🎉 Все привычки за этот день выполнены');
+        celebrate();
+      }
     }
   };
   /** отметка дня из карточки привычки (тепловая карта) */
@@ -926,14 +931,17 @@ function HabitCard({
   onOpen: () => void;
   /** долгое нажатие / правая кнопка: пропуск, пауза, удаление */
   onMenu: () => void;
-  /** свайп в сторону — «Удалить» */
+  /** свайп влево — «Удалить» */
   onDelete: () => void;
 }) {
   const press = useLongPress(onMenu);
-  const swipe = useSwipeDelete(onDelete);
+  const on0 = doneOn(days, h, date);
+  // свайп вправо — отметить (как «Выполнить» у задач); уже отмеченную и замороженную — не трогаем
+  const swipe = useSwipeActions({ onDelete, onRight: on0 || frozenOn(days, h, date) ? undefined : onTap });
+  const g = mergeHandlers(press, swipe.bind);
   const ice = freezeStatus(days, h, date);
   const fz = frozenOn(days, h, date);
-  const on = doneOn(days, h, date);
+  const on = on0;
   const t = targetOf(h);
   const count = countOn(days[date], h);
   const counter = t > 1;
@@ -942,39 +950,12 @@ function HabitCard({
   const time = timeRangeLabel(h) || (h.duration ? durationLabel(h.duration) : '');
   const freq = f === 'weekly' ? `${weekCount(days, h, date)} из ${weekGoal(days, h, date)} за неделю` : f === 'weekdays' ? freqLabel(h) : '';
   return (
-    <div ref={swipe.wrap} className={`hp-swipe${swipe.dx ? ' swiping' : ''}${swipe.dx > 0 ? ' to-right' : ''}${swipe.dragging ? ' dragging' : ''}${swipe.gone ? ' gone' : ''}`}>
-      {swipe.dx !== 0 && (
-        <div className="hp-swipe-bg">
-          <button className={`hp-swipe-del${swipe.armed ? ' armed' : ''}`} onClick={swipe.confirm} aria-label={`Удалить «${h.name}»`}>
-            <Trash size={22} weight="bold" />
-            <span>Удалить</span>
-          </button>
-        </div>
-      )}
+    <div ref={swipe.wrap} className={`hp-swipe ${swipe.wrapClass}`}>
+      <SwipeBg dx={swipe.dx} armed={swipe.armed} onDelete={swipe.confirmDelete} rightLabel={counter ? '+1' : 'Отметить'} deleteLabel="Удалить" />
     <div
-      className={`hp-card${on ? ' on' : ''}${off ? ' off' : ''}${fz ? ` frozen ${fz}` : ''}${burst ? ' burst' : ''}`}
-      style={{ '--hc': h.color, ...(swipe.dx ? { transform: `translateX(${swipe.dx}px)` } : null) } as CSSProperties}
-      onPointerDown={(e) => {
-        press.onPointerDown(e);
-        swipe.onPointerDown(e);
-      }}
-      onPointerMove={(e) => {
-        press.onPointerMove(e);
-        swipe.onPointerMove(e);
-      }}
-      onPointerUp={() => {
-        press.onPointerUp();
-        swipe.onPointerUp();
-      }}
-      onPointerCancel={() => {
-        press.onPointerCancel();
-        swipe.onPointerUp();
-      }}
-      onClickCapture={(e) => {
-        press.onClickCapture(e);
-        swipe.onClickCapture(e);
-      }}
-      onContextMenu={press.onContextMenu}
+      className={`hp-card sw-row${on ? ' on' : ''}${off ? ' off' : ''}${fz ? ` frozen ${fz}` : ''}${burst ? ' burst' : ''}`}
+      style={{ '--hc': h.color, ...swipe.style } as CSSProperties}
+      {...g}
     >
       <button className="hp-card-main" onClick={onOpen} aria-label={`${h.name}: статистика и настройки`}>
         <span className="hp-tile" aria-hidden>
@@ -1041,135 +1022,6 @@ function HabitCard({
     </div>
     </div>
   );
-}
-
-/**
- * Свайп карточки влево или вправо: открывается кнопка «Удалить»; длинный свайп (больше половины ширины) — удаляет сразу.
- * Только палец — мышью удаляют через меню (правая кнопка).
- */
-function useSwipeDelete(onDelete: () => void) {
-  const OPEN = 96;
-  const [dx, setDx] = useState(0);
-  const [gone, setGone] = useState(false);
-  /** палец ведёт карточку — без анимации сдвига */
-  const [dragging, setDragging] = useState(false);
-  const wrap = useRef<HTMLDivElement>(null);
-  const drag = useRef<{ x: number; y: number; id: number; horiz: boolean | null; base: number } | null>(null);
-  const moved = useRef(false);
-  /** сдвиг на последнем движении пальца (состояние могло ещё не обновиться) */
-  const last = useRef(0);
-  const width = () => wrap.current?.offsetWidth ?? 360;
-  const armed = Math.abs(dx) > width() * 0.5;
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  useEffect(() => () => clearTimeout(timer.current), []);
-
-  // открытая кнопка закрывается касанием в любом другом месте
-  useEffect(() => {
-    if (!dx || drag.current) return;
-    const close = (e: PointerEvent) => {
-      if (!wrap.current?.contains(e.target as Node)) setDx(0);
-    };
-    document.addEventListener('pointerdown', close, true);
-    return () => document.removeEventListener('pointerdown', close, true);
-  }, [dx]);
-
-  const remove = () => {
-    setGone(true);
-    setDx((v) => (v >= 0 ? width() : -width()));
-    timer.current = setTimeout(onDelete, 180);
-  };
-  return {
-    wrap,
-    dx,
-    gone,
-    armed,
-    dragging,
-    confirm: (e: ReactMouseEvent) => {
-      e.stopPropagation();
-      remove();
-    },
-    onPointerDown: (e: ReactPointerEvent) => {
-      moved.current = false;
-      if (e.pointerType === 'mouse' || gone) return;
-      drag.current = { x: e.clientX, y: e.clientY, id: e.pointerId, horiz: null, base: dx };
-    },
-    onPointerMove: (e: ReactPointerEvent) => {
-      const d = drag.current;
-      if (!d || d.id !== e.pointerId) return;
-      const mx = e.clientX - d.x;
-      const my = e.clientY - d.y;
-      if (d.horiz === null && Math.abs(mx) + Math.abs(my) > 10) d.horiz = Math.abs(mx) > Math.abs(my) * 1.3;
-      if (!d.horiz) return;
-      moved.current = true;
-      setDragging(true);
-      const w = width();
-      last.current = Math.max(-w, Math.min(w, d.base + mx));
-      setDx(last.current);
-    },
-    onPointerUp: () => {
-      const d = drag.current;
-      drag.current = null;
-      setDragging(false);
-      if (!d?.horiz) return;
-      const v = last.current;
-      if (Math.abs(v) > width() * 0.5) remove();
-      else setDx(Math.abs(v) > 56 ? (v > 0 ? OPEN : -OPEN) : 0);
-    },
-    onClickCapture: (e: ReactMouseEvent) => {
-      // после свайпа — не нажатие; открытая кнопка — касание закрывает её
-      if (moved.current || dx) {
-        moved.current = false;
-        e.stopPropagation();
-        e.preventDefault();
-        if (dx && !drag.current) setDx(0);
-      }
-    },
-  };
-}
-
-/** Долгое нажатие (палец ~0.5 с без сдвига) и правая кнопка мыши; клик после долгого нажатия гасится */
-function useLongPress(fn: () => void) {
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const start = useRef<{ x: number; y: number } | null>(null);
-  const fired = useRef(false);
-  useEffect(() => () => clearTimeout(timer.current), []);
-  const cancel = () => {
-    clearTimeout(timer.current);
-    start.current = null;
-  };
-  return {
-    onPointerDown: (e: ReactPointerEvent) => {
-      fired.current = false;
-      if (e.pointerType === 'mouse') return;
-      start.current = { x: e.clientX, y: e.clientY };
-      clearTimeout(timer.current);
-      timer.current = setTimeout(() => {
-        fired.current = true;
-        start.current = null;
-        haptic();
-        fn();
-      }, 480);
-    },
-    onPointerMove: (e: ReactPointerEvent) => {
-      const s = start.current;
-      if (s && Math.hypot(e.clientX - s.x, e.clientY - s.y) > 10) cancel();
-    },
-    onPointerUp: () => cancel(),
-    onPointerCancel: () => cancel(),
-    onClickCapture: (e: ReactMouseEvent) => {
-      if (!fired.current) return;
-      fired.current = false;
-      e.stopPropagation();
-      e.preventDefault();
-    },
-    onContextMenu: (e: ReactMouseEvent) => {
-      e.preventDefault();
-      // на телефоне меню уже открыто долгим нажатием
-      if (fired.current) return;
-      cancel();
-      fn();
-    },
-  };
 }
 
 // ---------- Пусто ----------

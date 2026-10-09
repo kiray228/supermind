@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { ChartPieSlice, Plus, SlidersHorizontal } from '@phosphor-icons/react';
+import { CaretRight, ChartPieSlice, Plus, SlidersHorizontal, X } from '@phosphor-icons/react';
 import { ensureTasks } from '../tasks/store';
 import { useFinance } from '../finance/store';
 import { todayYmd } from '../utils/mapTasks';
@@ -24,7 +24,6 @@ import { AreasModal } from '../goals/ui/AreasModal';
 import { Celebration } from '../goals/ui/Celebration';
 import { WheelTab } from '../goals/ui/Wheel';
 import { areaOf, ProgressRing, useTaskLookup } from '../goals/ui/parts';
-import { ListRow } from '../ui/list';
 import './goals.css';
 import { IconTile } from '../ui/icons';
 
@@ -155,15 +154,17 @@ function GoalsList({ data, onNew, onWheel, onTab }: { data: GoalsData; onNew: (p
 
       {view === 'active' && <Summary data={data} look={look} today={today} />}
 
+      {/* напоминание о колесе — одна строка; крестик скрывает до следующего месяца */}
       {view === 'active' && wheelDue(data, today) && (
-        <div className="ls-group gl-banner">
-          <ListRow
-            icon={<IconTile icon={ChartPieSlice} tone="violet" size="list" />}
-            title="Колесо баланса"
-            subtitle={data.wheel.length ? 'Прошёл месяц — оцените сферы жизни снова' : 'Оцените сферы жизни, чтобы понять, куда направить силы'}
-            chevron
-            onClick={onWheel}
-          />
+        <div className="gl-wheel-tip">
+          <button className="gl-wheel-tip-main" onClick={onWheel}>
+            <ChartPieSlice size={18} weight="duotone" className="gl-wheel-tip-ic" />
+            <span className="ellipsis">{data.wheel.length ? 'Колесо баланса: прошёл месяц — оцените снова' : 'Колесо баланса: оцените сферы жизни'}</span>
+            <CaretRight size={13} weight="bold" className="gl-wheel-tip-chev" />
+          </button>
+          <button className="gl-wheel-tip-x" onClick={() => setGoalsPrefs({ wheelSnooze: today.slice(0, 7) })} aria-label="Не напоминать в этом месяце" title="Не напоминать в этом месяце">
+            <X size={15} weight="bold" />
+          </button>
         </div>
       )}
 
@@ -250,31 +251,27 @@ function Summary({ data, look, today }: { data: GoalsData; look: TaskLookup; tod
   const overdue = active.filter((g) => deadlineInfo(g, today).state === 'overdue').length;
   const year = today.slice(0, 4);
   const doneYear = data.goals.filter((g) => g.status === 'done' && g.completedAt && new Date(g.completedAt).getFullYear() === Number(year)).length;
+  const mood = avg >= 70 ? 'Отличный темп — финиш близко' : avg >= 35 ? 'Хороший темп — продолжайте' : 'Начало пути — маленькие шаги каждый день';
+  // одна компактная строка (как сводка в «Привычках»): кольцо и числа рядом
   return (
-    <div className="gl-summary">
-      <div className="gl-sum-top">
-        <ProgressRing pct={avg} size={68} stroke={8} className="gl-sum-ring">
-          <span className="gl-sum-pct">{avg}%</span>
-        </ProgressRing>
-        <div className="gl-sum-text">
-          <div className="gl-sum-label">Средний прогресс</div>
-          <div className="gl-sum-sub">
-            {avg >= 70 ? 'Отличный темп — финиш близко' : avg >= 35 ? 'Хороший темп — продолжайте' : 'Начало пути — маленькие шаги каждый день'}
-          </div>
-        </div>
-      </div>
-      <div className="gl-sum-stats">
-        <div className="gl-sum">
-          <b>{active.length}</b>
-          <span>в работе</span>
-        </div>
-        <div className={'gl-sum' + (overdue ? ' is-danger' : '')}>
-          <b>{overdue}</b>
-          <span>просрочено</span>
-        </div>
-        <div className="gl-sum">
-          <b>{doneYear}</b>
-          <span>за {year} год</span>
+    <div className="gl-summary" title={mood}>
+      <ProgressRing pct={avg} size={52} stroke={6} className="gl-sum-ring">
+        <span className="gl-sum-pct">{avg}%</span>
+      </ProgressRing>
+      <div className="gl-sum-text">
+        <div className="gl-sum-label">Средний прогресс</div>
+        <div className="gl-sum-chips">
+          <span className="gl-sum-chip">
+            <b>{active.length}</b> в работе
+          </span>
+          {overdue > 0 && (
+            <span className="gl-sum-chip is-danger">
+              <b>{overdue}</b> просрочено
+            </span>
+          )}
+          <span className="gl-sum-chip">
+            <b>{doneYear}</b> за {year}
+          </span>
         </div>
       </div>
     </div>

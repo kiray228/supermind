@@ -164,6 +164,11 @@ function record(start: number, minutes: number, taskId: string | undefined, kind
     .catch(() => {});
 }
 
+/** Сессия фокуса завершена — маленький праздник (модуль подгружается только тогда) */
+function cheer() {
+  void import('../ui/celebrate').then((m) => m.celebrate()).catch(() => {});
+}
+
 // ---------- Управление ----------
 
 export function start() {
@@ -213,6 +218,7 @@ export function stop() {
   const now = Date.now();
   if (s.mode === 'stopwatch') {
     if (s.sessionStart != null) record(s.sessionStart, Math.floor(elapsedMs(s, now) / 60000), s.taskId, 'stopwatch');
+    if (s.sessionStart != null && elapsedMs(s, now) >= 15 * 60000) cheer();
     put({ running: false, startedAt: null, acc: 0, sessionStart: null, now });
     return;
   }
@@ -297,6 +303,7 @@ function finishPhase(s: FocusState, now: number) {
     } catch {
       /* нет вибрации */
     }
+    if (s.phase === 'work') cheer();
     if (!isNative()) {
       if (s.phase === 'work') webNotify('Помодоро завершён', 'Время отдохнуть');
       else webNotify('Перерыв окончен', 'Пора вернуться к фокусу');

@@ -10,6 +10,7 @@ import type { FinanceData } from '../finance/model';
 import { accountMap, txMain } from '../finance/model';
 import type { NotesData } from '../notes/model';
 import { addDaysYmd, fromYmd, toYmd } from '../utils/mapTasks';
+import { dayStreak } from './streak';
 
 // ================= Сферы =================
 
@@ -108,8 +109,15 @@ export function levelInfo(xp: number): LevelInfo {
 
 export interface Counters {
   activeDays: number;
+  /** общая серия активных дней (с заморозками) */
   streak: number;
   bestStreak: number;
+  /** заморозок потрачено в текущей серии */
+  freezesUsed: number;
+  /** заморозок в запасе */
+  freezesBanked: number;
+  /** активных дней из последних 30 */
+  rolling30: number;
   tasksDone: number;
   highTasks: number;
   earlyTasks: number;
@@ -154,6 +162,8 @@ export interface ProgressStats {
   weekXp: number;
   level: LevelInfo;
   counters: Counters;
+  /** дни, закрытые заморозкой серии */
+  frozen: Set<string>;
 }
 
 export interface ProgressInput {
@@ -203,7 +213,7 @@ export function computeProgress(src: ProgressInput, today: string): ProgressStat
     byArea[area] += xp;
   };
   const c: Counters = {
-    activeDays: 0, streak: 0, bestStreak: 0, tasksDone: 0, highTasks: 0, earlyTasks: 0, lateTasks: 0, bestTaskDay: 0,
+    activeDays: 0, streak: 0, bestStreak: 0, freezesUsed: 0, freezesBanked: 0, rolling30: 0, tasksDone: 0, highTasks: 0, earlyTasks: 0, lateTasks: 0, bestTaskDay: 0,
     checkItems: 0, habitChecks: 0, bestHabitStreak: 0, journalEntries: 0, journalStreak: 0, bestJournalStreak: 0,
     moodDays: 0, focusSessions: 0, focusMinutes: 0, bestFocusDay: 0, goalsCreated: 0, goalsDone: 0, stepsDone: 0,
     stagesDone: 0, wheelCount: 0, financeDays: 0, budgetMonths: 0, debtsClosed: 0, notes: 0, maps: 0,
@@ -421,9 +431,13 @@ export function computeProgress(src: ProgressInput, today: string): ProgressStat
   }
   const active = [...dayTotal.keys()].filter((d) => d <= today);
   c.activeDays = active.length;
-  const st = streaks(active, today);
+  // общая серия прощает пропуски: каждые 7 дней подряд дают заморозку (см. streak.ts)
+  const st = dayStreak(active, today);
   c.streak = st.current;
   c.bestStreak = st.best;
+  c.freezesUsed = st.freezesUsed;
+  c.freezesBanked = st.banked;
+  c.rolling30 = st.rolling30;
   c.areasTouched = AREA_IDS.filter((a) => byArea[a] > 0).length;
 
   const level = levelInfo(total);
@@ -433,7 +447,7 @@ export function computeProgress(src: ProgressInput, today: string): ProgressStat
   let weekXp = 0;
   for (let d = monday; d <= today; d = addDaysYmd(d, 1)) weekXp += dayTotal.get(d) ?? 0;
 
-  return { total, byArea, byDay, dayTotal, today, todayXp: dayTotal.get(today) ?? 0, weekXp, level, counters: c };
+  return { total, byArea, byDay, dayTotal, today, todayXp: dayTotal.get(today) ?? 0, weekXp, level, counters: c, frozen: new Set(st.frozen) };
 }
 
 function lastDayOfMonth(month: string): string {

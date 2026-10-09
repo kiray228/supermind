@@ -212,14 +212,24 @@ export default function Board() {
     commit({ ...b, cards: [...b.cards, card] });
   };
 
-  const deleteCard = async (id: string) => {
-    const card = boardRef.current?.cards.find((c) => c.id === id);
-    if (!card) return;
-    const ok = await confirmDialog('Удалить карточку?', `«${card.title}» будет удалена без возможности восстановления.`, { okText: 'Удалить', danger: true });
-    if (!ok) return;
-    const b = boardRef.current!;
+  /** Удалить сразу — с «Вернуть» в течение нескольких секунд */
+  const deleteCard = (id: string) => {
+    const b = boardRef.current;
+    const card = b?.cards.find((c) => c.id === id);
+    if (!b || !card) return;
     commit({ ...b, cards: b.cards.filter((c) => c.id !== id) });
     setEditCardId(null);
+    toast(`«${card.title}» удалена`, {
+      label: 'Вернуть',
+      run: () => {
+        const cur = boardRef.current;
+        if (!cur || cur.cards.some((c) => c.id === id)) return;
+        // колонку могли удалить — тогда в первую
+        const columnId = cur.columns.some((c) => c.id === card.columnId) ? card.columnId : cur.columns[0]?.id;
+        // свежая отметка — карточка побеждает отметку об удалении и на других устройствах
+        if (columnId) commit({ ...cur, cards: [...cur.cards, { ...card, columnId, updatedAt: Date.now() }] });
+      },
+    });
   };
 
   /** Переместить карточку в колонку на позицию visIndex среди видимых карточек (-1 — в конец) */

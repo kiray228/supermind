@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { CaretDown, Flame, ListChecks, LockSimple, NotePencil, Sparkle, Timer, Trophy } from '@phosphor-icons/react';
-import { toast, useApp } from '../store/appStore';
+import { useApp } from '../store/appStore';
 import { addDaysYmd, fromYmd } from '../utils/mapTasks';
 import { plural } from '../tasks/model';
 import { useProgress, refreshProgressSources } from '../progress/hooks';
 import { LevelRing } from '../progress/LevelBadge';
 import { AREA_IDS, LEVEL_TITLES, XP, xpForLevel, type AreaId, type ProgressStats } from '../progress/model';
 import { achievementColor, achievementStates, AREAS, type AchievementState } from '../progress/achievements';
+import { clearFresh, peekFresh } from '../progress/seen';
+import { WeeklyReviewEntry } from '../review/WeeklyEntry';
 import './progress.css';
 import { IconTile } from '../ui/icons';
 
@@ -19,58 +21,16 @@ const dateLabel = (ymd: string) => {
   return `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}, ${WD[d.getDay()]}`;
 };
 
-// ---------- «Что уже видели» (только на этом устройстве, для поздравлений) ----------
-
-const SEEN_KEY = 'sm-progress-seen';
-interface Seen {
-  level: number;
-  ach: string[];
-}
-function readSeen(): Seen | null {
-  try {
-    const v = JSON.parse(localStorage.getItem(SEEN_KEY) ?? 'null') as Seen | null;
-    return v && typeof v.level === 'number' && Array.isArray(v.ach) ? v : null;
-  } catch {
-    return null;
-  }
-}
-function writeSeen(s: Seen) {
-  try {
-    localStorage.setItem(SEEN_KEY, JSON.stringify(s));
-  } catch {
-    /* без сохранения */
-  }
-}
-
 export default function Progress() {
   const p = useProgress();
   const states = useMemo(() => (p ? achievementStates(p.counters) : []), [p]);
-  // что было получено к моменту открытия раздела — всё остальное помечается «Новое»
-  const [baseline] = useState(readSeen);
-  const fresh = useMemo(
-    () => new Set(baseline ? states.filter((s) => s.done && !baseline.ach.includes(s.a.id)).map((s) => s.a.id) : []),
-    [baseline, states],
-  );
+  // поздравляет ProgressWatcher (в любом разделе); здесь новые награды с прошлого визита помечаются «Новое»
+  const [fresh] = useState(peekFresh);
 
   useEffect(() => {
     void refreshProgressSources();
-  }, []);
-
-  // поздравления: новый уровень и достижения с прошлого визита
-  useEffect(() => {
-    if (!p) return;
-    const unlocked = states.filter((s) => s.done).map((s) => s.a.id);
-    const seen = readSeen();
-    writeSeen({ level: p.level.level, ach: [...new Set([...(seen?.ach ?? []), ...unlocked])] });
-    if (!seen) return;
-    const newAch = states.filter((s) => s.done && !seen.ach.includes(s.a.id));
-    const up = p.level.level > seen.level;
-    if (up && newAch.length)
-      toast(`🎉 Уровень ${p.level.level} — «${p.level.title}»! И ${newAch.length} ${plural(newAch.length, 'новое достижение', 'новых достижения', 'новых достижений')}`);
-    else if (up) toast(`🎉 Новый уровень ${p.level.level} — «${p.level.title}»!`);
-    else if (newAch.length === 1) toast(`🏆 Достижение получено: «${newAch[0].a.title}»`);
-    else if (newAch.length > 1) toast(`🏆 ${newAch.length} ${plural(newAch.length, 'новое достижение', 'новых достижения', 'новых достижений')}!`);
-  }, [p, states]);
+    return () => clearFresh(fresh);
+  }, [fresh]);
 
   return (
     <div className="page pg-page">
@@ -91,6 +51,7 @@ export default function Progress() {
           </div>
         ) : (
           <div className="pg-wrap">
+            <WeeklyReviewEntry />
             <Hero p={p} states={states} />
             {p.total === 0 && <StartCard />}
             <AreasCard p={p} />
@@ -163,6 +124,7 @@ function Hero({ p, states }: { p: ProgressStats; states: AchievementState[] }) {
           <span className="pg-stat-l">из {states.length} наград</span>
         </div>
       </div>
+      <StreakNote p={p} />
       {next && (
         <div className="pg-hero-next">
           <span className="pg-hero-next-ic" style={{ '--c': achievementColor(next.a) } as CSSProperties}>
@@ -178,6 +140,30 @@ function Hero({ p, states }: { p: ProgressStats; states: AchievementState[] }) {
         </div>
       )}
     </section>
+  );
+}
+
+/** Серия: заморозки, активность за 30 дней, бережные слова после перерыва */
+function StreakNote({ p }: { p: ProgressStats }) {
+  const c = p.counters;
+  if (!c.activeDays) return null;
+  const restart = c.streak < 2 && c.bestStreak >= 3;
+  return (
+    <div className="pg-streak-note">
+      {restart ? (
+        <span>
+          Рекорд {c.bestStreak} {plural(c.bestStreak, 'день', 'дня', 'дней')} сохранён — начнём новую серию 🌱
+        </span>
+      ) : (
+        <span>
+          {c.freezesUsed > 0 && <>❄️ {c.freezesUsed} {plural(c.freezesUsed, 'заморозка сберегла', 'заморозки сберегли', 'заморозок сберегли')} серию · </>}
+          {c.freezesBanked > 0 ? `в запасе ❄️ ${c.freezesBanked}` : 'каждые 7 дней подряд — заморозка ❄️'}
+        </span>
+      )}
+      <span className="pg-streak-30">
+        <b>{c.rolling30}</b> из 30 дней
+      </span>
+    </div>
   );
 }
 
@@ -375,11 +361,12 @@ function Heatmap({ p }: { p: ProgressStats }) {
             {weeks.flat().map((d) => {
               const xp = p.dayTotal.get(d) ?? 0;
               const future = d > p.today;
+              const frozen = !xp && p.frozen.has(d);
               return (
                 <span
                   key={d}
-                  className={`pg-cell l${heatLevel(xp)}${future ? ' future' : ''}${d === p.today ? ' today' : ''}`}
-                  title={future ? undefined : `${dateLabel(d)}: ${xp ? fmt(xp) + ' XP' : 'нет активности'}`}
+                  className={`pg-cell l${heatLevel(xp)}${future ? ' future' : ''}${d === p.today ? ' today' : ''}${frozen ? ' frozen' : ''}`}
+                  title={future ? undefined : `${dateLabel(d)}: ${xp ? fmt(xp) + ' XP' : frozen ? 'заморозка ❄️ — серия сохранена' : 'нет активности'}`}
                 />
               );
             })}
@@ -388,7 +375,8 @@ function Heatmap({ p }: { p: ProgressStats }) {
       </div>
       <div className="pg-heat-foot">
         <span className="tiny faint grow">
-          Серия: {p.counters.streak} · рекорд: {p.counters.bestStreak} · всего активных дней: {p.counters.activeDays}
+          Серия: {p.counters.streak}
+          {p.counters.freezesUsed > 0 && ` (❄️ ${p.counters.freezesUsed})`} · рекорд: {p.counters.bestStreak} · всего активных дней: {p.counters.activeDays}
         </span>
         <span className="pg-heat-legend tiny faint">
           меньше

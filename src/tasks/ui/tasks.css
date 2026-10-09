@@ -65,22 +65,17 @@
 .tk-done-group .tk-group-head { color: var(--text-2); }
 
 .tk-row-wrap { position: relative; overflow: hidden; }
-.tk-swipe-bg { position: absolute; inset: 0; display: none; align-items: stretch; background: var(--surface-2); }
-.tk-row-wrap.swiping .tk-swipe-bg { display: flex; }
-.tk-swipe-done { display: flex; align-items: center; gap: 6px; padding-left: 18px; color: #fff; background: var(--ios-green); font-weight: 600; font-size: 15px; width: 50%; }
-.tk-swipe-btn { width: 74px; border: none; color: #fff; display: inline-flex; align-items: center; justify-content: center; }
-.tk-swipe-btn.date { background: #5e5ce6; }
-.tk-swipe-btn.del { background: var(--ios-red); }
+/* строка внутри группы — фон свайпа без скруглений (углы обрезает группа) */
+.tk-row-wrap.sw-wrap { border-radius: 0; }
 .tk-row {
   position: relative; display: flex; align-items: flex-start; gap: 12px; min-height: 48px; padding: 12px 16px 11px; cursor: pointer;
   background: var(--surface); transition: background .15s, transform .22s cubic-bezier(.2, .9, .3, 1), opacity .25s;
-  touch-action: pan-y; user-select: none; -webkit-user-select: none;
+  touch-action: pan-y; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
 }
 /* тонкий разделитель от текста до края, как в iOS */
 .tk-row-wrap + .tk-row-wrap .tk-row::before, .tk-group-head + .tk-row-wrap .tk-row::before {
   content: ''; position: absolute; top: 0; left: 50px; right: 0; height: var(--hairline); background: var(--separator);
 }
-.tk-row-wrap.swiping .tk-row { transition: none; }
 .tk-row:active { background: color-mix(in srgb, var(--surface) 82%, var(--text-3)); }
 @media (hover: hover) { .tk-row:hover { background: color-mix(in srgb, var(--surface) 94%, var(--text-3)); } }
 .tk-row.is-done .tk-title { color: var(--text-2); }
@@ -423,4 +418,7 @@
 /* сенсорные экраны: поля не мельче 16px — иначе iPhone приближает страницу при фокусе */
 @media (pointer: coarse) {
   .td-select, .td-ck-text, .td-add input, .td-tag-input, .dp-time { font-size: 16px; }
+  /* мелкие кнопки разделов — область касания 40px */
+  .tk-nav-sec .icon-btn { position: relative; }
+  .tk-nav-sec .icon-btn::after { content: ''; position: absolute; inset: -6px; }
 }

@@ -2,7 +2,6 @@ import { useMemo, useState, type CSSProperties } from 'react';
 import { Trash } from '@phosphor-icons/react';
 import { addDaysYmd, todayYmd } from '../../utils/mapTasks';
 import { toast } from '../../store/appStore';
-import { confirmDialog } from '../../ui/dialogs';
 import { curSymbol, dateShort, parseMoneyInput, sortedAccounts, sortedCategories, type CatKind, type FinanceData, type TxType } from '../model';
 import { addTransaction, deleteTransaction, updateTransaction } from '../store';
 import { AmountInput, Sheet } from './common';
@@ -85,9 +84,9 @@ function TxForm({ data }: { data: FinanceData }) {
     closeTxSheet();
   };
 
-  const remove = async () => {
+  // без подтверждения: после удаления есть «Отменить» во всплывашке
+  const remove = () => {
     if (!edit) return;
-    if (!(await confirmDialog('Удалить операцию?', undefined, { okText: 'Удалить', danger: true }))) return;
     deleteTransaction(edit.id);
     closeTxSheet();
   };
@@ -111,7 +110,7 @@ function TxForm({ data }: { data: FinanceData }) {
       className="fn-tx-sheet"
       head={
         edit && (
-          <button className="icon-btn fn-danger" onClick={() => void remove()} aria-label="Удалить" title="Удалить">
+          <button className="icon-btn fn-danger" onClick={remove} aria-label="Удалить" title="Удалить">
             <Trash />
           </button>
         )

@@ -162,6 +162,15 @@ export function SavingsCardRow({ goal }: { goal: Goal }) {
   );
 }
 
+/** Окно «Пополнить» поверх всего (меню строки цели в списке) */
+export function DepositPortal({ goal, onClose }: { goal: Goal; onClose: () => void }) {
+  return (
+    <Portal>
+      <DepositSheet goal={goal} onClose={onClose} />
+    </Portal>
+  );
+}
+
 // ================= Пополнение =================
 
 function DepositSheet({ goal, onClose }: { goal: Goal; onClose: () => void }) {
