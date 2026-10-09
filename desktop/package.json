@@ -17,6 +17,7 @@
     "files": [
       "main.cjs",
       "offline.html",
+      "loading.html",
       "build/icon.png"
     ],
     "directories": {
@@ -40,7 +41,12 @@
       ],
       "language": "1049"
     },
-    "publish": null
+    "publish": null,
+    "electronLanguages": [
+      "ru",
+      "en-US"
+    ],
+    "compression": "maximum"
   },
   "devDependencies": {
     "electron": "^44.7.0",

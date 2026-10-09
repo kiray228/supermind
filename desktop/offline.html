@@ -22,7 +22,12 @@
   <button id="retry">Повторить</button>
 </main>
 <script>
-  const url = new URLSearchParams(location.search).get('url');
+  const q = new URLSearchParams(location.search);
+  const url = q.get('url');
+  if (q.get('crash')) {
+    document.querySelector('h1').textContent = 'SuperMind не смог открыться';
+    document.querySelector('p').textContent = 'Похоже, не хватило памяти или сбоит видеодрайвер. Закройте лишние программы и нажмите «Повторить».';
+  }
   document.getElementById('retry').onclick = () => { location.href = url; };
   window.addEventListener('online', () => { location.href = url; });
 </script>
