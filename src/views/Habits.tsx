@@ -48,7 +48,9 @@ import {
   frozenOn,
   isCounter,
   mondayOf,
-  partOf,
+  nextSlot,
+  partNow,
+  timesOf,
   PARTS,
   plural,
   reminderTimeOf,
@@ -312,7 +314,11 @@ export default function Habits() {
   };
 
   // ----- сводка -----
-  const due = useMemo(() => habits.filter((h) => isDue(days, h, date)).sort(compareByTime), [habits, days, date]);
+  const due = useMemo(() => {
+    // «несколько раз в день» — по времени следующего приёма
+    const at = (h: Habit) => nextSlot(h, countOn(days[date], h)) ?? h.time;
+    return habits.filter((h) => isDue(days, h, date)).sort((a, b) => compareByTime({ ...a, time: at(a) }, { ...b, time: at(b) }));
+  }, [habits, days, date]);
   const frozen = useMemo(() => habits.filter((h) => isFrozen(days, h, date)), [habits, days, date]);
   const off = useMemo(() => habits.filter((h) => !isDue(days, h, date) && !isFrozen(days, h, date)), [habits, days, date]);
   const doneCount = due.filter((h) => doneOn(days, h, date)).length;
@@ -467,7 +473,7 @@ export default function Habits() {
   const detail = detailId ? data.habits.find((h) => h.id === detailId && !h.deleted) : undefined;
   const sheetHabit = sheet ? data.habits.find((h) => h.id === sheet.id && !h.deleted) : undefined;
   const pausedNow = habits.filter((h) => hasPauseAhead(h, today));
-  const groups = PARTS.map((p) => ({ ...p, list: due.filter((h) => partOf(h) === p.id) })).filter((g) => g.list.length);
+  const groups = PARTS.map((p) => ({ ...p, list: due.filter((h) => partNow(h, countOn(days[date], h)) === p.id) })).filter((g) => g.list.length);
   const isToday = date === today;
   const future = date > today;
   const card = (h: Habit, isOff?: boolean) => (
@@ -947,11 +953,12 @@ function HabitCard({
   const counter = t > 1;
   const streak = currentStreak(days, h, date);
   const f = freqOf(h);
-  const time = timeRangeLabel(h) || (h.duration ? durationLabel(h.duration) : '');
+  const slots = timesOf(h);
+  const time = slots.length ? (h.duration ? durationLabel(h.duration) : '') : timeRangeLabel(h) || (h.duration ? durationLabel(h.duration) : '');
   const freq = f === 'weekly' ? `${weekCount(days, h, date)} из ${weekGoal(days, h, date)} за неделю` : f === 'weekdays' ? freqLabel(h) : '';
   return (
     <div ref={swipe.wrap} className={`hp-swipe ${swipe.wrapClass}`}>
-      <SwipeBg dx={swipe.dx} armed={swipe.armed} onDelete={swipe.confirmDelete} rightLabel={counter ? '+1' : 'Отметить'} deleteLabel="Удалить" />
+      <SwipeBg dx={swipe.dx} armed={swipe.armed} onDelete={swipe.confirmDelete} rightLabel={counter && !slots.length ? '+1' : 'Отметить'} deleteLabel="Удалить" />
     <div
       className={`hp-card sw-row${on ? ' on' : ''}${off ? ' off' : ''}${fz ? ` frozen ${fz}` : ''}${burst ? ' burst' : ''}`}
       style={{ '--hc': h.color, ...swipe.style } as CSSProperties}
@@ -964,7 +971,17 @@ function HabitCard({
         <span className="hp-card-body">
           <span className="hp-name">{h.name}</span>
           <span className="hp-meta">
-            {counter && (
+            {slots.length > 0 && (
+              <span className="hp-slots" aria-label={`Отмечено ${Math.min(count, slots.length)} из ${slots.length}`}>
+                {slots.map((tm, i) => (
+                  <span key={i} className={`hp-slot${count > i ? ' on' : ''}`}>
+                    {count > i ? <Check size={12} weight="bold" /> : <Clock size={12} weight="bold" />}
+                    {tm}
+                  </span>
+                ))}
+              </span>
+            )}
+            {counter && !slots.length && (
               <span className="hp-meta-count">
                 {count} / {t}
                 {h.unit ? ` ${h.unit}` : ''}

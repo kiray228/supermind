@@ -20,6 +20,7 @@ import {
   HABIT_EMOJIS,
   heatmap,
   partOf,
+  plural,
   PARTS,
   pausedOn,
   perWeekOf,
@@ -428,8 +429,12 @@ export function HabitEditor({
   const up = (patch: Partial<Habit>) => setD((x) => ({ ...x, ...patch }));
   const freq: HabitFreq = d.freq ?? 'daily';
   const t = targetOf(d);
-  const remindMode = d.remindOff ? 'off' : d.remind ? 'custom' : d.time ? 'time' : 'off';
-  const part = partTouched ? (d.part ?? 'any') : partOf({ time: d.time });
+  /** несколько раз в день: список времён (в редакторе может быть и одно — при сохранении станет обычным временем) */
+  const multi = d.times !== undefined;
+  const times = d.times ?? [];
+  const remindMode = d.remindOff ? 'off' : multi ? 'each' : d.remind ? 'custom' : d.time ? 'time' : 'off';
+  // несколько раз в день без ручного выбора — часть дня меняется сама, ни один вариант не выделен
+  const part = partTouched ? (d.part ?? 'any') : multi ? null : partOf({ time: d.time });
 
   const setTime = (time: string) => {
     const patch: Partial<Habit> = { time: time || undefined };
@@ -441,10 +446,26 @@ export function HabitEditor({
     const cur = d.days ?? [];
     up({ days: cur.includes(wd) ? cur.filter((x) => x !== wd) : [...cur, wd] });
   };
+  const setMulti = (on: boolean) => {
+    if (on) {
+      // утро и вечер — самый частый случай («таблетки утром и вечером»)
+      const first = d.time || '08:00';
+      up({ times: [first, first < '20:00' ? '20:00' : '22:00'], remind: undefined, remindOff: d.remindOff ?? false, unit: undefined });
+    } else up({ times: undefined, target: undefined, time: times[0] || d.time });
+  };
+  const setSlot = (i: number, v: string) => up({ times: times.map((x, k) => (k === i ? v : x)) });
+  const addSlot = () => {
+    const last = times[times.length - 1] ?? '08:00';
+    const [hh, mm] = last.split(':').map(Number);
+    const next = `${String(Math.min(23, (hh || 0) + 4)).padStart(2, '0')}:${String(mm || 0).padStart(2, '0')}`;
+    up({ times: [...times, next] });
+  };
   const canSave = d.name.trim().length > 0 && !(freq === 'weekdays' && !d.days?.length);
   const save = () => {
     if (!canSave) return;
-    onSave(cleanHabit({ ...d, part: partTouched ? d.part : undefined }));
+    const filled = times.filter(Boolean);
+    const out: Habit = multi ? { ...d, times: filled, target: Math.max(1, filled.length), time: filled[0] } : d;
+    onSave(cleanHabit({ ...out, part: partTouched ? d.part : undefined }));
   };
 
   return (
@@ -537,7 +558,8 @@ export function HabitEditor({
           </div>
         )}
 
-        <label className="label">Цель на день</label>
+        {!multi && <label className="label">Цель на день</label>}
+        {!multi && (
         <div className="hb-stepper-row">
           <Stepper value={t} min={1} max={50} onChange={(v) => up({ target: v })} />
           {t > 1 ? (
@@ -546,9 +568,44 @@ export function HabitEditor({
             <span className="muted small">простая отметка «сделано»</span>
           )}
         </div>
-        {t > 1 && <div className="tiny faint hb-hint">Каждое нажатие на кружок — +1. Привычка выполнена, когда счётчик дойдёт до {t}.</div>}
+        )}
+        {!multi && t > 1 && <div className="tiny faint hb-hint">Каждое нажатие на кружок — +1. Привычка выполнена, когда счётчик дойдёт до {t}.</div>}
 
         <label className="label">Время и длительность</label>
+        <div className="segmented hb-seg">
+          <button className={!multi ? 'active' : ''} onClick={() => multi && setMulti(false)}>
+            Один раз в день
+          </button>
+          <button className={multi ? 'active' : ''} onClick={() => !multi && setMulti(true)}>
+            Несколько раз
+          </button>
+        </div>
+        {multi ? (
+          <>
+            <div className="hb-times">
+              {times.map((tm, i) => (
+                <span key={i} className="hb-time">
+                  <input type="time" className="pl-time" aria-label={`Время ${i + 1}`} value={tm} onChange={(e) => setSlot(i, e.target.value)} />
+                  {times.length > 1 && (
+                    <button className="hb-clear" onClick={() => up({ times: times.filter((_, k) => k !== i) })} aria-label="Убрать время">
+                      <X size={14} />
+                    </button>
+                  )}
+                </span>
+              ))}
+              {times.length < 8 && (
+                <button className="chip hb-add-time" onClick={addSlot}>
+                  <Plus size={14} /> Ещё время
+                </button>
+              )}
+            </div>
+            <div className="tiny faint hb-hint">
+              {times.filter(Boolean).length > 1
+                ? `${times.filter(Boolean).length} ${plural(times.filter(Boolean).length, ['раз', 'раза', 'раз'])} в день — каждый приём отмечается отдельно, напоминание на каждое время.`
+                : 'Добавьте второе время — например, утром и вечером.'}
+            </div>
+          </>
+        ) : (
         <div className="hb-time-row">
           <span className="hb-time">
             <input type="time" className="pl-time" aria-label="Время" value={d.time ?? ''} onChange={(e) => setTime(e.target.value)} />
@@ -560,6 +617,7 @@ export function HabitEditor({
           </span>
           {!d.time && <span className="tiny faint">не обязательно</span>}
         </div>
+        )}
         <div className="hb-chips">
           {DURATIONS.map((m) => (
             <button key={m} className={`chip${d.duration === m ? ' active' : ''}`} onClick={() => up({ duration: d.duration === m ? undefined : m })}>
@@ -583,9 +641,20 @@ export function HabitEditor({
             </button>
           ))}
         </div>
-        {!partTouched && d.time && <div className="tiny faint hb-hint">Определяется по времени — можно выбрать вручную.</div>}
+        {!partTouched && multi && times.length > 1 && <div className="tiny faint hb-hint">Привычка будет в той части дня, когда пора следующий раз: утром — в «Утро», после отметки — в «Вечер».</div>}
+        {!partTouched && !multi && d.time && <div className="tiny faint hb-hint">Определяется по времени — можно выбрать вручную.</div>}
 
         <label className="label">Напоминание</label>
+        {multi ? (
+          <div className="segmented hb-seg">
+            <button className={remindMode === 'off' ? 'active' : ''} onClick={() => up({ remindOff: true })}>
+              Нет
+            </button>
+            <button className={remindMode === 'each' ? 'active' : ''} onClick={() => up({ remindOff: false })}>
+              В каждое время
+            </button>
+          </div>
+        ) : (
         <div className="segmented hb-seg">
           <button className={remindMode === 'off' ? 'active' : ''} onClick={() => up({ remindOff: true, remind: undefined })}>
             Нет
@@ -602,6 +671,7 @@ export function HabitEditor({
             Своё время
           </button>
         </div>
+        )}
         {remindMode === 'custom' && (
           <div className="hb-time-row">
             <span className="hb-time">
@@ -612,7 +682,9 @@ export function HabitEditor({
         <div className="tiny faint hb-hint">
           {remindMode === 'off'
             ? 'Напоминаний не будет.'
-            : `Напомним в ${d.remind || d.time}${freq === 'daily' ? ' каждый день' : freq === 'weekdays' ? ' в выбранные дни' : ', пока цель недели не выполнена'}, если привычка ещё не отмечена.`}
+            : remindMode === 'each'
+              ? `Напомним в ${times.filter(Boolean).join(', ') || '…'}, если этот приём ещё не отмечен.`
+              : `Напомним в ${d.remind || d.time}${freq === 'daily' ? ' каждый день' : freq === 'weekdays' ? ' в выбранные дни' : ', пока цель недели не выполнена'}, если привычка ещё не отмечена.`}
         </div>
 
         <div className="modal-actions hb-editor-actions">

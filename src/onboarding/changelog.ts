@@ -1,5 +1,5 @@
 /** «Что нового»: главное в каждой версии. Новые версии — сверху. */
-import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList } from 'lucide-react';
+import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock } from 'lucide-react';
 
 export interface ChangeItem {
   icon: typeof Sparkles;
@@ -15,6 +15,14 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.23',
+    title: 'Привычка несколько раз в день',
+    items: [
+      { icon: AlarmClock, title: 'Утром и вечером — одна привычка', text: 'В привычке выберите «Несколько раз» и добавьте времена, например 08:00 и 20:00. Напоминание придёт на каждое время, а каждый приём отмечается отдельно: «✓ 08:00 · 20:00». Утром привычка в разделе «Утро», после отметки сама переходит в «Вечер».' },
+      { icon: CalendarClock, title: 'В календаре и в библиотеке', text: 'В календаре — отдельное событие на каждое время, отмечается касанием. В библиотеке привычек — готовая «Лекарства утром и вечером».' },
+    ],
+  },
   {
     version: '1.22',
     title: 'Граф заметок',

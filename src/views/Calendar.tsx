@@ -13,8 +13,8 @@ import { openDoc } from '../actions';
 import { toast, useApp } from '../store/appStore';
 import type { Habit, PlannerData } from '../types';
 import type { GoalDue, GoalsData } from '../goals/model';
-import { activeHabits, doneOn, dueOn, isCounter } from '../habits/model';
-import { toggleHabitOn } from '../habits/store';
+import { activeHabits, countOn, doneOn, dueOn, isCounter, timesOf } from '../habits/model';
+import { bumpHabitOn, toggleHabitOn } from '../habits/store';
 import { useTaskActions } from '../tasks/ui/TaskRow';
 import './calendar.css';
 import { IconTile } from '../ui/icons';
@@ -191,24 +191,29 @@ function buildItems(
     const pdays = planner.days ?? {};
     for (const h of activeHabits(planner.habits)) {
       if (!h.time) continue;
+      // несколько раз в день — событие на каждое время; отмечен ли приём — по счётчику дня
+      const slots = timesOf(h);
       const born = h.createdAt ? toYmd(new Date(h.createdAt)) : '';
       for (let d = from; d <= to; d = addDaysYmd(d, 1)) {
         const done = doneOn(pdays, h, d);
         if (!done && (d < born || !dueOn(pdays, h, d))) continue;
-        push({
-          key: `h:${h.id}:${d}`,
-          kind: 'habit',
-          date: d,
-          title: `${h.icon ? `${h.icon} ` : ''}${h.name}`,
-          start: minutes(h.time),
-          dur: h.duration || 15,
-          color: h.color,
-          done,
-          overdue: false,
-          base: true,
-          movable: false,
-          habit: h,
-        });
+        const count = slots.length ? countOn(pdays[d], h) : 0;
+        (slots.length ? slots : [h.time]).forEach((tm, i) =>
+          push({
+            key: i ? `h:${h.id}:${d}:${i}` : `h:${h.id}:${d}`,
+            kind: 'habit',
+            date: d,
+            title: `${h.icon ? `${h.icon} ` : ''}${h.name}${slots.length ? ` (${i + 1}/${slots.length})` : ''}`,
+            start: minutes(tm),
+            dur: h.duration || 15,
+            color: h.color,
+            done: slots.length ? count > i : done,
+            overdue: false,
+            base: true,
+            movable: false,
+            habit: h,
+          }),
+        );
       }
     }
   }
@@ -282,6 +287,16 @@ async function tapHabit(it: Item) {
   const today = todayYmd();
   if (it.date > today) {
     toast(`${it.title} — ${dayLabel(it.date, today).toLowerCase()} в ${timeOf(it.start ?? 0)}`);
+    return;
+  }
+  if (timesOf(h).length) {
+    // несколько раз в день: отметить этот приём (или снять последнюю отметку, если он уже отмечен)
+    try {
+      const n = await bumpHabitOn(h, it.date, it.done ? -1 : 1);
+      toast(it.done ? `${h.name} — отметка снята` : `✓ ${h.name} — ${Math.min(n, timesOf(h).length)} из ${timesOf(h).length}`);
+    } catch {
+      toast('Не удалось отметить привычку');
+    }
     return;
   }
   if (isCounter(h)) {

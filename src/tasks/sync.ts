@@ -233,22 +233,37 @@ async function plan(fromMs: number, toMs: number): Promise<Planned[]> {
   if (p?.habits?.length) {
     const pdays = p.days ?? {};
     for (const h of hm.activeHabits(p.habits)) {
-      const time = hm.reminderTimeOf(h);
-      if (!time) continue;
+      const times = hm.reminderTimesOf(h);
+      // несколько раз в день — напоминание на каждый приём, пока он не отмечен
+      const slots = hm.timesOf(h).length;
       for (let i = 0; i <= HORIZON_DAYS; i++) {
         const day = addDaysYmd(toYmd(new Date(fromMs)), i);
         if (hm.doneOn(pdays, h, day) || !hm.dueOn(pdays, h, day)) continue;
-        const at = fromYmd(day).getTime() + minutesOf(time) * 60000;
-        if (at < fromMs || at > toMs) continue;
-        const t = hm.targetOf(h);
-        const left = hm.freqOf(h) === 'weekly' ? hm.weekGoal(pdays, h, day) - hm.weekCount(pdays, h, day, day) : 0;
-        const body =
-          t > 1
-            ? `Цель на сегодня: ${h.unit ? `${h.unit} ` : ''}×${t}${h.duration ? ` · ${hm.durationLabel(h.duration)}` : ''}`
-            : left > 0
-              ? `Ещё ${left} ${hm.plural(left, ['раз', 'раза', 'раз'])} на этой неделе — отметьте выполнение`
-              : `Привычка на сегодня${h.duration ? ` · ${hm.durationLabel(h.duration)}` : ''} — отметьте выполнение`;
-        out.push({ id: hash(`habit|${h.id}|${day}`), at, title: `${h.icon ?? '🔥'} ${h.name}`, body, extra: { habitId: h.id, date: day, sm: 1 } });
+        const count = hm.countOn(pdays[day], h);
+        times.forEach((time, k) => {
+          if (slots && count > k) return;
+          const at = fromYmd(day).getTime() + minutesOf(time) * 60000;
+          if (at < fromMs || at > toMs) return;
+          if (slots) {
+            out.push({
+              id: hash(k ? `habit|${h.id}|${day}|${k}` : `habit|${h.id}|${day}`),
+              at,
+              title: `${h.icon ?? '💊'} ${h.name}`,
+              body: `${k + 1}-й раз из ${slots} сегодня (${time}) — отметьте, когда сделаете`,
+              extra: { habitId: h.id, date: day, sm: 1 },
+            });
+            return;
+          }
+          const t = hm.targetOf(h);
+          const left = hm.freqOf(h) === 'weekly' ? hm.weekGoal(pdays, h, day) - hm.weekCount(pdays, h, day, day) : 0;
+          const body =
+            t > 1
+              ? `Цель на сегодня: ${h.unit ? `${h.unit} ` : ''}×${t}${h.duration ? ` · ${hm.durationLabel(h.duration)}` : ''}`
+              : left > 0
+                ? `Ещё ${left} ${hm.plural(left, ['раз', 'раза', 'раз'])} на этой неделе — отметьте выполнение`
+                : `Привычка на сегодня${h.duration ? ` · ${hm.durationLabel(h.duration)}` : ''} — отметьте выполнение`;
+          out.push({ id: hash(`habit|${h.id}|${day}`), at, title: `${h.icon ?? '🔥'} ${h.name}`, body, extra: { habitId: h.id, date: day, sm: 1 } });
+        });
       }
     }
   }
@@ -365,7 +380,10 @@ async function handleAction(action: string, ex: Record<string, string>) {
       if (p) {
         const h = p.habits?.find((x) => x.id === ex.habitId);
         const day = (p.days[ex.date] ??= { journal: '', tasks: [] });
-        if (h) {
+        if (h && hm.timesOf(h).length) {
+          // несколько раз в день — отметить один приём
+          p.days[ex.date] = hm.withCount(day, h, hm.countOn(day, h) + 1);
+        } else if (h) {
           // счётчик — сразу до цели дня
           p.days[ex.date] = hm.withDone(day, h, true);
         } else day.habits = [...new Set([...(day.habits ?? []), ex.habitId])];

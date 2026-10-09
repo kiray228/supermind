@@ -499,3 +499,11 @@
   .hp-sum { padding: 10px 8px 4px 12px; border-radius: 22px; }
   .hp-swipe { border-radius: 22px; }
 }
+
+/* несколько раз в день: приёмы на карточке (✓ 08:00 · 20:00) */
+.hp-slots { display: inline-flex; flex-wrap: wrap; gap: 5px; }
+.hp-slot {
+  display: inline-flex; align-items: center; gap: 3px; height: 24px; padding: 0 8px; border-radius: 999px; font-size: 13px; font-weight: 700;
+  background: var(--fill-3); color: var(--text-2); font-variant-numeric: tabular-nums;
+}
+.hp-slot.on { background: color-mix(in srgb, var(--hc) 20%, transparent); color: color-mix(in srgb, var(--hc) 75%, var(--text)); }

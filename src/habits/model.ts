@@ -6,6 +6,9 @@
  * без `target` — простая отметка. Выполнение дня хранится в PlannerDay.habits (как раньше),
  * счётчики — в PlannerDay.habitCounts; при достижении цели id попадает и в habits.
  *
+ * Несколько раз в день (Habit.times): это счётчик с целью = числу времён; i-й приём выполнен, если отметок > i.
+ * Напоминание — на каждое время, пока этот приём не отмечен.
+ *
  * Заморозка серии: пропуск дня — id в PlannerDay.skipped (сливается вместе с днём, как отметки),
  * пауза — Habit.pauses (диапазоны дат, сливаются вместе с привычкой). Замороженный день
  * (пропуск или пауза, если привычка не выполнена) — не по плану: серию не рвёт и не продлевает,
@@ -62,19 +65,49 @@ export const timeOfMin = (m: number) => {
 };
 
 /** Часть дня: заданная, иначе по времени, иначе «любое время» */
+const partOfTime = (t: string): HabitPart => {
+  const m = minutesOf(t);
+  return m < 12 * 60 ? 'morning' : m < 17 * 60 ? 'day' : 'evening';
+};
+
 export function partOf(h: Pick<Habit, 'part' | 'time'>): HabitPart {
   if (h.part) return h.part;
-  if (h.time) {
-    const m = minutesOf(h.time);
-    return m < 12 * 60 ? 'morning' : m < 17 * 60 ? 'day' : 'evening';
-  }
+  if (h.time) return partOfTime(h.time);
   return 'any';
+}
+
+/** Времена приёмов, если привычка несколько раз в день (иначе пусто) */
+export const timesOf = (h: Pick<Habit, 'times'>): string[] => (h.times && h.times.length > 1 ? h.times : []);
+
+/** Время следующего неотмеченного приёма (null — все отмечены или привычка не «несколько раз») */
+export function nextSlot(h: Habit, count: number): string | null {
+  const t = timesOf(h);
+  return t.length && count < t.length ? t[count] : null;
+}
+
+/**
+ * Часть дня с учётом отметок: привычка «утром и вечером» стоит в «Утро», пока утренний приём
+ * не отмечен, потом переходит в «Вечер». Выбранная вручную часть дня главнее.
+ */
+export function partNow(h: Habit, count: number): HabitPart {
+  const t = timesOf(h);
+  if (!t.length || h.part) return partOf(h);
+  return partOfTime(t[Math.min(count, t.length - 1)]);
 }
 
 /** Время напоминания: отдельное, иначе время привычки (если напоминания не выключены) */
 export function reminderTimeOf(h: Habit): string | undefined {
   if (h.remindOff) return undefined;
   return h.remind || h.time || undefined;
+}
+
+/** Все времена напоминаний: у «несколько раз в день» — каждое время приёма */
+export function reminderTimesOf(h: Habit): string[] {
+  if (h.remindOff) return [];
+  const t = timesOf(h);
+  if (t.length) return t;
+  const one = reminderTimeOf(h);
+  return one ? [one] : [];
 }
 
 export function plural(n: number, forms: [string, string, string]): string {
@@ -111,6 +144,8 @@ export function durationLabel(min: number): string {
 
 /** «07:00–07:15», «07:00» или '' */
 export function timeRangeLabel(h: Habit): string {
+  const t = timesOf(h);
+  if (t.length) return t.join(' · ');
   if (!h.time) return '';
   return h.duration ? `${h.time}–${timeOfMin(minutesOf(h.time) + h.duration)}` : h.time;
 }
@@ -507,6 +542,17 @@ export function cleanHabit(h: Habit): Habit {
   } else {
     out.perWeek = perWeekOf(out);
     delete out.days;
+  }
+  // несколько раз в день: времена по порядку без повторов; цель и первое время — из них
+  const times = [...new Set((out.times ?? []).filter((t) => /^\d{2}:\d{2}$/.test(t)))].sort();
+  if (times.length > 1) {
+    out.times = times;
+    out.target = times.length;
+    out.time = times[0];
+    delete out.remind;
+  } else {
+    if (out.times && times.length === 1 && !out.time) out.time = times[0];
+    delete out.times;
   }
   if (!out.time) {
     delete out.time;

@@ -26,6 +26,7 @@ export const HABIT_LIBRARY: HabitPreset[] = [
   // Здоровье
   { cat: 'health', name: 'Пить воду', icon: '💧', target: 8, unit: 'стакан', part: 'any', color: '#3b82f6', why: '8 стаканов в течение дня' },
   { cat: 'health', name: 'Витамины', icon: '💊', time: '08:30', part: 'morning', why: 'Сразу после завтрака' },
+  { cat: 'health', name: 'Лекарства утром и вечером', icon: '💊', times: ['08:00', '20:00'], color: '#ef4444', why: 'Два приёма — напомним о каждом' },
   { cat: 'health', name: 'Лечь спать до 23:00', icon: '😴', time: '22:30', part: 'evening', color: '#6366f1', why: 'Высыпаться и вставать легко' },
   { cat: 'health', name: '10 000 шагов', icon: '👣', part: 'day', why: 'Больше движения в течение дня' },
   { cat: 'health', name: 'Без сладкого', icon: '🍬', part: 'any', why: 'Стабильная энергия без сахарных качелей' },

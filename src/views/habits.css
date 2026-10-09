@@ -227,3 +227,7 @@ button.hb-item:hover, .hb-preset:hover { background: var(--surface-2); }
   .pl-habit { gap: 8px; }
   .pl-habit-toggle { width: 40px; height: 40px; }
 }
+
+/* несколько раз в день: список времён в редакторе */
+.hb-times { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
+.hb-add-time { display: inline-flex; align-items: center; gap: 4px; height: 36px; }
