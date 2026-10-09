@@ -1,7 +1,8 @@
 name: Build Windows app
 
-# Установщик SuperMind-Setup.exe прикрепляется к каждому релизу.
-# Ссылка в приложении ведёт на releases/latest/download/SuperMind-Setup.exe
+# Установщик SuperMind-Setup.exe прикрепляется к каждому релизу и к постоянному релизу «windows».
+# Ссылка в приложении ведёт на releases/download/windows/SuperMind-Setup.exe —
+# она работает и в первые минуты после нового релиза, пока установщик ещё собирается
 on:
   release:
     types: [published]
@@ -16,6 +17,8 @@ permissions:
 
 jobs:
   windows:
+    # сам постоянный релиз «windows» не пересобираем
+    if: github.event.release.tag_name != 'windows'
     runs-on: windows-latest
     env:
       TAG: ${{ github.event.release.tag_name || inputs.tag }}
@@ -39,3 +42,10 @@ jobs:
           npm pkg set version="$v"
       - run: npm run dist
       - run: gh release upload "$TAG" out/SuperMind-Setup.exe --clobber
+      # постоянная ссылка: сначала загрузить под временным именем, потом подменить — файл доступен всё время
+      - run: |
+          cp out/SuperMind-Setup.exe out/SuperMind-Setup-next.exe
+          gh release upload windows out/SuperMind-Setup-next.exe --clobber
+          gh release delete-asset windows SuperMind-Setup.exe -y || true
+          id=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/windows" --jq '.assets[] | select(.name == "SuperMind-Setup-next.exe") | .id')
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/assets/$id" -f name=SuperMind-Setup.exe > /dev/null
