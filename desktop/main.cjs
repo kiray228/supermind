@@ -4,7 +4,9 @@ const { app, BrowserWindow, shell, session } = require('electron');
 const fs = require('fs');
 const path = require('path');
 
-const APP_URL = 'https://kiray228.github.io/2mind/';
+const APP_URL = 'https://kiray228.github.io/supermind/';
+// прежний адрес (до переименования) переадресует на новый
+const OLD_URL = 'https://kiray228.github.io/2mind/';
 const ORIGIN = new URL(APP_URL).origin;
 
 // метка в User-Agent: веб-версия прячет «Скачать для Windows» внутри приложения
@@ -33,7 +35,7 @@ function saveState() {
   }
 }
 
-const isApp = (url) => url.startsWith(APP_URL);
+const isApp = (url) => url.startsWith(APP_URL) || url.startsWith(OLD_URL);
 const openOutside = (url) => {
   if (/^(https?|mailto):/i.test(url)) shell.openExternal(url);
 };

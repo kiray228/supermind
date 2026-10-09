@@ -41,7 +41,7 @@
 
 - **Веб-версия:** откройте ссылку на сайт в любом браузере.
 - **iPhone:** откройте сайт в Safari → «Поделиться» → «На экран „Домой“».
-- **Windows:** скачайте [`SuperMind-Setup.exe`](https://github.com/kiray228/2mind/releases/download/windows/SuperMind-Setup.exe) — установщик создаст ярлык на рабочем столе и в меню «Пуск». Или в Chrome/Edge: значок установки в адресной строке → «Установить» (так же на macOS и Linux).
+- **Windows:** скачайте [`SuperMind-Setup.exe`](https://github.com/kiray228/supermind/releases/download/windows/SuperMind-Setup.exe) — установщик создаст ярлык на рабочем столе и в меню «Пуск». Или в Chrome/Edge: значок установки в адресной строке → «Установить» (так же на macOS и Linux).
 - **Android:** установите `SuperMind.apk` (разрешите установку из неизвестных источников) или в Chrome: меню ⋮ → «Установить приложение».
 
 ## Разработка

@@ -13,12 +13,20 @@ function serviceWorker(): Plugin {
       const version = Date.now().toString(36)
       const code = `const CACHE = 'supermind-${version}';
 const ASSETS = ${JSON.stringify([...new Set(assets)])};
+// сначала файлы текущей версии, потом прошлых (их догружает ещё открытая вкладка старой версии)
+const match = (req) => caches.open(CACHE).then((c) => c.match(req)).then((hit) => hit || caches.match(req));
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => Promise.all(ASSETS.map((a) => c.add(a).catch(() => {})))).then(() => self.skipWaiting()));
+  // reload — мимо HTTP-кэша браузера: логотип и манифест без хэша в имени, иначе закэшируется старый
+  e.waitUntil(caches.open(CACHE).then((c) => Promise.all(ASSETS.map((a) => c.add(new Request(a, { cache: 'reload' })).catch(() => {})))).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', (e) => {
   // прошлые версии не удаляем сразу: открытая вкладка старой версии ещё догружает свои файлы (разделы, стили)
-  e.waitUntil(caches.keys().then((ks) => { const old = ks.filter((k) => k.startsWith('supermind-') && k !== CACHE); return Promise.all(old.slice(0, Math.max(0, old.length - 2)).map((k) => caches.delete(k))); }).then(() => self.clients.claim()));
+  // кэши других названий (2mind-… времён 2Mind) удаляем все: из них браузер брал старые логотип и манифест
+  e.waitUntil(caches.keys().then((ks) => {
+    const foreign = ks.filter((k) => !k.startsWith('supermind-'));
+    const old = ks.filter((k) => k.startsWith('supermind-') && k !== CACHE);
+    return Promise.all([...foreign, ...old.slice(0, Math.max(0, old.length - 2))].map((k) => caches.delete(k)));
+  }).then(() => self.clients.claim()));
 });
 self.addEventListener('fetch', (e) => {
   const req = e.request;
@@ -26,10 +34,10 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(req.url);
   if (url.origin !== location.origin) return;
   if (req.mode === 'navigate') {
-    e.respondWith(fetch(req).then((r) => { const cp = r.clone(); caches.open(CACHE).then((c) => c.put('./index.html', cp)); return r; }).catch(() => caches.match('./index.html')));
+    e.respondWith(fetch(req).then((r) => { const cp = r.clone(); caches.open(CACHE).then((c) => c.put('./index.html', cp)); return r; }).catch(() => match('./index.html')));
     return;
   }
-  e.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((r) => { if (r.ok) { const cp = r.clone(); caches.open(CACHE).then((c) => c.put(req, cp)); } return r; })));
+  e.respondWith(match(req).then((hit) => hit || fetch(req).then((r) => { if (r.ok) { const cp = r.clone(); caches.open(CACHE).then((c) => c.put(req, cp)); } return r; })));
 });
 // напоминание с сервера (приложение может быть закрыто)
 self.addEventListener('push', (e) => {
