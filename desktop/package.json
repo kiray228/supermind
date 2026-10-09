@@ -39,10 +39,12 @@
         "ru_RU"
       ],
       "language": "1049"
-    }
+    },
+    "publish": null
   },
   "devDependencies": {
     "electron": "^44.7.0",
     "electron-builder": "^26.15.3"
-  }
+  },
+  "repository": "github:kiray228/2mind"
 }
