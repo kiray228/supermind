@@ -52,12 +52,12 @@ npm run dev        # http://localhost:5173
 npm run build      # сборка веб-версии в dist/
 ```
 
-Приложение для Windows (`desktop/`, Electron-окно с веб-версией — обновляется вместе с сайтом, офлайн после первого запуска). Установщик собирается в GitHub Actions и прикрепляется к каждому релизу; вручную:
+Приложение для Windows (`desktop/`, Tauri: окно с веб-версией на встроенном в Windows движке WebView2, установщик ~2 МБ — обновляется вместе с сайтом, офлайн после первого запуска). Установщик собирается в GitHub Actions и прикрепляется к каждому релизу; вручную (нужны Rust и Visual Studio Build Tools):
 
 ```bash
 cd desktop
 npm install
-npm run dist       # desktop/out/SuperMind-Setup.exe
+npm run dist       # desktop/src-tauri/target/release/bundle/nsis/SuperMind_<версия>_x64-setup.exe
 ```
 
 Сборка APK (нужны JDK 21 и Android SDK):
