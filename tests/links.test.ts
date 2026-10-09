@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { allLinks, buildIndex, extractFeatures, isStopWord, keywordsOf, type LinkIndex, MIN_SCORE, relatedTo, stemEn, stemRu, termKey, tokenize } from '../src/notes/links.ts';
+import { allLinks, buildIndex, edgesOf, extractFeatures, isStopWord, keywordsOf, type LinkIndex, MIN_SCORE, relatedTo, stemEn, stemRu, termKey, tokenize } from '../src/notes/links.ts';
 import { CORPUS } from './fixtures/corpus.ts';
 
 const index = (docs: { id: string; title: string; text: string; headings?: string[] }[]): LinkIndex => buildIndex(docs.map((d) => ({ id: d.id, f: extractFeatures(d) })));
@@ -223,6 +223,14 @@ describe('связи на «живых» заметках', () => {
     assert.ok(keywordsOf(ix, 'fin-etf', 3).length <= 3);
   });
 
+  test('связи заметки для графа совпадают со связями панели', () => {
+    for (const f of CORPUS) {
+      const panel = relatedTo(ix, f.id, { limit: 4 }).map((r) => r.id).sort();
+      const graph = edgesOf(ix, f.id, 4).map((e) => (e.a === f.id ? e.b : e.a)).sort();
+      assert.deepEqual(graph, panel, f.id);
+    }
+  });
+
   test('рёбра графа: без повторов, у каждой заметки не больше perNote', () => {
     const edges = allLinks(ix, 2);
     const keys = edges.map((e) => e.a + '|' + e.b);
@@ -316,11 +324,14 @@ describe('скорость', () => {
   const vocab = Array.from({ length: 4000 }, () => Array.from({ length: 2 + Math.floor(rnd() * 3) }, () => syll[Math.floor(rnd() * syll.length)]).join('') + 'н');
   // закон Ципфа: частые слова встречаются гораздо чаще редких
   const word = () => vocab[Math.min(vocab.length - 1, Math.floor(Math.exp(rnd() * Math.log(vocab.length))))];
-  const docs = Array.from({ length: 2000 }, (_, i) => ({
-    id: 'n' + i,
-    title: `${word()} ${word()}`,
-    text: Array.from({ length: 30 + Math.floor(rnd() * 300) }, word).join(' '),
-  }));
+  // 80 тем по 25 своих слов; в заметке треть слов — из её темы, остальное — общий фон
+  const topics = Array.from({ length: 80 }, (_, i) => Array.from({ length: 25 }, (_, j) => vocab[(i * 37 + j * 11) % vocab.length] + 'т'));
+  const docs = Array.from({ length: 2000 }, (_, i) => {
+    const tp = topics[i % topics.length];
+    const tw = () => tp[Math.floor(rnd() * tp.length)];
+    const len = 30 + Math.floor(rnd() * 200);
+    return { id: 'n' + i, title: `${tw()} ${word()}`, text: Array.from({ length: len }, () => (rnd() < 0.33 ? tw() : word())).join(' ') };
+  });
 
   test('2000 заметок: признаки, индекс и связи для каждой — быстро', () => {
     let t = performance.now();
@@ -338,5 +349,40 @@ describe('скорость', () => {
     assert.ok(tFeat < 10000, `признаки ${tFeat} мс`);
     assert.ok(tBuild < 4000, `индекс ${tBuild} мс`);
     assert.ok(tRel < 60, `связи ${tRel} мс`);
+
+    // граф: все связи всех заметок
+    t = performance.now();
+    const edges = allLinks(ix, 6);
+    const tAll = performance.now() - t;
+    console.log(`  граф (все связи 2000 заметок): ${tAll.toFixed(0)} мс, рёбер: ${edges.length}`);
+    assert.ok(tAll < 20000, `граф ${tAll} мс`);
+
+    // поиск кандидатов приближённый — сверяем с полным перебором: сильные связи не теряются
+    type Vec = { w: Map<string, number> };
+    const vec = (id: string) => (ix.docs.get(id) as unknown as Vec).w;
+    const exactDot = (a: string, b: string) => {
+      let s = 0;
+      for (const [k, w] of vec(a)) s += w * (vec(b).get(k) ?? 0);
+      return s;
+    };
+    let hit = 0;
+    let total = 0;
+    for (let i = 0; i < 40; i++) {
+      const id = 'n' + i * 50;
+      const strong = [...ix.docs.keys()]
+        .filter((x) => x !== id)
+        .map((x) => [x, exactDot(id, x)] as const)
+        .filter(([, d]) => d >= 0.08)
+        .sort((x, y) => y[1] - x[1])
+        .slice(0, 5);
+      const got = new Set(relatedTo(ix, id, { min: 0.05, limit: 15 }).map((r) => r.id));
+      for (const [x] of strong) {
+        total++;
+        if (got.has(x)) hit++;
+      }
+    }
+    console.log(`  совпадение с полным перебором: ${hit}/${total}`);
+    assert.ok(total >= 50, `сильных пар для сверки: ${total}`);
+    assert.ok(hit / total >= 0.95, `найдено ${hit} из ${total}`);
   });
 });

@@ -3,11 +3,11 @@
  * и пересчитываются только у изменённых; индекс пересобирается по требованию.
  * Сам алгоритм — в links.ts.
  */
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { create } from 'zustand';
 import { get, set } from '../store/kv';
 import type { ID } from '../types';
-import { buildIndex, extractFeatures, keywordsOf, type LinkIndex, type NoteDoc, type NoteFeatures, type Related, relatedTo } from './links';
+import { buildIndex, edgesOf, extractFeatures, keywordsOf, type LinkEdge, type LinkIndex, type NoteDoc, type NoteFeatures, type Related, relatedTo } from './links';
 import { type NoteBody, type NoteMeta, stripInline } from './model';
 import { loadNoteBody, useNotes } from './store';
 
@@ -67,9 +67,14 @@ interface LinksState {
   progress: { done: number; total: number } | null;
   /** номер сборки индекса — подписчики пересчитывают связи */
   rev: number;
+  /** «Показать на графе»: какую заметку выделить, когда откроется граф */
+  graphFocus: ID | null;
 }
 
-export const useLinks = create<LinksState>(() => ({ progress: null, rev: 0 }));
+export const useLinks = create<LinksState>(() => ({ progress: null, rev: 0, graphFocus: null }));
+
+/** Открыть граф с выделенной заметкой */
+export const showInGraph = (id: ID) => useLinks.setState({ graphFocus: id });
 
 let ix: LinkIndex | null = null;
 let ixSig = '';
@@ -178,4 +183,78 @@ export function useRelatedNotes(id: ID | null, visible: boolean, limit = 8): Rel
     // rev — не используется внутри, но отмечает пересборку модульного ix
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, rev, limit, data]);
+}
+
+// ---------- Граф ----------
+
+/** у каждой заметки на графе — не больше стольких самых сильных связей */
+const GRAPH_PER_NOTE = 6;
+const graphCache = new WeakMap<LinkIndex, LinkEdge[]>();
+
+/** Все связи для графа. Считаются порциями, чтобы не подвешивать экран; результат — до следующей пересборки индекса */
+async function graphEdges(cur: LinkIndex, onProgress: (p: number) => void, alive: () => boolean): Promise<LinkEdge[] | null> {
+  const hit = graphCache.get(cur);
+  if (hit) return hit;
+  const ids = [...cur.docs.keys()];
+  const seen = new Map<string, LinkEdge>();
+  let t = performance.now();
+  for (let i = 0; i < ids.length; i++) {
+    for (const e of edgesOf(cur, ids[i], GRAPH_PER_NOTE)) {
+      const key = e.a + '|' + e.b;
+      if (!seen.has(key)) seen.set(key, e);
+    }
+    if (performance.now() - t > 30) {
+      onProgress((i + 1) / ids.length);
+      await new Promise((r) => setTimeout(r, 0));
+      if (!alive()) return null;
+      t = performance.now();
+    }
+  }
+  const edges = [...seen.values()];
+  graphCache.set(cur, edges);
+  return edges;
+}
+
+export interface GraphState {
+  /** индекс, по которому посчитаны связи (в нём — заметки, у которых есть текст) */
+  ix: LinkIndex | null;
+  edges: LinkEdge[] | null;
+  /** 0…1 — считаются связи; null — готово */
+  progress: number | null;
+}
+
+/** Связи всех заметок для экрана графа: пересчитываются после правок (с паузой) */
+export function useLinkGraph(): GraphState {
+  const data = useNotes((s) => s.data);
+  const rev = useLinks((s) => s.rev);
+  const [st, setSt] = useState<GraphState>(() => {
+    const e = ix ? graphCache.get(ix) : undefined;
+    return { ix: e ? ix : null, edges: e ?? null, progress: null };
+  });
+  const first = useRef(true);
+
+  useEffect(() => {
+    if (!data) return;
+    let alive = true;
+    const t = setTimeout(
+      () => {
+        first.current = false;
+        void ensureLinkIndex()
+          .then(async (cur) => {
+            if (!alive) return;
+            if (!graphCache.has(cur)) setSt((s) => ({ ...s, progress: 0 }));
+            const edges = await graphEdges(cur, (p) => alive && setSt((s) => ({ ...s, progress: p })), () => alive);
+            if (alive && edges) setSt({ ix: cur, edges, progress: null });
+          })
+          .catch(() => alive && setSt((s) => ({ ...s, progress: null })));
+      },
+      first.current ? 0 : DEBOUNCE,
+    );
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+  }, [data, rev]);
+
+  return st;
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, Check, ChevronDown, Copy, FolderInput, FolderPlus, MoreHorizontal, Pencil, Pin, PinOff, Plus, RotateCcw, Search, StickyNote, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, ChevronDown, Copy, FolderInput, FolderPlus, LayoutGrid, MoreHorizontal, Pencil, Pin, PinOff, Plus, RotateCcw, Search, StickyNote, Trash2, Waypoints, X } from 'lucide-react';
 import type { ID } from '../types';
 import { confirmDialog } from '../ui/dialogs';
 import { isBodyEmpty, type NoteMeta, type NotesSort } from '../notes/model';
@@ -21,6 +21,8 @@ import {
   useNotes,
 } from '../notes/store';
 import { NoteEditor } from '../notes/ui/NoteEditor';
+import { NotesGraph } from '../notes/ui/NotesGraph';
+import { useLinks } from '../notes/related';
 import { FolderDialog, NoteCard } from '../notes/ui/ListParts';
 import { MenuItem, MenuLabel, MenuSep, NtMenu, type MenuAnchor } from '../notes/ui/Menu';
 import './notes.css';
@@ -30,6 +32,7 @@ type Sel = { k: 'all' } | { k: 'pinned' } | { k: 'trash' } | { k: 'folder'; id: 
 type MenuState = { kind: 'note' | 'move'; id: ID; anchor: MenuAnchor } | { kind: 'page'; anchor: MenuAnchor } | { kind: 'folder'; id: ID; anchor: MenuAnchor } | null;
 
 const TRASH_DAYS = 30;
+const NO_IDS = new Set<ID>();
 const SORTS: [NotesSort, string][] = [
   ['updated', 'По изменению'],
   ['created', 'По созданию'],
@@ -70,6 +73,9 @@ export default function Notes() {
   const [drawer, setDrawer] = useState(false);
   const [menu, setMenu] = useState<MenuState>(null);
   const [folderDlg, setFolderDlg] = useState<{ id?: ID } | null>(null);
+  const [mode, setModeState] = useState<'list' | 'graph'>(() => readLS<'list' | 'graph'>('sm-notes-mode', 'list'));
+  const [graphSel, setGraphSel] = useState<ID | null>(null);
+  const graphFocus = useLinks((s) => s.graphFocus);
 
   useEffect(() => {
     void ensureNotes().then((d) => {
@@ -92,6 +98,21 @@ export default function Notes() {
     setQuery(null);
   };
   const setSort = (s: NotesSort) => (setSortState(s), writeLS('sm-notes-sort', s));
+  const setMode = (m: 'list' | 'graph') => {
+    setModeState(m);
+    writeLS('sm-notes-mode', m);
+    setGraphSel(null);
+  };
+
+  // «Показать на графе» из заметки: закрыть её и открыть граф (со всеми заметками, если её нет в текущей папке)
+  useEffect(() => {
+    if (!graphFocus) return;
+    const n = useNotes.getState().data?.notes.find((x) => x.id === graphFocus);
+    if (n && (sel.k === 'trash' || (sel.k === 'pinned' && !n.pinned) || (sel.k === 'folder' && n.folderId !== sel.id))) setSel({ k: 'all' });
+    setMode('graph');
+    void openNote(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [graphFocus]);
 
   // папку удалили — назад ко всем заметкам
   useEffect(() => {
@@ -161,6 +182,7 @@ export default function Notes() {
   const folders = sortedFolders(data);
   const curFolder = sel.k === 'folder' ? data.folders.find((f) => f.id === sel.id) : undefined;
   const isTrash = sel.k === 'trash' && !q;
+  const graphMode = mode === 'graph' && sel.k !== 'trash';
   const title = q ? 'Поиск' : sel.k === 'pinned' ? 'Закреплённые' : sel.k === 'trash' ? 'Корзина' : curFolder ? (curFolder.emoji ? curFolder.emoji + ' ' : '') + curFolder.name : 'Заметки';
 
   const inSel = (n: NoteMeta) => {
@@ -251,6 +273,11 @@ export default function Notes() {
           <ChevronDown size={18} className="nt-mobile-only" />
         </button>
         <div className="grow" />
+        {sel.k !== 'trash' && (
+          <button className={`icon-btn${mode === 'graph' ? ' active' : ''}`} onClick={() => setMode(mode === 'graph' ? 'list' : 'graph')} aria-label={mode === 'graph' ? 'Показать списком' : 'Граф заметок'} title={mode === 'graph' ? 'Списком' : 'Граф связей'}>
+            {mode === 'graph' ? <LayoutGrid /> : <Waypoints />}
+          </button>
+        )}
         {query !== null ? (
           <div className="nt-search">
             <Search size={16} />
@@ -272,7 +299,18 @@ export default function Notes() {
       <div className="nt-layout">
         <aside className="nt-nav">{nav}</aside>
         <div className={`nt-main${openId ? ' has-editor' : ''}`}>
-          <div className="page-body nt-list">
+          {graphMode && (
+            <NotesGraph
+              notes={data.notes.filter((n) => (q ? !n.trashed : inSel(n)))}
+              folders={data.folders}
+              highlight={q ? (found ?? NO_IDS) : null}
+              focusId={graphFocus}
+              onFocused={() => useLinks.setState({ graphFocus: null })}
+              onOpen={(id) => void openNote(id)}
+              onSelect={setGraphSel}
+            />
+          )}
+          <div className="page-body nt-list" hidden={graphMode}>
             {isTrash && list.length > 0 && <div className="nt-trash-hint small faint">Заметки в корзине удаляются навсегда через {TRASH_DAYS} дней.</div>}
             {list.length === 0 ? (
               <div className="empty">
@@ -299,7 +337,7 @@ export default function Notes() {
         </div>
       </div>
 
-      {!openId && (
+      {!openId && !(graphMode && graphSel) && (
         <button className="nt-fab" onClick={create} aria-label="Новая заметка">
           <Plus size={26} />
         </button>

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { ChevronRight, Waypoints } from 'lucide-react';
 import type { ID } from '../../types';
-import { useLinks, useRelatedNotes } from '../related';
+import { showInGraph, useLinks, useRelatedNotes } from '../related';
 import { openLinkedNote, useNotes } from '../store';
 
 /** Сила связи: 1–3 деления */
@@ -42,6 +42,12 @@ export function RelatedNotes({ id }: { id: ID }) {
         <Waypoints size={16} />
         <span>Связанные заметки</span>
         {list.length > 0 && <span className="nt-rel-count">{list.length}</span>}
+        <div className="grow" />
+        {list.length > 0 && (
+          <button className="nt-rel-graph" onClick={() => showInGraph(id)}>
+            На графе
+          </button>
+        )}
       </div>
       {progress && (
         <div className="nt-rel-progress">
