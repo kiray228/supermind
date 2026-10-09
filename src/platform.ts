@@ -31,13 +31,13 @@ export async function installPwa() {
 }
 
 /**
- * Как предложить установить приложение: 'pwa' — в один клик из Chrome/Edge (ярлык на рабочем столе, без файлов),
- * 'exe' — скачать программу для Windows (браузер не умеет устанавливать сайты), null — уже установлено или негде
+ * Как предложить установить приложение: 'exe' — на Windows скачать программу SuperMind (установщик с ярлыком),
+ * 'pwa' — на других системах установить из Chrome/Edge в один клик, null — уже установлено или негде
  */
 export function installMode(): 'pwa' | 'exe' | null {
-  if (isNative() || isDesktopApp() || pwaInstalled || window.matchMedia('(display-mode: standalone)').matches) return null;
-  if (installPrompt) return 'pwa';
-  return /Windows NT/.test(navigator.userAgent) ? 'exe' : null;
+  if (isNative() || isDesktopApp() || window.matchMedia('(display-mode: standalone)').matches) return null;
+  if (/Windows NT/.test(navigator.userAgent)) return 'exe';
+  return installPrompt && !pwaInstalled ? 'pwa' : null;
 }
 
 /** Сохранить файл в нативном приложении (Android): кэш + системное меню «Поделиться/Сохранить» */

@@ -260,23 +260,28 @@ const PERM_SHORT: Record<NotifyPermission, string> = {
 function DesktopInstall() {
   const [canInstall, setCanInstall] = useState(canInstallPwa);
   useEffect(() => onInstallChange(() => setCanInstall(canInstallPwa())), []);
+  // на Windows — только программа SuperMind: установка из браузера дала бы второй ярлык
+  const windows = /Windows NT/.test(navigator.userAgent);
   return (
     <ListSection header="Установка на компьютер" footer="SuperMind откроется в своём окне, с ярлыком на рабочем столе. Данные и вход в аккаунт — как в браузере, синхронизация через облако.">
-      <ListRow
-        icon={<IconTile icon={WindowsLogo} tone="blue" size="list" />}
-        title="Скачать для Windows"
-        subtitle="Установщик SuperMind-Setup.exe. Если Windows предупредит о неизвестном издателе — «Подробнее» → «Выполнить в любом случае»."
-        chevron
-        onClick={() => window.open(WINDOWS_SETUP_URL, '_blank', 'noopener')}
-      />
-      <ListRow
-        icon={<IconTile icon={Desktop} tone="gray" size="list" />}
-        title="Установить из браузера"
-        subtitle={canInstall ? 'Без скачивания файлов — Windows, macOS, Linux' : 'Chrome или Edge: значок установки в адресной строке → «Установить». Mac: Safari → Файл → «Добавить в Dock».'}
-        tone={canInstall ? 'accent' : undefined}
-        chevron={canInstall}
-        onClick={canInstall ? () => void installPwa().then((ok) => ok && toast('SuperMind установлен')) : undefined}
-      />
+      {windows ? (
+        <ListRow
+          icon={<IconTile icon={WindowsLogo} tone="blue" size="list" />}
+          title="Скачать для Windows"
+          subtitle="Установщик SuperMind-Setup.exe. Если Windows предупредит о неизвестном издателе — «Подробнее» → «Выполнить в любом случае»."
+          chevron
+          onClick={() => (location.href = WINDOWS_SETUP_URL)}
+        />
+      ) : (
+        <ListRow
+          icon={<IconTile icon={Desktop} tone="gray" size="list" />}
+          title="Установить приложение"
+          subtitle={canInstall ? 'Без скачивания файлов — в один клик' : 'Chrome или Edge: значок установки в адресной строке → «Установить». Mac: Safari → Файл → «Добавить в Dock».'}
+          tone={canInstall ? 'accent' : undefined}
+          chevron={canInstall}
+          onClick={canInstall ? () => void installPwa().then((ok) => ok && toast('SuperMind установлен')) : undefined}
+        />
+      )}
     </ListSection>
   );
 }

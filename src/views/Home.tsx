@@ -221,7 +221,7 @@ export default function Home() {
         <IconTile section="home" size="sm" className="ph-tile" />
         <h1>Мои карты</h1>
         <div className="grow" />
-        <InstallAppButton className="btn btn-tinted" label={<span className="hide-xs">Установить приложение</span>} />
+        <InstallAppButton className="btn btn-tinted" wrap={(t) => <span className="hide-xs">{t}</span>} />
         <button className="btn btn-primary" onClick={() => createAndOpen(docFromTemplate(TEMPLATES[0]))}><Plus size={16} /> <span className="hide-xs">Новая</span></button>
       </div>
       <div className="page-body">

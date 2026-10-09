@@ -1,10 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { DownloadSimple } from '@phosphor-icons/react';
+import { DownloadSimple, WindowsLogo } from '@phosphor-icons/react';
 import { installMode, installPwa, onInstallChange, WINDOWS_SETUP_URL } from '../platform';
 import { toast } from '../store/appStore';
 
-/** «Установить приложение»: из браузера в один клик, а где браузер не умеет — скачать программу для Windows */
-export function InstallAppButton({ className, iconSize = 16, label = 'Установить приложение' }: { className: string; iconSize?: number; label?: ReactNode }) {
+/** На Windows — «Скачать для Windows» (установщик SuperMind), на других системах — установка из браузера */
+export function InstallAppButton({ className, iconSize = 16, wrap }: { className: string; iconSize?: number; wrap?: (label: string) => ReactNode }) {
   const [mode, setMode] = useState(installMode);
   useEffect(() => onInstallChange(() => setMode(installMode())), []);
   if (!mode) return null;
@@ -15,9 +15,10 @@ export function InstallAppButton({ className, iconSize = 16, label = 'Устан
     }
     void installPwa().then((ok) => ok && toast('SuperMind установлен — ярлык на рабочем столе и в меню «Пуск»'));
   };
+  const label = mode === 'exe' ? 'Скачать для Windows' : 'Установить приложение';
   return (
-    <button type="button" className={className} onClick={install} title={mode === 'pwa' ? 'Ярлык на рабочем столе, отдельное окно, работает офлайн' : 'Программа SuperMind для Windows'}>
-      <DownloadSimple size={iconSize} weight="bold" /> {label}
+    <button type="button" className={className} onClick={install} title={mode === 'exe' ? 'Установщик SuperMind: ярлык на рабочем столе и в меню «Пуск»' : 'Ярлык на рабочем столе, отдельное окно, работает офлайн'}>
+      {mode === 'exe' ? <WindowsLogo size={iconSize} weight="fill" /> : <DownloadSimple size={iconSize} weight="bold" />} {wrap ? wrap(label) : label}
     </button>
   );
 }
