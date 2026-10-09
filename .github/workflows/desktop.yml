@@ -1,0 +1,41 @@
+name: Build Windows app
+
+# Установщик SuperMind-Setup.exe прикрепляется к каждому релизу.
+# Ссылка в приложении ведёт на releases/latest/download/SuperMind-Setup.exe
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Релиз, к которому прикрепить установщик (например v1.20)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+    defaults:
+      run:
+        working-directory: desktop
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm ci
+      # версия программы = версия релиза (v1.20 → 1.20.0)
+      - run: |
+          v="${TAG#v}"
+          [[ "$v" =~ ^[0-9]+\.[0-9]+$ ]] && v="$v.0"
+          npm pkg set version="$v"
+      - run: npm run dist
+      - run: gh release upload "$TAG" out/SuperMind-Setup.exe --clobber

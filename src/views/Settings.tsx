@@ -1,6 +1,6 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
-import { isNative } from '../platform';
+import { canInstallPwa, installPwa, isDesktopApp, isNative, onInstallChange, WINDOWS_SETUP_URL } from '../platform';
 import { AccountCard, PushCard } from '../ui/AccountCard';
 import { DataCard } from '../ui/DataCard';
 import { ACCENTS, DEFAULT_ACCENT } from '../ui/appearance';
@@ -48,6 +48,8 @@ import {
   Image as ImageIcon,
   CircleHalf,
   Confetti,
+  Desktop,
+  WindowsLogo,
 } from '@phosphor-icons/react';
 
 export default function Settings() {
@@ -213,6 +215,8 @@ export default function Settings() {
 
           <DataCard />
 
+          {!isNative() && !isDesktopApp() && <DesktopInstall />}
+
           <ListSection header="Установка на телефон">
             <ListRow
               icon={<IconTile icon={AppleLogo} tone="gray" size="list" />}
@@ -251,6 +255,31 @@ const PERM_SHORT: Record<NotifyPermission, string> = {
   prompt: 'Не разрешены',
   unsupported: 'Недоступны',
 };
+
+/** Приложение на компьютер: установщик для Windows или установка сайта из Chrome/Edge */
+function DesktopInstall() {
+  const [canInstall, setCanInstall] = useState(canInstallPwa);
+  useEffect(() => onInstallChange(() => setCanInstall(canInstallPwa())), []);
+  return (
+    <ListSection header="Установка на компьютер" footer="SuperMind откроется в своём окне, с ярлыком на рабочем столе. Данные и вход в аккаунт — как в браузере, синхронизация через облако.">
+      <ListRow
+        icon={<IconTile icon={WindowsLogo} tone="blue" size="list" />}
+        title="Скачать для Windows"
+        subtitle="Установщик SuperMind-Setup.exe. Если Windows предупредит о неизвестном издателе — «Подробнее» → «Выполнить в любом случае»."
+        chevron
+        onClick={() => window.open(WINDOWS_SETUP_URL, '_blank', 'noopener')}
+      />
+      <ListRow
+        icon={<IconTile icon={Desktop} tone="gray" size="list" />}
+        title="Установить из браузера"
+        subtitle={canInstall ? 'Без скачивания файлов — Windows, macOS, Linux' : 'Chrome или Edge: значок установки в адресной строке → «Установить». Mac: Safari → Файл → «Добавить в Dock».'}
+        tone={canInstall ? 'accent' : undefined}
+        chevron={canInstall}
+        onClick={canInstall ? () => void installPwa().then((ok) => ok && toast('SuperMind установлен')) : undefined}
+      />
+    </ListSection>
+  );
+}
 
 function TaskSettings() {
   const data = useTasks((s) => s.data);

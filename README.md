@@ -41,6 +41,7 @@
 
 - **Веб-версия:** откройте ссылку на сайт в любом браузере.
 - **iPhone:** откройте сайт в Safari → «Поделиться» → «На экран „Домой“».
+- **Windows:** скачайте [`SuperMind-Setup.exe`](https://github.com/kiray228/2mind/releases/latest/download/SuperMind-Setup.exe) — установщик создаст ярлык на рабочем столе и в меню «Пуск». Или в Chrome/Edge: значок установки в адресной строке → «Установить» (так же на macOS и Linux).
 - **Android:** установите `SuperMind.apk` (разрешите установку из неизвестных источников) или в Chrome: меню ⋮ → «Установить приложение».
 
 ## Разработка
@@ -49,6 +50,14 @@
 npm install
 npm run dev        # http://localhost:5173
 npm run build      # сборка веб-версии в dist/
+```
+
+Приложение для Windows (`desktop/`, Electron-окно с веб-версией — обновляется вместе с сайтом, офлайн после первого запуска). Установщик собирается в GitHub Actions и прикрепляется к каждому релизу; вручную:
+
+```bash
+cd desktop
+npm install
+npm run dist       # desktop/out/SuperMind-Setup.exe
 ```
 
 Сборка APK (нужны JDK 21 и Android SDK):

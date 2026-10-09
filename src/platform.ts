@@ -5,6 +5,28 @@ import { leaveEditor } from './actions';
 import { runBack } from './ui/dialogs';
 
 export const isNative = () => Capacitor.isNativePlatform();
+/** Запущено в приложении для Windows (Electron-оболочка добавляет метку в User-Agent) */
+export const isDesktopApp = () => navigator.userAgent.includes('SuperMind-Desktop');
+export const WINDOWS_SETUP_URL = 'https://github.com/kiray228/2mind/releases/latest/download/SuperMind-Setup.exe';
+
+type InstallPrompt = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
+let installPrompt: InstallPrompt | null = null;
+const installListeners = new Set<() => void>();
+/** Chrome/Edge разрешили установить сайт как приложение (кнопка «Установить») */
+export const canInstallPwa = () => installPrompt !== null;
+export const onInstallChange = (fn: () => void) => {
+  installListeners.add(fn);
+  return () => void installListeners.delete(fn);
+};
+export async function installPwa() {
+  const p = installPrompt;
+  if (!p) return false;
+  await p.prompt();
+  const { outcome } = await p.userChoice;
+  installPrompt = null;
+  installListeners.forEach((f) => f());
+  return outcome === 'accepted';
+}
 
 /** Сохранить файл в нативном приложении (Android): кэш + системное меню «Поделиться/Сохранить» */
 export async function nativeSaveBlob(blob: Blob, filename: string) {
@@ -86,7 +108,18 @@ export function setupPlatform() {
       new MutationObserver(apply).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     });
     import('@capacitor/splash-screen').then(({ SplashScreen }) => SplashScreen.hide().catch(() => {}));
-  } else if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  } else {
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      installPrompt = e as InstallPrompt;
+      installListeners.forEach((f) => f());
+    });
+    window.addEventListener('appinstalled', () => {
+      installPrompt = null;
+      installListeners.forEach((f) => f());
+    });
+  }
+  if (!isNative() && 'serviceWorker' in navigator && import.meta.env.PROD) {
     // офлайн-кэш (service worker скачивает все файлы приложения) — после запуска, чтобы не отнимать сеть у первого экрана
     const register = () => setTimeout(() => navigator.serviceWorker.register('./sw.js').catch(() => {}), 3000);
     if (document.readyState === 'complete') register();

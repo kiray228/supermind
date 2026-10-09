@@ -29,3 +29,6 @@ android/keystore.properties
 android/local.properties
 release/
 .claude/
+
+# Сборка приложения для Windows
+desktop/out/

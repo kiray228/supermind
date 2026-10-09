@@ -1,0 +1,48 @@
+{
+  "name": "supermind-desktop",
+  "productName": "SuperMind",
+  "version": "1.20.0",
+  "description": "SuperMind — интеллект-карты, задачи, ежедневник",
+  "author": "SuperMind",
+  "private": true,
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win --x64 --publish never"
+  },
+  "build": {
+    "appId": "app.twomind.mindmap",
+    "productName": "SuperMind",
+    "copyright": "SuperMind",
+    "files": [
+      "main.cjs",
+      "offline.html",
+      "build/icon.png"
+    ],
+    "directories": {
+      "output": "out",
+      "buildResources": "build"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.png",
+      "artifactName": "SuperMind-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "SuperMind",
+      "runAfterFinish": true,
+      "installerLanguages": [
+        "ru_RU"
+      ],
+      "language": "1049"
+    }
+  },
+  "devDependencies": {
+    "electron": "^44.7.0",
+    "electron-builder": "^26.15.3"
+  }
+}
