@@ -1,5 +1,5 @@
 /** «Что нового»: главное в каждой версии. Новые версии — сверху. */
-import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock } from 'lucide-react';
+import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2 } from 'lucide-react';
 
 export interface ChangeItem {
   icon: typeof Sparkles;
@@ -15,6 +15,14 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.24',
+    title: 'ИИ проверяет связи заметок',
+    items: [
+      { icon: Sparkles, title: 'Темы и связи — по смыслу', text: 'Внизу заметки — «Проверить»: ИИ уберёт случайные слова из тем, добавит пропущенные, подтвердит верные связи и уберёт случайные — с объяснением, почему. На графе — «Проверить ИИ» для всех заметок сразу.' },
+      { icon: Undo2, title: 'Последнее слово — ваше', text: 'Не согласны — «Вернуть» связь или «Убрать» её; ваше решение ИИ не меняет. Можно отменить и всю проверку.' },
+    ],
+  },
   {
     version: '1.23',
     title: 'Привычка несколько раз в день',

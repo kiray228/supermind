@@ -225,6 +225,33 @@
 .nt-rel-go { color: var(--text-3); flex-shrink: 0; }
 .nt-rel-empty { font-size: 13px; color: var(--text-3); line-height: 1.45; padding: 2px 0; }
 .nt-rel-graph { border: none; background: none; color: var(--accent); font: inherit; font-size: 13px; font-weight: 600; padding: 4px 2px; cursor: pointer; }
+.nt-rel-chip.is-ai { display: inline-flex; align-items: center; gap: 4px; background: var(--accent-soft); color: var(--accent); }
+.nt-rel-ok { display: inline-flex; align-items: center; gap: 2px; font-size: 11px; font-weight: 650; padding: 1px 6px 1px 4px; margin-right: 6px; border-radius: 6px; background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); vertical-align: 1px; }
+
+/* проверка связей ИИ */
+.nt-ai { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+.nt-ai-bar { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-2); min-height: 32px; }
+.nt-ai-ic { color: var(--accent); flex-shrink: 0; }
+.nt-ai-status { line-height: 1.35; }
+.nt-ai-btn {
+  display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+  padding: 6px 12px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border)); background: var(--accent-soft); color: var(--accent);
+}
+.nt-ai-btn:active { opacity: .75; }
+.nt-ai-result { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: var(--radius); background: var(--surface); border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border)); font-size: 13.5px; line-height: 1.45; color: var(--text-2); animation: nt-card-in .18s ease-out; }
+.nt-ai-result b { color: var(--text); font-weight: 600; }
+.nt-ai-result-head { display: flex; align-items: center; gap: 8px; font-weight: 650; color: var(--text); font-size: 14px; }
+.nt-ai-result-head > svg { color: var(--accent); flex-shrink: 0; }
+.nt-ai-result-head .icon-btn { margin: -8px -8px -8px 0; }
+.nt-ai-group { display: flex; flex-direction: column; gap: 6px; }
+.nt-ai-link { display: flex; align-items: center; gap: 8px; padding: 6px 0 6px 10px; border-left: 2px solid var(--accent); }
+.nt-ai-link.is-off { border-left-color: var(--fill); }
+.nt-ai-link.is-off .nt-ai-link-title { text-decoration: line-through; color: var(--text-3); }
+.nt-ai-link-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; border: none; background: none; padding: 0; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.nt-ai-link-title { font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nt-ai-link-why { font-size: 12.5px; color: var(--text-3); }
+.nt-ai-undo { align-self: flex-start; display: inline-flex; align-items: center; gap: 5px; border: none; background: none; padding: 2px 0; font: inherit; font-size: 13px; color: var(--text-3); cursor: pointer; }
+@media (hover: hover) { .nt-ai-undo:hover { color: var(--text); } }
 
 /* ---------- Граф заметок ---------- */
 .nt-list[hidden] { display: none; }

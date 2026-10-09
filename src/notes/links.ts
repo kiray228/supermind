@@ -362,6 +362,8 @@ interface DocVec {
   f: NoteFeatures;
   /** термин → вес TF-IDF (нормирован: длина вектора = 1) */
   w: Map<string, number>;
+  /** термин → частота (формы с беглой гласной слиты) */
+  tf: Map<string, number>;
   titleKey?: string;
   /** самые весомые термины с непустым списком заметок — для поиска кандидатов (считаются при первом запросе) */
   top?: string[];
@@ -377,7 +379,21 @@ export interface LinkIndex {
   titles: Map<string, string[]>;
   /** ключ названия → заметки, где он встречается в тексте */
   holders: Map<string, string[]>;
+  /** решения по парам (pairKey): true — связь верна (показывается, даже если слов общих мало), false — случайна (скрыта) */
+  pairs: Map<string, boolean>;
+  /** подтверждённые пары — по заметкам, чтобы добавить их в кандидаты */
+  forced: Map<string, string[]>;
+  /** ключ термина заметки → ключ в индексе (слияние форм с беглой гласной) */
+  canon: (k: string) => string;
 }
+
+export interface IndexOpts {
+  /** решения по парам заметок (ИИ или человек) */
+  pairs?: Map<string, boolean>;
+}
+
+/** Ключ пары заметок — один на пару, в каком бы порядке их ни назвали */
+export const pairKey = (a: string, b: string) => (a < b ? a + '|' + b : b + '|' + a);
 
 const BIGRAM_BOOST = 1.4;
 
@@ -395,7 +411,7 @@ function fleetingAliases(vocab: Set<string>): Map<string, string> {
   return alias;
 }
 
-export function buildIndex(items: LinkDoc[]): LinkIndex {
+export function buildIndex(items: LinkDoc[], opts: IndexOpts = {}): LinkIndex {
   const vocab = new Set<string>();
   for (const it of items) for (const k in it.f.terms) if (!k.includes(BIGRAM_SEP)) vocab.add(k);
   const alias = fleetingAliases(vocab);
@@ -457,7 +473,7 @@ export function buildIndex(items: LinkDoc[]): LinkIndex {
         p.push({ id: r.id, w: nv });
       }
     }
-    docs.set(r.id, { id: r.id, f: r.f, w, titleKey: r.titleKey });
+    docs.set(r.id, { id: r.id, f: r.f, w, tf: r.tf, titleKey: r.titleKey });
   }
 
   // названия и где они упоминаются — чтобы не перебирать все заметки при каждом запросе
@@ -465,7 +481,19 @@ export function buildIndex(items: LinkDoc[]): LinkIndex {
   for (const d of docs.values()) if (d.titleKey && mentionableKey(n, df, d.titleKey)) push(titles, d.titleKey, d.id);
   const holders = new Map<string, string[]>();
   for (const d of docs.values()) for (const k of d.w.keys()) if (titles.has(k)) push(holders, k, d.id);
-  return { n, docs, df, post, titles, holders };
+  // решения по парам — только для заметок, которые есть в индексе
+  const pairs = new Map<string, boolean>();
+  const forced = new Map<string, string[]>();
+  for (const [k, ok] of opts.pairs ?? []) {
+    const [a, b] = k.split('|');
+    if (!docs.has(a) || !docs.has(b) || a === b) continue;
+    pairs.set(pairKey(a, b), ok);
+    if (ok) {
+      push(forced, a, b);
+      push(forced, b, a);
+    }
+  }
+  return { n, docs, df, post, titles, holders, pairs, forced, canon };
 }
 
 function push<K, V>(m: Map<K, V[]>, k: K, v: V) {
@@ -484,12 +512,18 @@ export interface Related {
   terms: string[];
   /** одна заметка упоминает название другой */
   mention?: boolean;
+  /** связь подтверждена (ИИ или человеком) */
+  confirmed?: boolean;
 }
 
 export interface RelatedOpts {
   limit?: number;
   /** порог силы связи */
   min?: number;
+  /** без решений по парам — как связал бы один алгоритм (для повторной проверки ИИ) */
+  raw?: boolean;
+  /** и пары с одним общим словом — кандидаты, которые ИИ может счесть связанными */
+  loose?: boolean;
 }
 
 export const MIN_SCORE = 0.08;
@@ -585,8 +619,15 @@ function pairStats(a: DocVec, b: DocVec): { dot: number; words: number; phrase: 
   return { dot, words, phrase };
 }
 
+interface Scored {
+  id: string;
+  score: number;
+  mention: boolean;
+  confirmed: boolean;
+}
+
 /** Связи заметки без причин (их считать дороже) — самые сильные первыми */
-function scored(ix: LinkIndex, a: DocVec, min: number): { id: string; score: number; mention: boolean }[] {
+function scored(ix: LinkIndex, a: DocVec, min: number, raw = false, loose = false): Scored[] {
   // кандидаты — по самым весомым словам (приближённо), затем точная оценка
   const approx = new Map<string, number>();
   for (const k of topTerms(ix, a)) {
@@ -601,15 +642,23 @@ function scored(ix: LinkIndex, a: DocVec, min: number): { id: string; score: num
   );
   const mentions = mentionsOf(ix, a);
   for (const id of mentions) cands.add(id);
+  if (!raw) for (const id of ix.forced.get(a.id) ?? []) cands.add(id);
 
-  const out: { id: string; score: number; mention: boolean }[] = [];
+  const out: Scored[] = [];
   for (const bid of cands) {
+    const verdict = raw ? undefined : ix.pairs.get(pairKey(a.id, bid));
+    if (verdict === false) continue;
     const st = pairStats(a, ix.docs.get(bid)!);
     const mention = mentions.has(bid);
     const score = Math.min(1, st.dot + (mention ? MENTION_BONUS : 0));
+    // подтверждённая связь остаётся, даже если общих слов мало
+    if (verdict === true) {
+      out.push({ id: bid, score: Math.max(score, MIN_SCORE), mention, confirmed: true });
+      continue;
+    }
     if (score < min) continue;
     // одно общее слово — ещё не связь, если оно не очень весомое
-    if (st.words >= 2 || st.phrase || mention || score >= STRONG_ALONE) out.push({ id: bid, score, mention });
+    if (loose || st.words >= 2 || st.phrase || mention || score >= STRONG_ALONE) out.push({ id: bid, score, mention, confirmed: false });
   }
   return out.sort((x, y) => y.score - x.score || (x.id < y.id ? -1 : 1));
 }
@@ -618,13 +667,16 @@ function scored(ix: LinkIndex, a: DocVec, min: number): { id: string; score: num
 export function relatedTo(ix: LinkIndex, id: string, opts: RelatedOpts = {}): Related[] {
   const a = ix.docs.get(id);
   if (!a) return [];
-  let list = scored(ix, a, opts.min ?? MIN_SCORE);
+  let list = scored(ix, a, opts.min ?? MIN_SCORE, opts.raw, opts.loose);
   if (opts.limit) list = list.slice(0, opts.limit);
-  return list.map(({ id: bid, score, mention }) => {
+  return list.map(({ id: bid, score, mention, confirmed }) => {
     const b = ix.docs.get(bid)!;
     const terms = sharedTerms(a, b);
     if (mention && !terms.length) terms.push(displayForm(b, b.titleKey ?? '') || displayForm(a, a.titleKey ?? ''));
-    return mention ? { id: bid, score, terms, mention } : { id: bid, score, terms };
+    const r: Related = { id: bid, score, terms };
+    if (mention) r.mention = true;
+    if (confirmed) r.confirmed = true;
+    return r;
   });
 }
 
@@ -632,9 +684,72 @@ export function relatedTo(ix: LinkIndex, id: string, opts: RelatedOpts = {}): Re
 export function keywordsOf(ix: LinkIndex, id: string, max = 6): string[] {
   const d = ix.docs.get(id);
   if (!d) return [];
-  const list = [...d.w.entries()].sort((x, y) => y[1] - x[1]).map((x) => x[0]);
+  const list = [...d.w.entries()].sort((x, y) => y[1] - x[1] || (x[0] < y[0] ? -1 : 1)).map((x) => x[0]);
   // словосочетание — только если встречается больше одного раза или в нескольких заметках
-  return pickTerms(list, max, (k) => !k.includes(BIGRAM_SEP) || (d.f.terms[k] ?? 0) >= 2 || (ix.df.get(k) ?? 0) >= 2).map((k) => displayForm(d, k));
+  return pickTerms(list, max, (k) => !k.includes(BIGRAM_SEP) || (d.tf.get(k) ?? 0) >= 2 || (ix.df.get(k) ?? 0) >= 2).map((k) => displayForm(d, k));
+}
+
+/**
+ * Ключевые слова по признакам заметки (с ключами) — веса по частотам всего индекса.
+ * Нужны, чтобы показать ИИ выбор самого алгоритма, без прежних правок.
+ */
+export function keywordTerms(ix: LinkIndex, f: NoteFeatures, max = 10): { key: string; raw: string[]; form: string }[] {
+  // слить формы, как в индексе; raw — исходные ключи заметки (их убирает правка слов)
+  const agg = new Map<string, { tf: number; raw: string[]; form: string; best: number }>();
+  for (const k in f.terms) {
+    const c = ix.canon(k);
+    const a = agg.get(c) ?? { tf: 0, raw: [], form: '', best: -1 };
+    a.tf += f.terms[k];
+    a.raw.push(k);
+    if (f.terms[k] > a.best) [a.form, a.best] = [f.forms[k] ?? k, f.terms[k]];
+    agg.set(c, a);
+  }
+  const w: [string, number][] = [];
+  for (const [k, a] of agg) {
+    const idf = Math.log(1 + Math.max(1, ix.n) / Math.max(ix.df.get(k) ?? 1, 2));
+    w.push([k, (1 + Math.log(a.tf)) * idf * (k.includes(BIGRAM_SEP) ? BIGRAM_BOOST : 1)]);
+  }
+  w.sort((x, y) => y[1] - x[1] || (x[0] < y[0] ? -1 : 1));
+  return pickTerms(
+    w.map((x) => x[0]),
+    max,
+    (k) => !k.includes(BIGRAM_SEP) || agg.get(k)!.tf >= 2 || (ix.df.get(k) ?? 0) >= 2,
+  ).map((key) => ({ key, raw: agg.get(key)!.raw, form: agg.get(key)!.form }));
+}
+
+/** вес добавленной темы — как у подзаголовка (слова из названия остаются главнее) */
+const ADDED_W = 2;
+
+/**
+ * Применить правку важных слов: убрать неважные (и словосочетания с ними), добавить пропущенные темы.
+ * Возвращает новый объект — кэш признаков не меняется.
+ */
+export function applyTermReview(f: NoteFeatures, drop: string[], add: string[]): NoteFeatures {
+  if (!drop.length && !add.length) return f;
+  const gone = new Set(drop);
+  const terms: Record<string, number> = {};
+  const forms: Record<string, string> = {};
+  for (const k in f.terms) {
+    if (gone.has(k) || (k.includes(BIGRAM_SEP) && k.split(BIGRAM_SEP).some((p) => gone.has(p)))) continue;
+    terms[k] = f.terms[k];
+    forms[k] = f.forms[k];
+  }
+  for (const phrase of add) {
+    const toks = tokenize(phrase).filter((t): t is Token => !!t);
+    toks.forEach((t, i) => {
+      terms[t.key] = (terms[t.key] ?? 0) + ADDED_W;
+      forms[t.key] ??= t.form;
+      const next = toks[i + 1];
+      if (next && next.key !== t.key) {
+        const bk = t.key + BIGRAM_SEP + next.key;
+        terms[bk] = (terms[bk] ?? 0) + ADDED_W;
+        forms[bk] ??= t.form + ' ' + next.form;
+      }
+    });
+  }
+  const out: NoteFeatures = { terms, forms };
+  if (f.titleKey && terms[f.titleKey]) out.titleKey = f.titleKey;
+  return out;
 }
 
 export interface LinkEdge {
@@ -642,6 +757,7 @@ export interface LinkEdge {
   b: string;
   score: number;
   mention?: boolean;
+  confirmed?: boolean;
 }
 
 /**
@@ -655,7 +771,10 @@ export function edgesOf(ix: LinkIndex, id: string, perNote = 6, min = MIN_SCORE)
     .slice(0, perNote)
     .map((r) => {
       const [x, y] = id < r.id ? [id, r.id] : [r.id, id];
-      return r.mention ? { a: x, b: y, score: r.score, mention: true } : { a: x, b: y, score: r.score };
+      const e: LinkEdge = { a: x, b: y, score: r.score };
+      if (r.mention) e.mention = true;
+      if (r.confirmed) e.confirmed = true;
+      return e;
     });
 }
 

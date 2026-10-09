@@ -56,12 +56,39 @@ export interface Folder {
   updatedAt: number;
 }
 
+/** Проверка ИИ важных слов заметки (id — id заметки) */
+export interface AiTermsReview {
+  id: ID;
+  /** заметка на момент проверки (её updatedAt) — изменилась позже, значит, стоит проверить снова */
+  at: number;
+  /** ключи терминов, которые ИИ счёл неважными для темы */
+  drop: string[];
+  /** важные темы из текста, которые алгоритм пропустил (как написаны) */
+  add: string[];
+  checkedAt: number;
+  updatedAt: number;
+}
+
+/** Решение по паре заметок (id — «a|b», a < b): связь верна или случайна */
+export interface AiLinkReview {
+  id: string;
+  ok: boolean;
+  /** коротко — почему */
+  why?: string;
+  /** кто решил: ИИ или сам человек (решение человека ИИ не меняет) */
+  by: 'ai' | 'user';
+  updatedAt: number;
+}
+
 export interface NotesData {
   version: 1;
   notes: NoteMeta[];
   folders: Folder[];
   /** удалённые сущности: id → когда (для синхронизации) */
   gone?: Record<string, number>;
+  /** проверка связей ИИ */
+  aiTerms?: AiTermsReview[];
+  aiLinks?: AiLinkReview[];
 }
 
 export type NotesSort = 'updated' | 'created' | 'title';

@@ -43,6 +43,8 @@ function normalize(raw: Partial<NotesData> | undefined): NotesData {
     notes: (raw.notes ?? []).filter((n) => n && n.id).map((n) => ({ ...n, title: n.title ?? '', preview: n.preview ?? '', createdAt: n.createdAt ?? n.updatedAt ?? 0, updatedAt: n.updatedAt ?? 0 })),
     folders: (raw.folders ?? []).filter((f) => f && f.id).map((f, i) => ({ ...f, name: f.name ?? 'Папка', color: f.color ?? FOLDER_COLORS[0], order: f.order ?? i, createdAt: f.createdAt ?? 0, updatedAt: f.updatedAt ?? 0 })),
     gone: raw.gone ?? {},
+    aiTerms: (raw.aiTerms ?? []).filter((r) => r && r.id).map((r) => ({ ...r, drop: r.drop ?? [], add: r.add ?? [], at: r.at ?? 0, checkedAt: r.checkedAt ?? 0, updatedAt: r.updatedAt ?? 0 })),
+    aiLinks: (raw.aiLinks ?? []).filter((r) => r && r.id && typeof r.ok === 'boolean').map((r) => ({ ...r, by: r.by === 'user' ? 'user' : 'ai', updatedAt: r.updatedAt ?? 0 })),
   };
 }
 

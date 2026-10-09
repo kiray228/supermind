@@ -7,8 +7,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { create } from 'zustand';
 import { get, set } from '../store/kv';
 import type { ID } from '../types';
-import { buildIndex, edgesOf, extractFeatures, keywordsOf, type LinkEdge, type LinkIndex, type NoteDoc, type NoteFeatures, type Related, relatedTo } from './links';
-import { type NoteBody, type NoteMeta, stripInline } from './model';
+import { applyTermReview, buildIndex, edgesOf, extractFeatures, keywordsOf, type LinkEdge, type LinkIndex, type NoteDoc, type NoteFeatures, type Related, relatedTo } from './links';
+import { type NoteBody, type NoteMeta, type NotesData, stripInline } from './model';
 import { loadNoteBody, useNotes } from './store';
 
 /** Только на этом устройстве (не синхронизируется и не попадает в копии) */
@@ -81,14 +81,23 @@ let ixSig = '';
 let running: Promise<LinkIndex> | null = null;
 
 const alive = (notes: NoteMeta[]) => notes.filter((n) => !n.trashed);
-const signature = (notes: NoteMeta[]) => notes.map((n) => n.id + ':' + n.updatedAt).join('|');
+/** Что влияет на связи: заметки (их версии) и проверка ИИ (правки слов и решения по парам) */
+const signature = (d: NotesData | null) =>
+  alive(d?.notes ?? [])
+    .map((n) => n.id + ':' + n.updatedAt)
+    .join('|') +
+  '#' +
+  (d?.aiTerms ?? []).map((r) => r.id + ':' + r.updatedAt).join('|') +
+  '#' +
+  (d?.aiLinks ?? []).map((r) => r.id + ':' + (r.ok ? 1 : 0)).join('|');
 /** показывать прогресс, если читать с диска нужно много заметок */
 const PROGRESS_FROM = 15;
 
 async function rebuild(): Promise<LinkIndex> {
   const c = await loadCache();
-  const notes = alive(useNotes.getState().data?.notes ?? []);
-  const sig = signature(notes);
+  const data = useNotes.getState().data;
+  const notes = alive(data?.notes ?? []);
+  const sig = signature(data);
   if (ix && sig === ixSig) return ix;
 
   const stale = notes.filter((n) => c.items[n.id]?.at !== n.updatedAt);
@@ -115,7 +124,16 @@ async function rebuild(): Promise<LinkIndex> {
     }
   if (stale.length || pruned) scheduleSave();
 
-  ix = buildIndex(notes.filter((n) => c.items[n.id]).map((n) => ({ id: n.id, f: c.items[n.id].f })));
+  // правки ИИ: лишние слова убраны, пропущенные темы добавлены; решения по парам — поверх алгоритма
+  const reviews = new Map((data?.aiTerms ?? []).map((r) => [r.id, r]));
+  const items = notes
+    .filter((n) => c.items[n.id])
+    .map((n) => {
+      const r = reviews.get(n.id);
+      const f = c.items[n.id].f;
+      return { id: n.id, f: r ? applyTermReview(f, r.drop, r.add) : f };
+    });
+  ix = buildIndex(items, { pairs: new Map((data?.aiLinks ?? []).map((r) => [r.id, r.ok])) });
   ixSig = sig;
   useLinks.setState((s) => ({ progress: null, rev: s.rev + 1 }));
   return ix;
@@ -123,8 +141,7 @@ async function rebuild(): Promise<LinkIndex> {
 
 /** Актуальный индекс связей (запросы во время сборки ждут её и, если заметки успели измениться, — следующую) */
 export function ensureLinkIndex(): Promise<LinkIndex> {
-  const notes = alive(useNotes.getState().data?.notes ?? []);
-  if (ix && !running && signature(notes) === ixSig) return Promise.resolve(ix);
+  if (ix && !running && signature(useNotes.getState().data) === ixSig) return Promise.resolve(ix);
   const prev = running;
   const next: Promise<LinkIndex> = (prev ? prev.catch(() => undefined) : Promise.resolve()).then(rebuild);
   running = next;
@@ -135,6 +152,9 @@ export function ensureLinkIndex(): Promise<LinkIndex> {
     .catch(() => undefined);
   return next;
 }
+
+/** Важные слова заметки, как их выбрал алгоритм (без правок ИИ) — из кэша; индекс должен быть собран */
+export const rawFeatures = (id: ID): NoteFeatures | undefined => cache?.items[id]?.f;
 
 /** Текущий индекс без пересборки (может быть устаревшим) */
 export const linkIndex = () => ix;

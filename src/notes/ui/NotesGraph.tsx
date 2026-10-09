@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { ChevronRight, CircleDot, Maximize2, Minus, Plus, Waypoints, X } from 'lucide-react';
+import { ChevronRight, CircleDot, Maximize2, Minus, Plus, Sparkles, Waypoints, X } from 'lucide-react';
 import type { ID } from '../../types';
+import { AIError } from '../../ai/claude';
+import { toast } from '../../store/appStore';
+import { confirmDialog } from '../../ui/dialogs';
+import { notesToReview, reviewNote } from '../aiReview';
 import type { Folder, NoteMeta } from '../model';
 import { useLinkGraph, useLinks } from '../related';
 import { GraphView, type ViewLink, type ViewNode } from './graphView';
@@ -42,6 +46,9 @@ export function NotesGraph({ notes, folders, highlight, focusId, onFocused, onOp
   const [orphans, setOrphans] = useState(() => readLS('sm-graph-orphans', true));
   const { ix, edges, progress } = useLinkGraph();
   const analysing = useLinks((s) => s.progress);
+  const [bulk, setBulk] = useState<{ done: number; total: number } | null>(null);
+  const bulkAbort = useRef<AbortController | null>(null);
+  useEffect(() => () => bulkAbort.current?.abort(), []);
 
   const select = (id: ID | null) => {
     setSel(id);
@@ -131,6 +138,46 @@ export function NotesGraph({ notes, folders, highlight, focusId, onFocused, onOp
     writeLS('sm-graph-orphans', !orphans);
   };
 
+  /** Проверить ИИ все заметки на графе, которые ещё не проверены или изменились после проверки */
+  const reviewAll = async () => {
+    if (bulk) return;
+    const ids = await notesToReview(model.list.map((n) => n.id));
+    if (!ids.length) return toast('Все заметки уже проверены ИИ');
+    const n = ids.length;
+    const ok = await confirmDialog(
+      `Проверить ${n} ${plural(n, 'заметку', 'заметки', 'заметок')} ИИ?`,
+      'ИИ оценит важные слова и связи каждой заметки — по одному запросу на заметку. Остановить можно в любой момент.',
+      { okText: 'Проверить' },
+    );
+    if (!ok) return;
+    const ac = new AbortController();
+    bulkAbort.current = ac;
+    let rejected = 0;
+    let found = 0;
+    let done = 0;
+    setBulk({ done, total: n });
+    for (const id of ids) {
+      if (ac.signal.aborted) break;
+      try {
+        const r = await reviewNote(id, ac.signal);
+        rejected += r.rejected.length;
+        found += r.found.length;
+      } catch (e) {
+        if (ac.signal.aborted) break;
+        // лимит, ключ, сеть — дальше нет смысла; заметка без текста — просто пропускаем
+        if (e instanceof AIError) {
+          toast(e.message);
+          break;
+        }
+      }
+      done++;
+      setBulk({ done, total: n });
+    }
+    bulkAbort.current = null;
+    setBulk(null);
+    if (done) toast(`ИИ проверил ${done} ${plural(done, 'заметку', 'заметки', 'заметок')}: убрал случайных связей — ${rejected}, нашёл новых — ${found}`);
+  };
+
   const pick = (id: ID) => {
     viewRef.current?.select(id, true);
     select(id);
@@ -155,6 +202,11 @@ export function NotesGraph({ notes, folders, highlight, focusId, onFocused, onOp
         <button className={`nt-graph-chip${orphans ? ' active' : ''}`} onClick={toggleOrphans} aria-pressed={orphans} title="Показывать заметки без связей">
           <CircleDot size={14} /> Одиночные
         </button>
+        {model.list.length > 1 && !bulk && (
+          <button className="nt-graph-chip" onClick={() => void reviewAll()} title="ИИ проверит важные слова и связи заметок">
+            <Sparkles size={14} /> Проверить ИИ
+          </button>
+        )}
       </div>
 
       <div className="nt-graph-tools">
@@ -169,7 +221,21 @@ export function NotesGraph({ notes, folders, highlight, focusId, onFocused, onOp
         </button>
       </div>
 
-      {busy && (
+      {bulk && (
+        <div className="nt-graph-busy">
+          <div className="nt-rel-bar">
+            <span style={{ width: `${Math.round((bulk.done / Math.max(1, bulk.total)) * 100)}%` }} />
+          </div>
+          <span className="faint tiny">
+            ИИ проверяет связи… {bulk.done} из {bulk.total}
+          </span>
+          <button className="nt-ai-btn" onClick={() => bulkAbort.current?.abort()}>
+            Стоп
+          </button>
+        </div>
+      )}
+
+      {busy && !bulk && (
         <div className="nt-graph-busy">
           <div className="nt-rel-bar">
             <span style={{ width: `${Math.round((analysing ? analysing.done / Math.max(1, analysing.total) : (progress ?? 0)) * 100)}%` }} />
