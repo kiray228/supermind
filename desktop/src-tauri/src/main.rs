@@ -4,7 +4,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::io::Write;
-use tauri::webview::{NewWindowResponse, PageLoadEvent};
+use tauri::webview::{NewWindowResponse, PageLoadEvent, PermissionKind, PermissionResponse};
 use tauri::{AppHandle, Manager, Runtime, Url, WebviewUrl, WebviewWindowBuilder};
 
 const APP_URL: &str = "https://kiray228.github.io/supermind/";
@@ -76,6 +76,14 @@ fn main() {
                         open_outside(&url);
                     }
                     NewWindowResponse::Deny
+                })
+                // встроенный браузер Windows без ответа молча запрещает: напоминания (уведомления),
+                // голосовой ввод и заметки (микрофон), вставка из буфера
+                .on_permission_request(|_w, kind| match kind {
+                    PermissionKind::Notifications | PermissionKind::Microphone | PermissionKind::ClipboardRead => {
+                        PermissionResponse::Allow
+                    }
+                    _ => PermissionResponse::Default,
                 })
                 .on_page_load(move |_w, payload| {
                     if payload.event() == PageLoadEvent::Finished {
