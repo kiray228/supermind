@@ -100,9 +100,11 @@ export function fromAi(raw: unknown): VoiceAction | null {
       if (!name) return null;
       const pw = Math.round(Number(raw.perWeek));
       const wd = days(raw.days);
+      const times = Array.isArray(raw.times) ? [...new Set(raw.times.map(hhmm).filter((t): t is string => !!t))].sort().slice(0, 8) : [];
       return {
         type: 'add_habit',
         name,
+        ...(times.length > 1 ? { times } : {}),
         ...(hhmm(raw.time) ? { time: hhmm(raw.time) } : {}),
         ...(pw >= 1 && pw <= 6 ? { perWeek: pw } : {}),
         ...(wd.length && wd.length < 7 ? { days: wd } : {}),
@@ -177,6 +179,8 @@ function byName<T extends { id: string; name: string }>(items: T[], q?: string):
 
 /** Значок и цвет привычки: похожая из библиотеки или по умолчанию */
 const HABIT_ICONS: [RegExp, string, string][] = [
+  // лекарства раньше «пить»: «пить таблетки» — это не вода
+  [/витамин|таблет|лекарств|капл[иья]|сироп|укол|инсулин|мазь|пилюл/, '💊', '#ec4899'],
   [/вод[аыу]|пить/, '💧', '#3b82f6'],
   [/чита|чтени|книг/, '📚', '#a855f7'],
   [/бег|пробеж/, '🏃', '#f97316'],
@@ -186,7 +190,6 @@ const HABIT_ICONS: [RegExp, string, string][] = [
   [/шаг|ходьб|прогулк|гулять/, '👣', '#84cc16'],
   [/спать|сон|подъ[её]м|вставать/, '😴', '#6366f1'],
   [/английск|язык|слов/, '🗣️', '#0ea5e9'],
-  [/витамин|таблет|лекарств/, '💊', '#ec4899'],
   [/учи|учеб|курс/, '🎓', '#0ea5e9'],
   [/дневник|писать|журнал/, '✍️', '#f59e0b'],
   [/сладк|сахар/, '🍬', '#ec4899'],
@@ -278,9 +281,10 @@ export async function execute(a: VoiceAction): Promise<Done> {
         name: a.name,
         icon: look.icon,
         color: look.color,
-        ...(look.target ? { target: look.target, ...(look.unit ? { unit: look.unit } : {}) } : {}),
+        // несколько раз в день — цель из числа времён, а не из библиотеки («Пить воду» × 8)
+        ...(look.target && !a.times?.length ? { target: look.target, ...(look.unit ? { unit: look.unit } : {}) } : {}),
         ...(a.days?.length ? { freq: 'weekdays' as const, days: a.days } : a.perWeek ? { freq: 'weekly' as const, perWeek: a.perWeek } : {}),
-        ...(a.time ? { time: a.time } : {}),
+        ...(a.times && a.times.length > 1 ? { times: a.times } : a.time ? { time: a.time } : {}),
         createdAt: now,
         updatedAt: now,
       });
@@ -292,7 +296,7 @@ export async function execute(a: VoiceAction): Promise<Done> {
         ok: true,
         label: 'Привычка',
         title: `${h.icon} ${h.name}`,
-        meta: [freq, a.time].filter(Boolean).join(' · '),
+        meta: [freq, a.times && a.times.length > 1 ? `${a.times.length} раза: ${a.times.join(', ')}` : a.time].filter(Boolean).join(' · '),
         undo: async () => {
           const q = await loadPlanner();
           await savePlanner({ ...q, days: q.days ?? {}, habits: (q.habits ?? []).map((x) => (x.id === h.id ? { ...x, deleted: true, updatedAt: Date.now() } : x)) });

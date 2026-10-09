@@ -11,7 +11,7 @@ import type { Priority, RepeatRule } from '../tasks/model';
 export type VoiceAction =
   | { type: 'add_task'; title: string; date?: string; time?: string; repeat?: RepeatRule; remindAtTime?: boolean; priority?: Priority; list?: string }
   | { type: 'add_transaction'; kind: 'expense' | 'income'; amount: number; categoryId?: string; category?: string; account?: string; note?: string; date?: string }
-  | { type: 'add_habit'; name: string; time?: string; perWeek?: number; days?: number[]; target?: number; unit?: string }
+  | { type: 'add_habit'; name: string; time?: string; times?: string[]; perWeek?: number; days?: number[]; target?: number; unit?: string }
   | { type: 'add_note'; title: string; text: string }
   /** отметить выполненным: задачу или привычку по словам из фразы; strict — сказано явно («выполнил…», «отметь…») */
   | { type: 'mark_done'; query: string; n?: number; strict: boolean; kind?: 'task' | 'habit' }
@@ -266,9 +266,84 @@ function dayOfMonth(s: string, now: Date): string {
   });
 }
 
-function parseHabit(raw: string): VoiceAction | null {
-  if (!HABIT_RE.test(raw)) return null;
-  const { text, time: partTime } = normalizeRepeat(wordsToDigits(raw));
+// ---------- Несколько раз в день: «утром и вечером», «в 8 и в 20», «2 раза в день» ----------
+
+const PART_WORD = String.raw`(?:с\s+утра|утром|по\s+утрам|каждое\s+утро|утро|днём|днем|в\s+обед|в\s+середине\s+дня|по\s+вечерам|каждый\s+вечер|вечер(?:ом|ам)?|перед\s+сном|на\s+ночь)`;
+const SEP = String.raw`\s*(?:,|и|а\s+также|а\s+ещё|а\s+еще)\s*(?:(?:по|каждый)\s+)?`;
+const PART_LIST_RE = new RegExp(`(?:^|\\s)(${PART_WORD}(?:${SEP}${PART_WORD})+)(?=$|[\\s,.])`, 'iu');
+const HOUR = String.raw`\d{1,2}(?:[:.]\d{2})?(?:\s*час(?:а|ов)?)?(?:\s+(?:утра|дня|вечера|ночи))?`;
+const HOUR_LIST_RE = new RegExp(`(?:^|\\s)(в\\s+${HOUR}(?:\\s*(?:,|и)\\s*(?:в\\s+)?${HOUR})+)(?=$|[\\s,.])`, 'iu');
+const TIMES_PER_DAY_RE = /(?:^|\s)(?:(\d)\s*раз(?:а)?|(дважды|трижды))\s+(?:в\s+)?(?:день|сутки)(?=$|[\s,.])/iu;
+
+/** Время по части дня: утро 08:00, день 13:00, вечер 20:00, перед сном 22:00 */
+function partClock(w: string): string | null {
+  const s = w.toLowerCase();
+  if (/утр/u.test(s)) return '08:00';
+  if (/дн[её]м|обед|середине/u.test(s)) return '13:00';
+  if (/вечер/u.test(s)) return '20:00';
+  if (/сном|ночь/u.test(s)) return '22:00';
+  return null;
+}
+
+const hh = (h: number, m = 0) => `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+/** Времена по умолчанию для «N раз в день» — равномерно с 8 до 20 (до 22 — если больше 4) */
+function spread(n: number): string[] {
+  if (n === 2) return ['08:00', '20:00'];
+  if (n === 3) return ['08:00', '14:00', '20:00'];
+  const end = n > 4 ? 22 : 20;
+  return Array.from({ length: n }, (_, i) => hh(Math.round(8 + ((end - 8) * i) / (n - 1))));
+}
+
+/**
+ * Несколько времён в день из фразы (вырезаются из текста): «утром и вечером» → 08:00, 20:00;
+ * «в 9 утра и в 9 вечера» → 09:00, 21:00; «в 8 и в 8» → 08:00, 20:00; «3 раза в день» → 08:00, 14:00, 20:00.
+ */
+export function extractTimes(s: string): { text: string; times?: string[] } {
+  let text = s;
+  let times: string[] = [];
+  const hours = HOUR_LIST_RE.exec(text);
+  if (hours) {
+    let prev = -1;
+    for (const m of hours[1].matchAll(/(\d{1,2})(?:[:.](\d{2}))?(?:\s*час(?:а|ов)?)?(?:\s+(утра|дня|вечера|ночи))?/giu)) {
+      let h = +m[1];
+      const min = m[2] ? +m[2] : 0;
+      const suf = (m[3] ?? '').toLowerCase();
+      if (h > 23 || min > 59) continue;
+      if ((suf === 'вечера' || suf === 'дня') && h < 12) h += 12;
+      else if (suf === 'ночи' && h === 12) h = 0;
+      // «в 8 и в 8» — второй раз вечером
+      else if (!suf && h <= prev && h < 12) h += 12;
+      prev = h;
+      times.push(hh(h, min));
+    }
+    text = text.replace(hours[1], ' ');
+  }
+  if (times.length < 2) {
+    times = [];
+    const parts = PART_LIST_RE.exec(text);
+    if (parts) {
+      for (const w of parts[1].split(/\s*(?:,|\sи\s|\sа\s+также\s|\sа\s+ещ[её]\s)\s*/iu)) {
+        const c = partClock(w);
+        if (c) times.push(c);
+      }
+      text = text.replace(parts[1], ' ');
+    }
+  }
+  const per = TIMES_PER_DAY_RE.exec(text);
+  if (per) {
+    const n = per[2] ? (/^два/iu.test(per[2]) ? 2 : 3) : +per[1];
+    if (times.length < 2 && n >= 2 && n <= 8) times = spread(n);
+    text = text.replace(per[0], ' ');
+  }
+  const uniq = [...new Set(times)].sort();
+  return uniq.length > 1 ? { text, times: uniq } : { text: s };
+}
+
+/** Привычка: явно («привычка …») или если в фразе несколько времён в день — у задачи так не бывает */
+function parseHabit(raw: string, force = false): VoiceAction | null {
+  if (!force && !HABIT_RE.test(raw)) return null;
+  const multi = extractTimes(wordsToDigits(raw));
+  const { text, time: partTime } = normalizeRepeat(multi.text);
   let s = text
     .replace(/^(?:(?:по)?ставь|добавь|добавить|создай|создать|заведи|завести|начни|начать|хочу)\s*/iu, '')
     .replace(/(?:^|\s)(?:нов(?:ая|ую)\s+)?привычк[аиу](?![а-яёa-z0-9])/iu, ' ')
@@ -283,6 +358,7 @@ function parseHabit(raw: string): VoiceAction | null {
   if (!name) return null;
   const time = p.time ?? partTime;
   const days = p.repeat?.freq === 'weekly' && p.repeat.weekdays?.length ? p.repeat.weekdays : undefined;
+  if (multi.times) return { type: 'add_habit', name, times: multi.times, ...(days ? { days } : {}) };
   return { type: 'add_habit', name, ...(time ? { time } : {}), ...(perWeek && perWeek < 7 ? { perWeek } : {}), ...(days ? { days } : {}) };
 }
 
@@ -431,6 +507,17 @@ export function parseVoice(input: string, ctx: VoiceCtx = {}): VoiceParse {
   }
   const habit = parseHabit(raw);
   if (habit) return { actions: [habit], confident: true };
+  // «пить таблетки утром и вечером», «2 раза в день капли» — привычка (на конкретный день — это задачи)
+  const multiTimes = extractTimes(wordsToDigits(raw));
+  if (multiTimes.times) {
+    if (!/(?:^|\s)(?:сегодня|завтра|послезавтра|в\s+(?:понедельник|вторник|среду|четверг|пятницу|субботу|воскресенье))(?=$|[\s,.])/iu.test(raw)) {
+      const multi = parseHabit(raw, true);
+      if (multi) return { actions: [multi], confident: true };
+    }
+    // «завтра утром и вечером позвонить маме» — задача на день: первое время, без «и вечером» в названии
+    const dated = parseTaskCmd(`${multiTimes.text} в ${multiTimes.times[0]}`.replace(/\s+/g, ' ').trim(), now);
+    if (dated) return { actions: [dated.action], confident: dated.explicit };
+  }
   const note = parseNote(raw);
   if (note) return { actions: [note], confident: true };
   const task = parseTaskCmd(raw, now);
