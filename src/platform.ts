@@ -8,11 +8,10 @@ export const isNative = () => Capacitor.isNativePlatform();
 /** Запущено в приложении для Windows (Electron-оболочка добавляет метку в User-Agent) */
 export const isDesktopApp = () => navigator.userAgent.includes('SuperMind-Desktop');
 export const WINDOWS_SETUP_URL = 'https://github.com/kiray228/2mind/releases/download/windows/SuperMind-Setup.exe';
-/** Сайт открыт в браузере на Windows — предлагаем скачать программу */
-export const offerWindowsApp = () => !isNative() && !isDesktopApp() && /Windows NT/.test(navigator.userAgent);
 
 type InstallPrompt = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
 let installPrompt: InstallPrompt | null = null;
+let pwaInstalled = false;
 const installListeners = new Set<() => void>();
 /** Chrome/Edge разрешили установить сайт как приложение (кнопка «Установить») */
 export const canInstallPwa = () => installPrompt !== null;
@@ -26,8 +25,19 @@ export async function installPwa() {
   await p.prompt();
   const { outcome } = await p.userChoice;
   installPrompt = null;
+  if (outcome === 'accepted') pwaInstalled = true;
   installListeners.forEach((f) => f());
   return outcome === 'accepted';
+}
+
+/**
+ * Как предложить установить приложение: 'pwa' — в один клик из Chrome/Edge (ярлык на рабочем столе, без файлов),
+ * 'exe' — скачать программу для Windows (браузер не умеет устанавливать сайты), null — уже установлено или негде
+ */
+export function installMode(): 'pwa' | 'exe' | null {
+  if (isNative() || isDesktopApp() || pwaInstalled || window.matchMedia('(display-mode: standalone)').matches) return null;
+  if (installPrompt) return 'pwa';
+  return /Windows NT/.test(navigator.userAgent) ? 'exe' : null;
 }
 
 /** Сохранить файл в нативном приложении (Android): кэш + системное меню «Поделиться/Сохранить» */
@@ -118,6 +128,7 @@ export function setupPlatform() {
     });
     window.addEventListener('appinstalled', () => {
       installPrompt = null;
+      pwaInstalled = true;
       installListeners.forEach((f) => f());
     });
   }

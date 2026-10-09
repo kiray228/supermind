@@ -5,8 +5,7 @@
  */
 import { useEffect, useState } from 'react';
 import { Eye, EyeOff, Cloud, ShieldCheck, Smartphone } from 'lucide-react';
-import { WindowsLogo } from '@phosphor-icons/react';
-import { offerWindowsApp, WINDOWS_SETUP_URL } from '../platform';
+import { InstallAppButton } from './InstallAppButton';
 import { login, register, requestReset, resetPassword, useCloud } from '../store/cloud';
 import './auth.css';
 
@@ -195,11 +194,7 @@ export function AuthGate() {
             </li>
           </ul>
         )}
-        {!recovering && offerWindowsApp() && (
-          <a className="auth-download" href={WINDOWS_SETUP_URL}>
-            <WindowsLogo size={18} weight="fill" /> Скачать для Windows
-          </a>
-        )}
+        {!recovering && <InstallAppButton className="auth-download" iconSize={18} />}
       </div>
     </div>
   );

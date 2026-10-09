@@ -19,8 +19,7 @@ import { MapThumb } from './MapThumb';
 import './home.css';
 import { mark } from '../perf';
 import { IconTile } from '../ui/icons';
-import { WindowsLogo } from '@phosphor-icons/react';
-import { offerWindowsApp, WINDOWS_SETUP_URL } from '../platform';
+import { InstallAppButton } from '../ui/InstallAppButton';
 
 // импорт/экспорт (xmind, office…) и ИИ — отдельными модулями, только когда нужны
 const AICreate = lazy(() => import('./HomeAI'));
@@ -222,11 +221,7 @@ export default function Home() {
         <IconTile section="home" size="sm" className="ph-tile" />
         <h1>Мои карты</h1>
         <div className="grow" />
-        {offerWindowsApp() && (
-          <a className="btn btn-tinted" href={WINDOWS_SETUP_URL} title="Программа SuperMind с ярлыком на рабочем столе">
-            <WindowsLogo size={16} weight="fill" /> <span className="hide-xs">Скачать для Windows</span>
-          </a>
-        )}
+        <InstallAppButton className="btn btn-tinted" label={<span className="hide-xs">Установить приложение</span>} />
         <button className="btn btn-primary" onClick={() => createAndOpen(docFromTemplate(TEMPLATES[0]))}><Plus size={16} /> <span className="hide-xs">Новая</span></button>
       </div>
       <div className="page-body">
