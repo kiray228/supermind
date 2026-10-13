@@ -6,7 +6,7 @@ import type { Habit, PlannerData } from '../types';
 import type { TasksData } from '../tasks/model';
 import type { FinanceData } from '../finance/model';
 import { summarize } from '../finance/model';
-import { activeHabits, currentStreak, doneOn, freqOf, frozenOn, mondayOf, scheduledOn, streakText, weekCount, weekGoal } from '../habits/model';
+import { activeHabits, currentStreak, doneOn, freqOf, frozenOn, mondayOf, perWeekOf, scheduledOn, streakText, weekCount, weekGoal } from '../habits/model';
 import { addDaysYmd, fromYmd, toYmd } from '../utils/mapTasks';
 
 type Days = PlannerData['days'];
@@ -173,7 +173,16 @@ function habitWeek(days: Days, habits: Habit[], monday: string, last: string, to
     const born = createdYmd(h);
     if (born && born > last) continue;
     if (freqOf(h) === 'weekly') {
-      const g = weekGoal(days, h, monday);
+      let g = weekGoal(days, h, monday);
+      if (born > monday) {
+        // создана посреди недели — цель пропорционально дням, когда привычка уже была (как у ежедневных)
+        let active = 0;
+        for (let i = 0; i < 7; i++) {
+          const d = addDaysYmd(monday, i);
+          if (d >= born && !frozenOn(days, h, d)) active++;
+        }
+        g = active ? Math.min(g, Math.max(1, Math.ceil((perWeekOf(h) * active) / 7))) : 0;
+      }
       if (g <= 0) continue;
       expected += g;
       done += Math.min(g, weekCount(days, h, monday));

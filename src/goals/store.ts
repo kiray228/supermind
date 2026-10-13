@@ -11,7 +11,7 @@ import { savingsInfo, setSavingsSource } from './savings';
 import {
   AREA_COLORS,
   fmtNum,
-  goalProgress,
+  goalProgressRaw,
   makeTaskLookup,
   normalizeGoal,
   normalizeGoalsData,
@@ -266,13 +266,13 @@ export function setGoalStatus(id: string, status: GoalStatus) {
 function offerComplete(id: string, before: number) {
   const g = getGoal(id);
   if (!g || g.status !== 'active') return;
-  const after = goalProgress(g, lookup());
+  const after = goalProgressRaw(g, lookup());
   if (after >= 100 && before < 100) toast('Прогресс 100%! Завершить цель?', { label: 'Завершить', run: () => setGoalStatus(id, 'done') });
 }
 
 function withOffer(id: string, fn: () => void) {
   const g = getGoal(id);
-  const before = g ? goalProgress(g, lookup()) : 0;
+  const before = g ? goalProgressRaw(g, lookup()) : 0;
   fn();
   offerComplete(id, before);
 }
@@ -320,7 +320,7 @@ export function depositToSavings(goalId: string, fromAccountId: string, amount: 
     return false;
   }
   if (fromAccountId === to.id) return false;
-  const before = goalProgress(g, lookup());
+  const before = goalProgressRaw(g, lookup());
   const t = addTransaction(
     { type: 'transfer', amount, accountId: fromAccountId, toAccountId: to.id, ...(toAmount && toAmount > 0 ? { toAmount } : {}), date: todayYmd(), note: `Копилка: ${g.title}` },
     { silent: true },

@@ -1,6 +1,6 @@
 import { addDaysYmd, fromYmd, todayYmd, toYmd } from '../utils/mapTasks';
 import type { Priority, RepeatRule } from './model';
-import { minutesOf, pad2 } from './model';
+import { addMonthsClamped, minutesOf, pad2 } from './model';
 
 /**
  * Разбор быстрого ввода задачи на русском (как «умный ввод» в TickTick):
@@ -159,7 +159,8 @@ export function parseTask(input: string, now = new Date()): ParsedTask {
       const hourWord = !!m[3];
       const part = m[4]?.toLowerCase();
       if (part === 'дня' || part === 'вечера') h = h < 12 ? h + 12 : h;
-      if (part === 'ночи' && h === 12) h = 0;
+      // «в 12 ночи» — 00:00, «в 11 ночи» — 23:00, «в 2 ночи» — 02:00
+      if (part === 'ночи') h = h === 12 ? 0 : h >= 6 ? h + 12 : h;
       if (h > 23 || mi > 59) return false;
       // «в 3 раза» — не время: голый час принимаем только в конце или перед датой/меткой
       // …или рядом уже есть повтор/дата: «каждый день в 8 бег», «завтра в 8 бег»
@@ -189,9 +190,10 @@ export function parseTask(input: string, now = new Date()): ParsedTask {
     if (out.date) return false;
     out.date = d;
   };
-  take(new RegExp(`${B}послезавтра${E}`, 'i'), D(addDaysYmd(today, 2)));
-  take(new RegExp(`${B}завтра${E}`, 'i'), D(addDaysYmd(today, 1)));
-  take(new RegExp(`${B}сегодня${E}`, 'i'), D(today));
+  // «на завтра купить хлеб» — предлог уходит вместе с датой, а не остаётся в названии
+  take(new RegExp(`${B}(?:на\\s+)?послезавтра${E}`, 'i'), D(addDaysYmd(today, 2)));
+  take(new RegExp(`${B}(?:на\\s+)?завтра${E}`, 'i'), D(addDaysYmd(today, 1)));
+  take(new RegExp(`${B}(?:на\\s+)?сегодня${E}`, 'i'), D(today));
   take(new RegExp(`${B}через\\s+${NUM_RE}?\\s*(полчаса|${U_MIN}|${U_HOUR}|${U_DAY}|${U_WEEK}|${U_MONTH}|${U_YEAR})${E}`, 'i'), (m) => {
     if (out.date) return false;
     const n = numOf(m[1]?.toLowerCase());
@@ -203,22 +205,16 @@ export function parseTask(input: string, now = new Date()): ParsedTask {
       out.time = `${pad2(t.getHours())}:${pad2(t.getMinutes())}`;
     } else if (u.startsWith('д')) out.date = addDaysYmd(today, n);
     else if (u.startsWith('н')) out.date = addDaysYmd(today, 7 * n);
-    else if (u.startsWith('м')) {
-      const t = fromYmd(today);
-      t.setMonth(t.getMonth() + n);
-      out.date = toYmd(t);
-    } else {
-      const t = fromYmd(today);
-      t.setFullYear(t.getFullYear() + n);
-      out.date = toYmd(t);
-    }
+    // 31 января + месяц — 28 февраля, а не 3 марта
+    else if (u.startsWith('м')) out.date = addMonthsClamped(today, n);
+    else out.date = addMonthsClamped(today, 12 * n);
   });
   take(new RegExp(`${B}на следующей неделе${E}`, 'i'), D(nextWeekday(today, 1, true)));
   take(new RegExp(`${B}на (?:этих )?выходных${E}`, 'i'), D(nextWeekday(today, 6)));
-  take(new RegExp(`${B}(?:в|во)?\\s*(следующ(?:ий|ую|ее))?\\s*${WD_RE}${E}`, 'i'), (m) => {
+  take(new RegExp(`${B}(?:в|во|на)?\\s*(следующ(?:ий|ую|ее))?\\s*${WD_RE}${E}`, 'i'), (m) => {
     if (out.date) return false;
     // без предлога («окружающая среда») — не дата
-    if (!/^(в|во)\s/i.test(m[0].trim()) && !m[1]) return false;
+    if (!/^(в|во|на)\s/i.test(m[0].trim()) && !m[1]) return false;
     const wd = wdOf(m[2].toLowerCase());
     out.date = nextWeekday(today, wd, !!m[1]);
     if (m[1] && out.date && daysBetweenSimple(today, out.date) < 7) out.date = addDaysYmd(out.date, 7);
@@ -228,7 +224,7 @@ export function parseTask(input: string, now = new Date()): ParsedTask {
     if (out.date) return false;
     out.date = nextWeekday(today, wdOf(m[1].toLowerCase()));
   });
-  take(new RegExp(`${B}(?:(?:до|к)\\s+)?(\\d{1,2})\\s+${MONTH_RE}\\.?(?:\\s+(\\d{4}))?${E}`, 'i'), (m) => {
+  take(new RegExp(`${B}(?:(?:до|к|на)\\s+)?(\\d{1,2})\\s+${MONTH_RE}\\.?(?:\\s+(\\d{4}))?${E}`, 'i'), (m) => {
     if (out.date) return false;
     const day = +m[1];
     const mon = monthOf(m[2].toLowerCase());
@@ -238,7 +234,7 @@ export function parseTask(input: string, now = new Date()): ParsedTask {
     if (!m[3] && toYmd(d) < today) d = new Date(++year, mon, day);
     out.date = toYmd(d);
   });
-  take(new RegExp(`${B}(\\d{1,2})[./](\\d{2})(?:[./](\\d{2,4}))?${E}`, 'i'), (m) => {
+  take(new RegExp(`${B}(?:(?:до|к|на)\\s+)?(\\d{1,2})[./](\\d{2})(?:[./](\\d{2,4}))?${E}`, 'i'), (m) => {
     if (out.date) return false;
     if (UNIT_NEXT.test(s.slice(m.index + m[0].length).trimStart())) return false;
     const day = +m[1];
@@ -272,7 +268,13 @@ export function parseTask(input: string, now = new Date()): ParsedTask {
     if (out.repeat.freq === 'weekly' && out.repeat.weekdays?.length) {
       const cands = out.repeat.weekdays.map((w) => nextWeekday(today, w)).sort();
       out.date = cands.find((d) => d !== today || !passedToday) ?? addDaysYmd(cands[0], 7);
-    } else out.date = passedToday && out.repeat.freq === 'daily' ? addDaysYmd(today, 1) : today;
+    } else if (!passedToday) out.date = today;
+    else {
+      // «каждую неделю в 9», сказанное в 12:00 — первый раз через период, а не сразу просроченная задача
+      const iv = out.repeat.interval || 1;
+      const f = out.repeat.freq;
+      out.date = f === 'daily' ? addDaysYmd(today, iv) : f === 'weekly' ? addDaysYmd(today, 7 * iv) : f === 'monthly' ? addMonthsClamped(today, iv) : addMonthsClamped(today, 12 * iv);
+    }
   }
   // время без даты — сегодня (или завтра, если время уже прошло); вызывающий может подставить выбранный день
   if (out.time && !out.date) {

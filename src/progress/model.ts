@@ -3,12 +3,13 @@
  * Опыт не хранится — он ВЫЧИСЛЯЕТСЯ из уже существующих данных (задачи, привычки, дневник, фокус,
  * цели, финансы, заметки и карты). Поэтому он одинаков на всех устройствах и не может «разъехаться».
  */
-import type { DocMeta, PlannerData } from '../types';
+import type { DocMeta, Habit, PlannerData } from '../types';
 import type { TasksData } from '../tasks/model';
 import type { GoalsData } from '../goals/model';
 import type { FinanceData } from '../finance/model';
 import { accountMap, txMain } from '../finance/model';
 import type { NotesData } from '../notes/model';
+import { bestStreak, freqOf } from '../habits/model';
 import { addDaysYmd, fromYmd, toYmd } from '../utils/mapTasks';
 import { dayStreak } from './streak';
 
@@ -301,10 +302,18 @@ export function computeProgress(src: ProgressInput, today: string): ProgressStat
       }
     }
     // пропуск дня и пауза привычки — мостик в серии (без опыта, но и без штрафа)
-    const pausesOf = new Map<string, { from: string; to: string }[]>();
-    for (const h of Array.isArray(p.habits) ? p.habits : []) if (h && Array.isArray(h.pauses) && h.pauses.length) pausesOf.set(h.id, h.pauses);
+    const byId = new Map<string, Habit>();
+    for (const h of Array.isArray(p.habits) ? p.habits : []) if (h?.id) byId.set(h.id, h);
     for (const [id, days] of habitDays) {
-      const pauses = pausesOf.get(id);
+      const h = byId.get(id);
+      // по расписанию (Пн/Ср/Пт): незапланированные дни серию не рвут — как в разделе «Привычки».
+      // «N раз в неделю» серия там в неделях — для достижений в днях считаем дни подряд, как раньше
+      if (h && freqOf(h) !== 'weekly') {
+        const s = bestStreak(p.days, h, today);
+        if (s.n > c.bestHabitStreak) c.bestHabitStreak = s.n;
+        continue;
+      }
+      const pauses = h && Array.isArray(h.pauses) ? h.pauses : undefined;
       const bridge = (d: string) => !!p.days[d]?.skipped?.includes(id) || !!pauses?.some((x) => x.from <= d && d <= x.to);
       const s = streaks(days, today, bridge);
       if (s.best > c.bestHabitStreak) c.bestHabitStreak = s.best;
@@ -360,7 +369,9 @@ export function computeProgress(src: ProgressInput, today: string): ProgressStat
     const expenseMonths = new Set<string>();
     for (const tx of f.transactions) {
       if (tx.date > today) continue;
-      txPerDay.set(tx.date, (txPerDay.get(tx.date) ?? 0) + 1);
+      // активность дня — только если операция записана в тот же день (±1): импорт задним числом опыт за прошлое не даёт
+      const made = tx.createdAt ? dayOf(tx.createdAt) : '';
+      if (!made || (made >= addDaysYmd(tx.date, -1) && made <= addDaysYmd(tx.date, 1))) txPerDay.set(tx.date, (txPerDay.get(tx.date) ?? 0) + 1);
       if (tx.type === 'expense') {
         const m = tx.date.slice(0, 7);
         const v = txMain(f, tx, accs);
@@ -377,7 +388,8 @@ export function computeProgress(src: ProgressInput, today: string): ProgressStat
     const curMonth = today.slice(0, 7);
     for (const b of f.budgets) {
       if (!(b.limit > 0)) continue;
-      const from = dayOf(b.updatedAt || 0).slice(0, 7);
+      // createdAt не меняется при правке лимита (у старых записей его нет — берём updatedAt)
+      const from = dayOf(b.createdAt || b.updatedAt || 0).slice(0, 7);
       for (const m of expenseMonths) {
         if (m <= from || m >= curMonth) continue;
         const v = spent.get(b.categoryId ? m + '|' + b.categoryId : m) ?? 0;

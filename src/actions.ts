@@ -49,6 +49,8 @@ export async function openDoc(id: string, focusTopicId?: string): Promise<void> 
 
 /** Создать и открыть новый документ */
 export async function createAndOpen(doc: MindDoc) {
+  commitActiveInput();
+  await flushSave();
   await saveDoc(doc);
   useDoc.getState().open(doc);
   // новая карта: центральная тема выбрана — сразу видно «+» и что нажать дальше

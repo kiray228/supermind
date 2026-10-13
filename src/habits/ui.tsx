@@ -463,7 +463,8 @@ export function HabitEditor({
   const canSave = d.name.trim().length > 0 && !(freq === 'weekdays' && !d.days?.length);
   const save = () => {
     if (!canSave) return;
-    const filled = times.filter(Boolean);
+    // без повторов: два одинаковых времени — один приём, а не скрытый счётчик ×2
+    const filled = [...new Set(times.filter(Boolean))];
     const out: Habit = multi ? { ...d, times: filled, target: Math.max(1, filled.length), time: filled[0] } : d;
     onSave(cleanHabit({ ...out, part: partTouched ? d.part : undefined }));
   };

@@ -10,7 +10,7 @@ import type { Priority, RepeatRule } from '../tasks/model';
 
 export type VoiceAction =
   | { type: 'add_task'; title: string; date?: string; time?: string; repeat?: RepeatRule; remindAtTime?: boolean; priority?: Priority; list?: string }
-  | { type: 'add_transaction'; kind: 'expense' | 'income'; amount: number; categoryId?: string; category?: string; account?: string; note?: string; date?: string }
+  | { type: 'add_transaction'; kind: 'expense' | 'income'; amount: number; currency?: string; categoryId?: string; category?: string; account?: string; note?: string; date?: string }
   | { type: 'add_habit'; name: string; time?: string; times?: string[]; perWeek?: number; days?: number[]; target?: number; unit?: string }
   | { type: 'add_note'; title: string; text: string }
   /** отметить выполненным: задачу или привычку по словам из фразы; strict — сказано явно («выполнил…», «отметь…») */
@@ -52,8 +52,20 @@ const SMALL: Record<string, number> = {
   полторы: 1.5, полтора: 1.5,
 };
 const CURRENCY = '(?:тенге|тг|₸|kzt|руб(?:лей|ля|ль)?|р\\.?|₽|доллар(?:ов|а)?|бакс(?:ов|а)?|\\$|usd|евро|€|сом(?:ов|а)?|сум(?:ов|а)?)';
-const THOUSAND = '(?:тысяч[иа]?|тыс\\.?|к)';
+const THOUSAND = '(?:тысяч[иау]?|тыщ[иау]?|тыс\\.?|к)';
 const MILLION = '(?:миллион(?:ов|а)?|млн)';
+
+/** Код валюты по слову из фразы («долларов» → USD) */
+function currencyCode(word: string): string | undefined {
+  const w = word.toLowerCase();
+  if (/^(тенге|тг|₸|kzt)/.test(w)) return 'KZT';
+  if (/^(руб|р\.?$|₽)/.test(w)) return 'RUB';
+  if (/^(доллар|бакс|\$|usd)/.test(w)) return 'USD';
+  if (/^(евро|€)/.test(w)) return 'EUR';
+  if (/^сом/.test(w)) return 'KGS';
+  if (/^сум/.test(w)) return 'UZS';
+  return undefined;
+}
 
 /** Словесные числа («две тысячи пятьсот») → цифры, чтобы дальше работать с одним видом */
 export function wordsToDigits(text: string): string {
@@ -72,26 +84,34 @@ export function wordsToDigits(text: string): string {
       })
       // «три с половиной тысячи» → «3.5 тысячи»
       .replace(/(\d+)\s+с\s+половиной/giu, (_m, n: string) => String(+n + 0.5))
+      // «потратил тысячу», «получил миллион» — множитель без числа перед ним
+      .replace(/(?<![\d.,]\s*)(?<![\p{L}])(тысяч[уа]|тыщ[уа]|миллион)(?![\p{L}])/giu, (_m, w: string) => (/^м/i.test(w) ? '1000000' : '1000'))
   );
 }
 
-/** Найти сумму: «4500», «4 500», «4.5 тыс», «2к», «1,5 млн» */
-function findAmount(s: string): { amount: number; start: number; end: number } | null {
-  const re = new RegExp(`(?<![\\p{L}\\d])(\\d{1,3}(?:[ \\u00a0]\\d{3})+|\\d+(?:[.,]\\d+)?)\\s*(${THOUSAND}|${MILLION})?(?:\\s*${CURRENCY})?(?![\\p{L}\\d])`, 'giu');
-  let best: { amount: number; start: number; end: number; cur: boolean } | null = null;
+/** Найти сумму: «4500», «4 500», «4.5 тыс», «2к», «1,5 млн», «2 тысячи 500» */
+function findAmount(s: string): { amount: number; start: number; end: number; currency?: string } | null {
+  const re = new RegExp(
+    `(?<![\\p{L}\\d])(\\d{1,3}(?:[ \\u00a0]\\d{3})+|\\d+(?:[.,]\\d+)?)(?:\\s*(${THOUSAND}|${MILLION})(?:\\s+(\\d{1,3})(?![\\d.,:]))?)?(?:\\s*(${CURRENCY}))?(?![\\p{L}\\d])`,
+    'giu',
+  );
+  let best: { amount: number; start: number; end: number; rank: number; currency?: string } | null = null;
   for (const m of s.matchAll(re)) {
     let n = Number(m[1].replace(/[  ]/g, '').replace(',', '.'));
     if (!Number.isFinite(n) || n <= 0) continue;
-    if (m[2]) n *= /^м/i.test(m[2]) ? 1e6 : 1e3;
-    const cur = new RegExp(CURRENCY + '$', 'iu').test(m[0].trim());
+    if (m[2]) n = n * (/^м/i.test(m[2]) ? 1e6 : 1e3) + (m[3] ? Number(m[3]) : 0);
+    const cur = !!m[4];
     const after = s.slice(m.index! + m[0].length).trimStart();
     // «в 18:00», «2 л», «5 минут» — не деньги
     if (!cur && /^(:\d|час|мин|л(?![а-яёa-z0-9])|литр|мл|кг|раз|шт|км|дн|недел|месяц|числ)/i.test(after)) continue;
     if (!cur && /(?:^|\s)(в|к|до|с)\s*$/i.test(s.slice(0, m.index))) continue;
-    // предпочитаем сумму с валютой, затем самую первую
-    if (!best || (cur && !best.cur)) best = { amount: Math.round(n * 100) / 100, start: m.index!, end: m.index! + m[0].length, cur };
+    // сумма с валютой, затем «за 6000» / «2 тысячи», затем самая большая: «купил 2 пиццы за 6000» — 6000, а не 2
+    const rank = cur ? 3 : m[2] || /(?:^|\s)(?:за|на\s+сумму|стоимостью|по\s+цене)\s*$/iu.test(s.slice(0, m.index)) ? 2 : 1;
+    const amount = Math.round(n * 100) / 100;
+    if (!best || rank > best.rank || (rank === best.rank && amount > best.amount))
+      best = { amount, start: m.index!, end: m.index! + m[0].length, rank, currency: m[4] ? currencyCode(m[4]) : undefined };
   }
-  return best;
+  return best && { amount: best.amount, start: best.start, end: best.end, ...(best.currency ? { currency: best.currency } : {}) };
 }
 
 // ---------- Категории ----------
@@ -206,6 +226,7 @@ function parseMoney(raw: string, ctx: VoiceCtx, today: string): VoiceAction | nu
     type: 'add_transaction',
     kind,
     amount: amt.amount,
+    ...(amt.currency ? { currency: amt.currency } : {}),
     ...(cat.id ? { categoryId: cat.id } : {}),
     ...(cat.name ? { category: cat.name } : {}),
     ...(account ? { account } : {}),
@@ -260,6 +281,14 @@ function dayOfMonth(s: string, now: Date): string {
     if (mo > 11) {
       mo = 0;
       y++;
+    }
+    // «30 числа» 31 января: в феврале его нет — ближайший месяц, где такой день есть
+    for (let i = 0; i < 12 && new Date(y, mo, d).getMonth() !== mo; i++) {
+      mo++;
+      if (mo > 11) {
+        mo = 0;
+        y++;
+      }
     }
     if (new Date(y, mo, d).getMonth() !== mo) return m;
     return `${pre}${d}.${String(mo + 1).padStart(2, '0')}.${y}`;
@@ -477,6 +506,10 @@ function parseDone(raw: string): VoiceAction | null {
 function parseMoneyList(raw: string, ctx: VoiceCtx, today: string): VoiceAction[] | null {
   const parts = wordsToDigits(raw).split(/(?:,\s+|\s+и\s+|\s+а\s+(?:ещё|еще)\s+|\s+плюс\s+ещ[её]\s+)/iu);
   if (parts.length < 2 || !parts.every((p) => /\d/.test(p))) return null;
+  // следующая часть — отдельная трата, только если похожа на сумму: «3500 на обед», «500 тенге», «3000»,
+  // а не на количество: «1500 на кофе и 2 круассана» — одна трата
+  const amountLike = new RegExp(`^\\s*\\d[\\d\\s.,]*(?:(?:${THOUSAND}|${MILLION}|${CURRENCY})(?![\\p{L}])|\\s+(?:на|за)\\s+\\p{L}|\\s*$)`, 'iu');
+  if (!parts.slice(1).every((p) => amountLike.test(p) || EXPENSE_RE.test(p) || INCOME_RE.test(p))) return null;
   const first = parseMoney(parts[0], ctx, today);
   if (!first || first.type !== 'add_transaction') return null;
   const verb = first.kind === 'income' ? 'получил' : 'потратил';

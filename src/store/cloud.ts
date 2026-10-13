@@ -150,12 +150,16 @@ async function startSession(a: Account) {
     await (await import('./mapHistory')).clearAllHistory();
     await safety.reloadAll();
   }
-  if (meta.userId !== a.user.id) meta = { cursor: 0, seqs: {}, userId: a.user.id };
+  // снова тот же аккаунт: уже синхронизированное не отправляем заново (правки без входа и так отмечены),
+  // иначе каждая карта, изменённая на другом устройстве, давала бы копию «(версия с этого устройства)»
+  const same = meta.userId === a.user.id;
+  if (!same) meta = { cursor: 0, seqs: {}, userId: a.user.id };
   account = a;
   await setFromSync(ACCOUNT_KEY, a);
   await saveMeta();
   // всё, что есть на устройстве, — в аккаунт (сольётся с данными других устройств)
-  if (!foreign) for (const k of await keys()) if (typeof k === 'string' && isSynced(k)) await markDirty(k, 1);
+  if (!foreign)
+    for (const k of await keys()) if (typeof k === 'string' && isSynced(k) && !(same && k in meta.seqs)) await markDirty(k, 1);
   useCloud.setState({ account: a, error: undefined });
   wire();
   await syncNow();
@@ -363,7 +367,9 @@ async function applyRemote(item: RemoteItem, changed: Set<string>) {
     // слитое пишем сразу после проверки отметки (копия конфликта — потом): правка в промежутке не затрётся
     await setFromSync(item.key, merged);
     changed.add(item.key);
-    if (item.key.startsWith('doc:')) await keepConflictCopy(local, item.value, merged, changed);
+    // отметка 1 — «всё с устройства в аккаунт» при входе, а не настоящая правка: копию не плодим
+    if (item.key.startsWith('doc:') && at! > 1) await keepConflictCopy(local, item.value, merged, changed);
+    if (item.key.startsWith('note:') && at! > 1) await keepNoteConflictCopy(item.key, local, item.value, merged, changed);
     return;
   }
 }
@@ -382,6 +388,25 @@ async function keepConflictCopy(local: unknown, remote: unknown, winner: unknown
   const copy = { ...loser, id, title: `${String(loser.title || 'Карта')} (${loser === local ? 'версия с этого устройства' : 'версия с другого устройства'})`, updatedAt: Date.now() };
   await set(`doc:${id}`, copy);
   changed.add(`doc:${id}`);
+}
+
+/** То же для заметки: проигравшая версия — отдельной заметкой рядом (в списке заметок) */
+async function keepNoteConflictCopy(key: string, local: unknown, remote: unknown, winner: unknown, changed: Set<string>) {
+  const loser = winner === local ? remote : local;
+  if (!isObj(loser) || !Array.isArray(loser.blocks)) return;
+  const strip = (d: unknown) => (isObj(d) ? JSON.stringify({ ...d, updatedAt: 0 }) : '');
+  if (strip(loser) === strip(winner)) return;
+  const index = await get<Obj>('notes');
+  if (!isObj(index) || !Array.isArray(index.notes)) return;
+  const meta = (index.notes as Obj[]).find((n) => n.id === key.slice(5));
+  const { uid } = await import('../utils/tree');
+  const id = uid();
+  const now = Date.now();
+  const title = `${String(loser.title || 'Заметка')} (${loser === local ? 'версия с этого устройства' : 'версия с другого устройства'})`;
+  await set(`note:${id}`, { ...loser, title, updatedAt: now });
+  await set('notes', { ...index, notes: [...(index.notes as Obj[]), { ...(meta ?? { preview: '' }), id, title, pinned: false, trashed: undefined, createdAt: now, updatedAt: now }] });
+  changed.add(`note:${id}`);
+  changed.add('notes');
 }
 
 /** Отправить изменённое. true — был конфликт (кто-то успел изменить раньше), нужен ещё круг */
@@ -455,7 +480,10 @@ async function reconcileIndex(changed: Set<string>) {
   const index = ((await get<Obj[]>('docs:index')) ?? []) as Obj[];
   const docKeys = new Set((await keys()).filter((k): k is string => typeof k === 'string' && k.startsWith('doc:')));
   const ids = new Set(index.map((m) => m.id as string));
-  let next = index.filter((m) => docKeys.has(`doc:${m.id}`));
+  // убираем только карты, удалённые в этой синхронизации. Карты нет на устройстве по другой причине
+  // (слишком большая — лежит только там, где создана; загрузка прервалась) — запись оставляем,
+  // иначе список «прыгал» между устройствами и терял избранное, папки и корзину
+  let next = index.filter((m) => docKeys.has(`doc:${m.id}`) || !changed.has(`doc:${m.id}`));
   for (const k of docKeys) {
     const id = k.slice(4);
     if (ids.has(id)) continue;

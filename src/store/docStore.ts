@@ -7,7 +7,7 @@ import { saveDoc, saveLocked } from './db';
 import { mapSides } from '../layout/layout';
 import { encryptDoc } from '../utils/crypto';
 import { get as kvGet, remoteRev } from './kv';
-import { maybeSnapshot, snapshot } from './mapHistory';
+import { deleteHistory, maybeSnapshot, snapshot } from './mapHistory';
 
 export function newSheet(title = 'Лист 1', rootText = 'Центральная тема', structure: StructureType = 'map'): Sheet {
   return {
@@ -132,7 +132,8 @@ export async function flushSave() {
     if (password) await saveLocked(await encryptDoc(doc, password), doc.title);
     else {
       await saveDoc(doc);
-      maybeSnapshot(doc);
+      // пока сохраняли, могли поставить пароль — тогда без снимка
+      if (!useDoc.getState().password) maybeSnapshot(doc);
     }
     base = { id: doc.id, rev: remoteRev(`doc:${doc.id}`), updatedAt: doc.updatedAt };
   } finally {
@@ -248,6 +249,9 @@ export const useDoc = create<DocState>((set, get) => {
     },
     setPassword(p) {
       set({ password: p });
+      // с паролем история не ведётся — старые снимки без шифрования удаляем
+      const d = get().doc;
+      if (p && d) void deleteHistory(d.id).catch(() => {});
       scheduleSave();
     },
 
@@ -556,8 +560,11 @@ export const useDoc = create<DocState>((set, get) => {
     copy(cut) {
       const s = get().sheet();
       if (!s) return;
-      const items = get()
-        .selection.map((id) => findInSheet(s, id)?.topic)
+      const sel = new Set(get().selection);
+      // тема, выделенная вместе с предком, уже входит в его копию
+      const items = [...sel]
+        .filter((id) => !pathTo(s, id).slice(0, -1).some((p) => sel.has(p.id)))
+        .map((id) => findInSheet(s, id)?.topic)
         .filter(Boolean) as Topic[];
       if (!items.length) return;
       const outline = items.map((t) => toOutline(t)).join('');

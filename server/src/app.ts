@@ -14,7 +14,7 @@
 import { hashPassword, newToken, tokenHash, verifyPassword } from './crypto.ts';
 import { ensureSchema, type Row, type Sql } from './sql.ts';
 import { generateVapidKeys, sendPush, type PushResult, type PushSubscription, type VapidKeys } from './webpush.ts';
-import type { NextDueStore } from './objectStore.ts';
+import type { NextDueMark, NextDueStore } from './objectStore.ts';
 import { envMailer, feedbackMail, resetMail, type Mailer } from './mail.ts';
 import { commandPrompt, envAi, parseAiJson, type Ai } from './ai.ts';
 import { randomInt } from 'node:crypto';
@@ -44,6 +44,14 @@ const PULL_BYTES = 4 * 1024 * 1024;
 /** Облачные копии: не чаще раза в час; хранятся все за последние сутки и по одной на день за 30 дней */
 const SNAPSHOT_EVERY = '55 minutes';
 const KEEP_DAYS = 30;
+/**
+ * Отметке ближайшего напоминания верим, только когда она «отстоялась»: свежую мог затереть параллельный запрос
+ * с устаревшим значением — проверка идёт в базу и исправляет. Старше 3 часов тоже не верим (вдруг запись не удалась):
+ * напоминание тогда опоздает, но не пропадёт — отправляются наступившие за последние 6 часов.
+ * Ежеминутно базу не трогаем: иначе она не засыпает (бесплатный лимит Neon).
+ */
+const NEXT_DUE_SETTLE = 3 * 60_000;
+const NEXT_DUE_MAX_AGE = 3 * 3600_000;
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -86,16 +94,36 @@ export function createApp(deps: Deps) {
   const ai = deps.ai === undefined ? envAi() : deps.ai;
   const aiDailyLimit = deps.aiDailyLimit ?? (Number(process.env.AI_DAILY_LIMIT) || 100);
 
-  /** Записать время ближайшего неотправленного напоминания */
-  async function refreshNextDue() {
+  /** Запись отметки не удалась — проверка идёт в базу, пока не запишется */
+  let nextDueBroken = false;
+
+  async function writeNextDue(value: number | null | undefined) {
+    const ok = await nextDue!.set(value, now()).catch(() => false);
+    nextDueBroken = !ok;
+  }
+
+  /**
+   * Записать время ближайшего неотправленного напоминания.
+   * lowerOnly — после смены расписания: отметку только понижаем (более позднее значение от параллельного
+   * запроса не затрёт раннее). mark — отметка, прочитанная проверкой: совпадает — не переписываем, пусть «отстоится».
+   */
+  async function refreshNextDue(opts: { lowerOnly?: boolean; mark?: NextDueMark } = {}) {
     if (!nextDue) return;
     try {
       const r = await sql.query(
         `SELECT (extract(epoch FROM min(fire_at)) * 1000)::bigint FROM push_queue WHERE sent_at IS NULL AND fire_at > now() - interval '6 hours'`,
       );
-      await nextDue.set(r[0]?.[0] ? Number(r[0][0]) : null);
+      const next = r[0]?.[0] ? Number(r[0][0]) : null;
+      if (opts.lowerOnly) {
+        const cur = nextDueBroken ? undefined : await nextDue.get();
+        if (cur?.at !== undefined && (cur.next === next || (cur.next !== null && (next === null || cur.next < next)))) return;
+      } else {
+        const m = opts.mark;
+        if (!nextDueBroken && m?.at !== undefined && m.next === next && now() - m.at < NEXT_DUE_MAX_AGE) return;
+      }
+      await writeNextDue(next);
     } catch {
-      await nextDue.set(undefined);
+      await writeNextDue(undefined);
     }
   }
 
@@ -171,17 +199,21 @@ export function createApp(deps: Deps) {
   async function login(request: Request) {
     const b = await body<{ email?: string; password?: string }>(request);
     const email = str(b.email).trim().toLowerCase();
+    // сначала записываем попытку, потом считаем: параллельные запросы не проскочат лимит
+    const mine = await sql.query(`INSERT INTO auth_failures (email) VALUES ($1) RETURNING ctid`, [email]);
     const fails = await sql.query(
       `SELECT count(*) FROM auth_failures WHERE email = $1 AND at > now() - interval '15 minutes'`,
       [email],
     );
-    if (Number(fails[0]?.[0] ?? 0) >= 10) throw new HttpError(429, 'Слишком много попыток — подождите 15 минут');
+    if (Number(fails[0]?.[0] ?? 0) > 10) {
+      // отклонённая попытка блокировку не продлевает
+      await sql.query(`DELETE FROM auth_failures WHERE ctid = $1::tid`, [mine[0][0]]);
+      throw new HttpError(429, 'Слишком много попыток — подождите 15 минут');
+    }
     const rows = await sql.query(`SELECT id, name, pass_hash FROM users WHERE email = $1`, [email]);
     const user = rows[0] as string[] | undefined;
-    if (!user || !(await verifyPassword(str(b.password), user[2]))) {
-      await sql.query(`INSERT INTO auth_failures (email) VALUES ($1)`, [email]);
-      throw new HttpError(401, 'Неверный email или пароль');
-    }
+    // неудачная попытка уже записана
+    if (!user || !(await verifyPassword(str(b.password), user[2]))) throw new HttpError(401, 'Неверный email или пароль');
     await sql.query(`DELETE FROM auth_failures WHERE email = $1`, [email]);
     return json({ token: await createSession(user[0], request), user: { id: user[0], email, name: user[1] } });
   }
@@ -320,18 +352,20 @@ export function createApp(deps: Deps) {
     const password = str(b.password);
     if (password.length < 8) throw new HttpError(400, 'Пароль — минимум 8 символов');
     if (password.length > 200) throw new HttpError(400, 'Слишком длинный пароль');
+    // попытка засчитывается и проверяется одним запросом: параллельные запросы не превысят 5 попыток
     const rows = await sql.query(
-      `SELECT ctid, code_hash, attempts FROM password_resets
-       WHERE email = $1 AND NOT used AND expires_at > now() ORDER BY created_at DESC LIMIT 1`,
+      `UPDATE password_resets SET attempts = attempts + 1
+       WHERE email = $1 AND NOT used AND expires_at > now() AND attempts < 5
+         AND created_at = (SELECT max(created_at) FROM password_resets WHERE email = $1 AND NOT used AND expires_at > now())
+       RETURNING code_hash`,
       [email],
     );
-    const r = rows[0];
-    if (!r) throw new HttpError(400, 'Код устарел — запросите новый');
-    if (Number(r[2]) >= 5) throw new HttpError(429, 'Слишком много попыток — запросите новый код');
-    if (code.length !== 6 || tokenHash(`${email}|${code}`) !== r[1]) {
-      await sql.query(`UPDATE password_resets SET attempts = attempts + 1 WHERE ctid = $1::tid`, [r[0]]);
-      throw new HttpError(400, 'Неверный код');
+    if (!rows[0]) {
+      const fresh = await sql.query(`SELECT 1 FROM password_resets WHERE email = $1 AND NOT used AND expires_at > now() LIMIT 1`, [email]);
+      if (!fresh[0]) throw new HttpError(400, 'Код устарел — запросите новый');
+      throw new HttpError(429, 'Слишком много попыток — запросите новый код');
     }
+    if (code.length !== 6 || !rows.some((r) => tokenHash(`${email}|${code}`) === r[0])) throw new HttpError(400, 'Неверный код');
     await sql.query(`UPDATE password_resets SET used = true WHERE email = $1`, [email]);
     const u = await sql.query(`UPDATE users SET pass_hash = $2 WHERE email = $1 RETURNING id, name`, [email, await hashPassword(password)]);
     if (!u[0]) throw new HttpError(400, 'Код устарел — запросите новый');
@@ -571,7 +605,7 @@ export function createApp(deps: Deps) {
         ],
       );
     }
-    await refreshNextDue();
+    await refreshNextDue({ lowerOnly: true });
     return json({ scheduled: items.length });
   }
 
@@ -596,14 +630,18 @@ export function createApp(deps: Deps) {
 
   /** Раз в минуту: отправить наступившие напоминания (не старше 6 часов). */
   async function cron() {
+    let mark: NextDueMark | undefined;
     if (nextDue) {
-      const next = await nextDue.get();
+      mark = nextDueBroken ? undefined : await nextDue.get();
+      const age = mark?.at === undefined ? Infinity : now() - mark.at;
+      const settled = age >= NEXT_DUE_SETTLE && age < NEXT_DUE_MAX_AGE;
+      const next = !mark ? 'неизвестно' : mark.next === null ? 'нет' : new Date(mark.next).toISOString();
       // ничего не наступило — базу не трогаем
-      if (next === null || (typeof next === 'number' && next > now() + 20_000)) {
-        console.log(`cron: пропуск, ближайшее ${next === null ? 'нет' : new Date(next).toISOString()}`);
-        return json({ skipped: true, next });
+      if (mark && settled && (mark.next === null || mark.next > now() + 20_000)) {
+        console.log(`cron: пропуск, ближайшее ${next}`);
+        return json({ skipped: true, next: mark.next });
       }
-      console.log(`cron: проверка базы (ближайшее ${next === undefined ? 'неизвестно' : new Date(next).toISOString()})`);
+      console.log(`cron: проверка базы (ближайшее ${next}${mark && !settled ? ', отметка не отстоялась' : ''})`);
     }
     await init();
     const keys = await vapidKeys();
@@ -635,7 +673,7 @@ export function createApp(deps: Deps) {
     await sql.query(`DELETE FROM push_queue WHERE fire_at < now() - interval '2 days'`);
     await sql.query(`DELETE FROM auth_failures WHERE at < now() - interval '1 day'`);
     await sql.query(`DELETE FROM password_resets WHERE created_at < now() - interval '1 day'`);
-    await refreshNextDue();
+    await refreshNextDue({ mark });
     console.log(`cron: наступило ${due.length}, отправлено ${sent}`);
     return json({ due: due.length, sent, removedDevices: gone.size });
   }

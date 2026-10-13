@@ -7,7 +7,7 @@ import { api, useCloud } from '../store/cloud';
 import { addTask, ensureTasks, openTask, purgeTask } from '../tasks/store';
 import { repeatLabel, type Priority, type RepeatRule } from '../tasks/model';
 import { addTransaction, deleteTransaction, ensureFinance } from '../finance/store';
-import { fmtMoney, sortedAccounts, sortedCategories } from '../finance/model';
+import { fmtMoney, sortedAccounts, sortedCategories, toMain, type FinancePrefs } from '../finance/model';
 import { answer, dayLabel, findDone, markDone, type Done } from './answers';
 import { createNote, ensureNotes, openNote, purgeNote } from '../notes/store';
 import { loadPlanner, savePlanner } from '../store/db';
@@ -18,6 +18,13 @@ import { todayYmd } from '../utils/mapTasks';
 import { uid } from '../utils/tree';
 import type { Habit } from '../types';
 import { useApp, type View } from '../store/appStore';
+
+/** Сумма в основной валюте → в валюту счёта. null — курс не задан */
+function toAccountCurrency(main: number, cur: string, prefs: FinancePrefs): number | null {
+  if (cur === prefs.mainCurrency) return main;
+  const r = prefs.rates[cur];
+  return r && r > 0 ? main / r : null;
+}
 
 const go = (v: View) => useApp.getState().go(v);
 
@@ -89,6 +96,7 @@ export function fromAi(raw: unknown): VoiceAction | null {
         type: 'add_transaction',
         kind: raw.kind === 'income' ? 'income' : 'expense',
         amount,
+        ...(/^[A-Z]{3}$/.test(String(raw.currency ?? '')) ? { currency: String(raw.currency) } : {}),
         ...(str(raw.category, 80) ? { category: str(raw.category, 80) } : {}),
         ...(str(raw.account, 80) ? { account: str(raw.account, 80) } : {}),
         ...(str(raw.note) ? { note: str(raw.note) } : {}),
@@ -246,25 +254,39 @@ export async function execute(a: VoiceAction): Promise<Done> {
     case 'add_transaction': {
       const d = await ensureFinance();
       const accs = sortedAccounts(d);
-      const account = byName(accs, a.account) ?? accs.find((x) => x.id === d.prefs.lastAccountId) ?? accs[0];
+      const named = byName(accs, a.account);
+      // «10 долларов» — счёт в этой валюте, если он есть
+      const inCurrency = a.currency && !named ? accs.find((x) => x.currency === a.currency) : undefined;
+      const account = named ?? inCurrency ?? accs.find((x) => x.id === d.prefs.lastAccountId) ?? accs[0];
       if (!account) return { ok: false, label: a.kind === 'income' ? 'Доход' : 'Расход', title: String(a.amount), meta: 'Нет счёта — создайте его в Финансах' };
+      // валюта фразы не совпала со счётом — пересчёт по курсу из настроек Финансов; без курса не пишем неверную сумму
+      let amount = a.amount;
+      let note = a.note;
+      if (a.currency && a.currency !== account.currency) {
+        const main = toMain(a.amount, a.currency, d.prefs);
+        const conv = main === null ? null : toAccountCurrency(main, account.currency, d.prefs);
+        if (conv === null)
+          return { ok: false, label: a.kind === 'income' ? 'Доход' : 'Расход', title: `${a.amount} ${a.currency}`, meta: `Нет счёта в ${a.currency} и курса — добавьте курс в Финансах` };
+        amount = Math.round(conv * 100) / 100;
+        note = [a.note, `${a.amount} ${a.currency}`].filter(Boolean).join(' · ');
+      }
       const cats = sortedCategories(d, a.kind);
       const category = cats.find((c) => c.id === a.categoryId) ?? byName(cats, a.category);
       const date = a.date ?? todayYmd();
       const tx = addTransaction({
         type: a.kind,
-        amount: a.amount,
+        amount,
         accountId: account.id,
         date,
         ...(category ? { categoryId: category.id } : {}),
-        ...(a.note ? { note: a.note } : {}),
+        ...(note ? { note } : {}),
       });
-      if (!tx) return { ok: false, label: 'Финансы', title: String(a.amount), meta: 'Не удалось записать' };
+      if (!tx) return { ok: false, label: 'Финансы', title: String(amount), meta: 'Не удалось записать' };
       return {
         ok: true,
         label: a.kind === 'income' ? 'Доход' : 'Расход',
-        title: `${a.kind === 'income' ? '+' : '−'}${fmtMoney(a.amount, account.currency)}`,
-        meta: [category ? `${category.emoji} ${category.name}` : 'без категории', a.note, dayLabel(date), account.name].filter(Boolean).join(' · '),
+        title: `${a.kind === 'income' ? '+' : '−'}${fmtMoney(amount, account.currency)}`,
+        meta: [category ? `${category.emoji} ${category.name}` : 'без категории', note, dayLabel(date), account.name].filter(Boolean).join(' · '),
         undo: () => deleteTransaction(tx.id, false),
         open: () => go('finance'),
       };

@@ -73,8 +73,9 @@ function priority(x: unknown): Priority | undefined {
 }
 
 function amount(x: unknown): number | undefined {
-  const n = typeof x === 'number' ? x : Number(String(x ?? '').replace(/[\s ]/g, '').replace(',', '.'));
-  return Number.isFinite(n) && n > 0 && n < 1e12 ? Math.round(Math.abs(n) * 100) / 100 : undefined;
+  // ИИ иногда присылает «4500 ₸» или −4500 для расхода — берём модуль числа
+  const n = Math.abs(typeof x === 'number' ? x : Number(String(x ?? '').replace(/[^\d.,-]/g, '').replace(',', '.')));
+  return Number.isFinite(n) && n > 0 && n < 1e12 ? Math.round(n * 100) / 100 : undefined;
 }
 
 /** Проверить одно действие. Неизвестные и некорректные — null */

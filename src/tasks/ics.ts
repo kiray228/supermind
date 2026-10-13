@@ -27,7 +27,8 @@ export function toRRule(r: RepeatRule, date: string, opts: { allDay?: boolean; d
     }
   }
   if (r.count) parts.push(`COUNT=${Math.max(1, r.count - (opts.done ?? 0))}`);
-  else if (r.until) parts.push(`UNTIL=${r.until.replace(/-/g, '')}${opts.allDay ? '' : 'T235959Z'}`);
+  // конец последнего дня по местному времени, переведённый в UTC: иначе в UTC+5 добавлялся лишний день
+  else if (r.until) parts.push(`UNTIL=${opts.allDay ? r.until.replace(/-/g, '') : utcStamp(fromYmd(addDaysYmd(r.until, 1)).getTime() - 1000)}`);
   return parts.join(';');
 }
 

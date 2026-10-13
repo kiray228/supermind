@@ -58,7 +58,8 @@ function Row({ t, depth }: { t: Topic; depth: number }) {
       if (e.shiftKey) st.outdent(t.id);
       else st.indent(t.id);
       focusOther(t.id);
-    } else if (e.key === 'Backspace' && !val && depth > 0) {
+    } else if (e.key === 'Backspace' && !val && depth > 0 && !t.children.length) {
+      // тему с ветвями Backspace не удаляет — иначе молча пропадёт всё поддерево
       e.preventDefault();
       const order = visibleOrder(sh);
       const i = order.findIndex((x) => x.id === t.id);

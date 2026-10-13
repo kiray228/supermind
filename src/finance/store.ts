@@ -9,6 +9,7 @@ import {
   advanceSub,
   budgetLevel,
   categoryMap,
+  detachTransfers,
   fmtMoney,
   monthEnd,
   monthStart,
@@ -223,10 +224,14 @@ export function saveAccount(a: Omit<Account, 'updatedAt' | 'order'> & { order?: 
   });
 }
 
-/** Удалить счёт вместе с его операциями */
+/**
+ * Удалить счёт вместе с его операциями. Переводы с оставшимися счетами не удаляются (иначе их остаток
+ * «прыгнет»): на оставшемся счёте перевод становится расходом (ушло на удалённый) или доходом (пришло с него)
+ */
 export function deleteAccount(id: string) {
   mutateFinance((d) => {
     removeIn(d, 'accounts', id);
+    d.transactions = detachTransfers(d.transactions, id, new Set(d.accounts.map((a) => a.id)));
     removeWhere(d, 'transactions', (t) => t.accountId === id || t.toAccountId === id);
     removeWhere(d, 'subscriptions', (s) => s.accountId === id);
   });
@@ -307,7 +312,9 @@ export function setBudget(categoryId: string | undefined, limit: number) {
       if (old) removeIn(d, 'budgets', old.id);
       return;
     }
-    const b: Budget = clean({ id: old?.id ?? uid(), categoryId, limit: r2(limit), updatedAt: 0 });
+    // createdAt сохраняется при правке: от него считаются месяцы «бюджет соблюдён» (у старых записей — updatedAt)
+    const createdAt = old ? (old.createdAt ?? old.updatedAt) : Date.now();
+    const b: Budget = clean({ id: old?.id ?? uid(), categoryId, limit: r2(limit), createdAt, updatedAt: 0 });
     upsertIn(d, 'budgets', b);
   });
 }

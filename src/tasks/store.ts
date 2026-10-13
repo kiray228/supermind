@@ -9,6 +9,7 @@ import { focusQuickInput } from '../ui/keyboard';
 import {
   advanceRepeat,
   pinRule,
+  snapToRule,
   type ChecklistItem,
   DEFAULT_PREFS,
   dayLabel,
@@ -176,7 +177,10 @@ export function addTask(p: Partial<TaskItem>): TaskItem | null {
   if (!d) return null;
   const t = makeTask(d, p);
   t.listId = p.listId && d.lists.some((l) => l.id === p.listId) ? p.listId : INBOX;
-  if (t.repeat && t.date) t.repeat = pinRule(t.repeat, t.date);
+  if (t.repeat && t.date) {
+    t.date = snapToRule(t.repeat, t.date);
+    t.repeat = pinRule(t.repeat, t.date);
+  }
   mutateTasks((x) => void x.tasks.unshift(t));
   return t;
 }
@@ -198,7 +202,10 @@ export function updateTask(id: ID, patch: Partial<TaskItem>) {
     }
     if (!next.time) delete next.duration;
     // новое правило повтора закрепляем по дате; перенос задачи расписание не меняет
-    if ('repeat' in patch && next.repeat && next.date) next.repeat = pinRule(next.repeat, next.date);
+    if ('repeat' in patch && next.repeat && next.date) {
+      if (!('date' in patch)) next.date = snapToRule(next.repeat, next.date);
+      next.repeat = pinRule(next.repeat, next.date);
+    }
     for (const k of Object.keys(next) as (keyof TaskItem)[]) if (next[k] === undefined) delete next[k];
     d.tasks[i] = next;
   });

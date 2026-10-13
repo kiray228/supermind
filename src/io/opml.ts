@@ -38,7 +38,8 @@ function childEls(el: Element, name: string): Element[] {
 
 function fromOutline(el: Element): Topic {
   const text = el.getAttribute('text') ?? el.getAttribute('title') ?? '';
-  const t = newTopic(text.replace(/<[^>]+>/g, '').trim());
+  // text — обычный текст (уже раскодирован): «Vector<int>» оставляем как есть
+  const t = newTopic(text.trim());
   const note = el.getAttribute('_note');
   if (note && note.trim()) t.note = note.replace(/\r\n?/g, '\n');
   const link = el.getAttribute('url') || el.getAttribute('htmlUrl') || el.getAttribute('xmlUrl');

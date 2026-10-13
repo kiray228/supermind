@@ -54,6 +54,8 @@ export interface Budget {
   id: string;
   categoryId?: string;
   limit: number;
+  /** когда лимит задан впервые (правка лимита не меняет); у старых записей нет */
+  createdAt?: number;
   updatedAt: number;
 }
 
@@ -414,6 +416,25 @@ export function convertedTotal(totals: Record<string, number>, prefs: FinancePre
     else total += m;
   }
   return { total: r2(total), missing };
+}
+
+/**
+ * Удаляется счёт `id`: переводы между ним и оставшимся счётом становятся на оставшемся счёте
+ * расходом (ушло на удалённый) или доходом (пришло с него) — остаток оставшегося счёта не меняется.
+ * Остальные операции удалённого счёта не трогает (их удаляет вызывающий)
+ */
+export function detachTransfers(list: Transaction[], id: string, alive: Set<string>, now = Date.now()): Transaction[] {
+  return list.map((t) => {
+    if (t.type !== 'transfer' || !t.toAccountId || t.accountId === t.toAccountId) return t;
+    let x: Transaction;
+    if (t.toAccountId === id && alive.has(t.accountId)) x = { ...t, type: 'expense', updatedAt: now };
+    else if (t.accountId === id && alive.has(t.toAccountId)) x = { ...t, type: 'income', accountId: t.toAccountId, amount: t.toAmount ?? t.amount, updatedAt: now };
+    else return t;
+    delete x.toAccountId;
+    delete x.toAmount;
+    delete x.categoryId;
+    return x;
+  });
 }
 
 export function accountMap(d: FinanceData): Map<string, Account> {

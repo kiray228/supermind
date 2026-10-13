@@ -552,6 +552,8 @@ export function cleanHabit(h: Habit): Habit {
     delete out.remind;
   } else {
     if (out.times && times.length === 1 && !out.time) out.time = times[0];
+    // повторы схлопнулись в одно время (08:00, 08:00) — цель была из времён, это не счётчик
+    if (out.times && out.times.length > 1) delete out.target;
     delete out.times;
   }
   if (!out.time) {

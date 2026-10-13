@@ -373,7 +373,7 @@ export function goalProgressInfo(g: Goal, look: TaskLookup): ProgressInfo {
       return { pct: targetPercent(g.target), done: g.target?.current ?? 0, total: g.target?.target ?? 0 };
     case 'savings': {
       const s = savingsInfo(g);
-      return { pct: s.pct, done: s.saved, total: s.amount };
+      return { pct: s.reached ? 100 : s.pct, done: s.saved, total: s.amount };
     }
     case 'tasks': {
       let done = 0;
@@ -399,10 +399,16 @@ export function goalProgressInfo(g: Goal, look: TaskLookup): ProgressInfo {
   }
 }
 
-/** Прогресс цели 0..100 (выполненная — всегда 100) */
-export function goalProgress(g: Goal, look: TaskLookup): number {
+/** Прогресс цели 0..100 без округления (для сравнений «дошли до 100%?»; выполненная — всегда 100) */
+export function goalProgressRaw(g: Goal, look: TaskLookup): number {
   if (g.status === 'done') return 100;
-  return Math.round(goalProgressInfo(g, look).pct);
+  return goalProgressInfo(g, look).pct;
+}
+
+/** Прогресс цели 0..100 для показа: 100 — только когда дошли до конца (99,6% — это ещё 99) */
+export function goalProgress(g: Goal, look: TaskLookup): number {
+  const pct = goalProgressRaw(g, look);
+  return pct >= 100 ? 100 : Math.min(99, Math.round(pct));
 }
 
 export function fmtNum(n: number): string {

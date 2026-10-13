@@ -13,14 +13,24 @@ function labelToken(l: string): string {
   return '#' + l.trim().replace(/\s+/g, '_').replace(/#/g, '');
 }
 
+/** Экранировать разметку в тексте темы — при импорте unescapeMd вернёт тот же текст */
+function escapeMd(s: string): string {
+  return (
+    s
+      .replace(/\\(?=[\\`*_{}[\]()#+\-.!|>~<]|$)|[`*_~[\]#<>]/g, '\\$&')
+      // «--», «- - -» в пункте списка иначе читаются как линия
+      .replace(/^-/, '\\-')
+  );
+}
+
 function inlineTopic(t: Topic): string {
   let s = '';
   if (t.task) s += t.task.status === 'done' ? '[x] ' : '[ ] ';
   const text = oneLine(t.text) || (t.link ? '' : '…');
   if (t.link) {
-    const label = (text || t.link).replace(/([[\]])/g, '\\$1');
+    const label = escapeMd(text || t.link);
     s += `[${label}](${t.link.replace(/\s/g, '%20').replace(/\)/g, '%29')})`;
-  } else s += text;
+  } else s += escapeMd(text);
   if (t.labels?.length) s += ' ' + t.labels.filter((l) => l.trim()).map(labelToken).join(' ');
   return s;
 }
@@ -72,21 +82,22 @@ interface Inline {
 
 const RE_CHECK = /^\[([ xX\-~/])\]\s*/;
 const RE_IMG = /!\[([^\]]*)\]\(\s*<?([^)\s>]*)>?(?:\s+["'][^"']*["'])?\s*\)/g;
-const RE_LINK = /\[((?:\\.|[^\]\\])*)\]\(\s*<?([^)\s>]+)>?(?:\s+["'][^"']*["'])?\s*\)/g;
-const RE_AUTOLINK = /<((?:https?|ftp|mailto):[^>\s]+)>/gi;
+// в адресе допустимы скобки парами: …/wiki/A_(b)
+const RE_LINK = /\[((?:\\.|[^\]\\])*)\]\(\s*<?((?:[^()\s>]|\([^()\s>]*\)|\()+)>?(?:\s+["'][^"']*["'])?\s*\)/g;
+const RE_AUTOLINK = /(?<!\\)<((?:https?|ftp|mailto):[^>\s]+)>/gi;
 
 function stripEmphasis(s: string): string {
   return s
     .replace(/\*\*(.+?)\*\*/g, '$1')
     .replace(/__(.+?)__/g, '$1')
     .replace(/~~(.+?)~~/g, '$1')
-    .replace(/`([^`]+)`/g, '$1')
+    .replace(/(?<!\\)`([^`]*[^`\\])`/g, '$1')
     .replace(/(^|[\s(])\*(?=\S)([^*]*?\S)\*(?=$|[\s).,!?:;])/g, '$1$2')
     .replace(/(^|[\s(])_(?=\S)([^_]*?\S)_(?=$|[\s).,!?:;])/g, '$1$2');
 }
 
 function unescapeMd(s: string): string {
-  return s.replace(/\\([\\`*_{}[\]()#+\-.!|>~])/g, '$1');
+  return s.replace(/\\([\\`*_{}[\]()#+\-.!|>~<])/g, '$1');
 }
 
 function parseInline(raw: string): Inline {
@@ -282,10 +293,9 @@ export function markdownToTopic(md: string): Topic {
 
   const kids = top.children;
   let root: Topic;
-  if (kids.length && fromHeading.has(kids[0])) {
-    // первый заголовок верхнего уровня — центральная тема, прочие верхние — её ветви
+  if (kids.length === 1 && fromHeading.has(kids[0])) {
+    // единственный заголовок верхнего уровня — центральная тема (несколько «## …» — ветви общего корня)
     root = kids[0];
-    root.children.push(...kids.slice(1));
     if (preamble.length) root.note = [preamble.join('\n'), root.note].filter(Boolean).join('\n\n');
   } else if (kids.length === 1 && !preamble.length) {
     root = kids[0];

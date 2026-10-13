@@ -11,10 +11,28 @@ const KEY = 'push/next-due';
 const sha256 = (d: string) => createHash('sha256').update(d).digest('hex');
 const hmac = (k: Buffer | string, d: string) => createHmac('sha256', k).update(d).digest();
 
+export interface NextDueMark {
+  /** число (мс) — ближайшее напоминание; null — напоминаний нет */
+  next: number | null;
+  /** когда записано (мс); нет — старая запись без времени */
+  at?: number;
+}
+
 export interface NextDueStore {
-  /** число (мс) — ближайшее напоминание; null — напоминаний нет; undefined — неизвестно (идём в базу) */
-  get(): Promise<number | null | undefined>;
-  set(value: number | null | undefined): Promise<void>;
+  /** undefined — неизвестно (идём в базу) */
+  get(): Promise<NextDueMark | undefined>;
+  /** undefined — удалить отметку; false — записать не удалось */
+  set(value: number | null | undefined, at: number): Promise<boolean>;
+}
+
+/** «<мс|none> <время записи>»; старый формат — без времени записи */
+export function parseNextDue(text: string): NextDueMark | undefined {
+  const [v, w] = text.trim().split(/\s+/);
+  const at = w === undefined ? undefined : Number(w);
+  if (at !== undefined && !(Number.isFinite(at) && at > 0)) return undefined;
+  if (v === 'none') return { next: null, at };
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? { next: n, at } : undefined;
 }
 
 async function s3(method: 'GET' | 'PUT' | 'DELETE', body = ''): Promise<Response> {
@@ -58,22 +76,19 @@ export function s3NextDueStore(): NextDueStore | null {
       try {
         const r = await s3('GET');
         if (!r.ok) return undefined;
-        const t = (await r.text()).trim();
-        if (t === 'none') return null;
-        const n = Number(t);
-        return Number.isFinite(n) && n > 0 ? n : undefined;
+        return parseNextDue(await r.text());
       } catch {
         return undefined;
       }
     },
-    async set(value) {
-      if (value === undefined) {
-        await s3('DELETE').catch(() => undefined);
-        return;
-      }
-      const r = await s3('PUT', value === null ? 'none' : String(Math.round(value)));
+    async set(value, at) {
+      const del = () => s3('DELETE').then((r) => r.ok, () => false);
+      if (value === undefined) return del();
+      const r = await s3('PUT', `${value === null ? 'none' : Math.round(value)} ${Math.round(at)}`).catch(() => null);
+      if (r?.ok) return true;
       // не записалось — удаляем, чтобы проверка шла в базу (лучше разбудить базу, чем пропустить напоминание)
-      if (!r.ok) await s3('DELETE').catch(() => undefined);
+      await del();
+      return false;
     },
   };
 }

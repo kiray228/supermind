@@ -307,10 +307,14 @@ export function markdownToBlocks(md: string): Block[] {
     else if ((m = s.match(/^[-*+]\s+\[( |x|X)\]\s*(.*)$/))) out.push(newBlock('todo', { text: m[2], checked: m[1] !== ' ' }));
     else if ((m = s.match(/^\[( |x|X)?\]\s+(.*)$/))) out.push(newBlock('todo', { text: m[2], checked: !!m[1] && m[1] !== ' ' }));
     else if ((m = s.match(/^[-*+•]\s+(.*)$/))) out.push(newBlock('bullet', { text: m[1] }));
-    else if ((m = s.match(/^\d+[.)]\s+(.*)$/))) out.push(newBlock('number', { text: m[1] }));
+    // не больше трёх цифр: «2024. Год был…» — абзац, а не пункт списка
+    else if ((m = s.match(/^\d{1,3}[.)]\s+(.*)$/))) out.push(newBlock('number', { text: m[1] }));
     else if ((m = s.match(/^>\s?(.*)$/))) {
       const prev = out[out.length - 1];
-      if (prev?.type === 'quote') prev.text += '\n' + m[1];
+      // выноска экспортируется как «> 💡 текст»
+      const c = m[1].match(/^💡\s?(.*)$/u);
+      if (c) out.push(newBlock('callout', { text: c[1] }));
+      else if (prev?.type === 'quote' || prev?.type === 'callout') prev.text += '\n' + m[1];
       else out.push(newBlock('quote', { text: m[1] }));
     } else out.push(newBlock('p', { text: s }));
   }

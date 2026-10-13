@@ -227,7 +227,7 @@ export function mondayOf(ymd: string): string {
   return addDaysYmd(ymd, -((d.getDay() + 6) % 7));
 }
 
-function addMonthsClamped(ymd: string, n: number, day?: number): string {
+export function addMonthsClamped(ymd: string, n: number, day?: number): string {
   const d = fromYmd(ymd);
   const want = day ?? d.getDate();
   const t = new Date(d.getFullYear(), d.getMonth() + n, 1);
@@ -252,6 +252,17 @@ function nthWeekdayOfMonth(y: number, m: number, n: number, wd: number): string 
  * Закрепить в правиле день недели / число / месяц по дате задачи.
  * После этого перенос задачи на другой день не меняет расписание повторов.
  */
+/** «По будням», выбранное в субботу: дата задачи — первый день, который входит в правило */
+export function snapToRule(rule: RepeatRule, date: string): string {
+  const wd = rule.freq === 'weekly' ? rule.weekdays : undefined;
+  if (!wd?.length || wd.includes(fromYmd(date).getDay())) return date;
+  for (let i = 1; i <= 7; i++) {
+    const d = addDaysYmd(date, i);
+    if (wd.includes(fromYmd(d).getDay())) return d;
+  }
+  return date;
+}
+
 export function pinRule(rule: RepeatRule, date: string): RepeatRule {
   const d = fromYmd(date);
   const r = { ...rule };

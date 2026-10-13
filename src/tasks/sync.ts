@@ -162,23 +162,33 @@ export function planReminders(fromMs: number, toMs: number): Promise<Planned[]> 
   return plan(fromMs, toMs);
 }
 
+const isActiveTask = (id: string) => {
+  const t = getTask(id);
+  return !!t && isActive(t);
+};
+
 /** Отложенные напоминания веб-версии — тоже уходят на push-сервер */
 export function pendingWebSnoozes(): { at: number; taskId: string; title: string }[] {
-  return webSnoozes.filter((s) => s.at > Date.now()).map((s) => ({ ...s, title: getTask(s.taskId)?.title ?? 'Задача' }));
+  // задачу уже выполнили — отложенное напоминание не нужно
+  return webSnoozes.filter((s) => s.at > Date.now() && isActiveTask(s.taskId)).map((s) => ({ ...s, title: getTask(s.taskId)?.title ?? 'Задача' }));
 }
 
 async function plan(fromMs: number, toMs: number): Promise<Planned[]> {
   const d = tasksData();
   if (!d || !d.prefs.notify) return [];
   const out: Planned[] = [];
-  for (const f of reminderFires(d.tasks, fromMs, toMs)) {
+  // повторы «настойчивого» напоминания идут ещё 3×nag минут после основного — смотрим и чуть назад,
+  // иначе пересчёт расписания после основного напоминания отменял бы уже запланированные повторы
+  const back = d.prefs.nag > 0 ? 3 * d.prefs.nag * 60000 : 0;
+  for (const f of reminderFires(d.tasks, fromMs - back, toMs)) {
     const base = { taskId: f.task.id, date: f.date, sm: 1 };
-    out.push({ id: hash(`${f.task.id}|${f.date}|${f.offset}`), at: f.at, title: f.task.title || 'Задача', body: reminderBody(f.task, f.date, f.at), extra: base });
+    if (f.at >= fromMs)
+      out.push({ id: hash(`${f.task.id}|${f.date}|${f.offset}`), at: f.at, title: f.task.title || 'Задача', body: reminderBody(f.task, f.date, f.at), extra: base });
     // «настойчивое» напоминание — ещё 3 раза, пока задача не выполнена
     if (d.prefs.nag > 0 && f.offset === Math.max(...f.task.reminders))
       for (let k = 1; k <= 3; k++) {
         const at = f.at + k * d.prefs.nag * 60000;
-        if (at <= toMs) out.push({ id: hash(`${f.task.id}|${f.date}|nag${k}`), at, title: '⏰ ' + (f.task.title || 'Задача'), body: 'Ещё не выполнено · ' + reminderBody(f.task, f.date, at), extra: base });
+        if (at >= fromMs && at <= toMs) out.push({ id: hash(`${f.task.id}|${f.date}|nag${k}`), at, title: '⏰ ' + (f.task.title || 'Задача'), body: 'Ещё не выполнено · ' + reminderBody(f.task, f.date, at), extra: base });
       }
   }
   // платежи по подпискам (раздел «Финансы»): напоминание в 09:00 за указанное число дней
@@ -459,7 +469,12 @@ async function syncNative() {
   const have = new Set<number>();
   for (const n of pending) {
     const ex = (n.extra ?? {}) as Record<string, unknown>;
-    if (!ex.sm || ex.snooze) continue;
+    if (!ex.sm) continue;
+    // отложенное («через 10 мин») не трогаем, пока задача не выполнена
+    if (ex.snooze) {
+      if (typeof ex.taskId === 'string' && !isActiveTask(ex.taskId)) cancel.push({ id: n.id });
+      continue;
+    }
     const w = wantById.get(n.id);
     if (!w || ex.sig !== sig(w)) cancel.push({ id: n.id });
     else have.add(n.id);
@@ -815,7 +830,8 @@ export function reminderAction(r: InAppReminder, action: 'done' | 'snooze' | 'op
     return;
   }
   if (r.habitId) {
-    void handleAction(action === 'done' ? 'habit-done' : 'open', { habitId: r.habitId, date: todayYmd() });
+    // день напоминания, а не сегодняшний: вчерашнее напоминание, открытое утром, отмечает вчера
+    void handleAction(action === 'done' ? 'habit-done' : 'open', { habitId: r.habitId, date: r.date ?? todayYmd() });
     return;
   }
   if (!r.taskId) return;

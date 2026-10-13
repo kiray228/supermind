@@ -5,9 +5,10 @@
 import { createServer } from 'node:http';
 import { createApp } from '../src/app.ts';
 import { PgliteSql } from './pglite.ts';
+import type { NextDueMark } from '../src/objectStore.ts';
 
 const sent: { endpoint: string; payload: object }[] = [];
-let next: number | null | undefined;
+let next: NextDueMark | undefined;
 let dbCalls = 0;
 const sql = new PgliteSql();
 const counted = { query: (q: string, p?: unknown[]) => (dbCalls++, sql.query(q, p)) };
@@ -15,7 +16,7 @@ const app = createApp({
   sql: counted,
   // письма — в журнал (код восстановления виден в консоли сервера)
   mail: async (m) => void console.log('MAIL →', m.to, '|', m.subject),
-  nextDue: { get: async () => next, set: async (v) => void (next = v) },
+  nextDue: { get: async () => next, set: async (v, at) => ((next = v === undefined ? undefined : { next: v, at }), true) },
   push: async (sub, payload) => {
     sent.push({ endpoint: sub.endpoint, payload });
     console.log('PUSH →', JSON.stringify(payload));

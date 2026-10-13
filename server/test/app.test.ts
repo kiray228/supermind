@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createApp } from '../src/app.ts';
 import { PgliteSql } from './pglite.ts';
+import { parseNextDue, type NextDueMark, type NextDueStore } from '../src/objectStore.ts';
 
 const sql = new PgliteSql();
 const mails: { to: string; subject: string; text: string }[] = [];
@@ -218,4 +219,105 @@ test('бесплатный ИИ: текстовый ответ без своег
   assert.equal(last.system, 'Ты помощник');
   assert.deepEqual(last.user.map((m) => m.role), ['user', 'assistant', 'user']);
   assert.ok(!last.opts?.json);
+});
+
+test('восстановление пароля: параллельный перебор кода не превышает 5 попыток', async () => {
+  await call('POST', '/auth/register', { email: 'brute@b.cd', password: 'oldpass11' });
+  const before = mails.length;
+  await call('POST', '/auth/forgot', { email: 'brute@b.cd' });
+  const code = /(\d{6})/.exec(mails[before].text)![1];
+  const wrong = (n: number) => String((Number(code) + 1 + n) % 1_000_000).padStart(6, '0');
+  const rs = await Promise.all(Array.from({ length: 60 }, (_, i) => call('POST', '/auth/reset', { email: 'brute@b.cd', code: wrong(i), password: 'newpass22' })));
+  assert.equal(rs.filter((r) => r.status === 400).length, 5);
+  assert.equal(rs.filter((r) => r.status === 429).length, 55);
+  // попытки исчерпаны — даже верный код не проходит
+  assert.equal((await call('POST', '/auth/reset', { email: 'brute@b.cd', code, password: 'newpass22' })).status, 429);
+  const rows = await sql.query(`SELECT attempts FROM password_resets WHERE email = 'brute@b.cd' AND code_hash <> ''`);
+  assert.equal(Number(rows[0][0]), 5);
+});
+
+test('вход: параллельный перебор пароля не превышает 10 попыток за 15 минут', async () => {
+  await call('POST', '/auth/register', { email: 'lock@b.cd', password: 'rightpass1' });
+  const rs = await Promise.all(Array.from({ length: 40 }, (_, i) => call('POST', '/auth/login', { email: 'lock@b.cd', password: 'wrong' + i })));
+  const failed = rs.filter((r) => r.status === 401).length;
+  assert.ok(failed <= 10);
+  assert.equal(failed + rs.filter((r) => r.status === 429).length, 40);
+  // отклонённые попытки не записываются — блокировку не продлевают
+  const rows = await sql.query(`SELECT count(*) FROM auth_failures WHERE email = 'lock@b.cd'`);
+  assert.equal(Number(rows[0][0]), failed);
+  // добираем до 10 неудачных — дальше не проходит даже верный пароль
+  for (let i = failed; i < 10; i++) assert.equal((await call('POST', '/auth/login', { email: 'lock@b.cd', password: 'wrong' })).status, 401);
+  assert.equal((await call('POST', '/auth/login', { email: 'lock@b.cd', password: 'wrong' })).status, 429);
+  assert.equal((await call('POST', '/auth/login', { email: 'lock@b.cd', password: 'rightpass1' })).status, 429);
+  // через 15 минут верный пароль проходит и сбрасывает счётчик
+  await sql.query(`UPDATE auth_failures SET at = now() - interval '16 minutes' WHERE email = 'lock@b.cd'`);
+  assert.equal((await call('POST', '/auth/login', { email: 'lock@b.cd', password: 'rightpass1' })).status, 200);
+  const left = await sql.query(`SELECT count(*) FROM auth_failures WHERE email = 'lock@b.cd'`);
+  assert.equal(Number(left[0][0]), 0);
+});
+
+test('отметка ближайшего напоминания: расписание её только понижает; свежей, старой или незаписанной проверка не верит', async () => {
+  // старый формат (без времени записи) читается
+  assert.deepEqual(parseNextDue('1700000000000'), { next: 1700000000000, at: undefined });
+  assert.deepEqual(parseNextDue('none'), { next: null, at: undefined });
+  assert.deepEqual(parseNextDue('none 1700000000000'), { next: null, at: 1700000000000 });
+  assert.equal(parseNextDue('x'), undefined);
+
+  let mark: NextDueMark | undefined;
+  let fail = false;
+  const store: NextDueStore = {
+    get: async () => mark,
+    set: async (v, at) => {
+      if (fail) return false;
+      mark = v === undefined ? undefined : { next: v, at };
+      return true;
+    },
+  };
+  const sent: string[] = [];
+  const nApp = createApp({ sql, mail: null, nextDue: store, push: async (sub) => (sent.push(sub.endpoint), { status: 201, gone: false }) });
+  const fetchJson = async <T>(path: string, init: RequestInit) => (await (await nApp.fetch(new Request('http://x' + path, init))).json()) as T;
+  const dev = await fetchJson<{ deviceId: string; secret: string }>('/devices', {
+    method: 'POST',
+    body: JSON.stringify({ subscription: { endpoint: 'https://push.example/mark', keys: { p256dh: 'p', auth: 'a' } } }),
+  });
+  const schedule = (items: { id: string; at: number; title: string }[]) =>
+    fetchJson(`/devices/${dev.deviceId}/schedule`, { method: 'PUT', body: JSON.stringify({ secret: dev.secret, items }) });
+  const cron = () =>
+    fetchJson<{ skipped?: boolean; due?: number }>('/cron', { method: 'POST', headers: { 'x-neon-trigger-invocation-id': 'm' }, body: JSON.stringify({ invocation_id: 'm' }) });
+  const t = Date.now();
+
+  // отметка раньше нового расписания — не поднимается
+  mark = { next: t + 10 * 60_000, at: t - 10 * 60_000 };
+  await schedule([{ id: 'a', at: t + 60 * 60_000, title: 'A' }]);
+  assert.equal(mark?.next, t + 10 * 60_000);
+  // более раннее напоминание — понижает
+  await schedule([{ id: 'b', at: t + 5 * 60_000, title: 'B' }]);
+  assert.equal(mark?.next, t + 5 * 60_000);
+
+  // гонка: параллельный запрос только что затёр отметку на «нет» — свежей отметке не верим, идём в базу
+  await sql.query(`UPDATE push_queue SET fire_at = now() - interval '1 minute' WHERE device_id = $1 AND sent_at IS NULL`, [dev.deviceId]);
+  mark = { next: null, at: Date.now() };
+  const r = await cron();
+  assert.equal(r.due, 1);
+  assert.deepEqual(sent, ['https://push.example/mark']);
+  // отстоявшейся — верим, база не нужна
+  mark = { next: null, at: Date.now() - 5 * 60_000 };
+  assert.equal((await cron()).skipped, true);
+  // слишком старой и записанной старым кодом (без времени) — не верим
+  mark = { next: null, at: Date.now() - 4 * 3600_000 };
+  assert.ok(!(await cron()).skipped);
+  mark = { next: null };
+  assert.ok(!(await cron()).skipped);
+  assert.equal(typeof mark?.at, 'number');
+
+  // запись не удалась — пока не запишется, проверка идёт в базу, даже если в хранилище «отстоявшаяся» отметка
+  fail = true;
+  await schedule([{ id: 'c', at: t + 30 * 60_000, title: 'C' }]);
+  mark = { next: null, at: Date.now() - 5 * 60_000 };
+  assert.ok(!(await cron()).skipped);
+  fail = false;
+  assert.ok(!(await cron()).skipped);
+  assert.equal(mark?.next, t + 30 * 60_000);
+  mark = { next: mark!.next, at: Date.now() - 5 * 60_000 };
+  assert.equal((await cron()).skipped, true);
 });
