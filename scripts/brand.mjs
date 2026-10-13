@@ -33,7 +33,7 @@ const BG = svg(`<rect width="512" height="512" fill="url(#g)"/><rect width="512"
 /** Передний слой адаптивной иконки Android: в xml есть отступ 16.7%, поэтому логотип почти во весь слой */
 const FG = svg(`<g transform="translate(262 258) scale(.92) translate(-262 -258)">${GLYPH}</g>`);
 
-const png = (s, w, h = w) => new Resvg(s, { fitTo: { mode: 'width', value: w }, background: 'rgba(0,0,0,0)' }).render().asPng();
+const png = (s, w) => new Resvg(s, { fitTo: { mode: 'width', value: w }, background: 'rgba(0,0,0,0)' }).render().asPng();
 function pngCanvas(inner, w, h, bg) {
   // заставка: иконка по центру на фоне
   const size = Math.round(Math.min(w, h) * 0.28);

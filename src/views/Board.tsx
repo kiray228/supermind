@@ -425,7 +425,8 @@ export default function Board() {
     g.style.transform = `translate3d(${x - d.info.offX}px, ${y - d.info.offY}px, 0) rotate(2deg)`;
   };
 
-  const startDrag = (el: HTMLElement, kind: DragKind, id: string, x: number, y: number, pointerId: number) => {
+  // только рефы и сеттеры состояния — функция стабильна, глобальные слушатели не переподписываются
+  const startDrag = useCallback((el: HTMLElement, kind: DragKind, id: string, x: number, y: number, pointerId: number) => {
     const r = el.getBoundingClientRect();
     const info: DragInfo = { kind, id, x, y, offX: x - r.left, offY: y - r.top, w: r.width };
     dragRef.current = { info, pointerId };
@@ -439,7 +440,7 @@ export default function Board() {
     } catch {
       /* не поддерживается */
     }
-  };
+  }, [computeDrop]);
 
   // актуальные обработчики для глобальных слушателей
   const latest = useRef({ finish: () => {} });
@@ -540,7 +541,7 @@ export default function Board() {
       window.removeEventListener('keydown', onKey);
       document.removeEventListener('touchmove', onTouchMove);
     };
-  }, [computeDrop]);
+  }, [computeDrop, startDrag]);
 
   // автопрокрутка у краёв во время перетаскивания
   const dragging = drag !== null;

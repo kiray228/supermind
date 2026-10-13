@@ -35,7 +35,7 @@ createServer(async (req, res) => {
   if (req.url === '/__cron') {
     const r = await app.fetch(new Request('http://127.0.0.1:8787/cron', { method: 'POST', headers: { 'x-neon-trigger-invocation-id': 'local' }, body: JSON.stringify({ invocation_id: 'local' }) }));
     res.writeHead(r.status, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-    res.end(JSON.stringify({ ...(await r.json()), sent: sent.length, dbCalls, next }));
+    res.end(JSON.stringify({ ...((await r.json()) as Record<string, unknown>), sent: sent.length, dbCalls, next }));
     return;
   }
   const r = await app.fetch(request);

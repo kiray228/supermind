@@ -28,12 +28,12 @@ test('данные переживают ошибочную синхрониза�
   let r = await call<{ results: { ok: boolean; seq: number }[] }>('POST', '/sync', { items: [{ key: 'tasks', value: { tasks: [{ id: '1' }] }, updatedAt: 1, baseSeq: 0 }] }, t);
   assert.equal(r.data.results[0].ok, true);
   const seq = r.data.results[0].seq;
-  let list = await call<{ snapshots: unknown[] }>('GET', '/snapshots', undefined, t);
+  let list = await call<{ snapshots: { id: string; keys: number; reason: string }[] }>('GET', '/snapshots', undefined, t);
   assert.equal(list.data.snapshots.length, 0);
 
   // «плохое» изменение: перед ним сервер сам сохраняет копию
   r = await call('POST', '/sync', { items: [{ key: 'tasks', value: { tasks: [] }, updatedAt: 2, baseSeq: seq }] }, t);
-  list = await call<{ snapshots: { id: string; keys: number; reason: string }[] }>('GET', '/snapshots', undefined, t);
+  list = await call('GET', '/snapshots', undefined, t);
   assert.equal(list.data.snapshots.length, 1);
   assert.equal(list.data.snapshots[0].reason, 'auto');
 

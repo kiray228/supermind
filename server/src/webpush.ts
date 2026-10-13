@@ -96,7 +96,8 @@ export async function sendPush(
   subject: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<PushResult> {
-  const body = encryptPayload(sub, Buffer.from(JSON.stringify(payload)));
+  // Uint8Array, а не Buffer: тип тела fetch (BodyInit) не принимает Buffer<ArrayBufferLike>
+  const body = new Uint8Array(encryptPayload(sub, Buffer.from(JSON.stringify(payload))));
   const res = await fetchImpl(sub.endpoint, {
     method: 'POST',
     headers: {
