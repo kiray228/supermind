@@ -107,9 +107,15 @@ function acceptForPlatform(accept: string): string {
 
 /** Выбор файла через скрытый input. null — если пользователь отменил выбор. */
 export function pickFile(accept: string): Promise<File | null> {
+  return pickFiles(accept, false).then((f) => f[0] ?? null);
+}
+
+/** Выбор нескольких файлов. Пустой список — если пользователь отменил выбор. */
+export function pickFiles(accept: string, multiple = true): Promise<File[]> {
   return new Promise((resolve) => {
     const input = document.createElement('input');
     input.type = 'file';
+    input.multiple = multiple;
     const acc = acceptForPlatform(accept);
     if (acc) input.accept = acc;
     input.style.position = 'fixed';
@@ -121,7 +127,7 @@ export function pickFile(accept: string): Promise<File | null> {
 
     let done = false;
     let focusTimer: ReturnType<typeof setTimeout> | null = null;
-    const finish = (f: File | null) => {
+    const finish = (f: File[]) => {
       if (done) return;
       done = true;
       if (focusTimer) clearTimeout(focusTimer);
@@ -133,12 +139,12 @@ export function pickFile(accept: string): Promise<File | null> {
       // фолбэк для браузеров без события cancel: окно вернуло фокус, а change так и не пришёл
       if (focusTimer) clearTimeout(focusTimer);
       focusTimer = setTimeout(() => {
-        if (!input.files?.length) finish(null);
+        if (!input.files?.length) finish([]);
       }, 1500);
     };
 
-    input.addEventListener('change', () => finish(input.files?.[0] ?? null));
-    input.addEventListener('cancel', () => finish(null));
+    input.addEventListener('change', () => finish([...(input.files ?? [])]));
+    input.addEventListener('cancel', () => finish([]));
     document.body.appendChild(input);
     // подписываемся на focus после открытия диалога (только если нет нативного cancel —
     // на iOS focus может прийти, пока пользователь ещё листает «Файлы»)

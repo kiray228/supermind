@@ -1,5 +1,5 @@
 /** «Что нового»: главное в каждой версии. Новые версии — сверху. */
-import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy } from 'lucide-react';
+import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload } from 'lucide-react';
 
 export interface ChangeItem {
   icon: typeof Sparkles;
@@ -15,6 +15,14 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.28',
+    title: 'Синонимы и импорт из Obsidian',
+    items: [
+      { icon: Equal, title: 'Синонимы по смыслу', text: 'Заметки → «⋯» → «Синонимы»: ИИ найдёт в ваших записях разные слова для одного понятия — «бег» и «пробежка», «машина» и «автомобиль». Связи и «Спросить у мозга» считают их одним словом. Лишнее слово убирается крестиком, свою группу можно добавить: «бег = пробежка».' },
+      { icon: Upload, title: 'Импорт из Obsidian', text: 'Заметки → «⋯» → «Импорт из Obsidian»: выберите архив хранилища (.zip) или файлы .md. Переносятся папки, даты, [[ссылки]], картинки, выноски и теги. Повторный импорт не создаёт копий.' },
+    ],
+  },
   {
     version: '1.27',
     title: 'Спросить у мозга',

@@ -635,6 +635,8 @@ interface DocVec {
   w: Map<string, number>;
   /** термин → частота (формы с беглой гласной слиты) */
   tf: Map<string, number>;
+  /** ключ в индексе → исходный ключ заметки (как показать слово: «пробежка», а не ключ группы синонимов) */
+  rawOf: Map<string, string>;
   titleKey?: string;
   /** самые весомые термины с непустым списком заметок — для поиска кандидатов (считаются при первом запросе) */
   top?: string[];
@@ -654,13 +656,17 @@ export interface LinkIndex {
   pairs: Map<string, boolean>;
   /** подтверждённые пары — по заметкам, чтобы добавить их в кандидаты */
   forced: Map<string, string[]>;
-  /** ключ термина заметки → ключ в индексе (слияние форм с беглой гласной) */
+  /** ключ термина заметки → ключ в индексе (беглая гласная и синонимы) */
   canon: (k: string) => string;
+  /** то же без синонимов — для буквального сравнения (упоминания названий) */
+  canonLex: (k: string) => string;
 }
 
 export interface IndexOpts {
   /** решения по парам заметок (ИИ или человек) */
   pairs?: Map<string, boolean>;
+  /** группы синонимов (ключи терминов): слова одной группы считаются одним словом */
+  synonyms?: string[][];
 }
 
 /** Ключ пары заметок — один на пару, в каком бы порядке их ни назвали */
@@ -682,42 +688,86 @@ function fleetingAliases(vocab: Set<string>): Map<string, string> {
   return alias;
 }
 
+/**
+ * Группы синонимов → «слово → главное слово группы». Группы с общим словом сливаются (union-find);
+ * главное — по алфавиту первое, чтобы не зависеть от порядка групп.
+ */
+export function synonymMap(groups: string[][], norm: (k: string) => string = (k) => k): Map<string, string> {
+  const parent = new Map<string, string>();
+  const find = (x: string): string => {
+    let r = x;
+    while (parent.get(r) !== r) r = parent.get(r)!;
+    // сжатие пути
+    let c = x;
+    while (parent.get(c) !== r) {
+      const n = parent.get(c)!;
+      parent.set(c, r);
+      c = n;
+    }
+    return r;
+  };
+  for (const g of groups) {
+    const keys = [...new Set(g.map(norm).filter((k) => k && !k.includes(BIGRAM_SEP)))];
+    if (keys.length < 2) continue;
+    for (const k of keys) if (!parent.has(k)) parent.set(k, k);
+    for (let i = 1; i < keys.length; i++) {
+      const a = find(keys[0]);
+      const b = find(keys[i]);
+      if (a !== b) parent.set(a < b ? b : a, a < b ? a : b);
+    }
+  }
+  const out = new Map<string, string>();
+  for (const k of parent.keys()) {
+    const r = find(k);
+    if (r !== k) out.set(k, r);
+  }
+  return out;
+}
+
 export function buildIndex(items: LinkDoc[], opts: IndexOpts = {}): LinkIndex {
   const vocab = new Set<string>();
   for (const it of items) for (const k in it.f.terms) if (!k.includes(BIGRAM_SEP)) vocab.add(k);
   const alias = fleetingAliases(vocab);
+  const lexOne = (p: string) => alias.get(p) ?? p;
+  // синонимы: слово группы → её первое слово (группы с общим словом сливаются)
+  const syn = synonymMap(opts.synonyms ?? [], lexOne);
+  const one = (p: string) => {
+    const l = lexOne(p);
+    return syn.get(l) ?? l;
+  };
   const memo = new Map<string, string>();
-  const canon = (k: string) => {
-    if (!alias.size) return k;
-    let c = memo.get(k);
+  const memoLex = new Map<string, string>();
+  const make = (f: (p: string) => string, m: Map<string, string>, active: boolean) => (k: string) => {
+    if (!active) return k;
+    let c = m.get(k);
     if (c === undefined) {
-      c = k.includes(BIGRAM_SEP)
-        ? k
-            .split(BIGRAM_SEP)
-            .map((p) => alias.get(p) ?? p)
-            .join(BIGRAM_SEP)
-        : (alias.get(k) ?? k);
-      memo.set(k, c);
+      c = k.includes(BIGRAM_SEP) ? k.split(BIGRAM_SEP).map(f).join(BIGRAM_SEP) : f(k);
+      m.set(k, c);
     }
     return c;
   };
+  const canonLex = make(lexOne, memoLex, alias.size > 0);
+  const canon = make(one, memo, alias.size > 0 || syn.size > 0);
 
   // термины с учётом слияния форм
   const docs = new Map<string, DocVec>();
   const df = new Map<string, number>();
-  const raw: { id: string; f: NoteFeatures; tf: Map<string, number>; titleKey?: string }[] = [];
+  const raw: { id: string; f: NoteFeatures; tf: Map<string, number>; rawOf: Map<string, string>; titleKey?: string }[] = [];
   const seenIds = new Set<string>();
   for (const it of items) {
     if (seenIds.has(it.id)) continue;
     seenIds.add(it.id);
     const tf = new Map<string, number>();
+    const rawOf = new Map<string, string>();
     for (const k in it.f.terms) {
       const c = canon(k);
+      const prev = rawOf.get(c);
+      if (prev === undefined || it.f.terms[k] > it.f.terms[prev]) rawOf.set(c, k);
       tf.set(c, (tf.get(c) ?? 0) + it.f.terms[k]);
     }
     if (!tf.size) continue;
     for (const k of tf.keys()) df.set(k, (df.get(k) ?? 0) + 1);
-    raw.push({ id: it.id, f: it.f, tf, titleKey: it.f.titleKey ? canon(it.f.titleKey) : undefined });
+    raw.push({ id: it.id, f: it.f, tf, rawOf, titleKey: it.f.titleKey ? canon(it.f.titleKey) : undefined });
   }
   const n = raw.length;
 
@@ -744,7 +794,7 @@ export function buildIndex(items: LinkDoc[], opts: IndexOpts = {}): LinkIndex {
         p.push({ id: r.id, w: nv });
       }
     }
-    docs.set(r.id, { id: r.id, f: r.f, w, tf: r.tf, titleKey: r.titleKey });
+    docs.set(r.id, { id: r.id, f: r.f, w, tf: r.tf, rawOf: r.rawOf, titleKey: r.titleKey });
   }
 
   // названия и где они упоминаются — чтобы не перебирать все заметки при каждом запросе
@@ -764,7 +814,7 @@ export function buildIndex(items: LinkDoc[], opts: IndexOpts = {}): LinkIndex {
       push(forced, b, a);
     }
   }
-  return { n, docs, df, post, titles, holders, pairs, forced, canon };
+  return { n, docs, df, post, titles, holders, pairs, forced, canon, canonLex };
 }
 
 function push<K, V>(m: Map<K, V[]>, k: K, v: V) {
@@ -810,6 +860,8 @@ function mentionableKey(n: number, df: Map<string, number>, key: string): boolea
 }
 
 function displayForm(d: DocVec, key: string): string {
+  const raw = d.rawOf.get(key);
+  if (raw && d.f.forms[raw]) return d.f.forms[raw];
   if (d.f.forms[key]) return d.f.forms[key];
   // слитая беглая форма — ищем исходный ключ
   for (const k in d.f.forms) if (k !== key && k.length === key.length + 1 && k.replace(/[ео](?=[^аеиоуыэюяйь]$)/, '') === key) return d.f.forms[k];
@@ -1244,4 +1296,23 @@ export function findDuplicates(ix: LinkIndex, ids: Iterable<string>, min = DUP_S
       if (!seen.has(a + '|' + b)) seen.set(a + '|' + b, { a, b, score: d.score });
     }
   return [...seen.values()].sort((x, y) => y.score - x.score);
+}
+
+// ---------- Словарь (для поиска синонимов) ----------
+
+/** Главные слова всех записей: сумма весов по записям, с самой частой формой написания */
+export function vocabulary(ix: LinkIndex, max = 300): { key: string; form: string; weight: number }[] {
+  const weight = new Map<string, number>();
+  const best = new Map<string, { w: number; form: string }>();
+  for (const d of ix.docs.values())
+    for (const [k, w] of d.w) {
+      if (k.includes(BIGRAM_SEP)) continue;
+      weight.set(k, (weight.get(k) ?? 0) + w);
+      const b = best.get(k);
+      if (!b || w > b.w) best.set(k, { w, form: displayForm(d, k) });
+    }
+  return [...weight.entries()]
+    .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))
+    .slice(0, max)
+    .map(([key, w]) => ({ key, form: best.get(key)!.form, weight: w }));
 }

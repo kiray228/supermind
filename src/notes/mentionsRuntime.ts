@@ -52,7 +52,7 @@ export async function findBacklinks(id: ID): Promise<Backlink[]> {
       const body = await loadNoteBody(it.id).catch(() => null);
       for (const b of body?.blocks ?? []) {
         if (!b.text || b.type === 'code') continue;
-        const occ = titleMentions(b.text, title, ix.canon);
+        const occ = titleMentions(b.text, title, ix.canonLex);
         count += occ.length;
         if (occ.length && !first) {
           first = snippetAround(b.text, occ[0], SNIPPET);
@@ -62,7 +62,7 @@ export async function findBacklinks(id: ID): Promise<Backlink[]> {
     } else if (maybe) {
       const d = await itemText(it.id).catch(() => null);
       const text = d ? [d.title, ...(d.headings ?? []), d.text].join('\n') : '';
-      const occ = titleMentions(text, title, ix.canon);
+      const occ = titleMentions(text, title, ix.canonLex);
       count = occ.length;
       if (occ.length) first = snippetAround(text, occ[0], SNIPPET);
     }

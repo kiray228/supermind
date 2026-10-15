@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, Brain, Check, ChevronDown, Copy, CopyCheck, Download, FolderInput, FolderPlus, LayoutGrid, MoreHorizontal, Pencil, Pin, PinOff, Plus, RotateCcw, Search, StickyNote, Trash2, Waypoints, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Brain, Check, ChevronDown, Copy, CopyCheck, Download, Equal, FolderInput, FolderPlus, LayoutGrid, MoreHorizontal, Pencil, Pin, PinOff, Plus, RotateCcw, Search, StickyNote, Trash2, Upload, Waypoints, X } from 'lucide-react';
 import type { ID } from '../types';
 import { confirmDialog } from '../ui/dialogs';
 import { toast } from '../store/appStore';
@@ -25,6 +25,7 @@ import { NoteEditor } from '../notes/ui/NoteEditor';
 import { NotesGraph } from '../notes/ui/NotesGraph';
 import { BrainAsk } from '../notes/ui/BrainAsk';
 import { DuplicatesSheet } from '../notes/ui/DuplicatesSheet';
+import { SynonymsSheet } from '../notes/ui/SynonymsSheet';
 import { openAsk, useAsk } from '../notes/brainAsk';
 import { useLinks } from '../notes/related';
 import { FolderDialog, NoteCard } from '../notes/ui/ListParts';
@@ -82,6 +83,7 @@ export default function Notes() {
   const graphFocus = useLinks((s) => s.graphFocus);
   const askOpen = useAsk((s) => s.open);
   const [dupSheet, setDupSheet] = useState(false);
+  const [synSheet, setSynSheet] = useState(false);
 
   useEffect(() => {
     void ensureNotes().then((d) => {
@@ -361,6 +363,7 @@ export default function Notes() {
 
       {askOpen && <BrainAsk />}
       {dupSheet && <DuplicatesSheet onClose={() => setDupSheet(false)} />}
+      {synSheet && <SynonymsSheet onClose={() => setSynSheet(false)} />}
 
       {folderDlg && (
         <FolderDialog
@@ -380,6 +383,7 @@ export default function Notes() {
           <MenuSep />
           <MenuItem icon={<FolderPlus size={17} />} label="Новая папка" onClick={() => setFolderDlg({})} />
           <MenuItem icon={<CopyCheck size={17} />} label="Найти дубли" onClick={() => setDupSheet(true)} />
+          <MenuItem icon={<Equal size={17} />} label="Синонимы" onClick={() => setSynSheet(true)} />
           <MenuItem
             icon={<Download size={17} />}
             label="Экспорт для Obsidian"
@@ -389,6 +393,29 @@ export default function Notes() {
                 .then((m) => m.exportObsidianVault())
                 .then((n) => toast(`Сохранено заметок: ${n}. Распакуйте архив и откройте папку в Obsidian как хранилище`))
                 .catch(() => toast('Не удалось сохранить архив'));
+            }}
+          />
+          <MenuItem
+            icon={<Upload size={17} />}
+            label="Импорт из Obsidian"
+            onClick={() => {
+              void (async () => {
+                const { pickFiles } = await import('../io/download');
+                const files = await pickFiles('.zip,.md,text/markdown,image/*');
+                if (!files.length) return;
+                toast('Импортирую заметки…');
+                try {
+                  const m = await import('../notes/obsidianImportRun');
+                  const r = await m.importObsidian(files);
+                  const parts = [`Добавлено заметок: ${r.created}`];
+                  if (r.folders) parts.push(`папок: ${r.folders}`);
+                  if (r.images) parts.push(`картинок: ${r.images}`);
+                  if (r.skipped) parts.push(`уже были: ${r.skipped}`);
+                  toast(parts.join(', '));
+                } catch (e) {
+                  toast(e instanceof Error && e.name === 'ImportError' ? e.message : 'Не удалось импортировать заметки');
+                }
+              })();
             }}
           />
           {curFolder && <MenuItem icon={<Pencil size={17} />} label="Изменить папку" onClick={() => setFolderDlg({ id: curFolder.id })} />}

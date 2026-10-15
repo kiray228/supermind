@@ -46,6 +46,8 @@ function normalize(raw: Partial<NotesData> | undefined): NotesData {
     aiTerms: (raw.aiTerms ?? []).filter((r) => r && r.id).map((r) => ({ ...r, drop: r.drop ?? [], add: r.add ?? [], at: r.at ?? 0, checkedAt: r.checkedAt ?? 0, updatedAt: r.updatedAt ?? 0 })),
     aiLinks: (raw.aiLinks ?? []).filter((r) => r && r.id && typeof r.ok === 'boolean').map((r) => ({ ...r, by: r.by === 'user' ? 'user' : 'ai', updatedAt: r.updatedAt ?? 0 })),
     notDup: (raw.notDup ?? []).filter((r) => r && r.id).map((r) => ({ id: r.id, updatedAt: r.updatedAt ?? 0 })),
+    synonyms: (raw.synonyms ?? []).filter((r) => r && r.id && Array.isArray(r.words)).map((r) => ({ id: r.id, words: r.words.filter((w) => typeof w === 'string'), by: r.by === 'user' ? 'user' : 'ai', updatedAt: r.updatedAt ?? 0 })),
+    synNo: (raw.synNo ?? []).filter((r) => r && r.id).map((r) => ({ id: r.id, updatedAt: r.updatedAt ?? 0 })),
   };
 }
 

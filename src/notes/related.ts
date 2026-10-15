@@ -25,6 +25,7 @@ import {
   pairKey,
   type Related,
   relatedTo,
+  termKey,
 } from './links';
 import type { NotesData } from './model';
 import { type BrainItem, collectItems, itemText } from './brain';
@@ -99,7 +100,9 @@ const signature = (list: BrainItem[], d: NotesData | null) =>
   '#' +
   (d?.aiTerms ?? []).map((r) => r.id + ':' + r.updatedAt).join('|') +
   '#' +
-  (d?.aiLinks ?? []).map((r) => r.id + ':' + (r.ok ? 1 : 0)).join('|');
+  (d?.aiLinks ?? []).map((r) => r.id + ':' + (r.ok ? 1 : 0)).join('|') +
+  '#' +
+  (d?.synonyms ?? []).map((g) => g.id + ':' + g.updatedAt).join('|');
 /** показывать прогресс, если читать с диска нужно много */
 const PROGRESS_FROM = 15;
 const EMPTY: NoteFeatures = { terms: {}, forms: {} };
@@ -164,7 +167,9 @@ async function rebuild(): Promise<LinkIndex> {
       const f = c.items[n.id].f;
       return { id: n.id, f: r ? applyTermReview(f, r.drop, r.add) : f };
     });
-  const next = buildIndex(docs, { pairs });
+  // синонимы: слова группы → ключи терминов
+  const synonyms = (data?.synonyms ?? []).map((g) => g.words.map(termKey).filter((k): k is string => !!k));
+  const next = buildIndex(docs, { pairs, synonyms });
   ix = next;
   ixSig = sig;
   items = list;
@@ -175,7 +180,7 @@ async function rebuild(): Promise<LinkIndex> {
   const rare = (k: string) => (next.df.get(k) ?? 0) <= Math.max(3, Math.ceil(next.n * 0.15));
   const mentions = buildMentionIndex(
     list.filter((n) => n.kind !== 'task' && n.title.trim()).map((n) => ({ id: n.id, title: n.title })),
-    { canon: next.canon, isRare: rare },
+    { canon: next.canonLex, isRare: rare },
   );
   useLinks.setState((s) => ({ progress: null, rev: s.rev + 1, mentions }));
   return next;

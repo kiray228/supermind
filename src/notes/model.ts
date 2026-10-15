@@ -91,6 +91,18 @@ export interface NotesData {
   aiLinks?: AiLinkReview[];
   /** пары, которые человек отметил «не дубль» (id — «a|b») */
   notDup?: { id: string; updatedAt: number }[];
+  /** группы синонимов: слова одной группы связи считают одним словом */
+  synonyms?: SynonymGroup[];
+  /** пары слов, которые человек убрал из синонимов (id — «ключ|ключ»): ИИ их больше не предлагает */
+  synNo?: { id: string; updatedAt: number }[];
+}
+
+export interface SynonymGroup {
+  id: ID;
+  /** слова, как написаны («бег», «пробежка») — ключи считаются при сборке индекса */
+  words: string[];
+  by: 'ai' | 'user';
+  updatedAt: number;
 }
 
 export type NotesSort = 'updated' | 'created' | 'title';
