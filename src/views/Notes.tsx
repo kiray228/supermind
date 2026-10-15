@@ -29,6 +29,8 @@ import { SynonymsSheet } from '../notes/ui/SynonymsSheet';
 import { BrainReviewSheet } from '../notes/ui/BrainReviewSheet';
 import { TopicDigest } from '../notes/ui/TopicDigest';
 import { CardsLayer } from '../notes/ui/CardsLayer';
+import { BrainHub } from '../notes/ui/BrainHub';
+import { hubSeen, markHubSeen } from '../notes/hub';
 import { openCardsReview, todaysCards } from '../notes/cards';
 import { collectReview, markReviewSeen, reviewCount, reviewDue } from '../notes/brainReview';
 import { openAsk, useAsk } from '../notes/brainAsk';
@@ -71,6 +73,50 @@ function sortNotes(list: NoteMeta[], by: NotesSort): NoteMeta[] {
   else if (by === 'created') s.sort((a, b) => b.createdAt - a.createdAt);
   else s.sort((a, b) => b.updatedAt - a.updatedAt);
   return s;
+}
+
+/** Импорт из Obsidian: выбрать архив или файлы .md */
+async function importObsidianFiles() {
+  const { pickFiles } = await import('../io/download');
+  const files = await pickFiles('.zip,.md,text/markdown,image/*');
+  if (!files.length) return;
+  toast('Импортирую заметки…');
+  try {
+    const m = await import('../notes/obsidianImportRun');
+    const r = await m.importObsidian(files);
+    const parts = [`Добавлено заметок: ${r.created}`];
+    if (r.folders) parts.push(`папок: ${r.folders}`);
+    if (r.images) parts.push(`картинок: ${r.images}`);
+    if (r.skipped) parts.push(`уже были: ${r.skipped}`);
+    toast(parts.join(', '));
+  } catch (e) {
+    toast(e instanceof Error && e.name === 'ImportError' ? e.message : 'Не удалось импортировать заметки');
+  }
+}
+
+/** Один раз — приглашение посмотреть, что умеет второй мозг (когда заметок уже несколько) */
+function HubNudge({ count, onOpen }: { count: number; onOpen: () => void }) {
+  const [hidden, setHidden] = useState(hubSeen);
+  if (hidden || count < 3) return null;
+  return (
+    <div className="nt-rv-nudge">
+      <Brain size={18} />
+      <span className="grow">Второй мозг: связи, конспекты, карточки, дневник — что он умеет, за минуту</span>
+      <button className="nt-ai-btn" onClick={onOpen}>
+        Посмотреть
+      </button>
+      <button
+        className="icon-btn"
+        onClick={() => {
+          markHubSeen();
+          setHidden(true);
+        }}
+        aria-label="Скрыть"
+      >
+        <X size={16} />
+      </button>
+    </div>
+  );
 }
 
 /** Заметка дня: открыть (создав по шаблону) */
@@ -158,6 +204,13 @@ export default function Notes() {
   const [dupSheet, setDupSheet] = useState(false);
   const [synSheet, setSynSheet] = useState(false);
   const [reviewSheet, setReviewSheet] = useState(false);
+  const [hub, setHub] = useState(false);
+  // «Второй мозг» из поиска по приложению
+  useEffect(() => {
+    const open = () => setHub(true);
+    window.addEventListener('sm-open-brain-hub', open);
+    return () => window.removeEventListener('sm-open-brain-hub', open);
+  }, []);
 
   useEffect(() => {
     void ensureNotes().then((d) => {
@@ -400,6 +453,7 @@ export default function Notes() {
             />
           )}
           <div className="page-body nt-list" hidden={graphMode}>
+            {sel.k === 'all' && !q && <HubNudge count={data.notes.filter((n) => !n.trashed).length} onOpen={() => setHub(true)} />}
             {sel.k === 'all' && !q && <CardsNudge />}
             {sel.k === 'all' && !q && <ReviewNudge onOpen={() => setReviewSheet(true)} />}
             {isTrash && list.length > 0 && <div className="nt-trash-hint small faint">Заметки в корзине удаляются навсегда через {TRASH_DAYS} дней.</div>}
@@ -453,6 +507,19 @@ export default function Notes() {
         />
       )}
       <TopicDigest />
+      {hub && (
+        <BrainHub
+          onClose={() => setHub(false)}
+          act={{
+            graph: () => setMode('graph'),
+            ask: () => openAsk(),
+            review: () => setReviewSheet(true),
+            synonyms: () => setSynSheet(true),
+            duplicates: () => setDupSheet(true),
+            importObsidian: () => void importObsidianFiles(),
+          }}
+        />
+      )}
       <CardsLayer />
 
       {folderDlg && (
@@ -472,6 +539,7 @@ export default function Notes() {
           ))}
           <MenuSep />
           <MenuItem icon={<FolderPlus size={17} />} label="Новая папка" onClick={() => setFolderDlg({})} />
+          <MenuItem icon={<Brain size={17} />} label="Второй мозг: что умеет" onClick={() => setHub(true)} />
           <MenuItem icon={<Newspaper size={17} />} label="Статья по ссылке" onClick={() => void import('../notes/article').then((m) => m.askArticle())} />
           <MenuItem icon={<Compass size={17} />} label="Обзор мозга" onClick={() => setReviewSheet(true)} />
           <MenuItem icon={<GraduationCap size={17} />} label="Повторение карточек" onClick={openCardsReview} />
@@ -491,25 +559,7 @@ export default function Notes() {
           <MenuItem
             icon={<Upload size={17} />}
             label="Импорт из Obsidian"
-            onClick={() => {
-              void (async () => {
-                const { pickFiles } = await import('../io/download');
-                const files = await pickFiles('.zip,.md,text/markdown,image/*');
-                if (!files.length) return;
-                toast('Импортирую заметки…');
-                try {
-                  const m = await import('../notes/obsidianImportRun');
-                  const r = await m.importObsidian(files);
-                  const parts = [`Добавлено заметок: ${r.created}`];
-                  if (r.folders) parts.push(`папок: ${r.folders}`);
-                  if (r.images) parts.push(`картинок: ${r.images}`);
-                  if (r.skipped) parts.push(`уже были: ${r.skipped}`);
-                  toast(parts.join(', '));
-                } catch (e) {
-                  toast(e instanceof Error && e.name === 'ImportError' ? e.message : 'Не удалось импортировать заметки');
-                }
-              })();
-            }}
+            onClick={() => void importObsidianFiles()}
           />
           {curFolder && <MenuItem icon={<Pencil size={17} />} label="Изменить папку" onClick={() => setFolderDlg({ id: curFolder.id })} />}
           {sel.k === 'trash' && counts.trash > 0 && (

@@ -3,12 +3,12 @@
  * дубли, длинные заметки (разбить по разделам) и темы для конспекта. Правила — reviewCore.ts.
  */
 import type { ID } from '../types';
-import { normTitle, relatedTo } from './links';
+import { normTitle } from './links';
 import { newBlock, type Block } from './model';
 import { type Forgotten, LONG_WORDS, linkableTitle, RECENT_DAYS, reviewFindings, splitByHeadings } from './reviewCore';
 import { allDuplicates } from './mentionsRuntime';
 import { brainTopics, type BrainTopic } from './digest';
-import { brainItems, ensureLinkIndex, rawFeatures } from './related';
+import { brainGraph, brainItems, ensureLinkIndex, rawFeatures } from './related';
 import { createNote, editOpenBody, flushNotes, loadNoteBody, saveNoteBody, useNotes } from './store';
 
 const DAY = 86400000;
@@ -35,7 +35,14 @@ export interface BrainReview {
 /** Собрать обзор */
 export async function collectReview(now = Date.now()): Promise<BrainReview> {
   await flushNotes();
-  const ix = await ensureLinkIndex();
+  // связи — из графа (он считается один раз и обновляется по частям), а не заново для каждой заметки
+  const { edges } = await brainGraph();
+  const near = new Map<string, { id: string; score: number }[]>();
+  for (const e of edges) {
+    (near.get(e.a) ?? near.set(e.a, []).get(e.a)!).push({ id: e.b, score: e.score });
+    (near.get(e.b) ?? near.set(e.b, []).get(e.b)!).push({ id: e.a, score: e.score });
+  }
+  for (const list of near.values()) list.sort((x, y) => y.score - x.score);
   const notes = (useNotes.getState().data?.notes ?? []).filter((n) => !n.trashed);
   const items = brainItems();
   // названия, на которые есть [[ссылки]], и записи, в которых они есть
@@ -48,12 +55,7 @@ export async function collectReview(now = Date.now()): Promise<BrainReview> {
   }
   const recent = new Map<string, number>();
   for (const it of items) if (it.at > now - RECENT_DAYS * DAY) recent.set(it.id, it.at);
-  const relCache = new Map<string, string[]>();
-  const related = (id: string) => {
-    let r = relCache.get(id);
-    if (!r) relCache.set(id, (r = relatedTo(ix, id).map((x) => x.id)));
-    return r;
-  };
+  const related = (id: string) => (near.get(id) ?? []).map((x) => x.id);
   const found = reviewFindings({
     notes: notes.map((n) => ({ id: n.id, title: n.title, updatedAt: n.updatedAt, wordCount: n.wordCount ?? 0 })),
     related,

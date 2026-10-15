@@ -3,6 +3,7 @@
  * Сначала бесплатный разбор на устройстве; если фраза непонятна — бесплатная модель на сервере (если подключена).
  */
 import { parseVoice, type VoiceAction } from './intent';
+import { buildSplitPrompt, forcedSplit, isLongDictation, parseSplit, SPLIT_SYSTEM } from './dictation';
 import { api, useCloud } from '../store/cloud';
 import { addTask, ensureTasks, openTask, purgeTask } from '../tasks/store';
 import { repeatLabel, type Priority, type RepeatRule } from '../tasks/model';
@@ -10,6 +11,7 @@ import { addTransaction, deleteTransaction, ensureFinance } from '../finance/sto
 import { fmtMoney, sortedAccounts, sortedCategories, toMain, type FinancePrefs } from '../finance/model';
 import { answer, dayLabel, findDone, markDone, type Done } from './answers';
 import { createNote, ensureNotes, openNote, purgeNote } from '../notes/store';
+import { markdownToBlocks } from '../notes/model';
 import { loadPlanner, savePlanner } from '../store/db';
 import { HABIT_LIBRARY } from '../habits/library';
 import { cleanHabit, HABIT_COLORS } from '../habits/model';
@@ -148,10 +150,35 @@ export function fromAi(raw: unknown): VoiceAction | null {
   }
 }
 
+/** Разложить мысль ИИ (свой ключ Claude или модель на сервере). Не получилось — [] */
+async function splitDictation(text: string): Promise<VoiceAction[]> {
+  try {
+    const { hasOwnKey, streamText } = await import('../ai/claude');
+    if (!hasOwnKey() && !useCloud.getState().account) return [];
+    const answer = await streamText({ system: SPLIT_SYSTEM, messages: [{ role: 'user', content: buildSplitPrompt(text) }], effort: 'low', signal: AbortSignal.timeout(30000) });
+    return parseSplit(answer);
+  } catch {
+    return [];
+  }
+}
+
 /** Понять фразу: на устройстве, при неуверенности — у модели на сервере */
 export async function interpret(text: string): Promise<{ actions: VoiceAction[]; via: 'local' | 'ai' }> {
+  // «Разбери: …» — разложить на заметку, задачи и дневник даже короткую фразу
+  const forced = forcedSplit(text);
+  if (forced) {
+    const acts = await splitDictation(forced);
+    if (acts.length) return { actions: acts, via: 'ai' };
+  }
   const ctx = await context();
   const local = parseVoice(text, ctx);
+  // длинная мысль — не команда: ИИ разложит её на заметку, задачи и запись в дневник
+  // (кроме явных «запиши заметку», «в дневник», трат, привычек и вопросов — там человек сам сказал, что это)
+  const explicit = local.actions.some((a) => a.type === 'add_note' || a.type === 'add_journal' || a.type === 'add_transaction' || a.type === 'add_habit' || a.type === 'ask');
+  if (isLongDictation(text) && !explicit) {
+    const acts = await splitDictation(text);
+    if (acts.length) return { actions: acts, via: 'ai' };
+  }
   if (local.confident && local.actions.length) return { actions: local.actions, via: 'local' };
   // «выпил стакан воды» — если похоже на привычку, отмечаем без ИИ
   const md = local.actions[0];
@@ -347,7 +374,7 @@ export async function execute(a: VoiceAction): Promise<Done> {
     }
     case 'add_note': {
       await ensureNotes();
-      const n = createNote({ title: a.title, blocks: a.text && a.text !== a.title ? [{ id: uid(), type: 'p', text: a.text }] : [] });
+      const n = createNote({ title: a.title, blocks: a.text && a.text !== a.title ? (/\n/.test(a.text) ? markdownToBlocks(a.text) : [{ id: uid(), type: 'p', text: a.text }]) : [] });
       if (!n) return { ok: false, label: 'Заметка', title: a.title, meta: 'Не удалось создать' };
       return {
         ok: true,

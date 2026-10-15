@@ -76,6 +76,17 @@ export function buildCommands(): Entry[] {
       },
     }),
     entry({
+      key: 'c:brain-hub',
+      kind: 'cmd',
+      title: 'Второй мозг: что умеет',
+      emoji: '🧠',
+      body: 'второй мозг возможности функции связи граф конспект карточки дневник обзор справка помощь',
+      run: async () => {
+        await nav('notes');
+        setTimeout(() => window.dispatchEvent(new Event('sm-open-brain-hub')), 200);
+      },
+    }),
+    entry({
       key: 'c:save-article',
       kind: 'cmd',
       title: 'Сохранить статью по ссылке',

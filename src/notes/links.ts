@@ -628,14 +628,97 @@ export interface LinkDoc {
   f: NoteFeatures;
 }
 
+/** Словарь терминов индекса (только растёт) */
+export interface TermDict {
+  key: string[];
+  idOf: Map<string, number>;
+  /** 1 — словосочетание */
+  big: Uint8Array | number[];
+  /** длина ключа (для правила «одно общее слово — только длинное») */
+  len: number[];
+}
+
+function termId(t: TermDict, k: string): number {
+  let id = t.idOf.get(k);
+  if (id === undefined) {
+    id = t.key.length;
+    t.key.push(k);
+    t.idOf.set(k, id);
+    (t.big as number[]).push(k.includes(BIGRAM_SEP) ? 1 : 0);
+    t.len.push(k.length);
+  }
+  return id;
+}
+
+/**
+ * Веса терминов записи как «только для чтения» Map: поверх отсортированных номеров терминов и весов.
+ * Отдельная Map на запись с сотнями строковых ключей на большой базе — сотни мегабайт.
+ */
+export class Weights {
+  private readonly t: TermDict;
+  private readonly tid: Int32Array;
+  private readonly tw: Float32Array;
+  constructor(t: TermDict, tid: Int32Array, tw: Float32Array) {
+    this.t = t;
+    this.tid = tid;
+    this.tw = tw;
+  }
+  get size(): number {
+    return this.tid.length;
+  }
+  private at(k: string): number {
+    const id = this.t.idOf.get(k);
+    if (id === undefined) return -1;
+    let lo = 0;
+    let hi = this.tid.length - 1;
+    while (lo <= hi) {
+      const m = (lo + hi) >> 1;
+      const v = this.tid[m];
+      if (v === id) return m;
+      if (v < id) lo = m + 1;
+      else hi = m - 1;
+    }
+    return -1;
+  }
+  get(k: string): number | undefined {
+    const i = this.at(k);
+    return i < 0 ? undefined : this.tw[i];
+  }
+  has(k: string): boolean {
+    return this.at(k) >= 0;
+  }
+  *keys(): IterableIterator<string> {
+    for (let i = 0; i < this.tid.length; i++) yield this.t.key[this.tid[i]];
+  }
+  *entries(): IterableIterator<[string, number]> {
+    for (let i = 0; i < this.tid.length; i++) yield [this.t.key[this.tid[i]], this.tw[i]];
+  }
+  [Symbol.iterator](): IterableIterator<[string, number]> {
+    return this.entries();
+  }
+}
+
+/** Записи со словом: номера записей (в ix.ids) и веса — по убыванию веса */
+export interface Posting {
+  d: Int32Array;
+  w: Float32Array;
+}
+
 interface DocVec {
   id: string;
+  /** номер записи в ix.ids */
+  i: number;
+  /** сколько разных слов (без словосочетаний) */
+  words: number;
   f: NoteFeatures;
-  /** термин → вес TF-IDF (нормирован: длина вектора = 1) */
-  w: Map<string, number>;
-  /** термин → частота (формы с беглой гласной слиты) */
-  tf: Map<string, number>;
-  /** ключ в индексе → исходный ключ заметки (как показать слово: «пробежка», а не ключ группы синонимов) */
+  /** термин → вес TF-IDF (нормирован: длина вектора = 1); поверх tid/tw — без своей памяти */
+  w: Weights;
+  /** тот же вектор для быстрых сравнений: номера терминов по возрастанию и их веса */
+  tid: Int32Array;
+  tw: Float32Array;
+  /** частота термина (формы слиты) — по тем же местам, что tid */
+  tc: Uint16Array;
+  /** ключ в индексе → исходный ключ заметки, если они разные (как показать слово: «пробежка», а не ключ группы синонимов) */
   rawOf: Map<string, string>;
   titleKey?: string;
   /** самые весомые термины с непустым списком заметок — для поиска кандидатов (считаются при первом запросе) */
@@ -646,8 +729,20 @@ export interface LinkIndex {
   n: number;
   docs: Map<string, DocVec>;
   df: Map<string, number>;
-  /** термин → заметки, где он есть, с весом */
-  post: Map<string, { id: string; w: number }[]>;
+  /** номер записи → id (у удалённых при обновлении — пустая строка) */
+  ids: string[];
+  /** словарь терминов: номер ↔ ключ, словосочетание ли, длина ключа */
+  terms: TermDict;
+  /** обновлён по сравнению с base точечно: изменённые записи (для пересчёта графа по частям) */
+  base?: LinkIndex;
+  changed?: Set<string>;
+  /** сколько точечных обновлений после полной сборки */
+  patches: number;
+  /** исходные признаки записей — для точечного обновления */
+  items: Map<string, NoteFeatures>;
+  opts: IndexOpts;
+  /** термин → записи, где он есть (компактно, по убыванию веса) */
+  post: Map<string, Posting>;
   /** ключ названия → заметки с таким названием (только названия, упоминание которых что-то значит) */
   titles: Map<string, string[]>;
   /** ключ названия → заметки, где он встречается в тексте */
@@ -724,7 +819,8 @@ export function synonymMap(groups: string[][], norm: (k: string) => string = (k)
   return out;
 }
 
-export function buildIndex(items: LinkDoc[], opts: IndexOpts = {}): LinkIndex {
+/** Канонизация ключей индекса: беглая гласная и синонимы (canon) и только беглая гласная (canonLex) */
+function canonizers(items: LinkDoc[], opts: IndexOpts) {
   const vocab = new Set<string>();
   for (const it of items) for (const k in it.f.terms) if (!k.includes(BIGRAM_SEP)) vocab.add(k);
   const alias = fleetingAliases(vocab);
@@ -735,74 +831,109 @@ export function buildIndex(items: LinkDoc[], opts: IndexOpts = {}): LinkIndex {
     const l = lexOne(p);
     return syn.get(l) ?? l;
   };
-  const memo = new Map<string, string>();
-  const memoLex = new Map<string, string>();
-  const make = (f: (p: string) => string, m: Map<string, string>, active: boolean) => (k: string) => {
-    if (!active) return k;
-    let c = m.get(k);
-    if (c === undefined) {
-      c = k.includes(BIGRAM_SEP) ? k.split(BIGRAM_SEP).map(f).join(BIGRAM_SEP) : f(k);
-      m.set(k, c);
-    }
-    return c;
-  };
-  const canonLex = make(lexOne, memoLex, alias.size > 0);
-  const canon = make(one, memo, alias.size > 0 || syn.size > 0);
-
-  // термины с учётом слияния форм
-  const docs = new Map<string, DocVec>();
-  const df = new Map<string, number>();
-  const raw: { id: string; f: NoteFeatures; tf: Map<string, number>; rawOf: Map<string, string>; titleKey?: string }[] = [];
-  const seenIds = new Set<string>();
-  for (const it of items) {
-    if (seenIds.has(it.id)) continue;
-    seenIds.add(it.id);
-    const tf = new Map<string, number>();
-    const rawOf = new Map<string, string>();
-    for (const k in it.f.terms) {
-      const c = canon(k);
-      const prev = rawOf.get(c);
-      if (prev === undefined || it.f.terms[k] > it.f.terms[prev]) rawOf.set(c, k);
-      tf.set(c, (tf.get(c) ?? 0) + it.f.terms[k]);
-    }
-    if (!tf.size) continue;
-    for (const k of tf.keys()) df.set(k, (df.get(k) ?? 0) + 1);
-    raw.push({ id: it.id, f: it.f, tf, rawOf, titleKey: it.f.titleKey ? canon(it.f.titleKey) : undefined });
-  }
-  const n = raw.length;
-
-  const post = new Map<string, { id: string; w: number }[]>();
-  for (const r of raw) {
-    const w = new Map<string, number>();
-    let norm = 0;
-    for (const [k, c] of r.tf) {
-      // термин из одной заметки весит как из двух — опечатки и редкие слова не «размывают» вектор
-      const idf = Math.log(1 + n / Math.max(df.get(k)!, 2));
-      const v = (1 + Math.log(c)) * idf * (k.includes(BIGRAM_SEP) ? BIGRAM_BOOST : 1);
-      w.set(k, v);
-      norm += v * v;
-    }
-    norm = Math.sqrt(norm) || 1;
-    for (const [k, v] of w) {
-      const nv = v / norm;
-      w.set(k, nv);
-      // слово из одной заметки ни с чем не связывает; слово почти из всех — почти ничего не значит
-      const dk = df.get(k)!;
-      if (dk > 1 && (n < 20 || dk <= n * 0.5)) {
-        let p = post.get(k);
-        if (!p) post.set(k, (p = []));
-        p.push({ id: r.id, w: nv });
+  const make = (f: (p: string) => string, active: boolean) => {
+    const m = new Map<string, string>();
+    return (k: string) => {
+      if (!active) return k;
+      let c = m.get(k);
+      if (c === undefined) {
+        c = k.includes(BIGRAM_SEP) ? k.split(BIGRAM_SEP).map(f).join(BIGRAM_SEP) : f(k);
+        m.set(k, c);
       }
-    }
-    docs.set(r.id, { id: r.id, f: r.f, w, tf: r.tf, rawOf: r.rawOf, titleKey: r.titleKey });
-  }
+      return c;
+    };
+  };
+  return { canon: make(one, alias.size > 0 || syn.size > 0), canonLex: make(lexOne, alias.size > 0) };
+}
 
-  // названия и где они упоминаются — чтобы не перебирать все заметки при каждом запросе
+interface RawDoc {
+  id: string;
+  f: NoteFeatures;
+  tf: Map<string, number>;
+  rawOf: Map<string, string>;
+  titleKey?: string;
+}
+
+/** Термины записи в ключах индекса (формы слиты) */
+function rawDoc(it: LinkDoc, canon: (k: string) => string): RawDoc | null {
+  const tf = new Map<string, number>();
+  const rawOf = new Map<string, string>();
+  const terms = it.f.terms;
+  for (const k in terms) {
+    const c = canon(k);
+    // как показывать слово — только если ключ в индексе другой (иначе ключ и есть исходный)
+    if (k !== c) {
+      const prev = rawOf.get(c) ?? (terms[c] !== undefined ? c : undefined);
+      if (prev === undefined || terms[k] > terms[prev]) rawOf.set(c, k);
+    }
+    tf.set(c, (tf.get(c) ?? 0) + terms[k]);
+  }
+  for (const [c, k] of rawOf) if (terms[c] !== undefined && terms[c] >= terms[k]) rawOf.delete(c);
+  if (!tf.size) return null;
+  return { id: it.id, f: it.f, tf, rawOf, titleKey: it.f.titleKey ? canon(it.f.titleKey) : undefined };
+}
+
+/** Слово попадает в списки «слово → записи»: не из одной записи и не почти из всех */
+const postable = (n: number, dk: number) => dk > 1 && (n < 20 || dk <= n * 0.5);
+
+/** Вектор записи: TF-IDF, нормированный, и он же — в числовых массивах */
+function docVec(r: RawDoc, i: number, n: number, df: Map<string, number>, terms: TermDict): DocVec {
+  const w = new Map<string, number>();
+  let norm = 0;
+  for (const [k, c] of r.tf) {
+    // термин из одной заметки весит как из двух — опечатки и редкие слова не «размывают» вектор
+    const idf = Math.log(1 + n / Math.max(df.get(k) ?? 1, 2));
+    const v = (1 + Math.log(c)) * idf * (k.includes(BIGRAM_SEP) ? BIGRAM_BOOST : 1);
+    w.set(k, v);
+    norm += v * v;
+  }
+  norm = Math.sqrt(norm) || 1;
+  const pairs: [number, number][] = [];
+  let words = 0;
+  for (const [k, v] of w) {
+    const nv = v / norm;
+    w.set(k, nv);
+    pairs.push([termId(terms, k), nv]);
+    if (!k.includes(BIGRAM_SEP)) words++;
+  }
+  pairs.sort((x, y) => x[0] - y[0]);
+  const tid = new Int32Array(pairs.length);
+  const tw = new Float32Array(pairs.length);
+  const tc = new Uint16Array(pairs.length);
+  for (let j = 0; j < pairs.length; j++) {
+    tid[j] = pairs[j][0];
+    tw[j] = pairs[j][1];
+    tc[j] = Math.min(65535, r.tf.get(terms.key[pairs[j][0]])!);
+  }
+  return { id: r.id, i, words, f: r.f, w: new Weights(terms, tid, tw), tid, tw, tc, rawOf: r.rawOf, titleKey: r.titleKey };
+}
+
+/** Частота термина в записи (0 — нет) */
+function tfOf(ix: LinkIndex, d: DocVec, k: string): number {
+  const t = ix.terms.idOf.get(k);
+  if (t === undefined) return 0;
+  let lo = 0;
+  let hi = d.tid.length - 1;
+  while (lo <= hi) {
+    const m = (lo + hi) >> 1;
+    if (d.tid[m] === t) return d.tc[m];
+    if (d.tid[m] < t) lo = m + 1;
+    else hi = m - 1;
+  }
+  return 0;
+}
+
+/** Названия, упоминание которых что-то значит, и записи, где они встречаются */
+function titleMaps(docs: Map<string, DocVec>, n: number, df: Map<string, number>) {
   const titles = new Map<string, string[]>();
   for (const d of docs.values()) if (d.titleKey && mentionableKey(n, df, d.titleKey)) push(titles, d.titleKey, d.id);
   const holders = new Map<string, string[]>();
   for (const d of docs.values()) for (const k of d.w.keys()) if (titles.has(k)) push(holders, k, d.id);
-  // решения по парам — только для заметок, которые есть в индексе
+  return { titles, holders };
+}
+
+/** Решения по парам — только для записей, которые есть в индексе */
+function pairMaps(docs: Map<string, DocVec>, opts: IndexOpts) {
   const pairs = new Map<string, boolean>();
   const forced = new Map<string, string[]>();
   for (const [k, ok] of opts.pairs ?? []) {
@@ -814,7 +945,244 @@ export function buildIndex(items: LinkDoc[], opts: IndexOpts = {}): LinkIndex {
       push(forced, b, a);
     }
   }
-  return { n, docs, df, post, titles, holders, pairs, forced, canon, canonLex };
+  return { pairs, forced };
+}
+
+/** Полная сборка индекса по шагам: yield — можно отдать управление экрану */
+function* buildSteps(items: LinkDoc[], opts: IndexOpts): Generator<void, LinkIndex> {
+  const { canon, canonLex } = canonizers(items, opts);
+  yield;
+  const df = new Map<string, number>();
+  const raw: RawDoc[] = [];
+  const seenIds = new Set<string>();
+  const src = new Map<string, NoteFeatures>();
+  for (let j = 0; j < items.length; j++) {
+    const it = items[j];
+    if (seenIds.has(it.id)) continue;
+    seenIds.add(it.id);
+    src.set(it.id, it.f);
+    const r = rawDoc(it, canon);
+    if (r) {
+      for (const k of r.tf.keys()) df.set(k, (df.get(k) ?? 0) + 1);
+      raw.push(r);
+    }
+    if (j % 200 === 199) yield;
+  }
+  const n = raw.length;
+  const terms: TermDict = { key: [], idOf: new Map(), big: [], len: [] };
+  const docs = new Map<string, DocVec>();
+  const ids = raw.map((r) => r.id);
+  const postTmp = new Map<string, { d: number[]; w: number[] }>();
+  for (let ri = 0; ri < raw.length; ri++) {
+    const d = docVec(raw[ri], ri, n, df, terms);
+    docs.set(d.id, d);
+    for (const [k, nv] of d.w) {
+      if (!postable(n, df.get(k)!)) continue;
+      let p = postTmp.get(k);
+      if (!p) postTmp.set(k, (p = { d: [], w: [] }));
+      p.d.push(ri);
+      p.w.push(nv);
+    }
+    if (ri % 150 === 149) yield;
+  }
+  const post = new Map<string, Posting>();
+  let j = 0;
+  for (const [k, p] of postTmp) {
+    post.set(k, posting(p.d, p.w));
+    if (++j % 2000 === 0) yield;
+  }
+  const { titles, holders } = titleMaps(docs, n, df);
+  const { pairs, forced } = pairMaps(docs, opts);
+  return { n, docs, df, ids, terms, post, titles, holders, pairs, forced, canon, canonLex, patches: 0, items: src, opts };
+}
+
+export function buildIndex(items: LinkDoc[], opts: IndexOpts = {}): LinkIndex {
+  const g = buildSteps(items, opts);
+  let r = g.next();
+  while (!r.done) r = g.next();
+  return r.value;
+}
+
+/** Полная сборка, не замораживая экран: порциями по ~budget мс */
+export async function buildIndexAsync(items: LinkDoc[], opts: IndexOpts = {}, budget = 12): Promise<LinkIndex> {
+  const g = buildSteps(items, opts);
+  let t = performance.now();
+  let r = g.next();
+  while (!r.done) {
+    if (performance.now() - t > budget) {
+      await new Promise((res) => setTimeout(res, 0));
+      t = performance.now();
+    }
+    r = g.next();
+  }
+  return r.value;
+}
+
+/**
+ * Точечное обновление после правки нескольких записей: их векторы и списки «слово → записи» — заново,
+ * остальные записи — как были (веса слов у них чуть устаревают; полная сборка — когда правок наберётся много).
+ * null — правок слишком много или изменились решения по парам/синонимы: нужна полная сборка.
+ */
+export function patchIndex(prev: LinkIndex, items: LinkDoc[], opts: IndexOpts = {}): LinkIndex | null {
+  if (sameOpts(prev.opts, opts) === false) return null;
+  const next = new Map(items.map((it) => [it.id, it.f]));
+  const changed: LinkDoc[] = [];
+  const removed: string[] = [];
+  for (const it of items) if (prev.items.get(it.id) !== it.f) changed.push(it);
+  for (const id of prev.items.keys()) if (!next.has(id)) removed.push(id);
+  const touched = changed.length + removed.length;
+  if (!touched) return prev;
+  const limit = Math.max(10, Math.ceil(prev.n * 0.02));
+  if (touched > limit || prev.patches + touched > Math.max(60, prev.n * 0.1) || prev.n < 50) return null;
+
+  const df = new Map(prev.df);
+  const docs = new Map(prev.docs);
+  const ids = prev.ids.slice();
+  const affected = new Set<string>();
+  const drop = (id: string) => {
+    const d = docs.get(id);
+    if (!d) return;
+    for (const t of d.tid) {
+      const k = prev.terms.key[t];
+      df.set(k, (df.get(k) ?? 1) - 1);
+      if (df.get(k)! <= 0) df.delete(k);
+      affected.add(k);
+    }
+    docs.delete(id);
+    ids[d.i] = '';
+  };
+  for (const id of removed) drop(id);
+  const raws: RawDoc[] = [];
+  for (const it of changed) {
+    const old = docs.get(it.id);
+    drop(it.id);
+    const r = rawDoc(it, prev.canon);
+    if (!r) continue;
+    for (const k of r.tf.keys()) {
+      df.set(k, (df.get(k) ?? 0) + 1);
+      affected.add(k);
+    }
+    raws.push(r);
+    // место в ids: прежнее или новое в конце
+    if (old) ids[old.i] = it.id;
+  }
+  const n = docs.size + raws.length;
+  for (const r of raws) {
+    let i = ids.indexOf(r.id);
+    if (i < 0) i = ids.push(r.id) - 1;
+    docs.set(r.id, docVec(r, i, n, df, prev.terms));
+  }
+  // списки «слово → записи» для затронутых слов: без прежних версий изменённых записей + новые — на своё место
+  // (список уже упорядочен по весу — вставка, а не сортировка заново)
+  const post = new Map(prev.post);
+  const gone = new Set([...removed, ...changed.map((c) => c.id)]);
+  const goneI = new Set<number>();
+  for (const id of gone) {
+    const d = prev.docs.get(id);
+    if (d) goneI.add(d.i);
+  }
+  for (const k of affected) {
+    if (!postable(n, df.get(k) ?? 0)) {
+      post.delete(k);
+      continue;
+    }
+    const add: [number, number][] = [];
+    for (const r of raws) {
+      const v = docs.get(r.id)!;
+      const nv = v.w.get(k);
+      if (nv !== undefined) add.push([v.i, nv]);
+    }
+    add.sort((x, y) => y[1] - x[1] || x[0] - y[0]);
+    const old = prev.post.get(k);
+    const len = (old?.d.length ?? 0) + add.length;
+    const d = new Int32Array(len);
+    const w = new Float32Array(len);
+    let o = 0;
+    let a = 0;
+    let m = 0;
+    const oldLen = old?.d.length ?? 0;
+    while (o < oldLen || a < add.length) {
+      if (o < oldLen && goneI.has(old!.d[o])) {
+        o++;
+        continue;
+      }
+      if (a < add.length && (o >= oldLen || add[a][1] > old!.w[o])) {
+        d[m] = add[a][0];
+        w[m++] = add[a++][1];
+      } else {
+        d[m] = old!.d[o];
+        w[m++] = old!.w[o++];
+      }
+    }
+    if (m) post.set(k, { d: d.subarray(0, m), w: w.subarray(0, m) });
+    else post.delete(k);
+  }
+  const titles = new Map<string, string[]>();
+  for (const d of docs.values()) if (d.titleKey && mentionableKey(n, df, d.titleKey)) push(titles, d.titleKey, d.id);
+  const fresh = new Set(raws.map((r) => r.id));
+  const holders = new Map<string, string[]>();
+  for (const k of titles.keys()) {
+    const old = prev.titles.has(k) ? prev.holders.get(k) : undefined;
+    if (old !== undefined || prev.titles.has(k)) {
+      // прежнее название: прежние записи без изменённых + изменённые, где оно есть
+      const list = (old ?? []).filter((id) => !gone.has(id));
+      for (const id of fresh) if (docs.get(id)!.w.has(k)) list.push(id);
+      if (list.length) holders.set(k, list);
+    } else {
+      // новое название — где оно встречается (по списку «слово → записи», а если слова в нём нет — по всем)
+      const p = post.get(k);
+      const list = p ? Array.from(p.d, (i) => ids[i]).filter((id) => id && docs.has(id)) : [...docs.values()].filter((d) => d.w.has(k)).map((d) => d.id);
+      if (list.length) holders.set(k, list);
+    }
+  }
+  const { pairs, forced } = pairMaps(docs, opts);
+  return {
+    n,
+    docs,
+    df,
+    ids,
+    terms: prev.terms,
+    post,
+    titles,
+    holders,
+    pairs,
+    forced,
+    canon: prev.canon,
+    canonLex: prev.canonLex,
+    base: prev,
+    changed: new Set([...gone, ...raws.map((r) => r.id)]),
+    patches: prev.patches + touched,
+    items: next,
+    opts,
+  };
+}
+
+/** Решения по парам и синонимы те же (иначе — полная сборка) */
+function sameOpts(a: IndexOpts, b: IndexOpts): boolean {
+  const pa = a.pairs ?? new Map();
+  const pb = b.pairs ?? new Map();
+  if (pa.size !== pb.size) return false;
+  for (const [k, v] of pa) if (pb.get(k) !== v) return false;
+  return JSON.stringify(a.synonyms ?? []) === JSON.stringify(b.synonyms ?? []);
+}
+
+/** Список записей со словом — в типизированных массивах, по убыванию веса */
+function posting(d: number[], w: number[]): Posting {
+  const order = d.map((_, i) => i).sort((x, y) => w[y] - w[x] || d[x] - d[y]);
+  const out: Posting = { d: new Int32Array(order.length), w: new Float32Array(order.length) };
+  for (let i = 0; i < order.length; i++) {
+    out.d[i] = d[order[i]];
+    out.w[i] = w[order[i]];
+  }
+  return out;
+}
+
+/** Рабочие массивы на размер индекса (одни на индекс — без выделения памяти при каждом запросе) */
+const scratchMem = new WeakMap<LinkIndex, { acc: Float64Array; touched: Int32Array; mark: Uint8Array }>();
+function scratchOf(ix: LinkIndex) {
+  let s = scratchMem.get(ix);
+  if (!s) scratchMem.set(ix, (s = { acc: new Float64Array(ix.ids.length), touched: new Int32Array(ix.ids.length), mark: new Uint8Array(ix.ids.length) }));
+  return s;
 }
 
 function push<K, V>(m: Map<K, V[]>, k: K, v: V) {
@@ -905,6 +1273,62 @@ function sharedTerms(a: DocVec, b: DocVec, max = 4): string[] {
 /** по скольким самым весомым словам заметки ищутся кандидаты и сколько из них оцениваются точно */
 const QUERY_TERMS = 48;
 const CANDIDATES = 60;
+/**
+ * сколько записей с самым большим весом слова просматривать для кандидатов: у частого слова
+ * их тысячи, а вклад «слабых» в близость мал (точная оценка — потом, по кандидатам)
+ */
+const POST_CAP = 300;
+
+/** Кандидаты в связанные: приближённая близость по самым весомым словам, лучшие limit */
+function candidatesOf(ix: LinkIndex, a: DocVec, limit: number): string[] {
+  const { acc, touched } = scratchOf(ix);
+  let nt = 0;
+  for (const k of topTerms(ix, a)) {
+    const w = a.w.get(k)!;
+    const p = ix.post.get(k);
+    if (!p) continue;
+    const lim = Math.min(p.d.length, POST_CAP);
+    for (let j = 0; j < lim; j++) {
+      const di = p.d[j];
+      if (di === a.i) continue;
+      if (acc[di] === 0) touched[nt++] = di;
+      acc[di] += w * p.w[j];
+    }
+  }
+  // лучшие limit — куча на limit элементов, без сортировки всех
+  const heap: number[] = [];
+  const less = (x: number, y: number) => acc[x] < acc[y] || (acc[x] === acc[y] && x > y);
+  const down = (i: number) => {
+    for (;;) {
+      const l = 2 * i + 1;
+      const r = l + 1;
+      let m = i;
+      if (l < heap.length && less(heap[l], heap[m])) m = l;
+      if (r < heap.length && less(heap[r], heap[m])) m = r;
+      if (m === i) return;
+      [heap[i], heap[m]] = [heap[m], heap[i]];
+      i = m;
+    }
+  };
+  for (let j = 0; j < nt; j++) {
+    const di = touched[j];
+    if (heap.length < limit) {
+      heap.push(di);
+      for (let i = heap.length - 1; i > 0; ) {
+        const pa = (i - 1) >> 1;
+        if (!less(heap[i], heap[pa])) break;
+        [heap[i], heap[pa]] = [heap[pa], heap[i]];
+        i = pa;
+      }
+    } else if (less(heap[0], di)) {
+      heap[0] = di;
+      down(0);
+    }
+  }
+  heap.sort((x, y) => acc[y] - acc[x] || x - y);
+  for (let j = 0; j < nt; j++) acc[touched[j]] = 0;
+  return heap.map((i) => ix.ids[i]).filter(Boolean);
+}
 
 function topTerms(ix: LinkIndex, a: DocVec): string[] {
   a.top ??= [...a.w.entries()]
@@ -929,20 +1353,30 @@ function mentionsOf(ix: LinkIndex, a: DocVec): Set<string> {
 }
 
 /** Точная близость пары: скалярное произведение, число общих слов, есть ли общее словосочетание, самое длинное общее слово */
-function pairStats(a: DocVec, b: DocVec): { dot: number; words: number; phrase: boolean; longest: number } {
-  const [small, big] = a.w.size <= b.w.size ? [a.w, b.w] : [b.w, a.w];
+function pairStats(ix: LinkIndex, a: DocVec, b: DocVec): { dot: number; words: number; phrase: boolean; longest: number } {
+  const { big, len } = ix.terms;
+  const at = a.tid;
+  const bt = b.tid;
+  let i = 0;
+  let j = 0;
   let dot = 0;
   let words = 0;
   let phrase = false;
   let longest = 0;
-  for (const [k, w] of small) {
-    const wb = big.get(k);
-    if (wb === undefined) continue;
-    dot += w * wb;
-    if (k.includes(BIGRAM_SEP)) phrase = true;
+  while (i < at.length && j < bt.length) {
+    const x = at[i];
+    const y = bt[j];
+    if (x < y) i++;
+    else if (x > y) j++;
     else {
-      words++;
-      longest = Math.max(longest, k.length);
+      dot += a.tw[i] * b.tw[j];
+      if (big[x]) phrase = true;
+      else {
+        words++;
+        if (len[x] > longest) longest = len[x];
+      }
+      i++;
+      j++;
     }
   }
   return { dot, words, phrase, longest };
@@ -961,17 +1395,7 @@ interface Scored {
 /** Связи заметки без причин (их считать дороже) — самые сильные первыми */
 function scored(ix: LinkIndex, a: DocVec, min: number, raw = false, loose = false): Scored[] {
   // кандидаты — по самым весомым словам (приближённо), затем точная оценка
-  const approx = new Map<string, number>();
-  for (const k of topTerms(ix, a)) {
-    const w = a.w.get(k)!;
-    for (const e of ix.post.get(k)!) if (e.id !== a.id) approx.set(e.id, (approx.get(e.id) ?? 0) + w * e.w);
-  }
-  const cands = new Set(
-    [...approx.entries()]
-      .sort((x, y) => y[1] - x[1])
-      .slice(0, CANDIDATES)
-      .map((x) => x[0]),
-  );
+  const cands = new Set(candidatesOf(ix, a, CANDIDATES));
   const mentions = mentionsOf(ix, a);
   for (const id of mentions) cands.add(id);
   if (!raw) for (const id of ix.forced.get(a.id) ?? []) cands.add(id);
@@ -980,7 +1404,7 @@ function scored(ix: LinkIndex, a: DocVec, min: number, raw = false, loose = fals
   for (const bid of cands) {
     const verdict = raw ? undefined : ix.pairs.get(pairKey(a.id, bid));
     if (verdict === false) continue;
-    const st = pairStats(a, ix.docs.get(bid)!);
+    const st = pairStats(ix, a, ix.docs.get(bid)!);
     const mention = mentions.has(bid);
     const score = Math.min(1, st.dot + (mention ? MENTION_BONUS : 0));
     // подтверждённая связь остаётся, даже если общих слов мало
@@ -1018,7 +1442,7 @@ export function keywordsOf(ix: LinkIndex, id: string, max = 6): string[] {
   if (!d) return [];
   const list = [...d.w.entries()].sort((x, y) => y[1] - x[1] || (x[0] < y[0] ? -1 : 1)).map((x) => x[0]);
   // словосочетание — только если встречается больше одного раза или в нескольких заметках
-  return pickTerms(list, max, (k) => !k.includes(BIGRAM_SEP) || (d.tf.get(k) ?? 0) >= 2 || (ix.df.get(k) ?? 0) >= 2).map((k) => displayForm(d, k));
+  return pickTerms(list, max, (k) => !k.includes(BIGRAM_SEP) || tfOf(ix, d, k) >= 2 || (ix.df.get(k) ?? 0) >= 2).map((k) => displayForm(d, k));
 }
 
 /**
@@ -1133,16 +1557,6 @@ export interface SearchHit {
 }
 
 /** Полный обратный индекс (со словами из одной записи — они самые точные при поиске) */
-const fullPost = new WeakMap<LinkIndex, Map<string, { id: string; w: number }[]>>();
-function postingsAll(ix: LinkIndex): Map<string, { id: string; w: number }[]> {
-  let p = fullPost.get(ix);
-  if (!p) {
-    p = new Map();
-    for (const d of ix.docs.values()) for (const [k, w] of d.w) push(p, k, { id: d.id, w });
-    fullPost.set(ix, p);
-  }
-  return p;
-}
 
 /** вес дополнительных слов (синонимы, подсказанные ИИ) против слов самого вопроса */
 const EXTRA_W = 0.6;
@@ -1169,7 +1583,6 @@ export function queryTerms(ix: LinkIndex, query: string, extra: string[] = []): 
 export function searchIndex(ix: LinkIndex, query: string, opts: { limit?: number; extra?: string[] } = {}): SearchHit[] {
   const q = queryTerms(ix, query, opts.extra);
   if (!q.size) return [];
-  const post = postingsAll(ix);
   const n = Math.max(1, ix.n);
   const qw = new Map<string, number>();
   let norm = 0;
@@ -1184,11 +1597,14 @@ export function searchIndex(ix: LinkIndex, query: string, opts: { limit?: number
   norm = Math.sqrt(norm);
   const dot = new Map<string, number>();
   const hit = new Map<string, Set<string>>();
-  for (const [k, v] of qw)
-    for (const e of post.get(k) ?? []) {
-      dot.set(e.id, (dot.get(e.id) ?? 0) + (v / norm) * e.w);
-      let h = hit.get(e.id);
-      if (!h) hit.set(e.id, (h = new Set()));
+  // слов в вопросе мало — быстрее проверить их в каждой записи, чем держать второй полный список
+  for (const d of ix.docs.values())
+    for (const [k, v] of qw) {
+      const w = d.w.get(k);
+      if (w === undefined) continue;
+      dot.set(d.id, (dot.get(d.id) ?? 0) + (v / norm) * w);
+      let h = hit.get(d.id);
+      if (!h) hit.set(d.id, (h = new Set()));
       h.add(k);
     }
   // доля слов вопроса, найденных в записи (словосочетания не считаем — их «доля» и так в словах)
@@ -1257,29 +1673,42 @@ export const DUP_SCORE = 0.6;
  */
 const DUP_MIN_WORDS = 6;
 const DUP_MIN_RATIO = 0.4;
-const wordCount = (d: DocVec) => {
-  let n = 0;
-  for (const k of d.w.keys()) if (!k.includes(BIGRAM_SEP)) n++;
-  return n;
-};
+/** Скалярное произведение векторов пары */
+function dotOf(a: DocVec, b: DocVec): number {
+  const at = a.tid;
+  const bt = b.tid;
+  let i = 0;
+  let j = 0;
+  let dot = 0;
+  while (i < at.length && j < bt.length) {
+    if (at[i] < bt[j]) i++;
+    else if (at[i] > bt[j]) j++;
+    else dot += a.tw[i++] * b.tw[j++];
+  }
+  return dot;
+}
 
 /** Почти одинаковые записи (точная близость по словам, без упоминаний и решений по парам) */
 export function duplicatesOf(ix: LinkIndex, id: string, min = DUP_SCORE): { id: string; score: number }[] {
+  return dupScan(ix, id, min);
+}
+
+/** сколько ближайших записей проверять на дубль: у дубля почти все весомые слова общие — он всегда среди ближайших */
+const DUP_CANDIDATES = 40;
+
+function dupScan(ix: LinkIndex, id: string, min: number, skip?: (bid: string) => boolean): { id: string; score: number }[] {
   const a = ix.docs.get(id);
   if (!a) return [];
-  const na = wordCount(a);
+  const na = a.words;
   if (na < DUP_MIN_WORDS) return [];
-  const approx = new Map<string, number>();
-  for (const k of topTerms(ix, a)) {
-    const w = a.w.get(k)!;
-    for (const e of ix.post.get(k)!) if (e.id !== id) approx.set(e.id, (approx.get(e.id) ?? 0) + w * e.w);
-  }
   const out: { id: string; score: number }[] = [];
-  for (const bid of approx.keys()) {
-    const b = ix.docs.get(bid)!;
-    const nb = wordCount(b);
+  for (const bid of candidatesOf(ix, a, DUP_CANDIDATES)) {
+    if (skip?.(bid)) continue;
+    const b = ix.docs.get(bid);
+    if (!b) continue;
+    const nb = b.words;
     if (nb < DUP_MIN_WORDS || Math.min(na, nb) / Math.max(na, nb) < DUP_MIN_RATIO) continue;
-    const d = pairStats(a, b).dot;
+    const d = dotOf(a, b);
     if (d >= min) out.push({ id: bid, score: Math.min(1, d) });
   }
   return out.sort((x, y) => y.score - x.score || (x.id < y.id ? -1 : 1));
@@ -1290,12 +1719,11 @@ export function findDuplicates(ix: LinkIndex, ids: Iterable<string>, min = DUP_S
   const allow = new Set(ids);
   const seen = new Map<string, { a: string; b: string; score: number }>();
   for (const id of allow)
-    for (const d of duplicatesOf(ix, id, min)) {
-      if (!allow.has(d.id)) continue;
+    for (const d of dupScan(ix, id, min, (bid) => !allow.has(bid))) {
       const [a, b] = id < d.id ? [id, d.id] : [d.id, id];
       if (!seen.has(a + '|' + b)) seen.set(a + '|' + b, { a, b, score: d.score });
     }
-  return [...seen.values()].sort((x, y) => y.score - x.score);
+  return [...seen.values()].sort((x, y) => y.score - x.score || (x.a < y.a ? -1 : x.a > y.a ? 1 : x.b < y.b ? -1 : 1));
 }
 
 // ---------- Словарь (для поиска синонимов) ----------

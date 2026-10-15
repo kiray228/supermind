@@ -12,7 +12,8 @@ import { useTasks } from '../tasks/store';
 import type { ID } from '../types';
 import {
   applyTermReview,
-  buildIndex,
+  buildIndexAsync,
+  patchIndex,
   buildMentionIndex,
   edgesOf,
   extractFeatures,
@@ -43,6 +44,8 @@ interface CacheItem {
 interface Cache {
   v: number;
   items: Record<ID, CacheItem>;
+  /** разовые пересчёты части кэша (1 — статьи: их шаблон больше не участвует в связях) */
+  fix?: number;
 }
 
 // ---------- Кэш признаков ----------
@@ -106,6 +109,8 @@ const signature = (list: BrainItem[], d: NotesData | null) =>
 /** показывать прогресс, если читать с диска нужно много */
 const PROGRESS_FROM = 15;
 const EMPTY: NoteFeatures = { terms: {}, forms: {} };
+/** признаки с правками ИИ — те же объекты, пока не менялись ни признаки, ни правки */
+const reviewed = new Map<string, { src: NoteFeatures; at: number; out: NoteFeatures }>();
 
 async function rebuild(): Promise<LinkIndex> {
   const c = await loadCache();
@@ -114,6 +119,12 @@ async function rebuild(): Promise<LinkIndex> {
   const sig = signature(list, data);
   if (ix && sig === ixSig) return ix;
 
+  // статьи, разобранные до 1.32, — признаки заново (шаблон «Главные мысли»… связывал все статьи между собой)
+  if ((c.fix ?? 0) < 1) {
+    for (const n of data?.notes ?? []) if (n.source) delete c.items[n.id];
+    c.fix = 1;
+    scheduleSave();
+  }
   const stale = list.filter((n) => c.items[n.id]?.at !== n.at);
   const showProgress = stale.length >= PROGRESS_FROM;
   if (showProgress) useLinks.setState({ progress: { done: 0, total: stale.length } });
@@ -158,18 +169,26 @@ async function rebuild(): Promise<LinkIndex> {
       wiki.add(k);
     }
 
-  // правки ИИ: лишние слова убраны, пропущенные темы добавлены
+  // правки ИИ: лишние слова убраны, пропущенные темы добавлены (результат — тот же объект, пока ничего не менялось:
+  // так точечное обновление индекса видит, какие записи изменились)
   const reviews = new Map((data?.aiTerms ?? []).map((r) => [r.id, r]));
   const docs = list
     .filter((n) => c.items[n.id])
     .map((n) => {
       const r = reviews.get(n.id);
       const f = c.items[n.id].f;
-      return { id: n.id, f: r ? applyTermReview(f, r.drop, r.add) : f };
+      if (!r) return { id: n.id, f };
+      const hit = reviewed.get(n.id);
+      if (hit && hit.src === f && hit.at === r.updatedAt) return { id: n.id, f: hit.out };
+      const out = applyTermReview(f, r.drop, r.add);
+      reviewed.set(n.id, { src: f, at: r.updatedAt, out });
+      return { id: n.id, f: out };
     });
   // синонимы: слова группы → ключи терминов
   const synonyms = (data?.synonyms ?? []).map((g) => g.words.map(termKey).filter((k): k is string => !!k));
-  const next = buildIndex(docs, { pairs, synonyms });
+  // правка одной-двух записей — точечное обновление (миллисекунды); иначе полная сборка порциями (экран не замирает)
+  const opts = { pairs, synonyms };
+  const next = (ix && patchIndex(ix, docs, opts)) ?? (await buildIndexAsync(docs, opts));
   ix = next;
   ixSig = sig;
   items = list;
@@ -283,6 +302,17 @@ const graphCache = new WeakMap<LinkIndex, LinkEdge[]>();
 async function graphEdges(cur: LinkIndex, onProgress: (p: number) => void, alive: () => boolean): Promise<LinkEdge[] | null> {
   const hit = graphCache.get(cur);
   if (hit) return hit;
+  // индекс обновлён точечно — связи прежнего графа, кроме изменённых записей, + их связи заново
+  const prev = cur.base && cur.changed ? graphCache.get(cur.base) : undefined;
+  if (prev && cur.changed) {
+    const ch = cur.changed;
+    const seen = new Map<string, LinkEdge>();
+    for (const e of prev) if (!ch.has(e.a) && !ch.has(e.b)) seen.set(e.a + '|' + e.b, e);
+    for (const id of ch) for (const e of edgesOf(cur, id, GRAPH_PER_NOTE)) if (!seen.has(e.a + '|' + e.b)) seen.set(e.a + '|' + e.b, e);
+    const edges = [...seen.values()];
+    graphCache.set(cur, edges);
+    return edges;
+  }
   const ids = [...cur.docs.keys()];
   const seen = new Map<string, LinkEdge>();
   let t = performance.now();

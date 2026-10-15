@@ -586,6 +586,15 @@
 .nt-card-new { display: flex; gap: 8px; flex-wrap: wrap; }
 .nt-card-new .nt-syn-input { flex: 1 1 180px; }
 .nt-card-new.is-edit { padding: 8px; border-radius: var(--radius); border: 1px solid var(--accent); }
+/* второй мозг: что умеет */
+.nt-hub-body { gap: 18px; }
+.nt-hub-stats { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--text-2); padding: 10px 12px; border-radius: var(--radius); background: var(--accent-soft); }
+.nt-hub-stats b { color: var(--text); font-size: 15px; }
+.nt-hub-item { display: flex; align-items: center; gap: 12px; padding: 10px 6px 10px 10px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); }
+.nt-hub-ic { width: 34px; height: 34px; flex-shrink: 0; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; background: var(--accent-soft); color: var(--accent); }
+.nt-hub-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.nt-hub-text b { font-size: 14px; font-weight: 650; }
+.nt-hub-text span { font-size: 12.5px; color: var(--text-2); line-height: 1.4; }
 @media (max-width: 760px) {
   .nt-ask, .nt-dups { width: 100%; }
   .nt-ask { height: calc(var(--vvh, 100vh) - 24px); }

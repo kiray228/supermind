@@ -1,5 +1,5 @@
 /** «Что нового»: главное в каждой версии. Новые версии — сверху. */
-import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun } from 'lucide-react';
+import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge } from 'lucide-react';
 
 export interface ChangeItem {
   icon: typeof Sparkles;
@@ -15,6 +15,15 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.32',
+    title: 'Быстрый мозг и разбор голоса',
+    items: [
+      { icon: Gauge, title: 'Быстро и на тысячах заметок', text: 'Связи, граф, дубли и обзор работают в разы быстрее и не подвешивают экран: правка заметки обновляет связи за миллисекунды, поиск дублей — секунда вместо минут, памяти нужно меньше.' },
+      { icon: Mic, title: 'Длинная мысль голосом', text: 'Наговорите минуту — ИИ разложит сказанное на заметку, задачи с датами и запись в дневник, каждую часть можно отменить. «Разбери: …» — разобрать и короткую фразу.' },
+      { icon: Brain, title: 'Второй мозг: что умеет', text: 'Заметки → «⋯» → «Второй мозг: что умеет»: все возможности на одной странице — с кнопками «попробовать» и сводкой.' },
+    ],
+  },
   {
     version: '1.31',
     title: 'Статьи по ссылке и утренняя сводка из мозга',
