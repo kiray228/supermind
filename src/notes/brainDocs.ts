@@ -29,13 +29,24 @@ export const KIND_LABEL: Record<BrainKind, string> = { note: 'Заметка', m
 const DAILY_HEAD = new Set(['задачи на день', 'мысли', 'итоги дня']);
 const DAILY_LINE = /^(понедельник|вторник|среда|четверг|пятница|суббота|воскресенье)( · прошлая запись: \[\[[^\]]*\]\])?$/i;
 
-/** Заметка: заголовки — отдельно (весомее), текст блоков. Заметка дня — без даты в названии и без шаблона */
-export function noteDoc(body: NoteBody, daily = false): NoteDoc {
+/** Заголовки шаблона сохранённой статьи и строка «Источник: …» — общие у всех статей */
+const ARTICLE_HEAD = new Set(['главные мысли', 'цифры и факты', 'что применить', 'начало статьи']);
+const ARTICLE_LINE = /^Источник: \[[^\]]*\]\([^)]*\)$/;
+
+/** Какая заметка: обычная, заметка дня или сохранённая статья (у двух последних — свой шаблон) */
+export type NoteKind = 'plain' | 'daily' | 'article';
+
+/** Заметка: заголовки — отдельно (весомее), текст блоков. Заметка дня — без даты в названии; у дня и статьи — без шаблона */
+export function noteDoc(body: NoteBody, kind: NoteKind | boolean = 'plain'): NoteDoc {
+  const k: NoteKind = kind === true ? 'daily' : kind === false ? 'plain' : kind;
+  const daily = k === 'daily';
+  const heads = daily ? DAILY_HEAD : k === 'article' ? ARTICLE_HEAD : null;
+  const line = daily ? DAILY_LINE : k === 'article' ? ARTICLE_LINE : null;
   const headings: string[] = [];
   const text: string[] = [];
   for (const b of body.blocks) {
     if (b.type === 'code') continue;
-    if (daily && b.text && ((b.type.startsWith('h') && DAILY_HEAD.has(b.text.trim().toLowerCase())) || DAILY_LINE.test(b.text.trim()))) continue;
+    if (heads && line && b.text && ((b.type.startsWith('h') && heads.has(b.text.trim().toLowerCase())) || line.test(b.text.trim()))) continue;
     if (b.text) (b.type === 'h1' || b.type === 'h2' || b.type === 'h3' ? headings : text).push(b.text);
     if (b.caption) text.push(b.caption);
     if (b.transcript) text.push(b.transcript);

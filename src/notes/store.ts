@@ -296,12 +296,12 @@ export function undoOpenBody() {
 
 // ---------- Заметки ----------
 
-export function createNote(p: { folderId?: ID; title?: string; blocks?: Block[]; pinned?: boolean; day?: string; digest?: boolean } = {}): NoteMeta | null {
+export function createNote(p: { folderId?: ID; title?: string; blocks?: Block[]; pinned?: boolean; day?: string; digest?: boolean; source?: string } = {}): NoteMeta | null {
   const d = useNotes.getState().data;
   if (!d) return null;
   const now = Date.now();
   const folderId = p.folderId && d.folders.some((f) => f.id === p.folderId) ? p.folderId : undefined;
-  const meta: NoteMeta = { id: uid(), title: p.title ?? '', preview: '', createdAt: now, updatedAt: now, ...(folderId ? { folderId } : {}), ...(p.pinned ? { pinned: true } : {}), ...(p.day ? { day: p.day } : {}), ...(p.digest ? { digest: true } : {}) };
+  const meta: NoteMeta = { id: uid(), title: p.title ?? '', preview: '', createdAt: now, updatedAt: now, ...(folderId ? { folderId } : {}), ...(p.pinned ? { pinned: true } : {}), ...(p.day ? { day: p.day } : {}), ...(p.digest ? { digest: true } : {}), ...(p.source ? { source: p.source } : {}) };
   mutateNotes((x) => void x.notes.unshift(meta));
   if (p.title || p.blocks?.length) {
     const body: NoteBody = { ...emptyBody(), title: p.title ?? '', ...(p.blocks?.length ? { blocks: p.blocks } : {}) };

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarClock, Check, ChevronDown, CircleAlert, Flame, Plus, RefreshCw, Sparkles, Target, Wallet } from 'lucide-react';
+import { BookOpen, Brain, CalendarClock, Check, ChevronDown, CircleAlert, Flame, GraduationCap, Plus, RefreshCw, Sparkles, Target, Wallet } from 'lucide-react';
 import { useApp, toast } from '../store/appStore';
 import { useCloud } from '../store/cloud';
 import { get } from '../store/kv';
@@ -12,6 +12,7 @@ import type { PlannerData } from '../types';
 import { AIError } from '../ai/claude';
 import { aiBrief, cachedAiBrief, computeBriefing, plural } from './briefing';
 import { Markdown } from './Markdown';
+import type { BrainBrief } from '../notes/brainBrief';
 
 const COLLAPSE_KEY = 'sm-assistant-brief-collapsed';
 
@@ -78,6 +79,7 @@ export function BriefingCard({ hasKey, onCollapse }: { hasKey: boolean; onCollap
   }, []);
 
   const b = useMemo(() => computeBriefing({ tasks, goals, finance, planner, name, now: new Date(tick) }), [tasks, goals, finance, planner, name, tick]);
+  const mind = useMindBrief(b.today, b.todayTasks.map((t) => t.id).join(','));
   const habitsDone = b.habits.filter((h) => h.done).length;
 
   const toggleCollapsed = () => {
@@ -288,6 +290,33 @@ export function BriefingCard({ hasKey, onCollapse }: { hasKey: boolean; onCollap
             </div>
           )}
 
+          {mind && (mind.cards > 0 || mind.reread) && (
+            <div className="as-sec">
+              <div className="as-sec-title">
+                <Brain size={15} /> Из второго мозга
+              </div>
+              <ul className="as-rows">
+                {mind.cards > 0 && (
+                  <li>
+                    <button onClick={() => void openCards()}>
+                      <GraduationCap size={15} />
+                      <span className="grow ellipsis">Повторить карточки</span>
+                      <b className="as-amount">{mind.cards}</b>
+                    </button>
+                  </li>
+                )}
+                {mind.reread && (
+                  <li>
+                    <button onClick={() => void openReread(mind.reread!.id)}>
+                      <BookOpen size={15} />
+                      <span className="grow ellipsis">Перечитать: {mind.reread.title}</span>
+                    </button>
+                  </li>
+                )}
+              </ul>
+            </div>
+          )}
+
           {b.payments.length > 0 && (
             <div className="as-sec">
               <div className="as-sec-title">
@@ -331,4 +360,35 @@ export function BriefingCard({ hasKey, onCollapse }: { hasKey: boolean; onCollap
       )}
     </section>
   );
+}
+
+/** Повторение карточек — в «Заметках» */
+async function openCards() {
+  useApp.getState().go('notes');
+  const { openCardsReview } = await import('../notes/cards');
+  setTimeout(openCardsReview, 150);
+}
+
+async function openReread(id: string) {
+  const { openItem } = await import('../notes/brain');
+  await openItem(id);
+}
+
+/** Сводка из второго мозга на сегодня: карточки и давняя заметка к задачам дня */
+function useMindBrief(today: string, taskIds: string): BrainBrief | null {
+  const [m, setM] = useState<BrainBrief | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const t = setTimeout(() => {
+      void import('../notes/brainBrief')
+        .then((x) => x.brainBriefFor(today, taskIds ? taskIds.split(',') : []))
+        .then((r) => alive && setM(r))
+        .catch(() => undefined);
+    }, 600);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+  }, [today, taskIds]);
+  return m;
 }

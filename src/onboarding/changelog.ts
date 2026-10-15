@@ -1,5 +1,5 @@
 /** «Что нового»: главное в каждой версии. Новые версии — сверху. */
-import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share } from 'lucide-react';
+import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun } from 'lucide-react';
 
 export interface ChangeItem {
   icon: typeof Sparkles;
@@ -15,6 +15,15 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.31',
+    title: 'Статьи по ссылке и утренняя сводка из мозга',
+    items: [
+      { icon: Newspaper, title: 'Статья по ссылке', text: 'Поделитесь ссылкой в SuperMind → «Статья: главное от ИИ» (или «⋯» в заметках → «Статья по ссылке»): приложение прочитает страницу, ИИ выделит главные мысли, цифры и что применить. Заметка — со ссылкой на источник и сама встанет в связи.' },
+      { icon: Sun, title: 'Утренняя сводка из мозга', text: 'В утреннем «План на день» — сколько карточек повторить и какую давнюю заметку стоит перечитать: она связана с задачами дня. То же — в брифинге ассистента.' },
+      { icon: GraduationCap, title: 'Карточки по теме', text: 'В конспекте темы — кнопка «Карточки»: ИИ сделает вопросы и ответы по всей теме сразу.' },
+    ],
+  },
   {
     version: '1.30',
     title: 'Карточки, дневник голосом и фото из «Поделиться»',

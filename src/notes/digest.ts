@@ -153,6 +153,19 @@ export function digestTitle(topic: string, now = new Date()): string {
   return t;
 }
 
+/**
+ * Карточки по теме: конспект сохраняется заметкой (если ещё не сохранён), из неё ИИ делает карточки.
+ * Возвращает id заметки-конспекта и сколько карточек добавлено.
+ */
+export async function digestCards(signal?: AbortSignal): Promise<{ noteId: string; added: number } | null> {
+  const s = useDigest.getState();
+  if (s.state !== 'done') return null;
+  const noteId = s.savedId && useNotes.getState().data?.notes.some((n) => n.id === s.savedId && !n.trashed) ? s.savedId : await saveDigest(false);
+  if (!noteId) return null;
+  const { makeCards } = await import('./cards');
+  return { noteId, added: await makeCards(noteId, signal) };
+}
+
 /** Сохранить конспект заметкой: ссылки [n] становятся [[ссылками]] на записи темы */
 export async function saveDigest(open = true): Promise<string | null> {
   const s = useDigest.getState();

@@ -17,6 +17,7 @@ import { generateVapidKeys, sendPush, type PushResult, type PushSubscription, ty
 import type { NextDueMark, NextDueStore } from './objectStore.ts';
 import { envMailer, feedbackMail, resetMail, type Mailer } from './mail.ts';
 import { commandPrompt, envAi, parseAiJson, type Ai } from './ai.ts';
+import { fetchPublicPage, WebError, type FetchPage } from './web.ts';
 import { randomInt } from 'node:crypto';
 
 export interface Deps {
@@ -32,6 +33,8 @@ export interface Deps {
   supportEmail?: string;
   /** бесплатная модель для голосовых команд; null — не настроена */
   ai?: Ai | null;
+  /** страница по ссылке («Сохранить статью»); в тестах — заглушка */
+  fetchPage?: FetchPage;
   /** запросов к модели в день на пользователя (AI_DAILY_LIMIT, по умолчанию 100) */
   aiDailyLimit?: number;
 }
@@ -93,6 +96,7 @@ export function createApp(deps: Deps) {
   const supportTo = deps.supportEmail ?? process.env.SUPPORT_EMAIL ?? process.env.MAIL_FROM ?? '';
   const ai = deps.ai === undefined ? envAi() : deps.ai;
   const aiDailyLimit = deps.aiDailyLimit ?? (Number(process.env.AI_DAILY_LIMIT) || 100);
+  const fetchPage = deps.fetchPage ?? ((url: string) => fetchPublicPage(url));
 
   /** Запись отметки не удалась — проверка идёт в базу, пока не запишется */
   let nextDueBroken = false;
@@ -257,6 +261,22 @@ export function createApp(deps: Deps) {
       [userId],
     );
     if (Number(used[0]?.[0] ?? 0) > aiDailyLimit) throw new HttpError(429, 'Лимит ИИ на сегодня исчерпан');
+  }
+
+  /** Страница по ссылке для «Сохранить статью» (только публичные сайты; считается в дневной лимит ИИ) */
+  async function webPage(request: Request) {
+    const user = await userOf(request);
+    const b = await body<{ url?: unknown }>(request);
+    const url = typeof b.url === 'string' ? b.url.trim().slice(0, 2000) : '';
+    if (!url) throw new HttpError(400, 'Нет ссылки');
+    await spendAi(user.id);
+    try {
+      return json(await fetchPage(url));
+    } catch (e) {
+      if (e instanceof WebError) throw new HttpError(e.status, e.message);
+      console.error('web page', e);
+      throw new HttpError(502, 'Не удалось открыть страницу');
+    }
   }
 
   /** Текстовый ответ (ассистент, карты, сводки) — для тех, у кого нет своего ключа Claude */
@@ -702,6 +722,7 @@ export function createApp(deps: Deps) {
     if (m === 'GET' && path === '/feedback') return myFeedback(request);
     if (m === 'POST' && path === '/ai/command') return aiCommand(request);
     if (m === 'POST' && path === '/ai/chat') return aiChat(request);
+    if (m === 'POST' && path === '/web/page') return webPage(request);
     if (m === 'POST' && path === '/auth/reset') return reset(request);
     if (m === 'POST' && path === '/auth/password') return changePassword(request);
     if (m === 'GET' && path === '/auth/me') return json({ user: await userOf(request) });

@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react';
-import { CheckSquare, Loader2, Network, NotebookPen, PenLine, StickyNote } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { CheckSquare, Loader2, Network, Newspaper, NotebookPen, PenLine, StickyNote } from 'lucide-react';
+import { firstUrl } from '../notes/articleCore';
+import type { ArticleStage } from '../notes/article';
 import { cleanupSharedImages, loadSharedImages, shareAppend, shareToDaily, shareToMap, shareToNote, shareToTask, suggestNotes, type SharedText } from './share';
 
 /** Окно «Сохранить в SuperMind»: задача / заметка / в заметку дня / дописать в заметку / карта «Входящие» */
@@ -9,6 +11,22 @@ export default function ShareSheet({ shared, onClose }: { shared: SharedText; on
   const images = shared.images ?? [];
   const [pics, setPics] = useState<string[] | null>(images.length ? null : []);
   const [suggest, setSuggest] = useState<{ id: string; title: string }[]>([]);
+  const [stage, setStage] = useState<ArticleStage | null>(null);
+  const ac = useRef<AbortController | null>(null);
+  useEffect(() => () => ac.current?.abort(), []);
+  const url = images.length ? null : firstUrl(text);
+
+  // статья: окно остаётся открытым, пока страница читается и ИИ выделяет главное
+  const article = async () => {
+    if (!url || stage) return;
+    const c = (ac.current = new AbortController());
+    setStage('fetch');
+    const { saveArticleAndOpen } = await import('../notes/article');
+    const ok = await saveArticleAndOpen(url, { signal: c.signal, onStage: setStage });
+    if (c.signal.aborted) return;
+    setStage(null);
+    if (ok) onClose();
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -78,21 +96,27 @@ export default function ShareSheet({ shared, onClose }: { shared: SharedText; on
           </div>
         )}
         <textarea className="textarea" style={{ marginTop: 12 }} rows={hasPics ? 2 : 4} value={text} placeholder={images.length ? 'Подпись (необязательно)' : ''} onChange={(e) => setText(e.target.value)} />
+        {url && (
+          <button className="btn btn-primary" style={{ width: '100%', marginTop: 14, gap: 8 }} disabled={busy || !!stage} onClick={() => void article()}>
+            {stage ? <Loader2 size={18} className="spin" /> : <Newspaper size={18} />}
+            {stage === 'fetch' ? 'Читаю статью…' : stage === 'summary' ? 'ИИ выделяет главное…' : stage === 'save' ? 'Сохраняю…' : 'Статья: главное от ИИ'}
+          </button>
+        )}
         <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-          <button className="btn btn-primary" style={btn} disabled={off} onClick={run(shareToNote)}>
+          <button className={url ? 'btn' : 'btn btn-primary'} style={btn} disabled={off || !!stage} onClick={run(shareToNote)}>
             <StickyNote size={20} />
             Заметка
           </button>
-          <button className="btn" style={btn} disabled={off} onClick={run(shareToDaily)}>
+          <button className="btn" style={btn} disabled={off || !!stage} onClick={run(shareToDaily)}>
             <NotebookPen size={20} />В заметку дня
           </button>
           {!images.length && (
             <>
-              <button className="btn" style={btn} disabled={off} onClick={run((s) => shareToTask(s))}>
+              <button className="btn" style={btn} disabled={off || !!stage} onClick={run((s) => shareToTask(s))}>
                 <CheckSquare size={20} />
                 Задача
               </button>
-              <button className="btn" style={btn} disabled={off} onClick={run((s) => shareToMap(s))}>
+              <button className="btn" style={btn} disabled={off || !!stage} onClick={run((s) => shareToMap(s))}>
                 <Network size={20} />В карту
               </button>
             </>
@@ -105,7 +129,7 @@ export default function ShareSheet({ shared, onClose }: { shared: SharedText; on
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
               {suggest.map((n) => (
-                <button key={n.id} className="btn btn-sm" disabled={off} onClick={run((s, p) => shareAppend(n.id, s, p))} style={{ maxWidth: '100%' }}>
+                <button key={n.id} className="btn btn-sm" disabled={off || !!stage} onClick={run((s, p) => shareAppend(n.id, s, p))} style={{ maxWidth: '100%' }}>
                   <PenLine size={14} />
                   <span className="ellipsis">{n.title}</span>
                 </button>
@@ -114,7 +138,13 @@ export default function ShareSheet({ shared, onClose }: { shared: SharedText; on
           </>
         )}
         <div className="modal-actions" style={{ marginTop: 10 }}>
-          <button className="btn btn-ghost" onClick={onClose}>
+          <button
+            className="btn btn-ghost"
+            onClick={() => {
+              ac.current?.abort();
+              onClose();
+            }}
+          >
             Отмена
           </button>
         </div>

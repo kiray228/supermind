@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { BookOpenText, Loader2, RotateCcw, Save, Square, X } from 'lucide-react';
+import { BookOpenText, GraduationCap, Loader2, RotateCcw, Save, Square, X } from 'lucide-react';
 import { onBack } from '../../ui/dialogs';
 import { toast } from '../../store/appStore';
-import { closeDigest, runDigest, saveDigest, stopDigest, useDigest } from '../digest';
+import { closeDigest, digestCards, runDigest, saveDigest, stopDigest, useDigest } from '../digest';
+import { openCardsReview } from '../cards';
 import { openItem } from '../brain';
 import { parseItemId } from '../brainDocs';
 import { CitedText } from './CitedText';
@@ -18,6 +19,7 @@ export function TopicDigest() {
   const st = useDigest();
   const [srcOpen, setSrcOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [carding, setCarding] = useState(false);
 
   useEffect(() => {
     if (!st.open) return;
@@ -36,6 +38,27 @@ export function TopicDigest() {
       toast('Не удалось сохранить конспект');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const cards = async () => {
+    setCarding(true);
+    try {
+      const r = await digestCards();
+      if (!r) return;
+      if (r.added)
+        toast(`Карточек по теме: ${r.added}. Конспект сохранён заметкой`, {
+          label: 'Повторить',
+          run: () => {
+            closeDigest();
+            openCardsReview();
+          },
+        });
+      else toast('Новых карточек не получилось — всё главное уже есть');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Не удалось сделать карточки');
+    } finally {
+      setCarding(false);
     }
   };
 
@@ -94,6 +117,9 @@ export function TopicDigest() {
             <>
               <button className="nt-ai-btn nt-digest-save" disabled={st.state !== 'done' || saving} onClick={() => void save()}>
                 {saving ? <Loader2 size={15} className="spin" /> : <Save size={15} />} Сохранить заметкой
+              </button>
+              <button className="nt-ai-btn" disabled={st.state !== 'done' || carding || saving} onClick={() => void cards()} title="ИИ сделает карточки для повторения по конспекту">
+                {carding ? <Loader2 size={15} className="spin" /> : <GraduationCap size={15} />} Карточки
               </button>
               <button className="nt-ai-undo" onClick={() => void runDigest()}>
                 <RotateCcw size={14} /> Заново

@@ -76,6 +76,16 @@ export function buildCommands(): Entry[] {
       },
     }),
     entry({
+      key: 'c:save-article',
+      kind: 'cmd',
+      title: 'Сохранить статью по ссылке',
+      emoji: '📰',
+      body: 'статья ссылка сайт url прочитать позже пересказ главное сохранить страницу',
+      run: async () => {
+        await (await import('../notes/article')).askArticle();
+      },
+    }),
+    entry({
       key: 'c:cards-review',
       kind: 'cmd',
       title: 'Повторение карточек',

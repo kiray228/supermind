@@ -36,6 +36,8 @@ export interface NoteMeta {
   day?: string;
   /** конспект темы от ИИ: пересказывает свои источники — дублем их не считается */
   digest?: boolean;
+  /** ссылка на статью, из которой сделана заметка */
+  source?: string;
   /** в корзине с этого момента */
   trashed?: number;
   createdAt: number;

@@ -19,6 +19,9 @@ export class CardsError extends Error {
   override name = 'CardsError';
 }
 
+/** Утреннее уведомление считает карточки на день — пересчитать расписание (с паузой) */
+const replan = () => void import('../tasks/sync').then((m) => m.syncSoon(8000)).catch(() => undefined);
+
 const alive = () => new Set((useNotes.getState().data?.notes ?? []).filter((n) => !n.trashed).map((n) => n.id));
 
 /** Карточки заметки */
@@ -51,6 +54,7 @@ export async function makeCards(noteId: ID, signal?: AbortSignal): Promise<numbe
     const list = (d.cards ??= []);
     for (const f of found) list.push(newCard({ id: uid(), noteId, q: f.q, a: f.a, by: 'ai' }, today, now));
   });
+  replan();
   return found.length;
 }
 
@@ -89,6 +93,7 @@ export function gradeCard(id: ID, g: Grade): StudyCard | null {
     prev = { ...d.cards![i] };
     d.cards![i] = schedule(d.cards![i], g, todayYmd());
   });
+  replan();
   return prev;
 }
 

@@ -236,7 +236,10 @@ async function plan(fromMs: number, toMs: number): Promise<Planned[]> {
       const day = addDaysYmd(toYmd(new Date(fromMs)), i);
       const at = fromYmd(day).getTime() + minutesOf(brief) * 60000;
       if (at < fromMs || at > toMs) continue;
-      out.push({ id: hash(`brief|${day}`), at, ...briefingFor(d.tasks, p, day), extra: { briefing: 1, date: day, sm: 1 } });
+      // из «второго мозга»: карточки на день и давняя заметка к задачам дня
+      const ids = d.tasks.filter((t) => isActive(t) && t.date === day).map((t) => t.id);
+      const brain = await import('../notes/brainBrief').then((m) => m.brainBriefFor(day, ids).then(m.briefParts)).catch(() => ({}));
+      out.push({ id: hash(`brief|${day}`), at, ...briefingFor(d.tasks, p, day, brain), extra: { briefing: 1, date: day, sm: 1 } });
     }
   }
   // привычки с напоминанием: только в запланированные дни и пока не выполнены
@@ -325,7 +328,7 @@ async function planStreakSaver(pref: string | undefined, p: PlannerData | undefi
 }
 
 /** Текст утреннего уведомления на день */
-function briefingFor(tasks: TaskItem[], p: PlannerData | undefined, day: string): { title: string; body: string } {
+export function briefingFor(tasks: TaskItem[], p: PlannerData | undefined, day: string, brain: { part?: string; tail?: string } = {}): { title: string; body: string } {
   const active = tasks.filter((t) => isActive(t) && t.date);
   const today = active.filter((t) => t.date === day).sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0) || (a.time ?? '99').localeCompare(b.time ?? '99'));
   const overdue = active.filter((t) => t.date! < day && day <= addDaysYmd(toYmd(new Date()), 1)).length;
@@ -335,11 +338,14 @@ function briefingFor(tasks: TaskItem[], p: PlannerData | undefined, day: string)
   parts.push(today.length ? `Задач на сегодня: ${today.length}` : 'Задач на сегодня нет');
   if (overdue) parts.push(`просрочено: ${overdue}`);
   if (habits) parts.push(habits < due.length ? `привычки: осталось ${habits} из ${due.length}` : `привычек: ${habits}`);
+  if (brain.part) parts.push(brain.part);
   let body = parts.join(' · ');
   if (today[0]) {
     const t = today[0].time;
     body += `. Главное: ${today[0].title || 'Задача'}${t ? ` в ${t}` : ''}`;
   }
+  // «Перечитать» — только если влезает целиком
+  if (brain.tail && body.length + brain.tail.length + 2 <= 180) body += `. ${brain.tail}`;
   return { title: '☀️ Доброе утро! План на день', body: body.length > 180 ? body.slice(0, 177) + '…' : body };
 }
 

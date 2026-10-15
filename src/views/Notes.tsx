@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, Brain, Check, ChevronDown, Compass, Copy, CopyCheck, Download, Equal, GraduationCap, NotebookPen, FolderInput, FolderPlus, LayoutGrid, MoreHorizontal, Pencil, Pin, PinOff, Plus, RotateCcw, Search, StickyNote, Trash2, Upload, Waypoints, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Brain, Check, ChevronDown, Compass, Copy, CopyCheck, Download, Equal, GraduationCap, Newspaper, NotebookPen, FolderInput, FolderPlus, LayoutGrid, MoreHorizontal, Pencil, Pin, PinOff, Plus, RotateCcw, Search, StickyNote, Trash2, Upload, Waypoints, X } from 'lucide-react';
 import type { ID } from '../types';
 import { confirmDialog } from '../ui/dialogs';
 import { toast } from '../store/appStore';
@@ -472,6 +472,7 @@ export default function Notes() {
           ))}
           <MenuSep />
           <MenuItem icon={<FolderPlus size={17} />} label="Новая папка" onClick={() => setFolderDlg({})} />
+          <MenuItem icon={<Newspaper size={17} />} label="Статья по ссылке" onClick={() => void import('../notes/article').then((m) => m.askArticle())} />
           <MenuItem icon={<Compass size={17} />} label="Обзор мозга" onClick={() => setReviewSheet(true)} />
           <MenuItem icon={<GraduationCap size={17} />} label="Повторение карточек" onClick={openCardsReview} />
           <MenuItem icon={<CopyCheck size={17} />} label="Найти дубли" onClick={() => setDupSheet(true)} />
