@@ -18,6 +18,8 @@ export interface ReviewCandidate {
   shared: string[];
   /** сейчас показывается как связанная */
   linked: boolean;
+  /** не заметка: «Карта», «Задача», «Цель» */
+  kind?: string;
 }
 
 export interface ReviewInput {
@@ -64,7 +66,7 @@ export function buildReviewPrompt(inp: ReviewInput): string {
   if (!inp.keywords.length) lines.push('(нет)');
   lines.push('', 'Заметки-кандидаты для связи:');
   inp.candidates.forEach((c, i) => {
-    const parts = [`${i + 1}. «${clip(c.title.trim() || 'Без названия', 80)}»`];
+    const parts = [`${i + 1}. ${c.kind ? c.kind + ' ' : ''}«${clip(c.title.trim() || 'Без названия', 80)}»`];
     if (c.preview.trim()) parts.push(`начало: ${clip(c.preview.trim(), 160)}`);
     if (c.keywords.length) parts.push(`её темы: ${c.keywords.slice(0, 6).join(', ')}`);
     parts.push(c.shared.length ? `общие слова: ${c.shared.join(', ')}` : 'общих слов мало');

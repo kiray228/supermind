@@ -30,6 +30,8 @@ import { DatePicker } from './DatePicker';
 import { TaskCheck } from './TaskRow';
 import { Popover } from './Popover';
 import './tasks.css';
+import { RelatedNotes } from '../../notes/ui/RelatedNotes';
+import { itemId } from '../../notes/brainDocs';
 
 /** Окно задачи поверх любого раздела */
 export function TaskDetailHost() {
@@ -356,6 +358,11 @@ function TaskDetail({ task, onClose }: { task: TaskItem; onClose: () => void }) 
               <span className="small grow ellipsis">{task.source.docTitle || 'Открыть тему'}</span>
             </button>
           )}
+        </div>
+
+        {/* заметки, карты и цели на ту же тему — связи находятся сами */}
+        <div className="td-related">
+          <RelatedNotes id={itemId('task', task.id)} compact />
         </div>
 
         <div className="td-foot tiny faint">

@@ -24,6 +24,8 @@ import { areaColor, areaOf, ProgressBar, ProgressRing, Sheet, useTaskLookup } fr
 import { AddInput, StagesSection, TaskMini } from './Stages';
 import { SavingsBlock } from './Savings';
 import { useFinance } from '../../finance/store';
+import { RelatedNotes } from '../../notes/ui/RelatedNotes';
+import { itemId } from '../../notes/brainDocs';
 
 const dtFmt = (ms: number) =>
   new Date(ms).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -139,6 +141,11 @@ export function GoalDetail({ data, goal, onClose, onEdit }: { data: GoalsData; g
             <h3>Заметки</h3>
           </div>
           <NotesField goal={goal} />
+        </section>
+
+        {/* заметки, карты и задачи на ту же тему — связи находятся сами */}
+        <section className="gl-sec gl-related">
+          <RelatedNotes id={itemId('goal', goal.id)} compact />
         </section>
 
         <HistorySection goal={goal} />

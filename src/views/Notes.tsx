@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, Check, ChevronDown, Copy, FolderInput, FolderPlus, LayoutGrid, MoreHorizontal, Pencil, Pin, PinOff, Plus, RotateCcw, Search, StickyNote, Trash2, Waypoints, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, ChevronDown, Copy, Download, FolderInput, FolderPlus, LayoutGrid, MoreHorizontal, Pencil, Pin, PinOff, Plus, RotateCcw, Search, StickyNote, Trash2, Waypoints, X } from 'lucide-react';
 import type { ID } from '../types';
 import { confirmDialog } from '../ui/dialogs';
+import { toast } from '../store/appStore';
 import { isBodyEmpty, type NoteMeta, type NotesSort } from '../notes/model';
 import {
   createNote,
@@ -99,6 +100,8 @@ export default function Notes() {
   };
   const setSort = (s: NotesSort) => (setSortState(s), writeLS('sm-notes-sort', s));
   const setMode = (m: 'list' | 'graph') => {
+    // тот же режим — ничего не сбрасывать (выделение на графе уже могло появиться)
+    if (m === mode) return;
     setModeState(m);
     writeLS('sm-notes-mode', m);
     setGraphSel(null);
@@ -301,12 +304,11 @@ export default function Notes() {
         <div className={`nt-main${openId ? ' has-editor' : ''}`}>
           {graphMode && (
             <NotesGraph
-              notes={data.notes.filter((n) => (q ? !n.trashed : inSel(n)))}
+              noteScope={q || sel.k === 'all' ? null : new Set(data.notes.filter(inSel).map((n) => n.id))}
               folders={data.folders}
               highlight={q ? (found ?? NO_IDS) : null}
               focusId={graphFocus}
               onFocused={() => useLinks.setState({ graphFocus: null })}
-              onOpen={(id) => void openNote(id)}
               onSelect={setGraphSel}
             />
           )}
@@ -366,6 +368,17 @@ export default function Notes() {
           ))}
           <MenuSep />
           <MenuItem icon={<FolderPlus size={17} />} label="Новая папка" onClick={() => setFolderDlg({})} />
+          <MenuItem
+            icon={<Download size={17} />}
+            label="Экспорт для Obsidian"
+            onClick={() => {
+              toast('Готовлю архив заметок…');
+              void import('../notes/obsidianExport')
+                .then((m) => m.exportObsidianVault())
+                .then((n) => toast(`Сохранено заметок: ${n}. Распакуйте архив и откройте папку в Obsidian как хранилище`))
+                .catch(() => toast('Не удалось сохранить архив'));
+            }}
+          />
           {curFolder && <MenuItem icon={<Pencil size={17} />} label="Изменить папку" onClick={() => setFolderDlg({ id: curFolder.id })} />}
           {sel.k === 'trash' && counts.trash > 0 && (
             <MenuItem

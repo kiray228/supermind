@@ -4,10 +4,40 @@
  */
 import { bounds, ForceLayout, type GLink, type GNode, spiralPosition } from '../graphLayout';
 
+export type NodeShape = 'circle' | 'square' | 'diamond' | 'triangle';
+
 export interface ViewNode {
   id: string;
   label: string;
   color: string;
+  /** форма — по типу: заметка, карта, цель, задача */
+  shape?: NodeShape;
+  /** выполнено — блёклое */
+  done?: boolean;
+}
+
+/** Контур узла нужной формы (площадь примерно как у круга радиуса r) */
+function shapePath(ctx: CanvasRenderingContext2D, shape: NodeShape | undefined, x: number, y: number, r: number) {
+  ctx.beginPath();
+  if (shape === 'square') {
+    const a = r * 0.9;
+    // старые WebView без roundRect — обычный квадрат
+    if (typeof ctx.roundRect === 'function') ctx.roundRect(x - a, y - a, a * 2, a * 2, Math.min(4, a * 0.4));
+    else ctx.rect(x - a, y - a, a * 2, a * 2);
+  } else if (shape === 'diamond') {
+    const a = r * 1.25;
+    ctx.moveTo(x, y - a);
+    ctx.lineTo(x + a, y);
+    ctx.lineTo(x, y + a);
+    ctx.lineTo(x - a, y);
+    ctx.closePath();
+  } else if (shape === 'triangle') {
+    const a = r * 1.3;
+    ctx.moveTo(x, y - a);
+    ctx.lineTo(x + a * 0.95, y + a * 0.7);
+    ctx.lineTo(x - a * 0.95, y + a * 0.7);
+    ctx.closePath();
+  } else ctx.arc(x, y, r, 0, Math.PI * 2);
 }
 
 export interface ViewLink {
@@ -151,6 +181,8 @@ export class GraphView {
     if (!b || !this.w || !this.h) return;
     // свободная часть холста: сверху — счётчик, справа — кнопки, снизу на телефоне — меню приложения
     const ins = { t: 56, r: 60, b: this.w < 760 ? 104 : 20, l: 12 };
+    // выбрано — снизу карточка: граф вписывается над ней
+    if (this.sel >= 0) ins.b = Math.max(ins.b, Math.round(this.h * 0.48));
     const aw = Math.max(80, this.w - ins.l - ins.r);
     const ah = Math.max(80, this.h - ins.t - ins.b);
     // запас по бокам — под подписи, снизу — под подпись нижнего узла
@@ -472,17 +504,15 @@ export class GraphView {
       const y = sy(n.y);
       if (x < -pad || y < -pad || x > this.w + pad || y > this.h + pad) continue;
       const r = Math.max(2.5, this.radius(n) * k);
-      ctx.globalAlpha = dim(i) ? 0.18 : 1;
+      ctx.globalAlpha = dim(i) ? 0.18 : n.done ? 0.5 : 1;
       ctx.fillStyle = n.color;
-      ctx.beginPath();
-      ctx.arc(x, y, r, 0, Math.PI * 2);
+      shapePath(ctx, n.shape, x, y, r);
       ctx.fill();
       if (i === this.sel || (hl && hl.has(n.id) && !near)) {
         ctx.globalAlpha = 1;
         ctx.lineWidth = 2.5;
         ctx.strokeStyle = i === this.sel ? colors.text : colors.accent;
-        ctx.beginPath();
-        ctx.arc(x, y, r + 3.5, 0, Math.PI * 2);
+        shapePath(ctx, n.shape, x, y, r + 3.5);
         ctx.stroke();
       }
     }

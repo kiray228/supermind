@@ -293,6 +293,8 @@ export interface NoteFeatures {
   forms: Record<string, string>;
   /** термин из названия (1–2 значимых слова) — для поиска упоминаний в других заметках */
   titleKey?: string;
+  /** явные ссылки [[Название]] — как написаны */
+  wiki?: string[];
 }
 
 const TITLE_W = 3;
@@ -347,7 +349,276 @@ export function extractFeatures(doc: NoteDoc): NoteFeatures {
   let titleKey: string | undefined;
   if (titleToks.length === 1) titleKey = titleToks[0].key;
   else if (titleToks.length === 2 && titleToks[0].key !== titleToks[1].key) titleKey = titleToks[0].key + BIGRAM_SEP + titleToks[1].key;
-  return titleKey && terms[titleKey] ? { terms, forms, titleKey } : { terms, forms };
+  const out: NoteFeatures = { terms, forms };
+  if (titleKey && terms[titleKey]) out.titleKey = titleKey;
+  const wiki = extractWiki([...(doc.headings ?? []), doc.text].join('\n'));
+  if (wiki.length) out.wiki = wiki;
+  return out;
+}
+
+// ---------- Явные ссылки [[…]] ----------
+
+const WIKI_RE = /\[\[([^[\]\n]{1,200}?)\]\]/g;
+
+/** Название для сравнения: без регистра, «ё» = «е», пробелы схлопнуты */
+export const normTitle = (s: string) => s.toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim();
+
+/** Разобрать [[ссылку]] или [[ссылку|подпись]] → { title, label } */
+export function parseWiki(inner: string): { title: string; label: string } {
+  const bar = inner.indexOf('|');
+  const title = (bar >= 0 ? inner.slice(0, bar) : inner).trim();
+  const label = (bar >= 0 ? inner.slice(bar + 1) : '').trim() || title;
+  return { title, label };
+}
+
+/** Явные ссылки текста — названия без повторов, в порядке появления */
+export function extractWiki(text: string): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const m of text.matchAll(WIKI_RE)) {
+    const { title } = parseWiki(m[1]);
+    const k = normTitle(title);
+    if (!k || k.length > 120 || seen.has(k)) continue;
+    seen.add(k);
+    out.push(title);
+    if (out.length >= 100) break;
+  }
+  return out;
+}
+
+// ---------- Упоминания названий в тексте ----------
+
+/** Слово текста с позицией: word — значимое, stop — служебное, break — знак препинания или число */
+export interface SpanTok {
+  key: string | null;
+  start: number;
+  end: number;
+  kind: 'word' | 'stop' | 'break';
+}
+
+const URL_RE = /\bhttps?:\/\/\S+|\bwww\.\S+|\S+@\S+\.\S+/gi;
+
+/** Разбор текста с позициями (без очистки разметки — позиции совпадают с исходным текстом) */
+export function tokenizeSpans(text: string): SpanTok[] {
+  const urls = [...text.matchAll(URL_RE)].map((m) => [m.index!, m.index! + m[0].length] as const);
+  const out: SpanTok[] = [];
+  for (const m of text.matchAll(WORD_RE)) {
+    const raw = m[0];
+    const start = m.index!;
+    const end = start + raw.length;
+    if (urls.some(([a, b]) => start >= a && start < b)) {
+      if (out[out.length - 1]?.kind !== 'break') out.push({ key: null, start, end, kind: 'break' });
+      continue;
+    }
+    if (raw === '-' || raw === "'" || raw === '’') continue;
+    if (!/^\p{L}/u.test(raw)) {
+      out.push({ key: null, start, end, kind: 'break' });
+      continue;
+    }
+    const key = termKey(raw);
+    out.push(key ? { key, start, end, kind: 'word' } : { key: null, start, end, kind: 'stop' });
+  }
+  return out;
+}
+
+export interface MentionTarget {
+  id: string;
+  title: string;
+}
+
+export interface MentionIndex {
+  /** первый значимый термин названия → названия (длинные первыми); words — слова названия как написаны */
+  first: Map<string, { id: string; keys: string[]; words: string[]; punct: boolean[] }[]>;
+  canon: (k: string) => string;
+}
+
+/**
+ * Короткая основа (до 3 букв) неоднозначна: «еду» (ехать) и «еда» дают одну основу «ед».
+ * Для неё упоминание засчитывается, только если совпадает само слово.
+ */
+const SHORT_STEM = 3;
+const wordNorm = (s: string) => s.toLowerCase().replace(/ё/g, 'е');
+
+export interface Mention {
+  start: number;
+  end: number;
+  id: string;
+}
+
+/** не длиннее — длинные названия целиком в тексте почти не встречаются */
+const MENTION_MAX_WORDS = 6;
+/** служебных слов подряд внутри названия («план тренировок к полумарафону») */
+const MENTION_MAX_STOPS = 2;
+
+/**
+ * Индекс названий для поиска упоминаний. Название из одного слова считается упоминанием,
+ * только если слово редкое (isRare) и не короче 4 букв: «Купить» или «Идеи» не подсвечиваются повсюду.
+ * Порядок целей важен: при одинаковых названиях побеждает первая.
+ */
+export function buildMentionIndex(targets: MentionTarget[], opts: { canon?: (k: string) => string; isRare?: (key: string) => boolean } = {}): MentionIndex {
+  const canon = opts.canon ?? ((k: string) => k);
+  const first = new Map<string, { id: string; keys: string[]; words: string[]; punct: boolean[] }[]>();
+  const seen = new Set<string>();
+  for (const t of targets) {
+    // слова названия и где между ними стоит знак («Стамбул: маршрут») — там знак допустим и в тексте
+    const keys: string[] = [];
+    const words: string[] = [];
+    const punct: boolean[] = [];
+    let gap = false;
+    for (const x of tokenizeSpans(t.title)) {
+      if (x.kind === 'break') gap = keys.length > 0;
+      if (x.kind !== 'word') continue;
+      keys.push(canon(x.key!));
+      words.push(wordNorm(t.title.slice(x.start, x.end)));
+      punct.push(gap);
+      gap = false;
+    }
+    if (!keys.length || keys.length > MENTION_MAX_WORDS) continue;
+    if (keys.length === 1 && (keys[0].length < 4 || !(opts.isRare?.(keys[0]) ?? true))) continue;
+    const sig = keys.join(' ');
+    if (seen.has(sig)) continue;
+    seen.add(sig);
+    push(first, keys[0], { id: t.id, keys, words, punct });
+  }
+  for (const list of first.values()) list.sort((a, b) => b.keys.length - a.keys.length);
+  return { first, canon };
+}
+
+/** Упоминания названий в тексте: самые длинные, без пересечений; except — своё название не подсвечивать */
+export function findMentions(text: string, mx: MentionIndex, except?: string): Mention[] {
+  if (!mx.first.size || !text) return [];
+  const toks = tokenizeSpans(text);
+  const out: Mention[] = [];
+  let i = 0;
+  while (i < toks.length) {
+    const t = toks[i];
+    const cands = t.kind === 'word' ? mx.first.get(mx.canon(t.key!)) : undefined;
+    let next = i + 1;
+    if (cands)
+      for (const c of cands) {
+        if (c.id === except) continue;
+        let j = i;
+        let k = 0;
+        let stops = 0;
+        let last = i;
+        while (k < c.keys.length && j < toks.length) {
+          const u = toks[j];
+          if (u.kind === 'stop' && k > 0 && ++stops <= MENTION_MAX_STOPS) {
+            j++;
+            continue;
+          }
+          if (u.kind === 'break' && k > 0 && c.punct[k] && ++stops <= MENTION_MAX_STOPS) {
+            j++;
+            continue;
+          }
+          if (u.kind !== 'word' || mx.canon(u.key!) !== c.keys[k]) break;
+          if (c.keys[k].length <= SHORT_STEM && wordNorm(text.slice(u.start, u.end)) !== c.words[k]) break;
+          last = j;
+          k++;
+          j++;
+        }
+        if (k === c.keys.length) {
+          out.push({ start: t.start, end: toks[last].end, id: c.id });
+          next = last + 1;
+          break;
+        }
+      }
+    i = next;
+  }
+  return out;
+}
+
+// ---------- Темы (кластеры) и окрестность ----------
+
+/**
+ * Кластеры графа — распространение меток: каждый узел берёт метку, которая сильнее всего
+ * у его соседей. Детерминированно (порядок — по id). Номера кластеров — по убыванию размера, с нуля;
+ * одиночки без связей — каждый в своём кластере.
+ */
+export function clusterGraph(ids: string[], edges: { a: string; b: string; score: number }[], maxIter = 30): Map<string, number> {
+  const order = [...new Set(ids)].sort();
+  const idx = new Map(order.map((id, i) => [id, i]));
+  const adj: [number, number][][] = order.map(() => []);
+  for (const e of edges) {
+    const a = idx.get(e.a);
+    const b = idx.get(e.b);
+    if (a === undefined || b === undefined || a === b) continue;
+    adj[a].push([b, e.score]);
+    adj[b].push([a, e.score]);
+  }
+  const label = order.map((_, i) => i);
+  for (let it = 0; it < maxIter; it++) {
+    let changed = false;
+    for (let i = 0; i < order.length; i++) {
+      if (!adj[i].length) continue;
+      const w = new Map<number, number>();
+      for (const [j, s] of adj[i]) w.set(label[j], (w.get(label[j]) ?? 0) + s);
+      let best = label[i];
+      let bw = w.get(best) ?? 0;
+      for (const [l, v] of w) if (v > bw + 1e-12 || (Math.abs(v - bw) <= 1e-12 && l < best)) [best, bw] = [l, v];
+      if (best !== label[i]) {
+        label[i] = best;
+        changed = true;
+      }
+    }
+    if (!changed) break;
+  }
+  // перенумеровать: большие кластеры — первыми
+  const size = new Map<number, number>();
+  for (const l of label) size.set(l, (size.get(l) ?? 0) + 1);
+  const ranked = [...size.entries()].sort((x, y) => y[1] - x[1] || x[0] - y[0]).map((x) => x[0]);
+  const num = new Map(ranked.map((l, i) => [l, i]));
+  return new Map(order.map((id, i) => [id, num.get(label[i])!]));
+}
+
+/** Название темы кластера — самое частое важное слово его заметок */
+export function clusterTopics(ix: LinkIndex, clusters: Map<string, number>, perNote = 4): Map<number, string> {
+  const votes = new Map<number, Map<string, number>>();
+  /** как слово написано (первое встреченное, имя собственное — с заглавной) */
+  const shown = new Map<string, string>();
+  for (const [id, c] of clusters) {
+    if (!ix.docs.has(id)) continue;
+    const kw = keywordsOf(ix, id, perNote);
+    kw.forEach((k, i) => {
+      let m = votes.get(c);
+      if (!m) votes.set(c, (m = new Map()));
+      // первые слова заметки весомее
+      const key = k.toLowerCase();
+      m.set(key, (m.get(key) ?? 0) + (perNote - i));
+      const prev = shown.get(key);
+      if (!prev || (prev === key && k !== key)) shown.set(key, k);
+    });
+  }
+  const out = new Map<number, string>();
+  for (const [c, m] of votes) {
+    let best = '';
+    let bv = -1;
+    for (const [k, v] of m) if (v > bv || (v === bv && k < best)) [best, bv] = [k, v];
+    if (best) out.set(c, shown.get(best) ?? best);
+  }
+  return out;
+}
+
+/** Окрестность узла: он сам и все, до кого не больше depth шагов по связям */
+export function neighborhood(edges: { a: string; b: string }[], id: string, depth: number): Set<string> {
+  const adj = new Map<string, string[]>();
+  for (const e of edges) {
+    push(adj, e.a, e.b);
+    push(adj, e.b, e.a);
+  }
+  const seen = new Set([id]);
+  let frontier = [id];
+  for (let d = 0; d < depth && frontier.length; d++) {
+    const next: string[] = [];
+    for (const x of frontier)
+      for (const y of adj.get(x) ?? [])
+        if (!seen.has(y)) {
+          seen.add(y);
+          next.push(y);
+        }
+    frontier = next;
+  }
+  return seen;
 }
 
 // ---------- Индекс ----------
@@ -533,6 +804,8 @@ const STRONG_ALONE = 0.25;
 /** Термин из названия достаточно редкий, чтобы считать его упоминание связью */
 function mentionableKey(n: number, df: Map<string, number>, key: string): boolean {
   if (key.includes(BIGRAM_SEP)) return true;
+  // название из одного короткого слова («Купить», «Идеи») — слишком общее, его «упоминание» ничего не значит
+  if (key.length < 4) return false;
   return (df.get(key) ?? 0) <= Math.max(3, Math.ceil(n * 0.15));
 }
 
@@ -603,21 +876,28 @@ function mentionsOf(ix: LinkIndex, a: DocVec): Set<string> {
   return out;
 }
 
-/** Точная близость пары: скалярное произведение, число общих слов, есть ли общее словосочетание */
-function pairStats(a: DocVec, b: DocVec): { dot: number; words: number; phrase: boolean } {
+/** Точная близость пары: скалярное произведение, число общих слов, есть ли общее словосочетание, самое длинное общее слово */
+function pairStats(a: DocVec, b: DocVec): { dot: number; words: number; phrase: boolean; longest: number } {
   const [small, big] = a.w.size <= b.w.size ? [a.w, b.w] : [b.w, a.w];
   let dot = 0;
   let words = 0;
   let phrase = false;
+  let longest = 0;
   for (const [k, w] of small) {
     const wb = big.get(k);
     if (wb === undefined) continue;
     dot += w * wb;
     if (k.includes(BIGRAM_SEP)) phrase = true;
-    else words++;
+    else {
+      words++;
+      longest = Math.max(longest, k.length);
+    }
   }
-  return { dot, words, phrase };
+  return { dot, words, phrase, longest };
 }
+
+/** одно общее слово связывает, только если оно весомое и не короткое: «купить» (куп) — не тема, «Стамбул» — тема */
+const ALONE_MIN_STEM = 4;
 
 interface Scored {
   id: string;
@@ -658,7 +938,7 @@ function scored(ix: LinkIndex, a: DocVec, min: number, raw = false, loose = fals
     }
     if (score < min) continue;
     // одно общее слово — ещё не связь, если оно не очень весомое
-    if (loose || st.words >= 2 || st.phrase || mention || score >= STRONG_ALONE) out.push({ id: bid, score, mention, confirmed: false });
+    if (loose || st.words >= 2 || st.phrase || mention || (score >= STRONG_ALONE && st.longest >= ALONE_MIN_STEM)) out.push({ id: bid, score, mention, confirmed: false });
   }
   return out.sort((x, y) => y.score - x.score || (x.id < y.id ? -1 : 1));
 }
@@ -749,6 +1029,7 @@ export function applyTermReview(f: NoteFeatures, drop: string[], add: string[]):
   }
   const out: NoteFeatures = { terms, forms };
   if (f.titleKey && terms[f.titleKey]) out.titleKey = f.titleKey;
+  if (f.wiki) out.wiki = f.wiki;
   return out;
 }
 

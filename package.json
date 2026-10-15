@@ -1,7 +1,7 @@
 {
   "name": "supermind",
   "private": true,
-  "version": "1.25.0",
+  "version": "1.26.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -39,6 +39,7 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
+    "fake-indexeddb": "^6.2.5",
     "oxlint": "^1.81.0",
     "typescript": "~6.0.2",
     "vite": "^8.3.0"

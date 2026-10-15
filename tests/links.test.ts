@@ -264,6 +264,12 @@ describe('особые случаи', () => {
     assert.ok(r[0].mention);
   });
 
+  test('название из одного короткого слова («Купить») — не упоминание', () => {
+    const ix = index([...CORPUS, { id: 'task', title: 'Купить билеты на самолёт', text: 'Перелёт в Стамбул в мае, отель у Султанахмета.' }]);
+    assert.ok(!relatedTo(ix, 'solo-shop').some((r) => r.id === 'task'), JSON.stringify(relatedTo(ix, 'solo-shop', { min: 0 })));
+    assert.ok(relatedTo(ix, 'task').some((r) => r.id === 'trip-plan'), 'а с поездкой — связана');
+  });
+
   test('общее название из одного частого слова — не упоминание', () => {
     const docs = Array.from({ length: 12 }, (_, i) => ({ id: 'n' + i, title: i === 0 ? 'Идеи' : 'Заметка ' + i, text: `Идеи на выходные номер ${i}: ` + ['кино', 'парк', 'музей', 'каток', 'театр', 'боулинг', 'квест', 'концерт', 'выставка', 'пикник', 'сауна', 'рыбалка'][i] }));
     const ix = index(docs);

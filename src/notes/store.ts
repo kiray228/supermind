@@ -96,6 +96,8 @@ export function mutateNotes(fn: (d: NotesData) => void) {
 // ---------- Тела заметок ----------
 
 const pending = new Map<ID, { body: NoteBody; timer: ReturnType<typeof setTimeout> }>();
+/** записи, которые идут прямо сейчас */
+const writing = new Map<ID, { body: NoteBody; done: Promise<void> }>();
 const warned = new Set<ID>();
 /** Текст для поиска: без регистра, «ё» = «е» */
 const searchNorm = (s: string) => s.toLowerCase().replace(/ё/g, 'е');
@@ -105,6 +107,9 @@ const textCache = new Map<ID, { at: number; text: string }>();
 export async function loadNoteBody(id: ID): Promise<NoteBody> {
   const p = pending.get(id);
   if (p) return p.body;
+  // тело сейчас записывается (создали заметку и сразу открыли) — в базе его ещё нет
+  const w = writing.get(id);
+  if (w) return w.body;
   return normalizeBody(await get<NoteBody>(noteBodyKey(id)));
 }
 
@@ -125,6 +130,18 @@ async function writeBody(id: ID): Promise<void> {
   pending.delete(id);
   if (!useNotes.getState().data?.notes.some((n) => n.id === id)) return;
   const body: NoteBody = { ...p.body, updatedAt: Date.now() };
+  let finish = () => {};
+  const entry = { body, done: new Promise<void>((r) => (finish = r)) };
+  writing.set(id, entry);
+  try {
+    await writeNow(id, body);
+  } finally {
+    if (writing.get(id) === entry) writing.delete(id);
+    finish();
+  }
+}
+
+async function writeNow(id: ID, body: NoteBody): Promise<void> {
   const size = JSON.stringify(body).length;
   if (size > BODY_WARN_BYTES && !warned.has(id)) {
     warned.add(id);
@@ -149,6 +166,7 @@ async function writeBody(id: ID): Promise<void> {
 /** Сохранить всё несохранённое сразу */
 export async function flushNotes(): Promise<void> {
   await Promise.all([...pending.keys()].map(writeBody));
+  await Promise.all([...writing.values()].map((w) => w.done));
   await flushIndex();
 }
 

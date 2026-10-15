@@ -8,7 +8,8 @@ import type { ID } from '../types';
 import { keywordTerms, keywordsOf, pairKey, relatedTo } from './links';
 import { bodyPlainText, type AiLinkReview, type AiTermsReview } from './model';
 import { buildReviewPrompt, parseReview, REVIEW_SYSTEM, type ReviewCandidate, type ReviewInput } from './aiReviewPrompt';
-import { ensureLinkIndex, rawFeatures } from './related';
+import { KIND_LABEL, parseItemId } from './brainDocs';
+import { brainItem, ensureLinkIndex, isWikiLink, rawFeatures } from './related';
 import { loadNoteBody, mutateNotes, useNotes } from './store';
 
 /** сколько заметок-кандидатов показывать ИИ: связанные сейчас + близкие, но не дотянувшие до порога */
@@ -55,11 +56,13 @@ export async function reviewNote(id: ID, signal?: AbortSignal): Promise<ReviewSu
   // подтверждённые раньше ИИ (но не человеком) — тоже на пересмотр
   for (const r of relatedTo(ix, id)) if (r.confirmed && !near.some((x) => x.id === r.id) && pairs.get(pairKey(id, r.id))?.by !== 'user') near.push(r);
   const candidates: ReviewCandidate[] = near
-    .filter((r) => pairs.get(pairKey(id, r.id))?.by !== 'user')
+    // решение человека и явные [[ссылки]] — не на пересмотр
+    .filter((r) => pairs.get(pairKey(id, r.id))?.by !== 'user' && !isWikiLink(id, r.id) && brainItem(r.id))
     .slice(0, CANDIDATES + 4)
     .map((r) => {
-      const m = data!.notes.find((n) => n.id === r.id);
-      return { id: r.id, title: m?.title ?? '', preview: m?.preview ?? '', keywords: keywordsOf(ix, r.id, 6), shared: r.terms, linked: shown.has(r.id) };
+      const m = brainItem(r.id)!;
+      const kind = parseItemId(r.id).kind;
+      return { id: r.id, title: m.title, preview: m.preview, keywords: keywordsOf(ix, r.id, 6), shared: r.terms, linked: shown.has(r.id), ...(kind !== 'note' ? { kind: KIND_LABEL[kind] } : {}) };
     });
   const input: ReviewInput = { title: body.title, text: bodyPlainText(body), keywords, candidates };
 
@@ -146,7 +149,8 @@ export function linkVerdict(a: ID, b: ID): AiLinkReview | undefined {
 export async function notesToReview(ids: ID[]): Promise<ID[]> {
   const ix = await ensureLinkIndex();
   return ids.filter((id) => {
-    if (!ix.docs.has(id)) return false;
+    // проверка ИИ — только для заметок (у карт, задач и целей нет текста заметки)
+    if (parseItemId(id).kind !== 'note' || !ix.docs.has(id)) return false;
     const st = reviewState(id);
     return !st || st.stale;
   });

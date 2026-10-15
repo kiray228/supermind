@@ -188,77 +188,14 @@
 
 /* связанные заметки — под текстом заметки */
 .nt-tail:has(+ .nt-rel:not(.is-blank)) { min-height: 72px; }
-.nt-rel { margin: 8px 0 0; padding: 16px 0 calc(28px + var(--safe-bottom, 0px)); border-top: 1px solid var(--border); }
-.nt-rel.is-blank { display: none; }
-.nt-rel-kw { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 14px; }
-.nt-rel-kw-label { font-size: 12px; font-weight: 650; color: var(--text-3); text-transform: uppercase; letter-spacing: .04em; margin-right: 2px; }
-.nt-rel-chip { font-size: 13px; line-height: 1; padding: 6px 9px; border-radius: 999px; background: var(--fill-4); color: var(--text-2); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nt-rel-head { display: flex; align-items: center; gap: 7px; font-weight: 650; font-size: 14px; color: var(--text-2); margin-bottom: 8px; }
-.nt-rel-head svg { color: var(--accent); flex-shrink: 0; }
-.nt-rel-count { font-size: 12px; font-weight: 650; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; background: var(--accent-soft); color: var(--accent); }
-.nt-rel-progress { display: flex; flex-direction: column; gap: 6px; padding: 4px 0 8px; }
-.nt-rel-bar { height: 4px; border-radius: 4px; background: var(--fill-3); overflow: hidden; }
-.nt-rel-bar > span { display: block; height: 100%; background: var(--accent); border-radius: inherit; transition: width .2s; }
-.nt-rel-list { display: flex; flex-direction: column; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border); overflow: hidden; }
-.nt-rel-item {
-  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 10px 12px; border: none; background: none;
-  text-align: left; color: var(--text); cursor: pointer; font: inherit;
-}
-.nt-rel-item + .nt-rel-item { border-top: 1px solid var(--border); }
-.nt-rel-item:active { background: var(--fill-4); }
-.nt-rel-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-@media (hover: hover) { .nt-rel-item:hover { background: var(--fill-4); } }
-.nt-rel-str { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; flex-shrink: 0; }
-.nt-rel-str > i { width: 3px; border-radius: 2px; background: var(--fill); }
-.nt-rel-str > i:nth-child(1) { height: 6px; }
-.nt-rel-str > i:nth-child(2) { height: 10px; }
-.nt-rel-str > i:nth-child(3) { height: 14px; }
-.nt-rel-str[data-l='1'] > i:nth-child(-n+1),
-.nt-rel-str[data-l='2'] > i:nth-child(-n+2),
-.nt-rel-str[data-l='3'] > i { background: var(--accent); }
-.nt-rel-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.nt-rel-title { font-weight: 600; font-size: 15px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nt-rel-title.is-empty { color: var(--text-2); font-weight: 500; }
-.nt-rel-why { font-size: 12.5px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nt-rel-mention { display: inline-block; font-size: 11px; font-weight: 650; padding: 1px 6px; margin-right: 6px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); vertical-align: 1px; }
-.nt-rel-folder { width: 8px; height: 8px; border-radius: 50%; background: var(--fc); flex-shrink: 0; }
-.nt-rel-go { color: var(--text-3); flex-shrink: 0; }
-.nt-rel-empty { font-size: 13px; color: var(--text-3); line-height: 1.45; padding: 2px 0; }
-.nt-rel-graph { border: none; background: none; color: var(--accent); font: inherit; font-size: 13px; font-weight: 600; padding: 4px 2px; cursor: pointer; }
-.nt-rel-chip.is-ai { display: inline-flex; align-items: center; gap: 4px; background: var(--accent-soft); color: var(--accent); }
-.nt-rel-ok { display: inline-flex; align-items: center; gap: 2px; font-size: 11px; font-weight: 650; padding: 1px 6px 1px 4px; margin-right: 6px; border-radius: 6px; background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); vertical-align: 1px; }
-
-/* проверка связей ИИ */
-.nt-ai { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
-.nt-ai-bar { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-2); min-height: 32px; }
-.nt-ai-ic { color: var(--accent); flex-shrink: 0; }
-.nt-ai-status { line-height: 1.35; }
-.nt-ai-btn {
-  display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
-  padding: 6px 12px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border)); background: var(--accent-soft); color: var(--accent);
-}
-.nt-ai-btn:active { opacity: .75; }
-.nt-ai-result { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: var(--radius); background: var(--surface); border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border)); font-size: 13.5px; line-height: 1.45; color: var(--text-2); animation: nt-card-in .18s ease-out; }
-.nt-ai-result b { color: var(--text); font-weight: 600; }
-.nt-ai-result-head { display: flex; align-items: center; gap: 8px; font-weight: 650; color: var(--text); font-size: 14px; }
-.nt-ai-result-head > svg { color: var(--accent); flex-shrink: 0; }
-.nt-ai-result-head .icon-btn { margin: -8px -8px -8px 0; }
-.nt-ai-group { display: flex; flex-direction: column; gap: 6px; }
-.nt-ai-link { display: flex; align-items: center; gap: 8px; padding: 6px 0 6px 10px; border-left: 2px solid var(--accent); }
-.nt-ai-link.is-off { border-left-color: var(--fill); }
-.nt-ai-link.is-off .nt-ai-link-title { text-decoration: line-through; color: var(--text-3); }
-.nt-ai-link-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; border: none; background: none; padding: 0; text-align: left; font: inherit; color: inherit; cursor: pointer; }
-.nt-ai-link-title { font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nt-ai-link-why { font-size: 12.5px; color: var(--text-3); }
-.nt-ai-undo { align-self: flex-start; display: inline-flex; align-items: center; gap: 5px; border: none; background: none; padding: 2px 0; font: inherit; font-size: 13px; color: var(--text-3); cursor: pointer; }
-@media (hover: hover) { .nt-ai-undo:hover { color: var(--text); } }
 
 /* ---------- Граф заметок ---------- */
 .nt-list[hidden] { display: none; }
 .nt-graph { position: relative; flex: 1; min-height: 0; overflow: hidden; background: var(--bg); }
 .nt-main.has-editor .nt-graph { display: none; }
 .nt-graph-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
-.nt-graph-bar { position: absolute; top: 10px; left: 12px; right: 64px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; pointer-events: none; }
+.nt-graph-top { position: absolute; top: 10px; left: 12px; right: 64px; display: flex; flex-direction: column; gap: 8px; pointer-events: none; z-index: 3; }
+.nt-graph-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; pointer-events: none; }
 .nt-graph-bar > * { pointer-events: auto; }
 .nt-graph-stat {
   display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--text-2);
@@ -297,7 +234,37 @@
 .nt-graph-card-nb { display: flex; flex-wrap: wrap; gap: 6px; }
 .nt-graph-nb { border: none; cursor: pointer; font: inherit; font-size: 12.5px; max-width: 100%; }
 .nt-graph-nb:active { background: var(--fill-3); }
-.nt-graph-open { align-self: stretch; justify-content: center; margin-top: 2px; }
+.nt-graph-open { justify-content: center; }
+.nt-graph-card-actions { display: flex; gap: 8px; margin-top: 2px; }
+.nt-graph-card-actions .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.nt-graph-card-kind { font-weight: 650; color: var(--text-2); }
+/* «Вид» графа */
+.nt-graph-panel-shield { position: absolute; inset: 0; z-index: 4; }
+.nt-graph-panel {
+  position: absolute; top: 52px; left: 12px; z-index: 5; width: min(340px, calc(100% - 24px)); padding: 12px; display: flex; flex-direction: column; gap: 10px;
+  border-radius: var(--radius-card); background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-lg); animation: nt-card-in .15s ease-out;
+}
+.nt-graph-panel-label { font-size: 12px; font-weight: 650; color: var(--text-3); text-transform: uppercase; letter-spacing: .04em; margin-bottom: -4px; }
+.nt-graph-panel-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.nt-graph-panel-ai { align-self: flex-start; }
+.nt-seg { display: flex; padding: 2px; border-radius: 10px; background: var(--fill-3); }
+.nt-seg > button { flex: 1; border: none; background: none; font: inherit; font-size: 13px; font-weight: 600; color: var(--text-2); padding: 6px 8px; border-radius: 8px; cursor: pointer; }
+.nt-seg > button.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0, 0, 0, .12); }
+/* окрестность */
+.nt-graph-hood { max-width: 100%; padding-right: 4px; }
+.nt-graph-hood > .ellipsis { max-width: 140px; }
+.nt-graph-hood-depth, .nt-graph-hood-x { border: none; background: none; font: inherit; font-size: 12px; font-weight: 650; color: inherit; padding: 2px 6px; border-radius: 999px; cursor: pointer; display: inline-flex; align-items: center; }
+.nt-graph-hood-depth { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+/* легенда тем */
+.nt-graph-legend { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; pointer-events: auto; }
+.nt-graph-legend::-webkit-scrollbar { display: none; }
+.nt-graph-topic {
+  flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--text-2); cursor: pointer;
+  padding: 5px 10px 5px 8px; border-radius: 999px; background: color-mix(in srgb, var(--surface) 88%, transparent); border: 1px solid var(--border);
+}
+.nt-graph-topic > i { width: 9px; height: 9px; border-radius: 50%; background: var(--tc); }
+.nt-graph-topic-n { font-size: 11px; color: var(--text-3); }
+.nt-graph-topic.active { color: var(--text); border-color: var(--tc); background: color-mix(in srgb, var(--tc) 14%, var(--surface)); }
 
 /* ---------- Блоки ---------- */
 .nt-blocks { display: flex; flex-direction: column; }
@@ -315,6 +282,10 @@
 .nt-tb-view mark { background: color-mix(in srgb, var(--warn) 35%, transparent); color: inherit; border-radius: 3px; padding: 0 2px; }
 .nt-tb-view s { color: var(--text-3); }
 .nt-link { position: relative; z-index: 2; color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.nt-wiki { text-decoration: none; border-bottom: 1.5px solid color-mix(in srgb, var(--accent) 45%, transparent); border-radius: 2px; background: color-mix(in srgb, var(--accent) 8%, transparent); padding: 0 2px; }
+.nt-wiki.is-new { color: var(--text-2); border-bottom-style: dashed; background: none; }
+.nt-mention { position: relative; z-index: 2; color: inherit; text-decoration: underline dotted color-mix(in srgb, var(--accent) 70%, transparent); text-decoration-thickness: 1.5px; text-underline-offset: 3px; cursor: pointer; }
+@media (hover: hover) { .nt-mention:hover { color: var(--accent); } .nt-wiki:hover { background: color-mix(in srgb, var(--accent) 16%, transparent); } }
 
 .nt-b-h1 { font-size: 25px; font-weight: 750; line-height: 1.3; margin-top: 14px; letter-spacing: -.01em; }
 .nt-b-h2 { font-size: 21px; font-weight: 700; line-height: 1.32; margin-top: 10px; }

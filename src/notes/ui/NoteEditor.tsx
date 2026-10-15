@@ -9,6 +9,7 @@ import {
   FolderInput,
   FolderPlus,
   Image as ImageIcon,
+  Link2,
   Loader2,
   Mic,
   MoreHorizontal,
@@ -38,10 +39,43 @@ import { cloneBlocks, convertBlock, detectShortcut, listNumbers, nextTypeAfter, 
 import { BlockMenuItems, FORMAT_MARKS, FormatMenuItems, type FormatKind, TypeMenuItems } from './EditorMenus';
 import { MenuItem, MenuLabel, MenuSep, NtMenu, type MenuAnchor } from './Menu';
 import { RelatedNotes } from './RelatedNotes';
+import { KIND_ICON } from './kindIcons';
+import { KIND_LABEL } from '../brainDocs';
+import { normTitle } from '../links';
+import { brainItems } from '../related';
 
 type MenuState = { kind: 'type' | 'format' | 'block' | 'note' | 'folder'; anchor: MenuAnchor; blockId?: ID; replace?: boolean } | null;
 type RecState = { r: Recording; after: ID | null; final: string; recog: Recognizer | null; ended?: () => void };
 type FocusReq = { id: ID; start: number | 'end'; end?: number };
+type WikiState = { blockId: ID; from: number; query: string; anchor: HTMLElement; sel: number };
+type WikiOption = { title: string; kind: keyof typeof KIND_LABEL; create?: boolean };
+
+/** Набранное после «[[» до курсора — подсказка ссылки открыта */
+const WIKI_OPEN = /\[\[([^[\]\n|]{0,60})$/;
+const WIKI_MAX = 8;
+
+/** Варианты для [[ссылки]]: сначала начинающиеся с набранного, заметки — первыми; в конце — «Создать» */
+function wikiOptions(query: string, selfId: ID | null): WikiOption[] {
+  const q = normTitle(query);
+  const seen = new Set<string>();
+  const ranked: { o: WikiOption; r: number }[] = [];
+  const kindRank = { note: 0, map: 1, goal: 2, task: 3 } as const;
+  const add = (title: string, kind: WikiOption['kind'], id: string) => {
+    const k = normTitle(title);
+    if (!k || id === selfId || seen.has(k)) return;
+    const at = q ? k.indexOf(q) : 0;
+    if (at < 0) return;
+    seen.add(k);
+    ranked.push({ o: { title, kind }, r: (at === 0 ? 0 : 10) + kindRank[kind] });
+  };
+  for (const it of brainItems()) add(it.title, it.kind, it.id);
+  // индекс ещё не собран — хотя бы заметки
+  for (const n of useNotes.getState().data?.notes ?? []) if (!n.trashed) add(n.title, 'note', n.id);
+  ranked.sort((a, b) => a.r - b.r || a.o.title.localeCompare(b.o.title, 'ru'));
+  const out = ranked.slice(0, WIKI_MAX).map((x) => x.o);
+  if (query.trim() && !seen.has(q)) out.push({ title: query.trim(), kind: 'note', create: true });
+  return out;
+}
 
 const blocksNow = () => useNotes.getState().openBody?.blocks ?? [];
 const indexOf = (id: ID) => blocksNow().findIndex((b) => b.id === id);
@@ -64,6 +98,8 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
   const [dict, setDict] = useState<{ interim: string } | null>(null);
   const [ai, setAi] = useState<{ kind: NoteAIKind; chars: number } | null>(null);
   const [viewer, setViewer] = useState<string | null>(null);
+  /** подсказка [[ссылки]]: где началась и что уже набрано */
+  const [wiki, setWiki] = useState<WikiState | null>(null);
 
   const tas = useRef(new Map<ID, HTMLTextAreaElement>());
   const titleRef = useRef<HTMLTextAreaElement>(null);
@@ -367,6 +403,47 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
       if (nl >= 0) return split(id, value.slice(0, nl) + value.slice(nl + 1), nl);
     }
     patch(id, { text: value }, 'type');
+    // «[[» — подсказка ссылки на заметку, карту или цель
+    const m = WIKI_OPEN.exec(value.slice(0, el.selectionStart));
+    if (m) setWiki((w) => ({ blockId: id, from: el.selectionStart - m[0].length, query: m[1], anchor: el, sel: w && w.blockId === id ? Math.min(w.sel, WIKI_MAX) : 0 }));
+    else if (wiki) setWiki(null);
+  }
+
+  /** Вставить [[Название]] вместо набранного «[[…» */
+  function chooseWiki(title: string) {
+    const w = wiki;
+    setWiki(null);
+    if (!w) return;
+    const el = tas.current.get(w.blockId);
+    const b = blocksNow().find((x) => x.id === w.blockId);
+    if (!el || !b) return;
+    const text = b.text ?? '';
+    const caret = Math.max(w.from, Math.min(el.selectionStart, text.length));
+    // уже закрытые «]]» сразу после курсора не дублируем
+    const tail = text.slice(caret).startsWith(']]') ? text.slice(caret + 2) : text.slice(caret);
+    const link = `[[${title}]]`;
+    patch(w.blockId, { text: text.slice(0, w.from) + link + tail });
+    focusBlock(w.blockId, w.from + link.length);
+  }
+
+  /** Кнопка «Ссылка»: вставить «[[» у курсора — откроется подсказка */
+  function startWiki() {
+    const id = lastFocus.current;
+    const el = id ? tas.current.get(id) : undefined;
+    if (!id || !el) return toast('Поставьте курсор в текст');
+    const v = el.value;
+    const s0 = el.selectionStart;
+    const s1 = el.selectionEnd;
+    // выделенный текст становится ссылкой
+    if (s1 > s0) {
+      const r = wrapSelection(v, s0, s1, '[[', ']]');
+      patch(id, { text: r.text });
+      return focusBlock(id, r.end + 2);
+    }
+    const text = v.slice(0, s0) + '[[' + v.slice(s0);
+    patch(id, { text });
+    focusBlock(id, s0 + 2);
+    setWiki({ blockId: id, from: s0, query: '', anchor: el, sel: 0 });
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>, b: Block, el: HTMLTextAreaElement) {
@@ -390,6 +467,24 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
       return format('link');
     }
     if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+    // подсказка [[ссылки]]: стрелки — выбор, Enter/Tab — вставить, Esc — закрыть
+    if (wiki && wiki.blockId === b.id) {
+      const opts = wikiOptions(wiki.query, meta?.id ?? null);
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        const n = opts.length;
+        if (n) setWiki({ ...wiki, sel: (wiki.sel + (e.key === 'ArrowDown' ? 1 : n - 1)) % n });
+        return;
+      }
+      if ((e.key === 'Enter' || e.key === 'Tab') && opts.length) {
+        e.preventDefault();
+        return chooseWiki(opts[Math.min(wiki.sel, opts.length - 1)].title);
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        return setWiki(null);
+      }
+    }
     const s = el.selectionStart;
     const en = el.selectionEnd;
     const v = el.value;
@@ -831,6 +926,7 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
             {tb('Добавить блок', <Plus />, (el) => setMenu({ kind: 'type', anchor: el }))}
             {tb('Чек-лист', <SquareCheck />, toggleTodo, { active: focusedBlock?.type === 'todo' })}
             {tb('Оформление', <Bold />, (el) => setMenu({ kind: 'format', anchor: el }))}
+            {tb('Ссылка на заметку', <Link2 />, startWiki)}
             {tb('Фото', <ImageIcon />, () => pickImage(anchorId()))}
             {tb('Диктовка', <Mic />, toggleDictation, { active: !!dict })}
             {tb('Голосовая запись', <AudioLines />, () => void startRec())}
@@ -844,6 +940,30 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
           {kb && tb('Скрыть клавиатуру', <ChevronDown />, () => (document.activeElement as HTMLElement | null)?.blur(), { cls: 'nt-tool-kb' })}
         </div>
       )}
+
+      {wiki &&
+        (() => {
+          const opts = wikiOptions(wiki.query, meta.id);
+          if (!opts.length) return null;
+          return (
+            <NtMenu anchor={wiki.anchor} onClose={() => setWiki(null)} keepFocus className="nt-wiki-menu">
+              <MenuLabel>Ссылка на…</MenuLabel>
+              {opts.map((o, i) => {
+                const Icon = KIND_ICON[o.kind];
+                return (
+                  <MenuItem
+                    key={o.kind + o.title + (o.create ? '+' : '')}
+                    icon={o.create ? <Plus size={17} /> : <Icon size={17} />}
+                    label={o.create ? `Создать «${o.title}»` : o.title}
+                    hint={o.create ? undefined : KIND_LABEL[o.kind]}
+                    active={i === Math.min(wiki.sel, opts.length - 1)}
+                    onClick={() => chooseWiki(o.title)}
+                  />
+                );
+              })}
+            </NtMenu>
+          );
+        })()}
 
       {menu?.kind === 'type' && (
         <NtMenu anchor={menu.anchor} onClose={() => setMenu(null)} keepFocus>

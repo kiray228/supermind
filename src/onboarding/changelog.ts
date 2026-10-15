@@ -1,5 +1,5 @@
 /** «Что нового»: главное в каждой версии. Новые версии — сверху. */
-import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2 } from 'lucide-react';
+import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download } from 'lucide-react';
 
 export interface ChangeItem {
   icon: typeof Sparkles;
@@ -15,6 +15,16 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.26',
+    title: 'Второй мозг целиком',
+    items: [
+      { icon: Network, title: 'Карты, задачи и цели — тоже в связях', text: 'Связи находятся не только между заметками: заметка о поездке сама связывается с картой маршрута и задачей «Купить билеты». Связи видны и в окне задачи, и в цели.' },
+      { icon: Link2, title: '[[Ссылки]] и упоминания', text: 'Наберите «[[» или нажмите кнопку ссылки — появится подсказка. Ссылка на несуществующую заметку создаёт её. А названия других заметок, карт и целей в тексте подсвечиваются сами — нажмите, чтобы перейти.' },
+      { icon: Waypoints, title: 'Темы и окрестность на графе', text: '«Вид» → цвет «Темы»: граф сам делится на темы с подписями. Карты, цели и задачи — своими значками. «Окрестность» показывает только связи выбранного на 1–2 шага.' },
+      { icon: Download, title: 'Экспорт в Obsidian', text: 'Заметки → «⋯» → «Экспорт для Obsidian»: архив с заметками, папками, тегами и [[ссылками]] — распакуйте и откройте как хранилище.' },
+    ],
+  },
   {
     version: '1.25',
     title: 'Голосом: утром и вечером',
