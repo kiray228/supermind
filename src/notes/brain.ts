@@ -47,7 +47,7 @@ export async function collectItems(): Promise<BrainItem[]> {
 /** Текст единицы для анализа. null — прочитать не удалось (или карта защищена паролем) */
 export async function itemText(id: string): Promise<NoteDoc | null> {
   const { kind, raw } = parseItemId(id);
-  if (kind === 'note') return noteDoc(await loadNoteBody(raw));
+  if (kind === 'note') return noteDoc(await loadNoteBody(raw), !!useNotes.getState().data?.notes.find((n) => n.id === raw)?.day);
   if (kind === 'map') {
     const doc = await loadDoc(raw);
     return doc && !('locked' in doc && doc.locked) && 'sheets' in doc ? mapDoc(doc) : null;

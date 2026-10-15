@@ -295,12 +295,12 @@ export function undoOpenBody() {
 
 // ---------- Заметки ----------
 
-export function createNote(p: { folderId?: ID; title?: string; blocks?: Block[]; pinned?: boolean } = {}): NoteMeta | null {
+export function createNote(p: { folderId?: ID; title?: string; blocks?: Block[]; pinned?: boolean; day?: string; digest?: boolean } = {}): NoteMeta | null {
   const d = useNotes.getState().data;
   if (!d) return null;
   const now = Date.now();
   const folderId = p.folderId && d.folders.some((f) => f.id === p.folderId) ? p.folderId : undefined;
-  const meta: NoteMeta = { id: uid(), title: p.title ?? '', preview: '', createdAt: now, updatedAt: now, ...(folderId ? { folderId } : {}), ...(p.pinned ? { pinned: true } : {}) };
+  const meta: NoteMeta = { id: uid(), title: p.title ?? '', preview: '', createdAt: now, updatedAt: now, ...(folderId ? { folderId } : {}), ...(p.pinned ? { pinned: true } : {}), ...(p.day ? { day: p.day } : {}), ...(p.digest ? { digest: true } : {}) };
   mutateNotes((x) => void x.notes.unshift(meta));
   if (p.title || p.blocks?.length) {
     const body: NoteBody = { ...emptyBody(), title: p.title ?? '', ...(p.blocks?.length ? { blocks: p.blocks } : {}) };
@@ -375,6 +375,8 @@ export async function duplicateNote(id: ID): Promise<NoteMeta | null> {
   const copy: NoteBody = { title: body.title ? body.title + ' (копия)' : '', blocks: body.blocks.map((b) => ({ ...b, id: uid() })), updatedAt: Date.now() };
   const now = Date.now();
   const meta: NoteMeta = { ...src, id: uid(), title: copy.title, createdAt: now, updatedAt: now };
+  delete meta.day;
+  delete meta.digest;
   delete meta.pinned;
   delete meta.trashed;
   mutateNotes((x) => void x.notes.unshift(meta));

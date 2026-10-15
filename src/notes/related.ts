@@ -303,6 +303,13 @@ async function graphEdges(cur: LinkIndex, onProgress: (p: number) => void, alive
   return edges;
 }
 
+/** Индекс и все связи мозга (как на графе) — для тем и конспектов */
+export async function brainGraph(): Promise<{ ix: LinkIndex; edges: LinkEdge[]; items: BrainItem[] }> {
+  const cur = await ensureLinkIndex();
+  const edges = (await graphEdges(cur, () => undefined, () => true)) ?? [];
+  return { ix: cur, edges, items };
+}
+
 export interface GraphState {
   /** индекс, по которому посчитаны связи (в нём — единицы, у которых есть текст) */
   ix: LinkIndex | null;

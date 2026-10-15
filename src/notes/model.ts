@@ -32,6 +32,10 @@ export interface NoteMeta {
   preview: string;
   folderId?: ID;
   pinned?: boolean;
+  /** заметка дня (YYYY-MM-DD) */
+  day?: string;
+  /** конспект темы от ИИ: пересказывает свои источники — дублем их не считается */
+  digest?: boolean;
   /** в корзине с этого момента */
   trashed?: number;
   createdAt: number;

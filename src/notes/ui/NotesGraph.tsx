@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { ChevronRight, CircleDot, Maximize2, Minus, Plus, Scan, SlidersHorizontal, Sparkles, Waypoints, X } from 'lucide-react';
+import { BookOpenText, ChevronRight, CircleDot, Maximize2, Minus, Plus, Scan, SlidersHorizontal, Sparkles, Waypoints, X } from 'lucide-react';
 import type { ID } from '../../types';
 import { AIError } from '../../ai/claude';
 import { toast } from '../../store/appStore';
 import { confirmDialog } from '../../ui/dialogs';
 import { notesToReview, reviewNote } from '../aiReview';
+import { openDigest } from '../digest';
 import type { Folder } from '../model';
 import { type BrainKind, KIND_LABEL } from '../brainDocs';
 import { openItem, type BrainItem } from '../brain';
@@ -269,6 +270,19 @@ export function NotesGraph({ noteScope, folders, highlight, focusId, onFocused, 
     return m ? m.title || m.preview.slice(0, 40) || 'Без названия' : '';
   };
   const hoodTitle = hood ? titleOf(hood.id) : '';
+  /** конспект выбранной темы: её записи — самые связанные первыми */
+  const digestTopic = () => {
+    const t = model.topics.find((x) => x.c === topic);
+    if (!t) return;
+    const deg = new Map<ID, number>();
+    for (const l of model.links)
+      if (model.clusters.get(l.a) === t.c && model.clusters.get(l.b) === t.c) {
+        deg.set(l.a, (deg.get(l.a) ?? 0) + l.w);
+        deg.set(l.b, (deg.get(l.b) ?? 0) + l.w);
+      }
+    const ids = model.shown.filter((i) => model.clusters.get(i.id) === t.c).map((i) => i.id);
+    openDigest(t.name, ids.sort((a, b) => (deg.get(b) ?? 0) - (deg.get(a) ?? 0)));
+  };
   const scopeAll = !noteScope;
   const statLabel = scopeAll ? plural(model.shown.length, 'единица', 'единицы', 'единиц') : plural(model.shown.length, 'заметка', 'заметки', 'заметок');
 
@@ -306,6 +320,11 @@ export function NotesGraph({ noteScope, folders, highlight, focusId, onFocused, 
 
         {colorMode === 'topic' && model.topics.length > 0 && (
           <div className="nt-graph-legend" aria-label="Темы">
+            {topic !== null && model.topics.some((t) => t.c === topic) && (
+              <button className="nt-graph-topic nt-graph-digest active" style={{ '--tc': 'var(--accent)' } as CSSProperties} onClick={digestTopic} title="ИИ соберёт записи темы в обзор со ссылками">
+                <BookOpenText size={14} /> Конспект
+              </button>
+            )}
             {model.topics.map((t) => (
               <button
                 key={t.c}

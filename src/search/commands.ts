@@ -76,6 +76,16 @@ export function buildCommands(): Entry[] {
       },
     }),
     entry({
+      key: 'c:daily-note',
+      kind: 'cmd',
+      title: 'Заметка дня',
+      emoji: '📔',
+      body: 'дневник сегодня запись дня ежедневная заметка итоги дня мысли',
+      run: async () => {
+        await (await import('../notes/daily')).openDailyNote();
+      },
+    }),
+    entry({
       key: 'c:new-goal',
       kind: 'cmd',
       title: 'Новая цель',

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, Brain, Check, ChevronDown, Copy, CopyCheck, Download, Equal, FolderInput, FolderPlus, LayoutGrid, MoreHorizontal, Pencil, Pin, PinOff, Plus, RotateCcw, Search, StickyNote, Trash2, Upload, Waypoints, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Brain, Check, ChevronDown, Compass, Copy, CopyCheck, Download, Equal, NotebookPen, FolderInput, FolderPlus, LayoutGrid, MoreHorizontal, Pencil, Pin, PinOff, Plus, RotateCcw, Search, StickyNote, Trash2, Upload, Waypoints, X } from 'lucide-react';
 import type { ID } from '../types';
 import { confirmDialog } from '../ui/dialogs';
 import { toast } from '../store/appStore';
@@ -26,6 +26,9 @@ import { NotesGraph } from '../notes/ui/NotesGraph';
 import { BrainAsk } from '../notes/ui/BrainAsk';
 import { DuplicatesSheet } from '../notes/ui/DuplicatesSheet';
 import { SynonymsSheet } from '../notes/ui/SynonymsSheet';
+import { BrainReviewSheet } from '../notes/ui/BrainReviewSheet';
+import { TopicDigest } from '../notes/ui/TopicDigest';
+import { collectReview, markReviewSeen, reviewCount, reviewDue } from '../notes/brainReview';
 import { openAsk, useAsk } from '../notes/brainAsk';
 import { useLinks } from '../notes/related';
 import { FolderDialog, NoteCard } from '../notes/ui/ListParts';
@@ -68,6 +71,57 @@ function sortNotes(list: NoteMeta[], by: NotesSort): NoteMeta[] {
   return s;
 }
 
+/** Заметка дня: открыть (создав по шаблону) */
+const openDaily = () =>
+  import('../notes/daily')
+    .then((m) => m.openDailyNote())
+    .catch(() => toast('Не удалось открыть заметку дня'));
+
+/** Раз в неделю — напоминание об обзоре мозга (если есть что посмотреть) */
+function ReviewNudge({ onOpen }: { onOpen: () => void }) {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    if (!reviewDue()) return;
+    let alive = true;
+    // не мешать первому показу списка
+    const t = setTimeout(() => {
+      void collectReview()
+        .then((r) => alive && setN(reviewCount(r)))
+        .catch(() => undefined);
+    }, 1500);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+  }, []);
+  if (!n) return null;
+  return (
+    <div className="nt-rv-nudge">
+      <Compass size={18} />
+      <span className="grow">Обзор мозга за неделю: забытые и несвязанные заметки, дубли — поводов заглянуть: {n}</span>
+      <button
+        className="nt-ai-btn"
+        onClick={() => {
+          setN(0);
+          onOpen();
+        }}
+      >
+        Открыть
+      </button>
+      <button
+        className="icon-btn"
+        onClick={() => {
+          markReviewSeen();
+          setN(0);
+        }}
+        aria-label="Скрыть до следующей недели"
+      >
+        <X size={16} />
+      </button>
+    </div>
+  );
+}
+
 export default function Notes() {
   const data = useNotes((s) => s.data);
   const openId = useNotes((s) => s.openId);
@@ -84,6 +138,7 @@ export default function Notes() {
   const askOpen = useAsk((s) => s.open);
   const [dupSheet, setDupSheet] = useState(false);
   const [synSheet, setSynSheet] = useState(false);
+  const [reviewSheet, setReviewSheet] = useState(false);
 
   useEffect(() => {
     void ensureNotes().then((d) => {
@@ -283,6 +338,9 @@ export default function Notes() {
           <ChevronDown size={18} className="nt-mobile-only" />
         </button>
         <div className="grow" />
+        <button className="icon-btn" onClick={() => void openDaily()} aria-label="Заметка дня" title="Заметка дня">
+          <NotebookPen />
+        </button>
         <button className="icon-btn" onClick={() => openAsk()} aria-label="Спросить у мозга" title="Спросить у мозга">
           <Brain />
         </button>
@@ -323,6 +381,7 @@ export default function Notes() {
             />
           )}
           <div className="page-body nt-list" hidden={graphMode}>
+            {sel.k === 'all' && !q && <ReviewNudge onOpen={() => setReviewSheet(true)} />}
             {isTrash && list.length > 0 && <div className="nt-trash-hint small faint">Заметки в корзине удаляются навсегда через {TRASH_DAYS} дней.</div>}
             {list.length === 0 ? (
               <div className="empty">
@@ -364,6 +423,16 @@ export default function Notes() {
       {askOpen && <BrainAsk />}
       {dupSheet && <DuplicatesSheet onClose={() => setDupSheet(false)} />}
       {synSheet && <SynonymsSheet onClose={() => setSynSheet(false)} />}
+      {reviewSheet && (
+        <BrainReviewSheet
+          onClose={() => setReviewSheet(false)}
+          onDuplicates={() => {
+            setReviewSheet(false);
+            setDupSheet(true);
+          }}
+        />
+      )}
+      <TopicDigest />
 
       {folderDlg && (
         <FolderDialog
@@ -382,6 +451,7 @@ export default function Notes() {
           ))}
           <MenuSep />
           <MenuItem icon={<FolderPlus size={17} />} label="Новая папка" onClick={() => setFolderDlg({})} />
+          <MenuItem icon={<Compass size={17} />} label="Обзор мозга" onClick={() => setReviewSheet(true)} />
           <MenuItem icon={<CopyCheck size={17} />} label="Найти дубли" onClick={() => setDupSheet(true)} />
           <MenuItem icon={<Equal size={17} />} label="Синонимы" onClick={() => setSynSheet(true)} />
           <MenuItem

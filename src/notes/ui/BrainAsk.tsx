@@ -1,9 +1,8 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ArrowUp, Brain, Loader2, Square, Trash2, X } from 'lucide-react';
 import { onBack } from '../../ui/dialogs';
-import { renderInline } from '../inline';
-import { splitCitations } from '../askPrompt';
-import { type AskEntry, ask, clearAsk, closeAsk, sourceOf, stopAsk, useAsk } from '../brainAsk';
+import { CitedText } from './CitedText';
+import { type AskEntry, ask, clearAsk, closeAsk, stopAsk, useAsk } from '../brainAsk';
 import { openItem } from '../brain';
 import { brainItems } from '../related';
 import { parseItemId } from '../brainDocs';
@@ -15,52 +14,8 @@ function openSource(id: string) {
   void openItem(id);
 }
 
-/** Ответ ИИ: абзацы, списки, заголовки; [1] — ссылки на источники */
 function Answer({ entry }: { entry: AskEntry }) {
-  const count = entry.sources.length;
-  const line = (text: string, key: string): ReactNode[] =>
-    splitCitations(text, count).flatMap((p, i) =>
-      p.t === 'text'
-        ? renderInline(p.s).map((x, j) => <span key={`${key}-${i}-${j}`}>{x}</span>)
-        : [
-            <span key={`${key}-c${i}`} className="nt-ask-cites">
-              {p.n.map((n) => {
-                const s = sourceOf(entry, n);
-                return (
-                  <button key={n} className="nt-ask-cite" onClick={() => s && openSource(s.id)} title={s ? `${s.kind} «${s.title}»` : undefined}>
-                    {n}
-                  </button>
-                );
-              })}
-            </span>,
-          ],
-    );
-  const blocks: ReactNode[] = [];
-  let list: { ordered: boolean; items: ReactNode[] } | null = null;
-  const flush = () => {
-    if (!list) return;
-    blocks.push(list.ordered ? <ol key={'l' + blocks.length}>{list.items}</ol> : <ul key={'l' + blocks.length}>{list.items}</ul>);
-    list = null;
-  };
-  entry.a.split('\n').forEach((raw, i) => {
-    const s = raw.trim();
-    if (!s) return flush();
-    let m: RegExpMatchArray | null;
-    if ((m = s.match(/^[-*•]\s+(.*)$/)) || (m = s.match(/^(\d+)[.)]\s+(.*)$/))) {
-      const ordered = /^\d/.test(s);
-      if (!list || list.ordered !== ordered) {
-        flush();
-        list = { ordered, items: [] };
-      }
-      list.items.push(<li key={i}>{line(m[m.length - 1], 'li' + i)}</li>);
-      return;
-    }
-    flush();
-    if ((m = s.match(/^#{1,4}\s+(.*)$/))) blocks.push(<div key={i} className="nt-ask-h">{line(m[1], 'h' + i)}</div>);
-    else blocks.push(<p key={i}>{line(s, 'p' + i)}</p>);
-  });
-  flush();
-  return <div className="nt-ask-answer">{blocks}</div>;
+  return <CitedText text={entry.a} sources={entry.sources} onOpen={openSource} />;
 }
 
 function Entry({ entry }: { entry: AskEntry }) {

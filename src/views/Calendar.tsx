@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, MouseEvent as RMouseEvent, PointerEvent as RPointerEvent, RefObject, TouchEvent as RTouchEvent } from 'react';
-import { CalendarDays, Check, ChevronLeft, ChevronRight, Download, MoreHorizontal, Network, Plus, Repeat } from 'lucide-react';
+import { CalendarDays, Check, ChevronLeft, ChevronRight, Download, MoreHorizontal, Network, NotebookPen, Plus, Repeat } from 'lucide-react';
 import { ensureTasks, openQuickAdd, openTask, updateTask, useTasks } from '../tasks/store';
 import { dayLabel, isActive, isOverdue, longDate, minutesOf, mondayOf, MONTHS, occurrences, pad2, timeOf, WD_SHORT } from '../tasks/model';
 import type { TasksData, TaskItem } from '../tasks/model';
@@ -18,6 +18,7 @@ import { bumpHabitOn, toggleHabitOn } from '../habits/store';
 import { useTaskActions } from '../tasks/ui/TaskRow';
 import './calendar.css';
 import { IconTile } from '../ui/icons';
+import { ensureNotes, useNotes } from '../notes/store';
 
 // ---------- Константы ----------
 
@@ -74,7 +75,7 @@ const utcYmd = (ms: number) => {
 /** Одна запись в календаре: задача (или её повтор), событие телефона, задача из карты, привычка или срок цели */
 interface Item {
   key: string;
-  kind: 'task' | 'phone' | 'map' | 'habit' | 'goal';
+  kind: 'task' | 'phone' | 'map' | 'habit' | 'goal' | 'note';
   date: string;
   title: string;
   /** минуты от полуночи; нет — на весь день */
@@ -93,6 +94,8 @@ interface Item {
   map?: MapTask;
   habit?: Habit;
   goal?: GoalDue;
+  /** заметка дня */
+  noteId?: string;
 }
 
 type ByDay = Record<string, Item[]>;
@@ -114,6 +117,7 @@ function buildItems(
   now: number,
   planner: PlannerData | null,
   goals: GoalDue[],
+  daily: Map<string, string>,
 ): ByDay {
   const by: ByDay = {};
   const push = (it: Item) => (by[it.date] ??= []).push(it);
@@ -236,6 +240,12 @@ function buildItems(
     });
   }
 
+  // заметки дня — на весь день
+  for (const [d, id] of daily) {
+    if (d < from || d > to) continue;
+    push({ key: `n:${id}`, kind: 'note', date: d, title: '📔 Заметка дня', dur: 0, color: '#0ea5e9', done: false, overdue: false, base: true, movable: false, noteId: id });
+  }
+
   for (const k of Object.keys(by)) {
     by[k].sort((a, b) => (a.start ?? -1) - (b.start ?? -1) || Number(a.done) - Number(b.done) || a.title.localeCompare(b.title, 'ru'));
   }
@@ -322,11 +332,19 @@ function openGoalDue(g: GoalDue) {
 
 /** Нажатие на запись: задача — карточка, карта — тема, событие телефона — подсказка */
 function activate(it: Item) {
-  if (it.habit) void tapHabit(it);
+  if (it.noteId) void openDaily(it.date);
+  else if (it.habit) void tapHabit(it);
   else if (it.goal) openGoalDue(it.goal);
   else if (it.task) openTask(it.task.id);
   else if (it.map) void openDoc(it.map.docId, it.map.topicId);
   else if (it.ev) toast(`${it.title} · ${dayLabel(it.date)}, ${timeLabel(it).toLowerCase()} · ${it.ev.calendar || 'Календарь телефона'}`);
+}
+
+/** Заметка дня: открыть (создав по шаблону) */
+function openDaily(ymd: string) {
+  return import('../notes/daily')
+    .then((m) => m.openDailyNote(ymd))
+    .catch(() => toast('Не удалось открыть заметку дня'));
 }
 
 const kindIcon = (it: Item, size = 11) =>
@@ -353,9 +371,11 @@ export default function Calendar() {
   const busy = useRef(false);
   const swipe = useRef<{ x: number; y: number } | null>(null);
   const today = toYmd(new Date(now));
+  const notes = useNotes((s) => s.data?.notes);
 
   useEffect(() => {
     void ensureTasks();
+    void ensureNotes().catch(() => undefined);
     let alive = true;
     loadAllDocs()
       .then((docs) => alive && setMaps(collectMapTasks(docs)))
@@ -403,9 +423,15 @@ export default function Calendar() {
   }, [from, to, showPhone]);
 
   const goals = useMemo(() => (goalsSrc?.data ? goalsSrc.due(goalsSrc.data, from, to) : []), [goalsSrc, from, to]);
+  // заметки дня: день → заметка (самая свежая, если их несколько)
+  const daily = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const n of [...(notes ?? [])].sort((a, b) => b.updatedAt - a.updatedAt)) if (n.day && !n.trashed && !m.has(n.day)) m.set(n.day, n.id);
+    return m;
+  }, [notes]);
   const items = useMemo(
-    () => (data ? buildItems(data, maps, events, from, to, today, now, planner, goals) : {}),
-    [data, maps, events, from, to, today, now, planner, goals],
+    () => (data ? buildItems(data, maps, events, from, to, today, now, planner, goals, daily) : {}),
+    [data, maps, events, from, to, today, now, planner, goals, daily],
   );
 
   const setView = (v: CalView) => {
@@ -506,6 +532,14 @@ export default function Calendar() {
               }}
             >
               <Download size={16} /> Экспорт .ics
+            </button>
+            <button
+              onClick={() => {
+                setMenu(null);
+                void openDaily(cursor);
+              }}
+            >
+              <NotebookPen size={16} /> Заметка дня: {dayLabel(cursor, today).toLowerCase()}
             </button>
           </div>
         </>

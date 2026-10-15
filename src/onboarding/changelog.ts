@@ -1,5 +1,5 @@
 /** «Что нового»: главное в каждой версии. Новые версии — сверху. */
-import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload } from 'lucide-react';
+import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen } from 'lucide-react';
 
 export interface ChangeItem {
   icon: typeof Sparkles;
@@ -15,6 +15,15 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.29',
+    title: 'Конспекты, обзор и заметка дня',
+    items: [
+      { icon: BookOpenText, title: 'Конспект темы', text: 'Граф → «Вид» → «Темы» → выберите тему → «Конспект»: ИИ соберёт все её записи в обзор — главное, решения, открытые вопросы и следующие шаги, со ссылками на источники. Конспект можно сохранить заметкой.' },
+      { icon: Compass, title: 'Обзор мозга', text: 'Раз в неделю — что требует внимания: давние заметки, которые пригодятся для того, чем вы заняты сейчас, заметки без связей, дубли и длинные заметки, которые можно разбить по разделам. «⋯» → «Обзор мозга».' },
+      { icon: NotebookPen, title: 'Заметка дня', text: 'Кнопка с блокнотом в «Заметках»: одна заметка на день в папке «Дневник» — задачи дня ссылками, мысли, итоги. Заметки дней видны в календаре.' },
+    ],
+  },
   {
     version: '1.28',
     title: 'Синонимы и импорт из Obsidian',

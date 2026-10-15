@@ -96,20 +96,22 @@ export async function linkMention(sourceId: ID, at: NonNullable<Backlink['at']>,
 
 const ignored = () => new Set((useNotes.getState().data?.notDup ?? []).map((r) => r.id));
 const isNoteAlive = (id: string) => useNotes.getState().data?.notes.some((n) => n.id === id && !n.trashed) ?? false;
+/** конспект темы пересказывает свои источники — с ними он не дубль */
+const isDigest = (id: string) => useNotes.getState().data?.notes.some((n) => n.id === id && n.digest) ?? false;
 
 /** Почти одинаковые заметки для этой заметки (кроме отмеченных «не дубль») */
 export function noteDuplicates(id: ID): { id: string; score: number }[] {
   const ix = linkIndex();
-  if (!ix || parseItemId(id).kind !== 'note') return [];
+  if (!ix || parseItemId(id).kind !== 'note' || isDigest(id)) return [];
   const skip = ignored();
-  return duplicatesOf(ix, id, DUP_SCORE).filter((d) => parseItemId(d.id).kind === 'note' && isNoteAlive(d.id) && !skip.has(pairKey(id, d.id)));
+  return duplicatesOf(ix, id, DUP_SCORE).filter((d) => parseItemId(d.id).kind === 'note' && isNoteAlive(d.id) && !isDigest(d.id) && !skip.has(pairKey(id, d.id)));
 }
 
 /** Все пары дублей среди заметок */
 export async function allDuplicates(): Promise<{ a: string; b: string; score: number }[]> {
   const ix = await ensureLinkIndex();
   const skip = ignored();
-  const notes = (useNotes.getState().data?.notes ?? []).filter((n) => !n.trashed).map((n) => n.id);
+  const notes = (useNotes.getState().data?.notes ?? []).filter((n) => !n.trashed && !n.digest).map((n) => n.id);
   return findDuplicates(ix, notes, DUP_SCORE).filter((p) => !skip.has(pairKey(p.a, p.b)));
 }
 

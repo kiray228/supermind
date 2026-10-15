@@ -25,16 +25,22 @@ export const KIND_LABEL: Record<BrainKind, string> = { note: 'Заметка', m
  * Заметка: заголовки блоков отдельно (весят больше), код не учитывается.
  * Текст — как написан: разметку уберёт разбор, а [[ссылки]] нужны ему целыми.
  */
-export function noteDoc(body: NoteBody): NoteDoc {
+/** Заголовки шаблона заметки дня и строка «Четверг · прошлая запись: [[…]]» — общие у всех дней, связей по ним нет */
+const DAILY_HEAD = new Set(['задачи на день', 'мысли', 'итоги дня']);
+const DAILY_LINE = /^(понедельник|вторник|среда|четверг|пятница|суббота|воскресенье)( · прошлая запись: \[\[[^\]]*\]\])?$/i;
+
+/** Заметка: заголовки — отдельно (весомее), текст блоков. Заметка дня — без даты в названии и без шаблона */
+export function noteDoc(body: NoteBody, daily = false): NoteDoc {
   const headings: string[] = [];
   const text: string[] = [];
   for (const b of body.blocks) {
     if (b.type === 'code') continue;
+    if (daily && b.text && ((b.type.startsWith('h') && DAILY_HEAD.has(b.text.trim().toLowerCase())) || DAILY_LINE.test(b.text.trim()))) continue;
     if (b.text) (b.type === 'h1' || b.type === 'h2' || b.type === 'h3' ? headings : text).push(b.text);
     if (b.caption) text.push(b.caption);
     if (b.transcript) text.push(b.transcript);
   }
-  return { title: body.title, headings, text: text.join('\n') };
+  return { title: daily ? '' : body.title, headings, text: text.join('\n') };
 }
 
 /** Текст без HTML (темы карт могут быть с оформлением) */
