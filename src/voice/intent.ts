@@ -13,6 +13,8 @@ export type VoiceAction =
   | { type: 'add_transaction'; kind: 'expense' | 'income'; amount: number; currency?: string; categoryId?: string; category?: string; account?: string; note?: string; date?: string }
   | { type: 'add_habit'; name: string; time?: string; times?: string[]; perWeek?: number; days?: number[]; target?: number; unit?: string }
   | { type: 'add_note'; title: string; text: string }
+  /** запись в заметку дня: «Мысли» или «Итоги дня» */
+  | { type: 'add_journal'; text: string; section: 'thoughts' | 'results' }
   /** отметить выполненным: задачу или привычку по словам из фразы; strict — сказано явно («выполнил…», «отметь…») */
   | { type: 'mark_done'; query: string; n?: number; strict: boolean; kind?: 'task' | 'habit' }
   /** вопрос: что на день, сколько потрачено/получено, сколько денег на счетах */
@@ -391,6 +393,24 @@ function parseHabit(raw: string, force = false): VoiceAction | null {
   return { type: 'add_habit', name, ...(time ? { time } : {}), ...(perWeek && perWeek < 7 ? { perWeek } : {}), ...(days ? { days } : {}) };
 }
 
+/** «Запиши в дневник: …», «Дневник: …», «Итоги дня: …», «Запиши в дневник итоги дня: …» */
+const JOURNAL_RE = /^(?:(?:запиши|записать|добавь|добавить|занеси|внеси|напиши)\s+)?(?:(?:в|во)\s+)?(?:дневник|заметку\s+дня|журнал)(?![а-яёa-z0-9])[\s,:;.—–-]*/iu;
+const RESULTS_RE = /^(?:(?:запиши|записать|добавь|напиши)\s+)?(?:мои\s+)?(?:итог[иа]?\s+(?:дня|за\s+день)|итоги\s+сегодня)(?![а-яёa-z0-9])[\s,:;.—–-]*/iu;
+
+export function parseJournal(raw: string): VoiceAction | null {
+  const s = raw.trim();
+  let m = JOURNAL_RE.exec(s);
+  let rest = m ? s.slice(m[0].length) : s;
+  // «в дневник» без глагола — только если это начало фразы
+  if (m && !/^(?:запиш|записат|добав|занес|внес|напиш|в\s|во\s|дневник|журнал|заметку)/iu.test(s)) m = null;
+  const r = RESULTS_RE.exec(rest);
+  if (!m && !r) return null;
+  if (r) rest = rest.slice(r[0].length);
+  const text = cap(tidy(rest));
+  if (!text) return null;
+  return { type: 'add_journal', text, section: r ? 'results' : 'thoughts' };
+}
+
 function parseNote(raw: string): VoiceAction | null {
   const m = NOTE_RE.exec(raw.trim());
   if (!m) return null;
@@ -551,6 +571,8 @@ export function parseVoice(input: string, ctx: VoiceCtx = {}): VoiceParse {
     const dated = parseTaskCmd(`${multiTimes.text} в ${multiTimes.times[0]}`.replace(/\s+/g, ' ').trim(), now);
     if (dated) return { actions: [dated.action], confident: dated.explicit };
   }
+  const journal = parseJournal(raw);
+  if (journal) return { actions: [journal], confident: true };
   const note = parseNote(raw);
   if (note) return { actions: [note], confident: true };
   const task = parseTaskCmd(raw, now);

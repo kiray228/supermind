@@ -48,6 +48,7 @@ function normalize(raw: Partial<NotesData> | undefined): NotesData {
     notDup: (raw.notDup ?? []).filter((r) => r && r.id).map((r) => ({ id: r.id, updatedAt: r.updatedAt ?? 0 })),
     synonyms: (raw.synonyms ?? []).filter((r) => r && r.id && Array.isArray(r.words)).map((r) => ({ id: r.id, words: r.words.filter((w) => typeof w === 'string'), by: r.by === 'user' ? 'user' : 'ai', updatedAt: r.updatedAt ?? 0 })),
     synNo: (raw.synNo ?? []).filter((r) => r && r.id).map((r) => ({ id: r.id, updatedAt: r.updatedAt ?? 0 })),
+    cards: (raw.cards ?? []).filter((c) => c && c.id && c.noteId && typeof c.q === 'string' && typeof c.a === 'string').map((c) => ({ ...c, due: c.due || '1970-01-01', interval: Math.max(0, c.interval || 0), ease: Math.min(3, Math.max(1.3, c.ease || 2.5)), reps: c.reps || 0, lapses: c.lapses || 0, by: c.by === 'user' ? 'user' : 'ai', createdAt: c.createdAt || 0, updatedAt: c.updatedAt || 0 })),
   };
 }
 
@@ -359,6 +360,9 @@ export function purgeNote(id: ID) {
   mutateNotes((d) => {
     d.notes = d.notes.filter((n) => n.id !== id);
     (d.gone ??= {})[id] = Date.now();
+    // карточки удалённой заметки — тоже
+    for (const c of d.cards ?? []) if (c.noteId === id) d.gone[`card:${c.id}`] = Date.now();
+    if (d.cards?.some((c) => c.noteId === id)) d.cards = d.cards.filter((c) => c.noteId !== id);
   });
   void del(noteBodyKey(id)).catch(() => undefined);
 }

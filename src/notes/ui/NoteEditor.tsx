@@ -8,6 +8,7 @@ import {
   Download,
   FolderInput,
   FolderPlus,
+  GraduationCap,
   Image as ImageIcon,
   Link2,
   Loader2,
@@ -39,6 +40,7 @@ import { cloneBlocks, convertBlock, detectShortcut, listNumbers, nextTypeAfter, 
 import { BlockMenuItems, FORMAT_MARKS, FormatMenuItems, type FormatKind, TypeMenuItems } from './EditorMenus';
 import { MenuItem, MenuLabel, MenuSep, NtMenu, type MenuAnchor } from './Menu';
 import { RelatedNotes } from './RelatedNotes';
+import { openNoteCards } from '../cards';
 import { KIND_ICON } from './kindIcons';
 import { KIND_LABEL } from '../brainDocs';
 import { normTitle } from '../links';
@@ -1015,6 +1017,7 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
           {(Object.keys(NOTE_AI_LABELS) as NoteAIKind[]).map((k) => (
             <MenuItem key={k} icon={<Sparkles size={17} />} label={NOTE_AI_LABELS[k]} onClick={() => void runAI(k)} />
           ))}
+          <MenuItem icon={<GraduationCap size={17} />} label="Карточки для повторения" onClick={() => openNoteCards(meta.id)} />
           <MenuSep />
           <MenuItem
             icon={<Copy size={17} />}

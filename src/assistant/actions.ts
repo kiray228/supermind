@@ -18,6 +18,7 @@ export type AssistantAction =
   | { type: 'complete_task'; id: string; title?: string }
   | { type: 'reschedule_task'; id: string; date: string; time?: string | null; title?: string }
   | { type: 'add_note'; title: string; text: string }
+  | { type: 'add_journal'; text: string; section?: 'thoughts' | 'results'; date?: string }
   | { type: 'add_transaction'; kind: 'expense' | 'income'; amount: number; category?: string; account?: string; note?: string; date?: string }
   | { type: 'add_goal'; title: string; deadline?: string; emoji?: string; why?: string }
   | { type: 'add_goal_stage'; goalId: string; title: string; steps: string[]; deadline?: string };
@@ -110,6 +111,12 @@ export function validateAction(raw: unknown): AssistantAction | null {
       if (!id || !date) return null;
       const time = raw.time === null ? null : hhmm(raw.time);
       return { type, id, date, ...(time !== undefined ? { time } : {}), ...(str(raw.title, 300) ? { title: str(raw.title, 300) } : {}) };
+    }
+    case 'add_journal': {
+      const text = str(raw.text ?? raw.content, 5000);
+      if (!text) return null;
+      const date = ymd(raw.date);
+      return { type, text, ...(raw.section === 'results' ? { section: 'results' as const } : {}), ...(date ? { date } : {}) };
     }
     case 'add_note': {
       const text = str(raw.text ?? raw.content ?? raw.body, 20000);
@@ -235,6 +242,8 @@ export function describeAction(a: AssistantAction): ActionView {
             .join(' · ')
             .slice(0, 90) || undefined,
       };
+    case 'add_journal':
+      return { kind: 'note', label: a.section === 'results' ? 'Итоги дня' : 'В дневник', title: a.text.slice(0, 120), meta: a.date ? dateLabel(a.date) : 'сегодня' };
     case 'add_transaction':
       return {
         kind: 'money',
@@ -303,6 +312,11 @@ export async function executeAction(a: AssistantAction): Promise<{ ok: boolean; 
       if (!t || t.deleted) return { ok: false, info: 'Задача не найдена' };
       updateTask(a.id, { date: a.date, ...(a.time !== undefined ? { time: a.time ?? undefined } : {}) });
       return { ok: true, info: `Перенесено на ${dateLabel(a.date)}` };
+    }
+    case 'add_journal': {
+      const { appendToDaily } = await import('../notes/daily');
+      const r = await appendToDaily(a.text, a.section ?? 'thoughts', a.date ?? todayYmd());
+      return r ? { ok: true, info: 'Записано в заметку дня' } : { ok: false, info: 'Не удалось записать' };
     }
     case 'add_note': {
       await ensureNotes();

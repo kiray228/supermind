@@ -118,6 +118,10 @@ export function fromAi(raw: unknown): VoiceAction | null {
         ...(wd.length && wd.length < 7 ? { days: wd } : {}),
       };
     }
+    case 'add_journal': {
+      const text = str(raw.text, 5000);
+      return text ? { type: 'add_journal', text, section: raw.section === 'results' ? 'results' : 'thoughts' } : null;
+    }
     case 'add_note': {
       const text = str(raw.text, 5000) ?? '';
       const title = str(raw.title, 120) ?? text.split('\n')[0].slice(0, 80);
@@ -326,6 +330,19 @@ export async function execute(a: VoiceAction): Promise<Done> {
           syncSoon(300);
         },
         open: () => go('habits'),
+      };
+    }
+    case 'add_journal': {
+      const { appendToDaily, openDailyNote, removeBlocks } = await import('../notes/daily');
+      const r = await appendToDaily(a.text, a.section);
+      if (!r) return { ok: false, label: 'Дневник', title: a.text, meta: 'Не удалось записать' };
+      return {
+        ok: true,
+        label: a.section === 'results' ? 'Итоги дня' : 'Дневник',
+        title: a.text,
+        meta: 'в заметку дня',
+        undo: () => removeBlocks(r.noteId, r.blockIds),
+        open: () => void openDailyNote(),
       };
     }
     case 'add_note': {

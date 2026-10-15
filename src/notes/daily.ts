@@ -4,8 +4,9 @@
  */
 import type { ID } from '../types';
 import { todayYmd } from '../utils/mapTasks';
-import { DAILY_FOLDER, dailyBlocks, dailyTitle } from './dailyCore';
-import { addFolder, createNote, ensureNotes, openNote, useNotes } from './store';
+import { DAILY_FOLDER, DAILY_SECTIONS, dailyBlocks, dailyTitle, insertIntoSection, journalLine } from './dailyCore';
+import { type Block, newBlock } from './model';
+import { addFolder, createNote, editOpenBody, ensureNotes, flushNotes, loadNoteBody, openNote, saveNoteBody, useNotes } from './store';
 
 /** Заметка этого дня (последняя изменённая, если на двух устройствах создали по одной) */
 export function dailyNoteOf(ymd: string): ID | undefined {
@@ -70,4 +71,61 @@ export async function openDailyNote(ymd = todayYmd()): Promise<void> {
   await openNote(id);
   const { nav } = await import('../search/sources');
   await nav('notes');
+}
+
+/** Раздел заметки дня, куда дописывать */
+export type DailySection = 'thoughts' | 'results';
+
+/**
+ * Дописать запись в заметку дня (создав её): в «Мысли» или «Итоги дня», с временем.
+ * Возвращает id заметки и блока — для «Отменить».
+ */
+export async function appendToDaily(text: string, section: DailySection = 'thoughts', ymd = todayYmd(), extra: Block[] = []): Promise<{ noteId: ID; blockIds: string[] } | null> {
+  const t = text.trim();
+  if (!t && !extra.length) return null;
+  const id = await ensureDailyNote(ymd);
+  if (!id) return null;
+  await flushNotes();
+  const add = [...(t ? [newBlock('p', { text: journalLine(t) })] : []), ...extra];
+  const heading = DAILY_SECTIONS[section];
+  const s = useNotes.getState();
+  if (s.openId === id && s.openBody) editOpenBody((bd) => void (bd.blocks = insertIntoSection(bd.blocks, heading, add)));
+  else {
+    const body = await loadNoteBody(id);
+    saveNoteBody(id, { ...body, blocks: insertIntoSection(body.blocks, heading, add) });
+  }
+  await flushNotes();
+  return { noteId: id, blockIds: add.map((b) => b.id) };
+}
+
+/** Дописать блоки в конец заметки (открытой — через редактор) */
+export async function appendToNote(noteId: ID, add: Block[]): Promise<boolean> {
+  if (!add.length || !useNotes.getState().data?.notes.some((n) => n.id === noteId && !n.trashed)) return false;
+  await flushNotes();
+  const s = useNotes.getState();
+  const withAdded = (bs: Block[]) => {
+    const out = [...bs];
+    // пустой абзац в конце — заменить, а не оставлять «дырку»
+    while (out.length && out[out.length - 1].type === 'p' && !out[out.length - 1].text?.trim()) out.pop();
+    return [...out, ...add];
+  };
+  if (s.openId === noteId && s.openBody) editOpenBody((bd) => void (bd.blocks = withAdded(bd.blocks)));
+  else {
+    const body = await loadNoteBody(noteId);
+    saveNoteBody(noteId, { ...body, blocks: withAdded(body.blocks) });
+  }
+  await flushNotes();
+  return true;
+}
+
+/** Убрать дописанное (отмена) */
+export async function removeBlocks(noteId: ID, blockIds: string[]): Promise<void> {
+  const drop = new Set(blockIds);
+  const s = useNotes.getState();
+  if (s.openId === noteId && s.openBody) editOpenBody((bd) => void (bd.blocks = bd.blocks.filter((b) => !drop.has(b.id))));
+  else {
+    const body = await loadNoteBody(noteId);
+    saveNoteBody(noteId, { ...body, blocks: body.blocks.filter((b) => !drop.has(b.id)) });
+  }
+  await flushNotes();
 }

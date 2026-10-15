@@ -131,19 +131,98 @@ public class TodayWidget extends AppWidgetProvider {
     }
 
     /** Действия из intent активности: кнопки виджета (sm_action) и «Поделиться» (ACTION_SEND) */
+    /** не больше стольких картинок за раз и такого размера каждая */
+    private static final int MAX_SHARED_IMAGES = 10;
+    private static final long MAX_SHARED_BYTES = 25L * 1024 * 1024;
+
+    /**
+     * Присланные картинки — копией в files/shared (ссылка content:// живёт недолго):
+     * приложение прочитает их, вставит в заметку и удалит. Пути — относительно files.
+     */
+    static JSONArray copySharedImages(Context ctx, Intent intent) {
+        JSONArray out = new JSONArray();
+        List<Uri> uris = new ArrayList<>();
+        try {
+            if (Intent.ACTION_SEND_MULTIPLE.equals(intent.getAction())) {
+                ArrayList<Uri> list = intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM);
+                if (list != null) uris.addAll(list);
+            } else {
+                Uri u = intent.getParcelableExtra(Intent.EXTRA_STREAM);
+                if (u != null) uris.add(u);
+            }
+            if (uris.isEmpty() && intent.getClipData() != null) {
+                android.content.ClipData clip = intent.getClipData();
+                for (int i = 0; i < clip.getItemCount(); i++) if (clip.getItemAt(i).getUri() != null) uris.add(clip.getItemAt(i).getUri());
+            }
+        } catch (RuntimeException ignored) {
+            return out;
+        }
+        if (uris.isEmpty()) return out;
+        java.io.File dir = new java.io.File(ctx.getFilesDir(), "shared");
+        if (!dir.exists() && !dir.mkdirs()) return out;
+        android.content.ContentResolver cr = ctx.getContentResolver();
+        long stamp = System.currentTimeMillis();
+        int n = 0;
+        for (Uri u : uris) {
+            if (n >= MAX_SHARED_IMAGES) break;
+            String type = cr.getType(u);
+            if (type == null) type = intent.getType();
+            if (type == null || !type.startsWith("image/")) continue;
+            String ext = type.contains("png") ? "png" : type.contains("webp") ? "webp" : type.contains("gif") ? "gif" : type.contains("heic") || type.contains("heif") ? "heic" : "jpg";
+            java.io.File f = new java.io.File(dir, stamp + "_" + n + "." + ext);
+            long total = 0;
+            boolean ok = true;
+            try (java.io.InputStream in = cr.openInputStream(u)) {
+                if (in == null) continue;
+                try (java.io.OutputStream os = new java.io.FileOutputStream(f)) {
+                    byte[] buf = new byte[64 * 1024];
+                    int r;
+                    while ((r = in.read(buf)) > 0) {
+                        total += r;
+                        if (total > MAX_SHARED_BYTES) {
+                            ok = false;
+                            break;
+                        }
+                        os.write(buf, 0, r);
+                    }
+                }
+            } catch (Exception e) {
+                ok = false;
+            }
+            if (!ok || total == 0) {
+                //noinspection ResultOfMethodCallIgnored
+                f.delete();
+                continue;
+            }
+            try {
+                JSONObject img = new JSONObject();
+                img.put("path", "shared/" + f.getName());
+                img.put("type", type);
+                out.put(img);
+                n++;
+            } catch (JSONException ignored) {
+            }
+        }
+        return out;
+    }
+
     static void queueFromIntent(Context ctx, Intent intent) {
         try {
-            if (Intent.ACTION_SEND.equals(intent.getAction())) {
+            if (Intent.ACTION_SEND.equals(intent.getAction()) || Intent.ACTION_SEND_MULTIPLE.equals(intent.getAction())) {
                 CharSequence text = intent.getCharSequenceExtra(Intent.EXTRA_TEXT);
                 String subject = intent.getStringExtra(Intent.EXTRA_SUBJECT);
-                if (text != null && text.toString().trim().length() > 0) {
+                JSONArray images = copySharedImages(ctx, intent);
+                boolean hasText = text != null && text.toString().trim().length() > 0;
+                if (hasText || images.length() > 0) {
                     JSONObject o = new JSONObject();
                     o.put("type", "share");
-                    o.put("text", text.toString());
+                    o.put("text", hasText ? text.toString() : "");
                     if (subject != null) o.put("title", subject);
+                    if (images.length() > 0) o.put("images", images);
                     queue(ctx, o);
                 }
                 intent.removeExtra(Intent.EXTRA_TEXT);
+                intent.removeExtra(Intent.EXTRA_STREAM);
                 intent.setAction(Intent.ACTION_MAIN);
                 return;
             }

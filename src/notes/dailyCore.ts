@@ -62,3 +62,29 @@ export function prevYmd(ymd: string, days = 1): string {
   d.setDate(d.getDate() - days);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
+
+/**
+ * Дописать блоки в раздел заметки (после последнего непустого блока раздела, до следующего заголовка того же уровня).
+ * Пустой абзац-заглушка раздела заменяется. Раздела нет — блоки в конец.
+ */
+export function insertIntoSection(blocks: Block[], heading: string, add: Block[]): Block[] {
+  const norm = (s: string) => s.trim().toLowerCase();
+  const h = blocks.findIndex((b) => /^h[1-3]$/.test(b.type) && norm(b.text ?? '') === norm(heading));
+  if (h < 0) {
+    const out = [...blocks];
+    // пустой последний абзац — заменить, а не оставлять «дырку»
+    while (out.length && out[out.length - 1].type === 'p' && !out[out.length - 1].text?.trim()) out.pop();
+    return [...out, ...add];
+  }
+  const level = blocks[h].type;
+  let end = h + 1;
+  while (end < blocks.length && !(/^h[1-3]$/.test(blocks[end].type) && blocks[end].type <= level)) end++;
+  // раздел: убрать пустые абзацы-заглушки, дописать после содержимого
+  const section = blocks.slice(h + 1, end).filter((b) => !(b.type === 'p' && !b.text?.trim()));
+  return [...blocks.slice(0, h + 1), ...section, ...add, ...blocks.slice(end)];
+}
+
+/** «14:05 · текст» — запись в дневник с временем */
+export function journalLine(text: string, at = new Date()): string {
+  return `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')} · ${text.trim()}`;
+}

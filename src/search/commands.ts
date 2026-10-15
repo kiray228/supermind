@@ -76,6 +76,17 @@ export function buildCommands(): Entry[] {
       },
     }),
     entry({
+      key: 'c:cards-review',
+      kind: 'cmd',
+      title: 'Повторение карточек',
+      emoji: '🎓',
+      body: 'карточки повторить вспомнить выучить запомнить anki флешкарты',
+      run: async () => {
+        await nav('notes');
+        (await import('../notes/cards')).openCardsReview();
+      },
+    }),
+    entry({
       key: 'c:daily-note',
       kind: 'cmd',
       title: 'Заметка дня',

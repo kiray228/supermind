@@ -556,6 +556,36 @@
 .nt-rv-nudge .grow { min-width: 0; line-height: 1.35; }
 /* конспект темы на графе */
 .nt-graph-digest { flex-shrink: 0; }
+/* карточки для повторения */
+.nt-cards { min-height: min(520px, calc(var(--vvh, 100vh) - 32px)); }
+.nt-cards-count { font-size: 13px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.nt-cards-body { flex: 1; display: flex; flex-direction: column; align-items: stretch; gap: 16px; padding: 18px; overflow-y: auto; }
+.nt-cards-src { align-self: flex-start; border: none; background: var(--accent-soft); color: var(--accent); font: inherit; font-size: 12.5px; font-weight: 600; padding: 3px 10px; border-radius: 999px; cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nt-cards-q { font-size: 20px; font-weight: 650; line-height: 1.35; overflow-wrap: anywhere; }
+.nt-cards-a { font-size: 16.5px; line-height: 1.5; padding: 14px 16px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border); overflow-wrap: anywhere; animation: nt-rel-in .18s ease-out; }
+.nt-cards-show { align-self: center; margin-top: auto; min-width: 220px; }
+.nt-cards-grades { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: auto; }
+.nt-cards-grade { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 4px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); font: inherit; color: var(--text); cursor: pointer; }
+.nt-cards-grade b { font-size: 14px; }
+.nt-cards-grade span { font-size: 11.5px; color: var(--text-3); }
+.nt-cards-grade.g0 { border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); }
+.nt-cards-grade.g0 b { color: var(--danger); }
+.nt-cards-grade.g2 { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+.nt-cards-grade.g2 b { color: var(--accent); }
+.nt-cards-grade:active { opacity: .7; }
+.nt-cards-undo { align-self: center; }
+.nt-cards-done { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 32px 24px; text-align: center; color: var(--text-2); line-height: 1.45; }
+.nt-cards-done > svg { color: var(--accent); }
+.nt-cards-done b { color: var(--text); font-size: 17px; }
+.nt-cards-done .nt-ai-undo { align-self: center; margin-top: 6px; }
+.nt-card-row { display: flex; align-items: center; gap: 6px; padding: 8px 6px 8px 12px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); }
+.nt-card-text { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; border: none; background: none; padding: 0; font: inherit; text-align: left; color: var(--text); cursor: pointer; }
+.nt-card-text b { font-weight: 600; font-size: 14px; overflow-wrap: anywhere; }
+.nt-card-text span { font-size: 13px; color: var(--text-2); overflow-wrap: anywhere; }
+.nt-card-text i { font-style: normal; font-size: 11.5px; color: var(--text-3); }
+.nt-card-new { display: flex; gap: 8px; flex-wrap: wrap; }
+.nt-card-new .nt-syn-input { flex: 1 1 180px; }
+.nt-card-new.is-edit { padding: 8px; border-radius: var(--radius); border: 1px solid var(--accent); }
 @media (max-width: 760px) {
   .nt-ask, .nt-dups { width: 100%; }
   .nt-ask { height: calc(var(--vvh, 100vh) - 24px); }

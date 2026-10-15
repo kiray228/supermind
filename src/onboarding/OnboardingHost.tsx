@@ -59,8 +59,14 @@ export default function OnboardingHost() {
 
   useEffect(() => {
     if (decided || !signedIn || !synced) return;
-    const t = setTimeout(async () => {
+    let t: ReturnType<typeof setTimeout>;
+    const show = async () => {
       if (decided) return;
+      // открыто «Сохранить в SuperMind» (прислали из другого приложения) — окна подождут, пока его закроют
+      if (document.querySelector('#sm-share-host .modal-backdrop')) {
+        t = setTimeout(() => void show(), 1500);
+        return;
+      }
       decided = true;
       const forceOb = takeParam('onboarding');
       const forceWn = takeParam('whatsnew');
@@ -84,7 +90,8 @@ export default function OnboardingHost() {
       }
       // после перерыва — тёплое «С возвращением!» (только если в этот запуск других окон нет)
       if (awayAtLaunch >= AWAY_DAYS) setWelcome(true);
-    }, 900);
+    };
+    t = setTimeout(() => void show(), 900);
     return () => clearTimeout(t);
   }, [signedIn, synced]);
 

@@ -20,14 +20,14 @@ import { bumpHabitOn } from '../habits/store';
 import { loadPlanner } from '../store/db';
 import { ensureGoals, openGoal } from '../goals/store';
 import { buildAgenda, buildHabits, buildMaps, invalidatePhoneEvents, subscribeGoals } from './widgetData';
-import { joinShared, type SharedText } from './share';
+import { joinShared, type SharedImage, type SharedText } from './share';
 
 type PendingAction =
   | { type: 'complete'; id: string; date?: string }
   | { type: 'open_task'; id: string }
   | { type: 'quick_add' }
   | { type: 'open_view'; view: string }
-  | { type: 'share'; text: string; title?: string }
+  | { type: 'share'; text: string; title?: string; images?: SharedImage[] }
   /** привычка из виджета: n — новое значение счётчика за день (0/1 для простой отметки) */
   | { type: 'habit'; id: string; date: string; n: number }
   | { type: 'open_map'; id: string }
@@ -190,7 +190,7 @@ async function applyPending() {
           break;
         }
         case 'share':
-          openShare({ text: a.text, title: a.title });
+          openShare({ text: a.text ?? '', title: a.title, ...(a.images?.length ? { images: a.images } : {}) });
           break;
       }
     }

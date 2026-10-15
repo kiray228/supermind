@@ -24,8 +24,8 @@ export default function VoiceHost() {
 type Phase = 'listening' | 'thinking' | 'done' | 'idle' | 'unknown';
 type Card = Done & { key: number; kind: VoiceAction['type']; undone?: boolean };
 
-const KIND_ICON = { add_task: CheckSquare, add_transaction: Wallet, add_habit: Plant, add_note: NotePencil, mark_done: CheckCircle, ask: ChatCircleText } as const;
-const EXAMPLES = ['Купить хлеб завтра в 9', 'Каждый день выпивать 2 л воды', 'Потратил 2000 на такси и 3500 на обед', 'Выпил стакан воды', 'Выполнил задачу купить хлеб', 'Что у меня сегодня?', 'Сколько я потратил за месяц?', 'Новая привычка — читать 20 минут'];
+const KIND_ICON = { add_task: CheckSquare, add_transaction: Wallet, add_habit: Plant, add_note: NotePencil, add_journal: NotePencil, mark_done: CheckCircle, ask: ChatCircleText } as const;
+const EXAMPLES = ['Купить хлеб завтра в 9', 'Каждый день выпивать 2 л воды', 'Потратил 2000 на такси и 3500 на обед', 'Выпил стакан воды', 'Выполнил задачу купить хлеб', 'Что у меня сегодня?', 'Сколько я потратил за месяц?', 'Новая привычка — читать 20 минут', 'Запиши в дневник: сегодня пробежал 10 км'];
 
 function VoiceSheet() {
   const [phase, setPhase] = useState<Phase>('idle');

@@ -154,6 +154,7 @@ export const ACTIONS_GUIDE = `## Действия
 - complete_task: id (только id из данных ниже), (title)
 - reschedule_task: id, date, (time HH:MM или null — убрать время), (title)
 - add_note: title, text (Markdown: списки «- », чек-листы «- [ ] »)
+- add_journal: text, (section "thoughts" — мысли, по умолчанию, или "results" — итоги дня; date YYYY-MM-DD) — запись в заметку дня (дневник)
 - add_transaction: kind "expense" | "income", amount (число), (category — название из списка категорий, account — название счёта, note, date)
 - add_goal: title, (deadline YYYY-MM-DD, emoji, why)
 - add_goal_stage: goalId (id цели из данных ниже), title, steps (массив строк), (deadline)

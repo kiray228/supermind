@@ -1,5 +1,5 @@
 /** «Что нового»: главное в каждой версии. Новые версии — сверху. */
-import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen } from 'lucide-react';
+import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share } from 'lucide-react';
 
 export interface ChangeItem {
   icon: typeof Sparkles;
@@ -15,6 +15,15 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.30',
+    title: 'Карточки, дневник голосом и фото из «Поделиться»',
+    items: [
+      { icon: GraduationCap, title: 'Карточки для повторения', text: 'В заметке «⋯» → «Карточки для повторения»: ИИ сделает вопросы и ответы по главному. Приложение покажет их снова, когда вы начнёте забывать — через день, неделю, месяц. «Карточек на сегодня» — в списке заметок.' },
+      { icon: NotebookPen, title: 'Дневник голосом', text: '«Запиши в дневник: …» или «Итоги дня: …» — запись с временем попадёт в заметку дня. Ассистент тоже умеет.' },
+      { icon: Share, title: 'Фото и «дописать» из «Поделиться»', text: 'Делитесь в SuperMind фотографиями — одной или несколькими. Присланное можно сохранить в заметку дня или дописать в подходящую заметку: приложение само подскажет, в какую.' },
+    ],
+  },
   {
     version: '1.29',
     title: 'Конспекты, обзор и заметка дня',

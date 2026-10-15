@@ -99,6 +99,30 @@ export interface NotesData {
   synonyms?: SynonymGroup[];
   /** пары слов, которые человек убрал из синонимов (id — «ключ|ключ»): ИИ их больше не предлагает */
   synNo?: { id: string; updatedAt: number }[];
+  /** карточки для повторения */
+  cards?: StudyCard[];
+}
+
+/** Карточка для повторения: вопрос и ответ по заметке, интервальное повторение (как в Anki) */
+export interface StudyCard {
+  id: ID;
+  /** заметка-источник */
+  noteId: ID;
+  q: string;
+  a: string;
+  /** когда показать (YYYY-MM-DD) */
+  due: string;
+  /** текущий интервал, дней (0 — новая или забытая) */
+  interval: number;
+  /** лёгкость: 1.3…3, во сколько раз растёт интервал */
+  ease: number;
+  /** сколько раз подряд вспомнил */
+  reps: number;
+  /** сколько раз забывал */
+  lapses: number;
+  by: 'ai' | 'user';
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface SynonymGroup {

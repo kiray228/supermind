@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, Brain, Check, ChevronDown, Compass, Copy, CopyCheck, Download, Equal, NotebookPen, FolderInput, FolderPlus, LayoutGrid, MoreHorizontal, Pencil, Pin, PinOff, Plus, RotateCcw, Search, StickyNote, Trash2, Upload, Waypoints, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Brain, Check, ChevronDown, Compass, Copy, CopyCheck, Download, Equal, GraduationCap, NotebookPen, FolderInput, FolderPlus, LayoutGrid, MoreHorizontal, Pencil, Pin, PinOff, Plus, RotateCcw, Search, StickyNote, Trash2, Upload, Waypoints, X } from 'lucide-react';
 import type { ID } from '../types';
 import { confirmDialog } from '../ui/dialogs';
 import { toast } from '../store/appStore';
@@ -28,6 +28,8 @@ import { DuplicatesSheet } from '../notes/ui/DuplicatesSheet';
 import { SynonymsSheet } from '../notes/ui/SynonymsSheet';
 import { BrainReviewSheet } from '../notes/ui/BrainReviewSheet';
 import { TopicDigest } from '../notes/ui/TopicDigest';
+import { CardsLayer } from '../notes/ui/CardsLayer';
+import { openCardsReview, todaysCards } from '../notes/cards';
 import { collectReview, markReviewSeen, reviewCount, reviewDue } from '../notes/brainReview';
 import { openAsk, useAsk } from '../notes/brainAsk';
 import { useLinks } from '../notes/related';
@@ -76,6 +78,23 @@ const openDaily = () =>
   import('../notes/daily')
     .then((m) => m.openDailyNote())
     .catch(() => toast('Не удалось открыть заметку дня'));
+
+/** Карточки на сегодня — повторить */
+function CardsNudge() {
+  const cards = useNotes((s) => s.data?.cards);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const n = useMemo(() => todaysCards().length, [cards]);
+  if (!n) return null;
+  return (
+    <div className="nt-rv-nudge">
+      <GraduationCap size={18} />
+      <span className="grow">Карточек на сегодня: {n}</span>
+      <button className="nt-ai-btn" onClick={openCardsReview}>
+        Повторить
+      </button>
+    </div>
+  );
+}
 
 /** Раз в неделю — напоминание об обзоре мозга (если есть что посмотреть) */
 function ReviewNudge({ onOpen }: { onOpen: () => void }) {
@@ -381,6 +400,7 @@ export default function Notes() {
             />
           )}
           <div className="page-body nt-list" hidden={graphMode}>
+            {sel.k === 'all' && !q && <CardsNudge />}
             {sel.k === 'all' && !q && <ReviewNudge onOpen={() => setReviewSheet(true)} />}
             {isTrash && list.length > 0 && <div className="nt-trash-hint small faint">Заметки в корзине удаляются навсегда через {TRASH_DAYS} дней.</div>}
             {list.length === 0 ? (
@@ -433,6 +453,7 @@ export default function Notes() {
         />
       )}
       <TopicDigest />
+      <CardsLayer />
 
       {folderDlg && (
         <FolderDialog
@@ -452,6 +473,7 @@ export default function Notes() {
           <MenuSep />
           <MenuItem icon={<FolderPlus size={17} />} label="Новая папка" onClick={() => setFolderDlg({})} />
           <MenuItem icon={<Compass size={17} />} label="Обзор мозга" onClick={() => setReviewSheet(true)} />
+          <MenuItem icon={<GraduationCap size={17} />} label="Повторение карточек" onClick={openCardsReview} />
           <MenuItem icon={<CopyCheck size={17} />} label="Найти дубли" onClick={() => setDupSheet(true)} />
           <MenuItem icon={<Equal size={17} />} label="Синонимы" onClick={() => setSynSheet(true)} />
           <MenuItem
