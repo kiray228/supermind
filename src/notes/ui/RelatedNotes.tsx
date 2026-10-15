@@ -8,6 +8,7 @@ import { openItem } from '../brain';
 import { brainItem, isWikiLink, showInGraph, useLinks, useRelatedNotes } from '../related';
 import { useNotes } from '../store';
 import { AiReviewPanel } from './AiReviewPanel';
+import { Backlinks, DuplicateBanner } from './Backlinks';
 import './related.css';
 
 /** Сила связи: 1–3 деления */
@@ -43,8 +44,16 @@ export function RelatedNotes({ id, compact = false }: { id: ID; compact?: boolea
   const empty = !loading && !progress && !list.length;
   // в задаче и цели пустую панель не показываем вовсе
   if (compact && empty) return <section ref={ref} className="nt-rel is-blank" aria-hidden />;
+  // у пустой заметки своих связей нет, но на неё могут ссылаться другие — только «Упоминается в»
+  if (empty && !keywords.length)
+    return (
+      <section ref={ref} className="nt-rel is-quiet" aria-label="Упоминается в">
+        <Backlinks id={id} />
+      </section>
+    );
   return (
     <section ref={ref} className={`nt-rel${compact ? ' is-compact' : ''}${empty && !keywords.length ? ' is-blank' : ''}`} aria-label="Связи">
+      {!compact && isNote && <DuplicateBanner id={id} />}
       {!compact && keywords.length > 0 && (
         <div className="nt-rel-kw" title="Важные слова — по ним находятся связи">
           <span className="nt-rel-kw-label">Темы</span>
@@ -130,6 +139,7 @@ export function RelatedNotes({ id, compact = false }: { id: ID; compact?: boolea
         </div>
       )}
       {!compact && empty && keywords.length > 0 && <div className="nt-rel-empty">Связей пока нет. Они появятся сами, когда эти темы встретятся в другой заметке, карте или задаче.</div>}
+      {!compact && <Backlinks id={id} />}
       {!compact && isNote && keywords.length > 0 && <AiReviewPanel id={id} />}
     </section>
   );

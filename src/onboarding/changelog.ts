@@ -1,5 +1,5 @@
 /** «Что нового»: главное в каждой версии. Новые версии — сверху. */
-import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download } from 'lucide-react';
+import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy } from 'lucide-react';
 
 export interface ChangeItem {
   icon: typeof Sparkles;
@@ -15,6 +15,15 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.27',
+    title: 'Спросить у мозга',
+    items: [
+      { icon: Brain, title: 'Вопрос своими словами', text: 'Заметки → кнопка с мозгом: «Что мне сделать перед поездкой?» — ответ соберётся из ваших заметок, карт, задач и целей, с номерами-ссылками на них. Можно уточнять. Если слов из вопроса в записях нет, ИИ сам подберёт синонимы.' },
+      { icon: AtSign, title: 'Упоминается в', text: 'Внизу заметки — где на неё ссылаются и где упоминают её название без ссылки, с фрагментом текста. «Ссылкой» превращает упоминание в [[ссылку]].' },
+      { icon: Copy, title: 'Дубли', text: 'Почти одинаковые заметки — с плашкой «Похоже на дубль»: объединить в одну (вторая уйдёт в корзину, ссылки переведутся) или отметить «не дубль». Все пары сразу — «⋯» → «Найти дубли».' },
+    ],
+  },
   {
     version: '1.26',
     title: 'Второй мозг целиком',

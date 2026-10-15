@@ -89,6 +89,8 @@ export interface NotesData {
   /** проверка связей ИИ */
   aiTerms?: AiTermsReview[];
   aiLinks?: AiLinkReview[];
+  /** пары, которые человек отметил «не дубль» (id — «a|b») */
+  notDup?: { id: string; updatedAt: number }[];
 }
 
 export type NotesSort = 'updated' | 'created' | 'title';

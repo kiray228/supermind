@@ -1069,3 +1069,179 @@ export function allLinks(ix: LinkIndex, perNote = 6, min = MIN_SCORE): LinkEdge[
     }
   return [...seen.values()];
 }
+
+// ---------- Поиск по записям («Спросить у мозга») ----------
+
+export interface SearchHit {
+  id: string;
+  /** 0…1 */
+  score: number;
+  /** найденные слова вопроса (как написаны в записи) */
+  terms: string[];
+}
+
+/** Полный обратный индекс (со словами из одной записи — они самые точные при поиске) */
+const fullPost = new WeakMap<LinkIndex, Map<string, { id: string; w: number }[]>>();
+function postingsAll(ix: LinkIndex): Map<string, { id: string; w: number }[]> {
+  let p = fullPost.get(ix);
+  if (!p) {
+    p = new Map();
+    for (const d of ix.docs.values()) for (const [k, w] of d.w) push(p, k, { id: d.id, w });
+    fullPost.set(ix, p);
+  }
+  return p;
+}
+
+/** вес дополнительных слов (синонимы, подсказанные ИИ) против слов самого вопроса */
+const EXTRA_W = 0.6;
+
+/** Ключи вопроса с весами (для поиска и выбора абзацев) */
+export function queryTerms(ix: LinkIndex, query: string, extra: string[] = []): Map<string, number> {
+  const q = new Map<string, number>();
+  const add = (text: string, w: number) => {
+    const f = extractFeatures({ title: '', text });
+    for (const k in f.terms) {
+      const c = ix.canon(k);
+      q.set(c, Math.max(q.get(c) ?? 0, w * (1 + Math.log(f.terms[k]))));
+    }
+  };
+  add(query, 1);
+  for (const e of extra) add(e, EXTRA_W);
+  return q;
+}
+
+/**
+ * Записи, лучше всего отвечающие на вопрос: TF-IDF вопроса × векторы записей,
+ * с поправкой на долю найденных слов вопроса (запись про все слова вопроса — выше).
+ */
+export function searchIndex(ix: LinkIndex, query: string, opts: { limit?: number; extra?: string[] } = {}): SearchHit[] {
+  const q = queryTerms(ix, query, opts.extra);
+  if (!q.size) return [];
+  const post = postingsAll(ix);
+  const n = Math.max(1, ix.n);
+  const qw = new Map<string, number>();
+  let norm = 0;
+  for (const [k, w] of q) {
+    const df = ix.df.get(k);
+    if (!df) continue;
+    const v = w * Math.log(1 + n / df) * (k.includes(BIGRAM_SEP) ? BIGRAM_BOOST : 1);
+    qw.set(k, v);
+    norm += v * v;
+  }
+  if (!qw.size) return [];
+  norm = Math.sqrt(norm);
+  const dot = new Map<string, number>();
+  const hit = new Map<string, Set<string>>();
+  for (const [k, v] of qw)
+    for (const e of post.get(k) ?? []) {
+      dot.set(e.id, (dot.get(e.id) ?? 0) + (v / norm) * e.w);
+      let h = hit.get(e.id);
+      if (!h) hit.set(e.id, (h = new Set()));
+      h.add(k);
+    }
+  // доля слов вопроса, найденных в записи (словосочетания не считаем — их «доля» и так в словах)
+  const words = [...qw.keys()].filter((k) => !k.includes(BIGRAM_SEP));
+  const out: SearchHit[] = [];
+  for (const [id, d] of dot) {
+    const h = hit.get(id)!;
+    const covered = words.length ? words.filter((k) => h.has(k)).length / words.length : 1;
+    const doc = ix.docs.get(id)!;
+    out.push({ id, score: Math.min(1, d * (0.5 + 0.5 * covered)), terms: pickTerms([...h], 4).map((k) => displayForm(doc, k)) });
+  }
+  out.sort((a, b) => b.score - a.score || (a.id < b.id ? -1 : 1));
+  return out.slice(0, opts.limit ?? 8);
+}
+
+/**
+ * Самые подходящие к вопросу абзацы длинного текста (в исходном порядке, пропуски — «…»).
+ * Короткий текст — целиком.
+ */
+export function bestPassages(text: string, keys: Iterable<string>, maxChars: number, canon: (k: string) => string = (k) => k): string {
+  const t = text.trim();
+  if (t.length <= maxChars) return t;
+  const want = new Set(keys);
+  const paras = t
+    .split(/\n+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const scored = paras.map((p, i) => {
+    let s = 0;
+    for (const tok of tokenize(p)) if (tok && want.has(canon(tok.key))) s++;
+    return { i, p, s };
+  });
+  // первый абзац — контекст (о чём запись), дальше — по числу слов вопроса
+  const order = [scored[0], ...scored.slice(1).sort((a, b) => b.s - a.s || a.i - b.i)];
+  const picked = new Set<number>();
+  let len = 0;
+  for (const x of order) {
+    if (x.i !== 0 && x.s === 0 && picked.size > 0) break;
+    const room = maxChars - len;
+    if (room <= 40) break;
+    picked.add(x.i);
+    len += Math.min(x.p.length, room) + 2;
+  }
+  const out: string[] = [];
+  let prev = -1;
+  let used = 0;
+  for (const x of scored) {
+    if (!picked.has(x.i)) continue;
+    if (prev >= 0 && x.i !== prev + 1) out.push('…');
+    const room = maxChars - used;
+    const s = x.p.length > room ? x.p.slice(0, Math.max(0, room - 1)) + '…' : x.p;
+    out.push(s);
+    used += s.length + 2;
+    prev = x.i;
+  }
+  return out.join('\n');
+}
+
+// ---------- Дубли ----------
+
+/** Порог «похоже на дубль»: почти тот же набор важных слов */
+export const DUP_SCORE = 0.6;
+/**
+ * Дубль — только у заметок с содержанием и сопоставимого объёма: пустая заметка (одно название)
+ * иначе «совпадает» с любой, где это название упомянуто.
+ */
+const DUP_MIN_WORDS = 6;
+const DUP_MIN_RATIO = 0.4;
+const wordCount = (d: DocVec) => {
+  let n = 0;
+  for (const k of d.w.keys()) if (!k.includes(BIGRAM_SEP)) n++;
+  return n;
+};
+
+/** Почти одинаковые записи (точная близость по словам, без упоминаний и решений по парам) */
+export function duplicatesOf(ix: LinkIndex, id: string, min = DUP_SCORE): { id: string; score: number }[] {
+  const a = ix.docs.get(id);
+  if (!a) return [];
+  const na = wordCount(a);
+  if (na < DUP_MIN_WORDS) return [];
+  const approx = new Map<string, number>();
+  for (const k of topTerms(ix, a)) {
+    const w = a.w.get(k)!;
+    for (const e of ix.post.get(k)!) if (e.id !== id) approx.set(e.id, (approx.get(e.id) ?? 0) + w * e.w);
+  }
+  const out: { id: string; score: number }[] = [];
+  for (const bid of approx.keys()) {
+    const b = ix.docs.get(bid)!;
+    const nb = wordCount(b);
+    if (nb < DUP_MIN_WORDS || Math.min(na, nb) / Math.max(na, nb) < DUP_MIN_RATIO) continue;
+    const d = pairStats(a, b).dot;
+    if (d >= min) out.push({ id: bid, score: Math.min(1, d) });
+  }
+  return out.sort((x, y) => y.score - x.score || (x.id < y.id ? -1 : 1));
+}
+
+/** Все пары дублей среди ids (каждая пара — один раз) */
+export function findDuplicates(ix: LinkIndex, ids: Iterable<string>, min = DUP_SCORE): { a: string; b: string; score: number }[] {
+  const allow = new Set(ids);
+  const seen = new Map<string, { a: string; b: string; score: number }>();
+  for (const id of allow)
+    for (const d of duplicatesOf(ix, id, min)) {
+      if (!allow.has(d.id)) continue;
+      const [a, b] = id < d.id ? [id, d.id] : [d.id, id];
+      if (!seen.has(a + '|' + b)) seen.set(a + '|' + b, { a, b, score: d.score });
+    }
+  return [...seen.values()].sort((x, y) => y.score - x.score);
+}

@@ -65,6 +65,17 @@ export function buildCommands(): Entry[] {
       },
     }),
     entry({
+      key: 'c:ask-brain',
+      kind: 'cmd',
+      title: 'Спросить у мозга',
+      emoji: '🧠',
+      body: 'вопрос ответ по заметкам ии найти что я писал второй мозг',
+      run: async () => {
+        await nav('notes');
+        (await import('../notes/brainAsk')).openAsk();
+      },
+    }),
+    entry({
       key: 'c:new-goal',
       kind: 'cmd',
       title: 'Новая цель',

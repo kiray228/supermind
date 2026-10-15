@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, Check, ChevronDown, Copy, Download, FolderInput, FolderPlus, LayoutGrid, MoreHorizontal, Pencil, Pin, PinOff, Plus, RotateCcw, Search, StickyNote, Trash2, Waypoints, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Brain, Check, ChevronDown, Copy, CopyCheck, Download, FolderInput, FolderPlus, LayoutGrid, MoreHorizontal, Pencil, Pin, PinOff, Plus, RotateCcw, Search, StickyNote, Trash2, Waypoints, X } from 'lucide-react';
 import type { ID } from '../types';
 import { confirmDialog } from '../ui/dialogs';
 import { toast } from '../store/appStore';
@@ -23,6 +23,9 @@ import {
 } from '../notes/store';
 import { NoteEditor } from '../notes/ui/NoteEditor';
 import { NotesGraph } from '../notes/ui/NotesGraph';
+import { BrainAsk } from '../notes/ui/BrainAsk';
+import { DuplicatesSheet } from '../notes/ui/DuplicatesSheet';
+import { openAsk, useAsk } from '../notes/brainAsk';
 import { useLinks } from '../notes/related';
 import { FolderDialog, NoteCard } from '../notes/ui/ListParts';
 import { MenuItem, MenuLabel, MenuSep, NtMenu, type MenuAnchor } from '../notes/ui/Menu';
@@ -77,6 +80,8 @@ export default function Notes() {
   const [mode, setModeState] = useState<'list' | 'graph'>(() => readLS<'list' | 'graph'>('sm-notes-mode', 'list'));
   const [graphSel, setGraphSel] = useState<ID | null>(null);
   const graphFocus = useLinks((s) => s.graphFocus);
+  const askOpen = useAsk((s) => s.open);
+  const [dupSheet, setDupSheet] = useState(false);
 
   useEffect(() => {
     void ensureNotes().then((d) => {
@@ -276,6 +281,9 @@ export default function Notes() {
           <ChevronDown size={18} className="nt-mobile-only" />
         </button>
         <div className="grow" />
+        <button className="icon-btn" onClick={() => openAsk()} aria-label="Спросить у мозга" title="Спросить у мозга">
+          <Brain />
+        </button>
         {sel.k !== 'trash' && (
           <button className={`icon-btn${mode === 'graph' ? ' active' : ''}`} onClick={() => setMode(mode === 'graph' ? 'list' : 'graph')} aria-label={mode === 'graph' ? 'Показать списком' : 'Граф заметок'} title={mode === 'graph' ? 'Списком' : 'Граф связей'}>
             {mode === 'graph' ? <LayoutGrid /> : <Waypoints />}
@@ -351,6 +359,9 @@ export default function Notes() {
         </div>
       )}
 
+      {askOpen && <BrainAsk />}
+      {dupSheet && <DuplicatesSheet onClose={() => setDupSheet(false)} />}
+
       {folderDlg && (
         <FolderDialog
           folder={folderDlg.id ? data.folders.find((f) => f.id === folderDlg.id) : undefined}
@@ -368,6 +379,7 @@ export default function Notes() {
           ))}
           <MenuSep />
           <MenuItem icon={<FolderPlus size={17} />} label="Новая папка" onClick={() => setFolderDlg({})} />
+          <MenuItem icon={<CopyCheck size={17} />} label="Найти дубли" onClick={() => setDupSheet(true)} />
           <MenuItem
             icon={<Download size={17} />}
             label="Экспорт для Obsidian"

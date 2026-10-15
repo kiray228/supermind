@@ -3,6 +3,8 @@
 @keyframes nt-rel-in { from { opacity: 0; transform: translateY(8px); } }
 .nt-rel { margin: 8px 0 0; padding: 16px 0 calc(28px + var(--safe-bottom, 0px)); border-top: 1px solid var(--border); }
 .nt-rel.is-blank { display: none; }
+.nt-rel.is-quiet { border-top: none; padding-top: 0; }
+.nt-rel.is-quiet .nt-bl { margin-top: 0; }
 .nt-rel-kw { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 14px; }
 .nt-rel-kw-label { font-size: 12px; font-weight: 650; color: var(--text-3); text-transform: uppercase; letter-spacing: .04em; margin-right: 2px; }
 .nt-rel-chip { font-size: 13px; line-height: 1; padding: 6px 9px; border-radius: 999px; background: var(--fill-4); color: var(--text-2); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -72,3 +74,20 @@
 .nt-ai-link-why { font-size: 12.5px; color: var(--text-3); }
 .nt-ai-undo { align-self: flex-start; display: inline-flex; align-items: center; gap: 5px; border: none; background: none; padding: 2px 0; font: inherit; font-size: 13px; color: var(--text-3); cursor: pointer; }
 @media (hover: hover) { .nt-ai-undo:hover { color: var(--text); } }
+
+/* «Упоминается в» */
+.nt-bl { margin-top: 16px; }
+.nt-bl-item { display: flex; align-items: center; gap: 8px; padding: 10px 12px; }
+.nt-bl-item + .nt-bl-item { border-top: 1px solid var(--border); }
+.nt-bl-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; border: none; background: none; padding: 0; text-align: left; font: inherit; color: var(--text); cursor: pointer; }
+.nt-bl-snip { font-size: 13px; line-height: 1.4; color: var(--text-2); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.nt-bl-snip mark { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--text); border-radius: 3px; padding: 0 2px; }
+.nt-bl-link { padding: 5px 10px; font-size: 12.5px; }
+.nt-bl-link:disabled { opacity: .5; }
+/* «Похоже на дубль» */
+.nt-dup { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; margin-bottom: 14px; border-radius: var(--radius); background: color-mix(in srgb, var(--warn) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--warn) 35%, var(--border)); }
+.nt-dup-ic { color: var(--warn); flex-shrink: 0; margin-top: 2px; }
+.nt-dup-title { font-weight: 600; font-size: 14px; color: var(--text); }
+.nt-dup-title > button { border: none; background: none; padding: 0; font: inherit; color: var(--accent); cursor: pointer; text-align: left; }
+.nt-dup-sub { font-size: 12.5px; color: var(--text-2); margin-top: 2px; }
+.nt-dup-actions { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
