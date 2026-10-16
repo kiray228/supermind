@@ -233,7 +233,7 @@ export function formatBriefing(b: BriefingData): { title: string; body: string }
   const g = b.goals[0];
   if (g) parts.push(`Срок «${cut(g.title, 30)}» ${relDay(g.date, b.today)}`);
   const p = b.payments[0];
-  if (p) parts.push(`Платёж ${cut(p.title, 24)} ${fmtMoney(p.amount, p.currency)} ${relDay(p.date, b.today)}`);
+  if (p) parts.push(`${p.income ? 'Поступление' : 'Платёж'} ${cut(p.title, 24)} ${p.income ? '+' : ''}${fmtMoney(p.amount, p.currency)} ${relDay(p.date, b.today)}`);
   if (b.yesterday.count) parts.push(`Вчера сделано: ${b.yesterday.count}`);
 
   let body = '';
@@ -282,7 +282,7 @@ export function briefingAsText(b: BriefingData): string {
   if (b.overdue.length) lines.push(`Просрочено (${b.overdue.length}):\n${b.overdue.slice(0, 8).map((x) => `- ${x.title} (срок ${x.date})`).join('\n')}`);
   if (b.habits.length) lines.push(`Привычки на сегодня: ${b.habits.map((h) => `${h.name}${h.done ? ' ✓' : ''}`).join(', ')}`);
   if (b.goals.length) lines.push(`Сроки целей на неделе: ${b.goals.map((g) => `${g.title} — ${g.date}`).join('; ')}`);
-  if (b.payments.length) lines.push(`Платежи на неделе: ${b.payments.slice(0, 5).map((p) => `${p.title} ${fmtMoney(p.amount, p.currency)} — ${p.date}`).join('; ')}`);
+  if (b.payments.length) lines.push(`Платежи и поступления на неделе: ${b.payments.slice(0, 5).map((p) => `${p.title} ${p.income ? '+' : '−'}${fmtMoney(p.amount, p.currency)} — ${p.date}`).join('; ')}`);
   lines.push(`Вчера выполнено задач: ${b.yesterday.count}${b.yesterday.titles.length ? ` (${b.yesterday.titles.join(', ')})` : ''}.`);
   if (b.moods.length) lines.push(`Настроение за последние дни: ${b.moods.map((m) => m.mood).join(' ')}`);
   return lines.join('\n\n');

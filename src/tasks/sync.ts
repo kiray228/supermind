@@ -210,8 +210,8 @@ async function plan(fromMs: number, toMs: number): Promise<Planned[]> {
       out.push({
         id: hash(`pay|${pay.id}`),
         at,
-        title: `💳 ${pay.title}`,
-        body: `${pay.remindDays === 0 ? 'Платёж сегодня' : `Платёж ${dayLabel(pay.date, day).toLowerCase()}`} · ${amount}`,
+        title: `${pay.income ? '💰' : '💳'} ${pay.title}`,
+        body: `${pay.income ? 'Поступление' : 'Платёж'} ${pay.remindDays === 0 ? 'сегодня' : dayLabel(pay.date, day).toLowerCase()} · ${pay.income ? '+' : ''}${amount}`,
         extra: { payId: pay.id, date: pay.date, sm: 1 },
       });
     }

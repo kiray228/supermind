@@ -237,6 +237,8 @@ export interface Habit {
   everyDays?: number;
   /** для freq = 'every': с какого дня отсчёт (YYYY-MM-DD) */
   everyFrom?: string;
+  /** порядок, заданный вручную (меньше — выше); у привычек со временем порядок по времени */
+  order?: number;
   /** время привычки HH:MM */
   time?: string;
   /**

@@ -64,6 +64,8 @@ export type SubPeriod = 'week' | 'month' | 'year';
 export interface Subscription {
   id: string;
   name: string;
+  /** регулярный доход (зарплата, аренда от жильцов); нет — расход */
+  income?: boolean;
   amount: number;
   accountId: string;
   categoryId?: string;
@@ -564,6 +566,8 @@ export interface UpcomingPayment {
   currency: string;
   /** напомнить за N дней (меньше 0 — не напоминать) */
   remindDays: number;
+  /** поступление (регулярный доход), а не платёж */
+  income?: boolean;
 }
 
 /** Предстоящие платежи активных подписок в диапазоне дат (включительно) */
@@ -575,7 +579,7 @@ export function upcomingPayments(data: FinanceData, fromYmd: string, toYmdArg: s
     const currency = accs.get(s.accountId)?.currency ?? data.prefs.mainCurrency;
     let date = s.nextDate;
     for (let i = 0; i < 500 && date <= toYmdArg; i++) {
-      if (date >= fromYmd) out.push({ id: `${s.id}@${date}`, subscriptionId: s.id, title: s.name, date, amount: s.amount, currency, remindDays: s.remindDays });
+      if (date >= fromYmd) out.push({ id: `${s.id}@${date}`, subscriptionId: s.id, title: s.name, date, amount: s.amount, currency, remindDays: s.remindDays, ...(s.income ? { income: true } : {}) });
       date = advanceSub(s, date);
     }
   }

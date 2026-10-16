@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Delete, Lock } from 'lucide-react';
-import { lockWait, tryUnlock, useLock } from './lock';
+import { biometricOn, lockWait, tryUnlock, unlockWithBiometric, useLock } from './lock';
+import { Fingerprint } from 'lucide-react';
 import { onBack } from './dialogs';
 import './lock.css';
 
@@ -86,6 +87,11 @@ export function LockScreen() {
 
   // «Назад» на Android не должен закрывать окна под экраном блокировки
   useEffect(() => (locked ? onBack(() => true) : undefined), [locked]);
+  // отпечаток — сразу, как появился экран (не вышло — остаётся код)
+  const bio = biometricOn();
+  useEffect(() => {
+    if (locked && bio) void unlockWithBiometric();
+  }, [locked, bio]);
   useEffect(() => {
     if (!locked) return;
     const tick = () => setWait(lockWait());
@@ -124,6 +130,11 @@ export function LockScreen() {
         hint={wait > 0 ? `Слишком много попыток. Ещё ${Math.ceil(wait / 1000)} с` : undefined}
         onDone={(p) => void done(p)}
       />
+      {bio && (
+        <button className="lock-bio" onClick={() => void unlockWithBiometric()}>
+          <Fingerprint size={22} /> Отпечаток
+        </button>
+      )}
       <button className="lock-forgot" onClick={() => setForgot(!forgot)}>
         Забыли код?
       </button>

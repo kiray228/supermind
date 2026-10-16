@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { EyeSlash, LockKey, Timer, Password } from '@phosphor-icons/react';
+import { EyeSlash, Fingerprint, LockKey, Timer, Password } from '@phosphor-icons/react';
 import { toast } from '../store/appStore';
 import { IconTile } from './icons';
 import { ListRow, ListSection, SelectRow, SwitchRow } from './list';
-import { disableLock, LOCK_AFTER_OPTIONS, lockConfig, secureWindow, setLockAfter, setPin, setSecure, useLock } from './lock';
+import { biometricAvailable, biometricOn, disableLock, LOCK_AFTER_OPTIONS, lockConfig, secureWindow, setBiometric, setLockAfter, setPin, setSecure, useLock } from './lock';
 import { isNative } from '../platform';
 import { PinPad } from './LockScreen';
 import { onBack } from './dialogs';
@@ -66,6 +66,11 @@ export function LockSettings() {
   const [setup, setSetup] = useState(false);
   const [after, setAfter] = useState(() => lockConfig()?.after ?? 1);
   const [secure, setSecureState] = useState(secureWindow);
+  const [bio, setBio] = useState(biometricOn);
+  const [bioAvail, setBioAvail] = useState(false);
+  useEffect(() => {
+    void biometricAvailable().then(setBioAvail);
+  }, []);
 
   return (
     <ListSection
@@ -97,6 +102,18 @@ export function LockSettings() {
               setLockAfter(Number(v));
             }}
           />
+          {bioAvail && (
+            <SwitchRow
+              icon={<IconTile icon={Fingerprint} tone="blue" size="list" />}
+              title="Вход по отпечатку"
+              subtitle="Код остаётся запасным способом"
+              checked={bio}
+              onChange={(v) => {
+                setBiometric(v);
+                setBio(v);
+              }}
+            />
+          )}
           <ListRow icon={<IconTile icon={Password} tone="gray" size="list" />} title="Сменить код" chevron onClick={() => setSetup(true)} />
         </>
       )}

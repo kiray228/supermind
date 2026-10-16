@@ -187,6 +187,11 @@ button.hb-cell:hover { transform: scale(1.12); }
   background: none; text-align: left; color: inherit;
 }
 button.hb-item:hover, .hb-preset:hover { background: var(--surface-2); }
+.hb-item-row { display: flex; align-items: center; gap: 2px; }
+.hb-item-row .hb-item { width: auto; min-width: 0; }
+.hb-order { display: flex; flex-direction: column; flex-shrink: 0; }
+.hb-order .icon-btn { width: 30px; height: 26px; color: var(--text-3); }
+.hb-order .icon-btn:disabled { opacity: .25; }
 .hb-item-ic {
   width: 38px; height: 38px; flex-shrink: 0; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center;
   font-size: 20px; background: color-mix(in srgb, var(--hc) 15%, var(--surface-2));

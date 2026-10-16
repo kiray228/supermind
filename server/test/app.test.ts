@@ -55,6 +55,20 @@ test('данные переживают ошибочную синхрониза�
   assert.equal((await call('GET', '/snapshots')).status, 401);
 });
 
+test('вход, которым не пользовались полгода, больше не действует; свежий — продлевается', async () => {
+  const reg = await call<{ token: string; user: { id: string } }>('POST', '/auth/register', { email: 'idle@b.cd', password: '12345678' });
+  const t = reg.data.token;
+  assert.equal((await call('GET', '/auth/me', undefined, t)).status, 200);
+  await sql.query(`UPDATE sessions SET last_used_at = now() - interval '179 days' WHERE user_id = $1`, [reg.data.user.id]);
+  assert.equal((await call('GET', '/auth/me', undefined, t)).status, 200, '179 дней — ещё действует и продлевается');
+  await sql.query(`UPDATE sessions SET last_used_at = now() - interval '181 days' WHERE user_id = $1`, [reg.data.user.id]);
+  const r = await call<{ error: string }>('GET', '/auth/me', undefined, t);
+  assert.equal(r.status, 401);
+  assert.match(r.data.error, /Сессия истекла/);
+  const again = await call<{ token: string }>('POST', '/auth/login', { email: 'idle@b.cd', password: '12345678' });
+  assert.equal((await call('GET', '/auth/me', undefined, again.data.token)).status, 200, 'новый вход работает');
+});
+
 test('хранение копий: сутки — все, дальше — первая и последняя за день, старше 30 дней — удаляются', async () => {
   const reg = await call<{ token: string; user: { id: string } }>('POST', '/auth/register', { email: 'keep@b.cd', password: '12345678' });
   const { token: t, user } = reg.data;

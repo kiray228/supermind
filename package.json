@@ -1,7 +1,7 @@
 {
   "name": "supermind",
   "private": true,
-  "version": "1.37.0",
+  "version": "1.38.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -22,6 +22,7 @@
     "@capacitor/share": "^8.0.3",
     "@capacitor/splash-screen": "^8.0.2",
     "@capacitor/status-bar": "^8.0.4",
+    "@capgo/capacitor-native-biometric": "8.7.0",
     "@phosphor-icons/react": "^2.1.10",
     "idb-keyval": "^6.3.0",
     "jspdf": "^4.2.1",

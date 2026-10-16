@@ -345,7 +345,7 @@ export function paySubscription(id: string, date = todayYmd()): Transaction | nu
     toast('Этот платёж уже записан');
     return null;
   }
-  const t = addTransaction({ type: 'expense', amount: s.amount, accountId: s.accountId, categoryId: s.categoryId, date, note: s.name, subscriptionId: s.id }, { id: txId });
+  const t = addTransaction({ type: s.income ? 'income' : 'expense', amount: s.amount, accountId: s.accountId, categoryId: s.categoryId, date, note: s.name, subscriptionId: s.id }, { id: txId });
   mutateFinance((x) => {
     const y = x.subscriptions.find((z) => z.id === id);
     if (!y) return;
@@ -353,7 +353,7 @@ export function paySubscription(id: string, date = todayYmd()): Transaction | nu
     y.updatedAt = Date.now();
   });
   if (t)
-    toast(`Оплачено: ${s.name}`, {
+    toast(`${s.income ? 'Получено' : 'Оплачено'}: ${s.name}`, {
       label: 'Отменить',
       run: () =>
         mutateFinance((x) => {

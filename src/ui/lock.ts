@@ -107,6 +107,58 @@ export async function tryUnlock(pin: string, now = Date.now()): Promise<'ok' | '
 
 export const lockNow = () => lockConfig() && useLock.setState({ locked: true });
 
+// ---------- Отпечаток (лицо): вместо кода, код — запасной ----------
+
+const BIO = 'sm-lock-bio';
+export const biometricOn = () => {
+  try {
+    return localStorage.getItem(BIO) === '1';
+  } catch {
+    return false;
+  }
+};
+export function setBiometric(on: boolean) {
+  try {
+    localStorage.setItem(BIO, on ? '1' : '0');
+  } catch {
+    /* не страшно */
+  }
+}
+
+/** Есть ли на устройстве отпечаток или распознавание лица (только Android-приложение) */
+export async function biometricAvailable(): Promise<boolean> {
+  const { isNative } = await import('../platform');
+  if (!isNative()) return false;
+  try {
+    const { NativeBiometric } = await import('@capgo/capacitor-native-biometric');
+    return (await NativeBiometric.isAvailable({ useFallback: false })).isAvailable;
+  } catch {
+    return false;
+  }
+}
+
+/** идёт проверка отпечатка: системное окно может «свернуть» приложение — это не уход в фон */
+let bioActive = false;
+let bioDoneAt = 0;
+
+/** Открыть по отпечатку: true — открыто (неудача или «Ввести код» — false, код остаётся) */
+export async function unlockWithBiometric(): Promise<boolean> {
+  if (bioActive || !lockConfig() || !biometricOn() || !(await biometricAvailable())) return false;
+  bioActive = true;
+  try {
+    const { NativeBiometric } = await import('@capgo/capacitor-native-biometric');
+    await NativeBiometric.verifyIdentity({ title: 'SuperMind', subtitle: 'Разблокировать приложение', negativeButtonText: 'Ввести код', maxAttempts: 3 });
+    localStorage.removeItem(FAILS);
+    useLock.setState({ locked: false });
+    return true;
+  } catch {
+    return false;
+  } finally {
+    bioActive = false;
+    bioDoneAt = Date.now();
+  }
+}
+
 // ---------- Android: прятать содержимое в списке недавних приложений ----------
 
 const SECURE = 'sm-secure-window';
@@ -145,6 +197,11 @@ export function initLock() {
   document.addEventListener('visibilitychange', () => {
     const c = lockConfig();
     if (!c) return;
+    // окно отпечатка (и секунда после него) — не уход из приложения
+    if (bioActive || Date.now() - bioDoneAt < 1500) {
+      hiddenAt = 0;
+      return;
+    }
     if (document.visibilityState === 'hidden') hiddenAt = Date.now();
     else if (hiddenAt && Date.now() - hiddenAt >= c.after * 60_000) useLock.setState({ locked: true });
   });

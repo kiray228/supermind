@@ -1,11 +1,14 @@
 import { useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { Archive, ArchiveRestore, Bell, BellOff, Check, ChevronDown, ChevronRight, Flame, Minus, Pause, Pencil, Plus, Snowflake, Trash2, Trophy, X } from 'lucide-react';
+import { Archive, ArchiveRestore, Bell, BellOff, Check, ChevronDown, ChevronRight, ChevronUp, Flame, Minus, Pause, Pencil, Plus, Snowflake, Trash2, Trophy, X } from 'lucide-react';
 import type { Habit, HabitFreq, HabitPart, PlannerData } from '../types';
 import { addDaysYmd, fromYmd, todayYmd } from '../utils/mapTasks';
 import { uid } from '../utils/tree';
 import {
   activeHabits,
+  byOrder,
+  compareByTime,
+  moveHabitOrder,
   bestStreak,
   cleanHabit,
   completion,
@@ -165,7 +168,7 @@ export function HabitsToday({
   const rest = habits.filter((h) => !dueIds.has(h.id));
   const groups = PARTS.map((p) => ({
     ...p,
-    list: due.filter((h) => partOf(h) === p.id).sort((a, b) => (a.time && b.time ? (a.time < b.time ? -1 : a.time > b.time ? 1 : 0) : a.time ? -1 : b.time ? 1 : 0)),
+    list: due.filter((h) => partOf(h) === p.id).sort(compareByTime),
   })).filter((g) => g.list.length);
   const single = groups.length === 1 && groups[0].id === 'any';
   const row = (h: Habit, off?: boolean) => (
@@ -741,6 +744,7 @@ export function HabitsManager({
   onCreate,
   onAddPreset,
   onRestore,
+  onReorder,
   onClose,
 }: {
   habits: Habit[];
@@ -749,12 +753,14 @@ export function HabitsManager({
   onCreate: () => void;
   onAddPreset: (h: Habit) => void;
   onRestore: (h: Habit) => void;
+  /** порядок изменён: сохранить эти привычки */
+  onReorder?: (changed: Habit[]) => void;
   onClose: () => void;
 }) {
   const [tab, setTab] = useState<'mine' | 'library'>(initialTab);
   const [cat, setCat] = useState<HabitCategory | 'all'>('all');
   const [archOpen, setArchOpen] = useState(false);
-  const active = activeHabits(habits);
+  const active = byOrder(activeHabits(habits));
   const archived = habits.filter((h) => h.archived && !h.deleted);
   const names = useMemo(() => new Set(active.map((h) => h.name.trim().toLowerCase())), [active]);
   const presets = HABIT_LIBRARY.filter((p) => cat === 'all' || p.cat === cat);
@@ -790,18 +796,30 @@ export function HabitsManager({
               </div>
             ) : (
               <div className="hb-list">
-                {active.map((h) => (
-                  <button key={h.id} className="hb-item" style={{ '--hc': h.color } as CSSProperties} onClick={() => onEdit(h)}>
-                    <span className="hb-item-ic">{h.icon ?? '🔥'}</span>
-                    <span className="grow hb-item-body">
-                      <span className="hb-item-name ellipsis">{h.name}</span>
-                      <span className="hb-item-meta ellipsis">
-                        {[freqLabel(h), timeRangeLabel(h), targetOf(h) > 1 ? `×${targetOf(h)}${h.unit ? ` (${h.unit})` : ''}` : ''].filter(Boolean).join(' · ')}
+                {active.map((h, i) => (
+                  <div key={h.id} className="hb-item-row">
+                    <button className="hb-item grow" style={{ '--hc': h.color } as CSSProperties} onClick={() => onEdit(h)}>
+                      <span className="hb-item-ic">{h.icon ?? '🔥'}</span>
+                      <span className="grow hb-item-body">
+                        <span className="hb-item-name ellipsis">{h.name}</span>
+                        <span className="hb-item-meta ellipsis">
+                          {[freqLabel(h), timeRangeLabel(h), targetOf(h) > 1 ? `×${targetOf(h)}${h.unit ? ` (${h.unit})` : ''}` : ''].filter(Boolean).join(' · ')}
+                        </span>
                       </span>
-                    </span>
-                    {reminderTimeOf(h) && <Bell size={14} className="faint" />}
-                    <ChevronRight size={18} className="faint" />
-                  </button>
+                      {reminderTimeOf(h) && <Bell size={14} className="faint" />}
+                      <ChevronRight size={18} className="faint" />
+                    </button>
+                    {onReorder && active.length > 1 && (
+                      <span className="hb-order">
+                        <button className="icon-btn" disabled={i === 0} onClick={() => onReorder(moveHabitOrder(habits, h.id, -1))} aria-label={`«${h.name}» выше`}>
+                          <ChevronUp size={16} />
+                        </button>
+                        <button className="icon-btn" disabled={i === active.length - 1} onClick={() => onReorder(moveHabitOrder(habits, h.id, 1))} aria-label={`«${h.name}» ниже`}>
+                          <ChevronDown size={16} />
+                        </button>
+                      </span>
+                    )}
+                  </div>
                 ))}
               </div>
             )}

@@ -34,10 +34,16 @@ export function SubscriptionsSection({ data }: { data: FinanceData }) {
   const list = [...data.subscriptions].sort((a, b) => Number(b.active) - Number(a.active) || (a.nextDate ?? '').localeCompare(b.nextDate ?? '') || a.name.localeCompare(b.name, 'ru'));
   const main = data.prefs.mainCurrency;
 
-  // стоимость в месяц: по валютам и общий итог
+  // стоимость в месяц: по валютам и общий итог (доходы — отдельно)
   const monthly: Record<string, number> = {};
+  const incomeMonthly: Record<string, number> = {};
   for (const s of data.subscriptions) {
     if (!s.active) continue;
+    if (s.income) {
+      const c = accs.get(s.accountId)?.currency ?? main;
+      incomeMonthly[c] = r2((incomeMonthly[c] ?? 0) + subMonthly(s));
+      continue;
+    }
     const c = accs.get(s.accountId)?.currency ?? main;
     monthly[c] = r2((monthly[c] ?? 0) + subMonthly(s));
   }
@@ -61,6 +67,11 @@ export function SubscriptionsSection({ data }: { data: FinanceData }) {
             ≈ {Object.keys(monthly).length === 1 ? fmtMoney(Object.values(monthly)[0] * 12, Object.keys(monthly)[0], { compact: true }) : fmtMoney(total * 12, main, { compact: true })} в год
           </span>
         )}
+        {Object.keys(incomeMonthly).length > 0 && (
+          <span className="small fn-pos">
+            Регулярные доходы: <CurTotals totals={incomeMonthly} className="fn-inline" /> в месяц
+          </span>
+        )}
       </div>
       <div className="card fn-list">
         {list.map((s) => {
@@ -70,24 +81,24 @@ export function SubscriptionsSection({ data }: { data: FinanceData }) {
           return (
             <div key={s.id} className={'fn-item' + (s.active ? '' : ' is-archived')}>
               <button className="fn-item-main" onClick={() => setEdit(s)}>
-                <CatIcon emoji={c?.emoji ?? '🔁'} color={c?.color ?? '#6366f1'} />
+                <CatIcon emoji={c?.emoji ?? (s.income ? '💰' : '🔁')} color={c?.color ?? (s.income ? '#22c55e' : '#6366f1')} />
                 <span className="grow fn-tx-main">
                   <span className="fn-tx-title ellipsis">{s.name}</span>
                   <span className={'fn-tx-sub ellipsis' + (overdue ? ' fn-neg' : '')}>
                     {s.active ? `${overdue ? 'просрочен: ' : 'след. '}${dateShort(s.nextDate)}` : 'приостановлен'} · {periodText(s)}
                   </span>
                 </span>
-                <Money v={s.amount} cur={a?.currency ?? main} className="small" />
+                <Money v={s.amount} cur={a?.currency ?? main} className={'small' + (s.income ? ' fn-pos' : '')} />
               </button>
               {s.active && (
                 <button className="btn btn-sm fn-pay-btn" onClick={() => paySubscription(s.id)}>
-                  Оплачено
+                  {s.income ? 'Получено' : 'Оплачено'}
                 </button>
               )}
             </div>
           );
         })}
-        {!list.length && <p className="muted small fn-pad">Добавьте подписки, аренду, кредит, связь — приложение напомнит о платеже и посчитает, сколько уходит в месяц.</p>}
+        {!list.length && <p className="muted small fn-pad">Добавьте подписки, аренду, кредит, связь — и зарплату: приложение напомнит о платеже или поступлении и посчитает, сколько уходит и приходит в месяц.</p>}
       </div>
       <button className="btn btn-primary fn-self-start" onClick={() => setEdit('new')}>
         <Plus size={16} /> Новый платёж
@@ -102,6 +113,7 @@ type PeriodOpt = 'week' | 'month' | 'months' | 'year';
 function SubSheet({ data, sub, onClose }: { data: FinanceData; sub: Subscription | null; onClose: () => void }) {
   const accounts = sortedAccounts(data, true);
   const [name, setName] = useState(sub?.name ?? '');
+  const [income, setIncome] = useState(!!sub?.income);
   const [amount, setAmount] = useState(sub ? String(sub.amount).replace('.', ',') : '');
   const [accountId, setAccountId] = useState(sub?.accountId ?? data.prefs.lastAccountId ?? accounts[0]?.id ?? '');
   const [categoryId, setCategoryId] = useState(sub?.categoryId ?? (data.categories.some((c) => c.id === 'c-subs') ? 'c-subs' : ''));
@@ -128,6 +140,7 @@ function SubSheet({ data, sub, onClose }: { data: FinanceData; sub: Subscription
     saveSubscription({
       id: sub?.id ?? uid(),
       name: name.trim(),
+      ...(income ? { income: true } : {}),
       amount: v,
       accountId,
       categoryId: categoryId || undefined,
@@ -151,7 +164,7 @@ function SubSheet({ data, sub, onClose }: { data: FinanceData; sub: Subscription
 
   return (
     <Sheet
-      title={sub ? 'Регулярный платёж' : 'Новый регулярный платёж'}
+      title={sub ? (income ? 'Регулярный доход' : 'Регулярный платёж') : income ? 'Новый регулярный доход' : 'Новый регулярный платёж'}
       onClose={onClose}
       actions={
         <>
@@ -170,15 +183,35 @@ function SubSheet({ data, sub, onClose }: { data: FinanceData; sub: Subscription
         </>
       }
     >
+      <div className="segmented fn-kind-seg">
+        <button
+          className={income ? '' : 'active'}
+          onClick={() => {
+            setIncome(false);
+            if (categoryId && !sortedCategories(data, 'expense').some((c) => c.id === categoryId)) setCategoryId('');
+          }}
+        >
+          Расход
+        </button>
+        <button
+          className={income ? 'active' : ''}
+          onClick={() => {
+            setIncome(true);
+            if (categoryId && !sortedCategories(data, 'income').some((c) => c.id === categoryId)) setCategoryId('');
+          }}
+        >
+          Доход
+        </button>
+      </div>
       <label className="label">Название</label>
-      <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Netflix, аренда, кредит…" autoFocus={!sub} />
+      <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder={income ? 'Зарплата, аванс, аренда…' : 'Netflix, аренда, кредит…'} autoFocus={!sub} />
       <div className="fn-grid2">
         <div>
           <label className="label">Сумма, {curSymbol(cur)}</label>
           <AmountInput value={amount} onChange={setAmount} onEnter={save} />
         </div>
         <div>
-          <label className="label">Следующий платёж</label>
+          <label className="label">{income ? 'Следующее поступление' : 'Следующий платёж'}</label>
           <input type="date" className="input" value={nextDate} onChange={(e) => setNextDate(e.target.value)} />
         </div>
         <div>
@@ -215,7 +248,7 @@ function SubSheet({ data, sub, onClose }: { data: FinanceData; sub: Subscription
           <label className="label">Категория</label>
           <select className="select" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
             <option value="">Без категории</option>
-            {sortedCategories(data, 'expense').map((c) => (
+            {sortedCategories(data, income ? 'income' : 'expense').map((c) => (
               <option key={c.id} value={c.id}>
                 {c.emoji} {c.name}
               </option>

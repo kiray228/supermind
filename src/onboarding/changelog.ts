@@ -1,5 +1,5 @@
 /** «Что нового»: главное в каждой версии. Новые версии — сверху. */
-import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge, MessageCircleQuestion, CloudOff, LayoutTemplate, SquareArrowOutUpRight, BellRing, Target, Timer, Lock, Crosshair, Move, GitMerge, EyeOff, CalendarRange } from 'lucide-react';
+import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge, MessageCircleQuestion, CloudOff, LayoutTemplate, SquareArrowOutUpRight, BellRing, Target, Timer, Lock, Crosshair, Move, GitMerge, EyeOff, CalendarRange, Fingerprint, ArrowUpDown, Banknote } from 'lucide-react';
 
 export interface ChangeItem {
   icon: typeof Sparkles;
@@ -15,6 +15,16 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.38',
+    title: 'Отпечаток, регулярный доход и порядок привычек',
+    items: [
+      { icon: Fingerprint, title: 'Вход по отпечатку', text: 'Настройки → «Защита» → «Вход по отпечатку»: при открытии приложение сразу спросит отпечаток (или лицо), код остаётся запасным.' },
+      { icon: Banknote, title: 'Регулярный доход', text: 'Финансы → регулярные платежи → «Доход»: зарплата, аванс, аренда от жильцов. Напомнит о поступлении, «Получено» запишет доход одним нажатием.' },
+      { icon: ArrowUpDown, title: 'Свой порядок привычек', text: '«Мои привычки» → стрелки вверх и вниз: так привычки и стоят в дне (у привычек со временем — по времени). Порядок одинаковый на всех устройствах.' },
+      { icon: ShieldCheck, title: 'Вход в аккаунт не вечный', text: 'Если аккаунтом не пользовались полгода, приложение попросит войти снова — старый вход на потерянном устройстве перестанет действовать.' },
+    ],
+  },
   {
     version: '1.37',
     title: 'Синхронизация без потерь и приватность',

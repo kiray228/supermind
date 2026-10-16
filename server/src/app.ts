@@ -153,6 +153,9 @@ export function createApp(deps: Deps) {
 
   // ---------- Аккаунты ----------
 
+  /** вход без запросов дольше стольких дней — недействителен (украденный старый токен не работает вечно) */
+  const SESSION_IDLE_DAYS = 180;
+
   async function createSession(userId: string, request: Request) {
     const token = newToken();
     await sql.query(`INSERT INTO sessions (token_hash, user_id, agent) VALUES ($1, $2, $3)`, [
@@ -166,10 +169,12 @@ export function createApp(deps: Deps) {
   async function userOf(request: Request): Promise<{ id: string; email: string; name: string }> {
     const auth = request.headers.get('authorization') ?? '';
     if (!auth.toLowerCase().startsWith('bearer ')) throw new HttpError(401, 'Войдите в аккаунт');
+    // вход, которым не пользовались SESSION_IDLE_DAYS дней, больше не действует (каждый запрос продлевает срок)
     const rows = await sql.query(
       `UPDATE sessions s SET last_used_at = now() FROM users u
-       WHERE s.token_hash = $1 AND u.id = s.user_id RETURNING u.id, u.email, u.name`,
-      [tokenHash(auth.slice(7).trim())],
+       WHERE s.token_hash = $1 AND u.id = s.user_id AND s.last_used_at > now() - make_interval(days => $2)
+       RETURNING u.id, u.email, u.name`,
+      [tokenHash(auth.slice(7).trim()), SESSION_IDLE_DAYS],
     );
     if (!rows[0]) throw new HttpError(401, 'Сессия истекла — войдите снова');
     const [id, email, name] = rows[0] as string[];

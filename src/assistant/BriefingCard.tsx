@@ -327,7 +327,10 @@ export function BriefingCard({ hasKey, onCollapse }: { hasKey: boolean; onCollap
                   <li key={p.id}>
                     <button onClick={() => go('finance')}>
                       <span className="grow ellipsis">{p.title}</span>
-                      <b className="as-amount">{fmtMoney(p.amount, p.currency)}</b>
+                      <b className="as-amount">
+                        {p.income ? '+' : ''}
+                        {fmtMoney(p.amount, p.currency)}
+                      </b>
                       <span className="as-when">{relDay(p.date, b.today)}</span>
                     </button>
                   </li>

@@ -603,8 +603,25 @@ export function cleanHabit(h: Habit): Habit {
 
 /** Порядок внутри части дня: по времени, без времени — в конце (порядок списка сохраняется) */
 export function compareByTime(a: Habit, b: Habit): number {
-  if (a.time && b.time) return a.time < b.time ? -1 : a.time > b.time ? 1 : 0;
+  if (a.time && b.time) return a.time < b.time ? -1 : a.time > b.time ? 1 : compareByOrder(a, b);
   if (a.time) return -1;
   if (b.time) return 1;
-  return 0;
+  return compareByOrder(a, b);
+}
+
+/** Порядок, заданный вручную; без него — как в списке (сортировка устойчивая) */
+export const compareByOrder = (a: Habit, b: Habit) => (a.order ?? 1e9) - (b.order ?? 1e9);
+
+/** Привычки в ручном порядке (для списка «Мои») */
+export const byOrder = (list: Habit[]) => [...list].sort(compareByOrder);
+
+/** Сдвинуть привычку в ручном порядке на dir (−1 — выше): у всех активных — свой номер. Возвращает изменённые */
+export function moveHabitOrder(list: Habit[], id: string, dir: -1 | 1): Habit[] {
+  const ordered = byOrder(activeHabits(list));
+  const i = ordered.findIndex((h) => h.id === id);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= ordered.length) return [];
+  [ordered[i], ordered[j]] = [ordered[j], ordered[i]];
+  const now = Date.now();
+  return ordered.flatMap((h, k) => (h.order === k ? [] : [{ ...h, order: k, updatedAt: now }]));
 }

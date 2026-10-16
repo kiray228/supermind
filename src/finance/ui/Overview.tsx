@@ -176,7 +176,7 @@ export function Overview({ data }: { data: FinanceData }) {
       {upcoming.length > 0 && (
         <section className="card fn-panel">
           <div className="fn-panel-head">
-            <h3>Ближайшие платежи</h3>
+            <h3>{upcoming.some((p) => p.income) ? 'Ближайшие платежи и поступления' : 'Ближайшие платежи'}</h3>
             <button className="fn-link small" onClick={() => openMore('subs')}>
               Все <CaretRight size={13} weight="bold" />
             </button>
@@ -189,9 +189,9 @@ export function Overview({ data }: { data: FinanceData }) {
                   <span className="ellipsis fn-tx-title">{p.title}</span>
                   <span className={'tiny ' + (p.date < today ? 'fn-neg' : 'faint')}>{p.date < today ? 'просрочен · ' + dayTitle(p.date) : dayTitle(p.date)}</span>
                 </span>
-                <Money v={p.amount} cur={p.currency} className="small" />
+                <Money v={p.amount} cur={p.currency} className={'small' + (p.income ? ' fn-pos' : '')} />
                 <button className="btn btn-sm" onClick={() => paySubscription(p.subscriptionId)}>
-                  Оплачено
+                  {p.income ? 'Получено' : 'Оплачено'}
                 </button>
               </div>
             ))}

@@ -680,6 +680,12 @@ export default function Habits() {
           onCreate={() => setEditing('new')}
           onAddPreset={addPreset}
           onRestore={(h) => archiveHabit(h, false)}
+          onReorder={(changed) => {
+            const p = ref.current;
+            if (!p || !changed.length) return;
+            const byId = new Map(changed.map((h) => [h.id, h]));
+            commit({ ...p, habits: p.habits.map((h) => byId.get(h.id) ?? h) });
+          }}
           onClose={() => setManager(false)}
         />
       )}
