@@ -29,6 +29,7 @@ import { SynonymsSheet } from '../notes/ui/SynonymsSheet';
 import { BrainReviewSheet } from '../notes/ui/BrainReviewSheet';
 import { TopicDigest } from '../notes/ui/TopicDigest';
 import { CardsLayer } from '../notes/ui/CardsLayer';
+import { QuestionCard } from '../notes/ui/QuestionCard';
 import { BrainHub } from '../notes/ui/BrainHub';
 import { hubSeen, markHubSeen } from '../notes/hub';
 import { openCardsReview, todaysCards } from '../notes/cards';
@@ -454,6 +455,7 @@ export default function Notes() {
           )}
           <div className="page-body nt-list" hidden={graphMode}>
             {sel.k === 'all' && !q && <HubNudge count={data.notes.filter((n) => !n.trashed).length} onOpen={() => setHub(true)} />}
+            {sel.k === 'all' && !q && <QuestionCard />}
             {sel.k === 'all' && !q && <CardsNudge />}
             {sel.k === 'all' && !q && <ReviewNudge onOpen={() => setReviewSheet(true)} />}
             {isTrash && list.length > 0 && <div className="nt-trash-hint small faint">Заметки в корзине удаляются навсегда через {TRASH_DAYS} дней.</div>}

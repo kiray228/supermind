@@ -1,5 +1,5 @@
 /** «Что нового»: главное в каждой версии. Новые версии — сверху. */
-import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge } from 'lucide-react';
+import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge, MessageCircleQuestion, CloudOff } from 'lucide-react';
 
 export interface ChangeItem {
   icon: typeof Sparkles;
@@ -15,6 +15,15 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.33',
+    title: 'Вопрос дня и ИИ без связи',
+    items: [
+      { icon: MessageCircleQuestion, title: 'Вопрос дня', text: 'В заметках раз в день — вопрос по давней заметке: актуально ли, что изменилось. Ответ ляжет в заметку дня и, если хочется, — обновлением в саму заметку.' },
+      { icon: CloudOff, title: 'ИИ доделает, когда появится связь', text: 'Статья сохранилась без пересказа или длинная мысль голосом пришлась на «нет сети» — ничего не теряется: слова сразу в дневнике, а пересказ и разбор на заметку и задачи сделаются сами, как только ИИ станет доступен.' },
+      { icon: Gauge, title: 'Скорость на этом устройстве', text: '«Второй мозг: что умеет» → внизу: сколько занимают связи, граф и обзор на вашем телефоне — и отчёт одной кнопкой, если что-то медленно.' },
+    ],
+  },
   {
     version: '1.32',
     title: 'Быстрый мозг и разбор голоса',

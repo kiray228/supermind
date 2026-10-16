@@ -7,6 +7,7 @@ import { normTitle } from './links';
 import { newBlock, type Block } from './model';
 import { type Forgotten, LONG_WORDS, linkableTitle, RECENT_DAYS, reviewFindings, splitByHeadings } from './reviewCore';
 import { allDuplicates } from './mentionsRuntime';
+import { perfStart } from './perfLog';
 import { brainTopics, type BrainTopic } from './digest';
 import { brainGraph, brainItems, ensureLinkIndex, rawFeatures } from './related';
 import { createNote, editOpenBody, flushNotes, loadNoteBody, saveNoteBody, useNotes } from './store';
@@ -34,6 +35,13 @@ export interface BrainReview {
 
 /** Собрать обзор */
 export async function collectReview(now = Date.now()): Promise<BrainReview> {
+  const t = perfStart();
+  const r = await review(now);
+  t('review', useNotes.getState().data?.notes.length ?? 0);
+  return r;
+}
+
+async function review(now: number): Promise<BrainReview> {
   await flushNotes();
   // связи — из графа (он считается один раз и обновляется по частям), а не заново для каждой заметки
   const { edges } = await brainGraph();

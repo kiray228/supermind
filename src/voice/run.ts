@@ -151,24 +151,29 @@ export function fromAi(raw: unknown): VoiceAction | null {
 }
 
 /** Разложить мысль ИИ (свой ключ Claude или модель на сервере). Не получилось — [] */
-async function splitDictation(text: string): Promise<VoiceAction[]> {
+async function splitDictation(text: string): Promise<{ acts: VoiceAction[]; failed: boolean }> {
   try {
     const { hasOwnKey, streamText } = await import('../ai/claude');
-    if (!hasOwnKey() && !useCloud.getState().account) return [];
+    if (!hasOwnKey() && !useCloud.getState().account) return { acts: [], failed: true };
     const answer = await streamText({ system: SPLIT_SYSTEM, messages: [{ role: 'user', content: buildSplitPrompt(text) }], effort: 'low', signal: AbortSignal.timeout(30000) });
-    return parseSplit(answer);
+    return { acts: parseSplit(answer), failed: false };
   } catch {
-    return [];
+    // нет сети или ИИ недоступен — разберём позже
+    return { acts: [], failed: true };
   }
 }
+
+/** ИИ сейчас не разобрать: слова — в дневник (не потеряются), разбор — когда ИИ станет доступен */
+const later = (text: string): { actions: VoiceAction[]; via: 'local' } => ({ actions: [{ type: 'add_journal', text, section: 'thoughts', later: true }], via: 'local' });
 
 /** Понять фразу: на устройстве, при неуверенности — у модели на сервере */
 export async function interpret(text: string): Promise<{ actions: VoiceAction[]; via: 'local' | 'ai' }> {
   // «Разбери: …» — разложить на заметку, задачи и дневник даже короткую фразу
   const forced = forcedSplit(text);
   if (forced) {
-    const acts = await splitDictation(forced);
-    if (acts.length) return { actions: acts, via: 'ai' };
+    const r = await splitDictation(forced);
+    if (r.acts.length) return { actions: r.acts, via: 'ai' };
+    if (r.failed) return later(forced);
   }
   const ctx = await context();
   const local = parseVoice(text, ctx);
@@ -176,8 +181,9 @@ export async function interpret(text: string): Promise<{ actions: VoiceAction[];
   // (кроме явных «запиши заметку», «в дневник», трат, привычек и вопросов — там человек сам сказал, что это)
   const explicit = local.actions.some((a) => a.type === 'add_note' || a.type === 'add_journal' || a.type === 'add_transaction' || a.type === 'add_habit' || a.type === 'ask');
   if (isLongDictation(text) && !explicit) {
-    const acts = await splitDictation(text);
-    if (acts.length) return { actions: acts, via: 'ai' };
+    const r = await splitDictation(text);
+    if (r.acts.length) return { actions: r.acts, via: 'ai' };
+    if (r.failed) return later(text);
   }
   if (local.confident && local.actions.length) return { actions: local.actions, via: 'local' };
   // «выпил стакан воды» — если похоже на привычку, отмечаем без ИИ
@@ -363,12 +369,18 @@ export async function execute(a: VoiceAction): Promise<Done> {
       const { appendToDaily, openDailyNote, removeBlocks } = await import('../notes/daily');
       const r = await appendToDaily(a.text, a.section);
       if (!r) return { ok: false, label: 'Дневник', title: a.text, meta: 'Не удалось записать' };
+      // длинная мысль без ИИ: разобрать на заметку и задачи, когда ИИ станет доступен
+      const q = a.later ? await import('../notes/aiQueue') : null;
+      if (q) q.queueDictation(a.text, r);
       return {
         ok: true,
         label: a.section === 'results' ? 'Итоги дня' : 'Дневник',
         title: a.text,
-        meta: 'в заметку дня',
-        undo: () => removeBlocks(r.noteId, r.blockIds),
+        meta: a.later ? 'в заметку дня · ИИ разберёт на заметку и задачи, когда появится связь' : 'в заметку дня',
+        undo: async () => {
+          q?.dropQueued((x) => x.kind === 'dictation' && x.journal?.noteId === r.noteId && x.journal.blockIds[0] === r.blockIds[0]);
+          await removeBlocks(r.noteId, r.blockIds);
+        },
         open: () => void openDailyNote(),
       };
     }

@@ -1,9 +1,12 @@
-import { useEffect, useMemo, type ReactNode } from 'react';
-import { BookOpenText, Brain, Compass, Copy, Equal, GraduationCap, Link2, Mic, Newspaper, NotebookPen, Share2, Upload, Waypoints, X } from 'lucide-react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { BookOpenText, Brain, ClipboardCopy, CloudOff, Compass, Copy, Equal, Gauge, GraduationCap, Link2, Loader2, MessageCircleQuestion, Mic, Newspaper, NotebookPen, Share2, Upload, Waypoints, X } from 'lucide-react';
 import { onBack } from '../../ui/dialogs';
 import { useNotes } from '../store';
 import { todaysCards } from '../cards';
 import { markHubSeen } from '../hub';
+import { fmtMs, perfReport, perfSummary } from '../perfLog';
+import { processQueue, useAiQueue } from '../aiQueue';
+import { toast } from '../../store/appStore';
 
 export interface HubActions {
   graph: () => void;
@@ -60,6 +63,7 @@ export function BrainHub({ onClose, act }: { onClose: () => void; act: HubAction
       items: [
         { icon: <Brain size={18} />, title: 'Спросить у мозга', text: 'Вопрос своими словами — ответ из ваших записей, со ссылками на них.', action: { label: 'Спросить', run: go(act.ask) } },
         { icon: <BookOpenText size={18} />, title: 'Конспект темы', text: 'ИИ соберёт все записи темы в обзор: главное, решения, открытые вопросы. На графе: «Вид» → «Темы» → тема → «Конспект».' },
+        { icon: <MessageCircleQuestion size={18} />, title: 'Вопрос дня', text: 'Раз в день — вопрос по давней заметке: актуально ли, что изменилось. Ответ — в заметку дня и, если хочется, в саму заметку.' },
         { icon: <Compass size={18} />, title: 'Обзор мозга', text: 'Раз в неделю: забытые заметки, которые пригодятся сейчас, заметки без связей, дубли, длинные — разбить.', action: { label: 'Обзор', run: go(act.review) } },
         { icon: <Copy size={18} />, title: 'Дубли', text: 'Почти одинаковые заметки — объединить в одну или отметить «не дубль».', action: { label: 'Найти', run: go(act.duplicates) } },
       ],
@@ -133,8 +137,75 @@ export function BrainHub({ onClose, act }: { onClose: () => void; act: HubAction
               ))}
             </section>
           ))}
+          <Health notes={stats.notes} />
         </div>
       </div>
     </div>
+  );
+}
+
+/** Скорость на этом устройстве и работа, которая ждёт ИИ */
+function Health({ notes }: { notes: number }) {
+  const queue = useAiQueue((s) => s.items);
+  const [busy, setBusy] = useState(false);
+  const rows = useMemo(() => perfSummary(), []);
+  // устройство: «Linux; Android 14; Pixel 7» — из первых скобок строки браузера, и сколько ядер
+  const device = typeof navigator !== 'undefined' ? `${/\(([^)]*)\)/.exec(navigator.userAgent)?.[1] ?? navigator.userAgent.slice(0, 60)}, ядер: ${navigator.hardwareConcurrency ?? '?'}` : '';
+
+  const runQueue = async () => {
+    setBusy(true);
+    try {
+      const r = await processQueue();
+      toast(r.messages.length ? r.messages.join('; ') : useAiQueue.getState().items.length ? 'ИИ пока недоступен — попробую позже сам' : 'Готово');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(perfReport(device, notes));
+      toast('Отчёт скопирован — пришлите его, если что-то медленно');
+    } catch {
+      toast('Не удалось скопировать');
+    }
+  };
+
+  return (
+    <section className="nt-rv-sec">
+      <h3 className="nt-rv-h">
+        <Gauge size={16} /> На этом устройстве
+      </h3>
+      {queue.length > 0 && (
+        <div className="nt-hub-item">
+          <span className="nt-hub-ic">
+            <CloudOff size={18} />
+          </span>
+          <div className="grow nt-hub-text">
+            <b>Ждут ИИ: {queue.length}</b>
+            <span>{queue.map((x) => (x.kind === 'article' ? 'пересказ статьи' : 'разбор голосовой записи')).join(', ')} — доделается сам, когда появится связь.</span>
+          </div>
+          <button className="nt-ai-btn" disabled={busy} onClick={() => void runQueue()}>
+            {busy ? <Loader2 size={14} className="spin" /> : null} Сейчас
+          </button>
+        </div>
+      )}
+      {rows.length ? (
+        <div className="nt-hub-perf">
+          {rows.map((r) => (
+            <div key={r.op} className={`nt-hub-perf-row${r.slow ? ' is-slow' : ''}`}>
+              <span className="grow">{r.label}</span>
+              <b>{fmtMs(r.ms)}</b>
+            </div>
+          ))}
+          {rows.some((r) => r.slow) && <p className="nt-rv-hint">Что-то работает медленно — скопируйте отчёт и пришлите его разработчику.</p>}
+        </div>
+      ) : (
+        <p className="nt-rv-hint">Скорость появится здесь, когда мозг поработает: связи, граф, обзор.</p>
+      )}
+      <button className="nt-ai-undo" onClick={() => void copy()}>
+        <ClipboardCopy size={14} /> Скопировать отчёт о скорости
+      </button>
+    </section>
   );
 }

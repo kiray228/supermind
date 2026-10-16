@@ -117,6 +117,8 @@ export default function App() {
       void import('./store/push').then((m) => m.ensurePush()).catch(() => {});
       void import('./tasks/focusTimer').then((m) => m.initFocusTimer()).catch(() => {});
       void import('./native/widget').then((m) => m.initWidget()).catch(() => {});
+      // работа ИИ, отложенная без связи (пересказ статьи, разбор голосовой мысли)
+      void import('./notes/aiQueue').then((m) => m.initAiQueue()).catch(() => {});
     }, 1500);
     // первая карта-подсказка при первом запуске
     if (!welcomeStarted) {

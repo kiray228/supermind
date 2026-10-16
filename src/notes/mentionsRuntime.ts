@@ -6,6 +6,7 @@ import type { ID } from '../types';
 import { DUP_SCORE, duplicatesOf, findDuplicates, normTitle, pairKey, tokenize } from './links';
 import { hasWikiTo, linkOccurrence, mergeBodies, retargetWiki, snippetAround, titleMentions } from './backlinks';
 import { parseItemId, type BrainKind } from './brainDocs';
+import { perfStart } from './perfLog';
 import { itemText } from './brain';
 import { brainItem, brainItems, ensureLinkIndex, linkIndex, rawFeatures } from './related';
 import { editOpenBody, flushNotes, loadNoteBody, mutateNotes, saveNoteBody, trashNote, useNotes } from './store';
@@ -112,7 +113,10 @@ export async function allDuplicates(): Promise<{ a: string; b: string; score: nu
   const ix = await ensureLinkIndex();
   const skip = ignored();
   const notes = (useNotes.getState().data?.notes ?? []).filter((n) => !n.trashed && !n.digest).map((n) => n.id);
-  return findDuplicates(ix, notes, DUP_SCORE).filter((p) => !skip.has(pairKey(p.a, p.b)));
+  const t = perfStart();
+  const out = findDuplicates(ix, notes, DUP_SCORE).filter((p) => !skip.has(pairKey(p.a, p.b)));
+  t('dups', notes.length);
+  return out;
 }
 
 /** «Не дубль» — больше не предлагать объединить */

@@ -30,6 +30,7 @@ import {
 } from './links';
 import type { NotesData } from './model';
 import { type BrainItem, collectItems, itemText } from './brain';
+import { perfStart } from './perfLog';
 import { useNotes } from './store';
 
 /** Только на этом устройстве (не синхронизируется и не попадает в копии) */
@@ -126,6 +127,7 @@ async function rebuild(): Promise<LinkIndex> {
     scheduleSave();
   }
   const stale = list.filter((n) => c.items[n.id]?.at !== n.at);
+  const tFeat = perfStart();
   const showProgress = stale.length >= PROGRESS_FROM;
   if (showProgress) useLinks.setState({ progress: { done: 0, total: stale.length } });
   let done = 0;
@@ -150,6 +152,7 @@ async function rebuild(): Promise<LinkIndex> {
       pruned = true;
     }
   if (stale.length || pruned) scheduleSave();
+  if (stale.length >= 20) tFeat('features', stale.length);
 
   // названия → единицы (заметки первыми: при совпадении [[ссылка]] ведёт на заметку)
   const titles = new Map<string, string>();
@@ -188,7 +191,10 @@ async function rebuild(): Promise<LinkIndex> {
   const synonyms = (data?.synonyms ?? []).map((g) => g.words.map(termKey).filter((k): k is string => !!k));
   // правка одной-двух записей — точечное обновление (миллисекунды); иначе полная сборка порциями (экран не замирает)
   const opts = { pairs, synonyms };
-  const next = (ix && patchIndex(ix, docs, opts)) ?? (await buildIndexAsync(docs, opts));
+  const tIx = perfStart();
+  const patched = ix ? patchIndex(ix, docs, opts) : null;
+  const next = patched ?? (await buildIndexAsync(docs, opts));
+  if (next !== ix) tIx(patched ? 'patch' : 'index', next.n);
   ix = next;
   ixSig = sig;
   items = list;
@@ -304,6 +310,7 @@ async function graphEdges(cur: LinkIndex, onProgress: (p: number) => void, alive
   if (hit) return hit;
   // индекс обновлён точечно — связи прежнего графа, кроме изменённых записей, + их связи заново
   const prev = cur.base && cur.changed ? graphCache.get(cur.base) : undefined;
+  const tG = perfStart();
   if (prev && cur.changed) {
     const ch = cur.changed;
     const seen = new Map<string, LinkEdge>();
@@ -311,6 +318,7 @@ async function graphEdges(cur: LinkIndex, onProgress: (p: number) => void, alive
     for (const id of ch) for (const e of edgesOf(cur, id, GRAPH_PER_NOTE)) if (!seen.has(e.a + '|' + e.b)) seen.set(e.a + '|' + e.b, e);
     const edges = [...seen.values()];
     graphCache.set(cur, edges);
+    tG('graph-patch', cur.n);
     return edges;
   }
   const ids = [...cur.docs.keys()];
@@ -330,6 +338,7 @@ async function graphEdges(cur: LinkIndex, onProgress: (p: number) => void, alive
   }
   const edges = [...seen.values()];
   graphCache.set(cur, edges);
+  tG('graph', cur.n);
   return edges;
 }
 

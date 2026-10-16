@@ -14,7 +14,7 @@ export type VoiceAction =
   | { type: 'add_habit'; name: string; time?: string; times?: string[]; perWeek?: number; days?: number[]; target?: number; unit?: string }
   | { type: 'add_note'; title: string; text: string }
   /** запись в заметку дня: «Мысли» или «Итоги дня» */
-  | { type: 'add_journal'; text: string; section: 'thoughts' | 'results' }
+  | { type: 'add_journal'; text: string; section: 'thoughts' | 'results'; later?: boolean }
   /** отметить выполненным: задачу или привычку по словам из фразы; strict — сказано явно («выполнил…», «отметь…») */
   | { type: 'mark_done'; query: string; n?: number; strict: boolean; kind?: 'task' | 'habit' }
   /** вопрос: что на день, сколько потрачено/получено, сколько денег на счетах */

@@ -63,19 +63,26 @@ export async function saveArticle(url: string, opts: { signal?: AbortSignal; onS
   const a = extractArticle(page.html, page.url);
   if (!a.text && !a.description) throw new ArticleError('На странице не нашлось текста статьи');
   let summary = '';
+  let aiFailed = false;
   if (a.text.length > 200) {
     opts.onStage?.('summary');
     try {
       summary = await streamText({ system: ARTICLE_SYSTEM, messages: [{ role: 'user', content: buildArticlePrompt(a) }], signal: opts.signal, effort: 'low' });
-    } catch (e) {
+    } catch {
       if (opts.signal?.aborted) throw new ArticleError('Остановлено');
-      void e; // ИИ недоступен — сохраним без пересказа
+      // ИИ недоступен — сохраним без пересказа, пересказ доделается, когда ИИ станет доступен
+      aiFailed = true;
     }
   }
   opts.onStage?.('save');
-  const m = createNote({ title: a.title, blocks: markdownToBlocks(articleMarkdown(a, summary)), source: a.url, ...(opts.folderId ? { folderId: opts.folderId } : {}) });
+  const blocks = markdownToBlocks(articleMarkdown(a, summary));
+  const m = createNote({ title: a.title, blocks, source: a.url, ...(opts.folderId ? { folderId: opts.folderId } : {}) });
   if (!m) throw new ArticleError('Не удалось сохранить заметку');
   await flushNotes();
+  if (aiFailed) {
+    const { queueArticle, bodyStamp } = await import('./aiQueue');
+    queueArticle(m.id, a.url, bodyStamp(blocks));
+  }
   return { id: m.id, summary: !!summary.trim(), article: a };
 }
 
@@ -95,7 +102,7 @@ export async function saveArticleAndOpen(url: string, opts: { signal?: AbortSign
   }
   try {
     const r = await saveArticle(url, opts);
-    toast(r.summary ? 'Статья сохранена — с главными мыслями' : 'Статья сохранена (без пересказа — ИИ недоступен)');
+    toast(r.summary ? 'Статья сохранена — с главными мыслями' : 'Статья сохранена; пересказ ИИ добавится, когда появится связь');
     open(r.id);
     return true;
   } catch (e) {
