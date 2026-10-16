@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { ArrowElbowDownRight, Check, Plus } from '@phosphor-icons/react';
 import type { ID, Sheet, Topic } from '../types';
 import { layoutSheet, subtreeBounds, type LayoutResult, type LNode } from '../layout/layout';
-import { useDoc, flushSave } from '../store/docStore';
+import { useDoc, flushSave, takeDroppedEdit } from '../store/docStore';
 import { AddHandle, BoundaryView, NodeView, RelationshipView, SummaryView, Toggle } from './render';
 import { FONT_FAMILY } from '../layout/measure';
 import { findInSheet } from '../utils/tree';
@@ -1038,6 +1038,8 @@ function InlineEditor({ n, view, animating }: { n: LNode; view: View; animating?
     () => () => {
       // текст не меняли — не трогаем (иначе «Отменить» во время ввода тут же возвращал бы отменённое)
       if (done.current || textRef.current === startText.current) return;
+      // ввод отменили «Отменить» — набранное не возвращать
+      if (takeDroppedEdit(n.id)) return;
       const st = useDoc.getState();
       // тема могла остаться на другом листе (переключили лист, не закрыв поле)
       const has = st.doc?.sheets.some((sh) => {

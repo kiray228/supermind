@@ -94,7 +94,11 @@ export function buildIcs(tasks: TaskItem[], name = 'SuperMind'): string {
       L.push(`DTSTART;VALUE=DATE:${t.date.replace(/-/g, '')}`, `DTEND;VALUE=DATE:${addDaysYmd(t.date, 1).replace(/-/g, '')}`);
     }
     const rr = t.repeat && !t.done ? toRRule(t.repeat, t.date, { allDay: !t.time, done: t.repeatDone }) : null;
-    if (rr) L.push(`RRULE:${rr}`);
+    if (rr) {
+      L.push(`RRULE:${rr}`);
+      // пропущенные повторы
+      for (const d of t.repeat?.skip ?? []) L.push(t.time ? `EXDATE:${utcStamp(startAt(t, d).getTime())}` : `EXDATE;VALUE=DATE:${d.replace(/-/g, '')}`);
+    }
     L.push(`DESCRIPTION:${esc(taskDescription(t))}`);
     if (t.priority) L.push(`PRIORITY:${t.priority === 1 ? 1 : t.priority === 2 ? 5 : 9}`);
     if (t.tags.length) L.push(`CATEGORIES:${t.tags.map(esc).join(',')}`);

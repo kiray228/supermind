@@ -130,6 +130,8 @@ function buildItems(
     const lc = listColor.get(t.listId) ?? '#64748b';
     for (const d of occurrences(t, from, to, 100)) {
       const base = d === t.date;
+      // просроченный повтор — только сам он: прошедшие дни после него не «копятся» (выполнение переносит на будущее)
+      if (!base && t.repeat && d < today) continue;
       const overdue = base && isOverdue(t, today, now);
       push({
         key: `t:${t.id}:${d}`,

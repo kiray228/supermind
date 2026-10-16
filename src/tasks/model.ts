@@ -28,6 +28,8 @@ export interface RepeatRule {
   day?: number;
   /** закреплённый месяц 0..11 (yearly) */
   month?: number;
+  /** пропущенные (или выполненные заранее) повторы — YYYY-MM-DD: их нет ни в списках, ни в напоминаниях */
+  skip?: string[];
 }
 
 export interface ChecklistItem {
@@ -334,11 +336,12 @@ export function occurrences(task: TaskItem, from: string, to: string, limit = 40
   if (!task.date) return [];
   if (!task.repeat || task.done) return task.date >= from && task.date <= to ? [task.date] : [];
   const out: string[] = [];
+  const skip = new Set(task.repeat.skip ?? []);
   let d = task.date;
   let n = task.repeatDone ?? 0;
   for (let i = 0; i < 5000 && out.length < limit && d <= to; i++) {
     if (!withinRule(task.repeat, d, n)) break;
-    if (d >= from) out.push(d);
+    if (d >= from && !skip.has(d)) out.push(d);
     // «от даты выполнения» — будущие даты неизвестны, показываем только ближайшую
     if (task.repeat.fromCompletion) break;
     d = nextOccurrence(task.repeat, d, task.date);
@@ -375,8 +378,20 @@ export function advanceRepeat(task: TaskItem, completedOn = todayYmd()): string 
   if (!rule.fromCompletion) {
     for (let i = 0; i < 5000 && next <= completedOn; i++) next = nextOccurrence(rule, next, task.date);
   }
+  // пропущенные повторы — мимо
+  const skip = new Set(rule.skip ?? []);
+  for (let i = 0; i < 400 && skip.has(next); i++) next = nextOccurrence(rule, next, task.date);
   if (!withinRule(rule, next, (task.repeatDone ?? 0) + 1)) return null;
   return next;
+}
+
+/** Правило без пропусков, которые уже позади (раньше from) */
+export function pruneSkip(rule: RepeatRule, from: string): RepeatRule {
+  const skip = (rule.skip ?? []).filter((d) => d >= from);
+  const r = { ...rule };
+  if (skip.length) r.skip = [...new Set(skip)].sort();
+  else delete r.skip;
+  return r;
 }
 
 // ================= Напоминания =================

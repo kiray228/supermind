@@ -8,8 +8,19 @@ export function newTopic(text = '', children: Topic[] = []): Topic {
   return { id: uid(), text, children };
 }
 
+/**
+ * Глубокая копия данных (объекты и массивы — новые, строки и числа — общие).
+ * Строки неизменяемы: картинки (data URL) в каждой копии истории отмены не дублируются,
+ * как при structuredClone, — память не растёт с каждой правкой карты.
+ */
 export function clone<T>(v: T): T {
-  return structuredClone(v);
+  if (v === null || typeof v !== 'object') return v;
+  if (Array.isArray(v)) return v.map(clone) as T;
+  const proto = Object.getPrototypeOf(v);
+  if (proto !== Object.prototype && proto !== null) return structuredClone(v);
+  const out: Record<string, unknown> = {};
+  for (const k of Object.keys(v)) out[k] = clone((v as Record<string, unknown>)[k]);
+  return out as T;
 }
 
 /** Обход дерева (pre-order). Возврат false из cb прекращает спуск в детей. */

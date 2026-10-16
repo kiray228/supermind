@@ -1,5 +1,5 @@
 /** «Что нового»: главное в каждой версии. Новые версии — сверху. */
-import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge, MessageCircleQuestion, CloudOff, LayoutTemplate, SquareArrowOutUpRight, BellRing } from 'lucide-react';
+import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge, MessageCircleQuestion, CloudOff, LayoutTemplate, SquareArrowOutUpRight, BellRing, Target, Timer } from 'lucide-react';
 
 export interface ChangeItem {
   icon: typeof Sparkles;
@@ -15,6 +15,17 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.35',
+    title: 'Повторы по одному, сроки целей и надёжность',
+    items: [
+      { icon: Repeat, title: 'Один повтор, а не вся серия', text: 'У повторяющейся задачи: «Пропустить этот повтор» и «Удалить все повторы»; смахивание пропускает только этот день. Перенос будущего повтора двигает только его — остальные остаются на месте.' },
+      { icon: Target, title: 'Сроки целей в напоминаниях', text: 'За неделю, накануне и в день срока цели или этапа — уведомление с прогрессом. Нажатие открывает цель.' },
+      { icon: Timer, title: 'Фокус: экран не гаснет', text: 'Пока идёт помодоро или секундомер, экран остаётся включённым.' },
+      { icon: Undo2, title: 'Карты: отмена как надо', text: 'Новая тема с текстом убирается одним «Отменить», «Отменить» во время ввода не возвращает набранное. Большие карты с картинками — меньше памяти, быстрее раскладка.' },
+      { icon: ShieldCheck, title: 'Надёжнее и безопаснее', text: 'Синхронизация не теряет правки с другого устройства, оплата подписки на двух устройствах — одна операция, видно, если у валюты нет курса. Опасные ссылки в картах не открываются, экспорт CSV безопасен для Excel.' },
+    ],
+  },
   {
     version: '1.34',
     title: 'Шаблоны, встроенные заметки и ответ из шторки',

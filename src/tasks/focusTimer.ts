@@ -338,7 +338,54 @@ function ensureTicker() {
 }
 
 /** Запустить проверку таймера (вызывается при старте приложения) */
+// ---------- Экран не гаснет, пока идёт фокус ----------
+
+type WakeLock = { release(): Promise<void>; addEventListener(t: 'release', f: () => void): void };
+let wake: WakeLock | null = null;
+let wakeWanted = false;
+
+async function acquireWake() {
+  const nav = navigator as Navigator & { wakeLock?: { request(type: 'screen'): Promise<WakeLock> } };
+  if (wake || !nav.wakeLock || document.visibilityState !== 'visible') return;
+  try {
+    const w = await nav.wakeLock.request('screen');
+    if (!wakeWanted) return void w.release().catch(() => {});
+    wake = w;
+    w.addEventListener('release', () => {
+      if (wake === w) wake = null;
+    });
+  } catch {
+    /* не поддерживается или запрещено (экономия батареи) — не страшно */
+  }
+}
+
+/** Таймер идёт — держать экран включённым (как в Forest); пауза или стоп — отпустить */
+function syncWake() {
+  const want = g().running;
+  if (want === wakeWanted) return;
+  wakeWanted = want;
+  if (want) void acquireWake();
+  else if (wake) {
+    const w = wake;
+    wake = null;
+    void w.release().catch(() => {});
+  }
+}
+
+let wakeInit = false;
+function initWake() {
+  if (wakeInit || typeof document === 'undefined') return;
+  wakeInit = true;
+  useFocus.subscribe(syncWake);
+  // система отпускает блокировку, когда приложение уходит в фон — взять снова при возврате
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && wakeWanted) void acquireWake();
+  });
+  syncWake();
+}
+
 export function initFocusTimer() {
+  initWake();
   ensureTicker();
   void ensureTasks()
     .catch(() => {})

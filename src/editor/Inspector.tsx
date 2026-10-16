@@ -5,6 +5,8 @@ import {
 import type { LineStyle, ShapeType, StructureType, TaskStatus, Topic } from '../types';
 import { useDoc, beginBatch, endBatch, flushSave } from '../store/docStore';
 import { findInSheet } from '../utils/tree';
+import { safeUrl } from '../utils/url';
+import { toast } from '../store/appStore';
 import { MARKER_GROUPS, MARKERS, toggleMarker } from '../markers';
 import { COLOR_SWATCHES, THEMES } from '../themes';
 import { StructureIcon } from './StructureIcon';
@@ -330,7 +332,12 @@ function TopicPanel({ t, ids }: { t: Topic; ids: string[] }) {
           value={link}
           onChange={(e) => setLink(e.target.value)}
           onBlur={() => {
-            const v = link.trim() ? normalizeUrl(link.trim()) : undefined;
+            const v = link.trim() ? (safeUrl(link) ?? undefined) : undefined;
+            if (link.trim() && !v) {
+              toast('Такую ссылку открыть нельзя — нужен адрес сайта, почта или телефон');
+              setLink(t.link ?? '');
+              return;
+            }
             if (v !== t.link) {
               st.updateTopic(t.id, { link: v });
               if (v) setLink(v);
@@ -338,8 +345,8 @@ function TopicPanel({ t, ids }: { t: Topic; ids: string[] }) {
           }}
           onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
         />
-        {t.link && (
-          <a className="icon-btn" href={t.link} target="_blank" rel="noreferrer" title="Открыть">
+        {t.link && safeUrl(t.link) && (
+          <a className="icon-btn" href={safeUrl(t.link)!} target="_blank" rel="noreferrer" title="Открыть">
             <Link size={18} />
           </a>
         )}
@@ -363,9 +370,6 @@ function TopicPanel({ t, ids }: { t: Topic; ids: string[] }) {
   );
 }
 
-function normalizeUrl(u: string) {
-  return /^[a-z]+:/i.test(u) ? u : 'https://' + u;
-}
 
 export async function resizeImage(file: File, max: number): Promise<string> {
   const url = URL.createObjectURL(file);

@@ -17,6 +17,7 @@ import { StructureIcon } from './StructureIcon';
 import { askText, confirmDialog, hasOverlay, onBack } from '../ui/dialogs';
 import { primeKeyboard } from '../ui/keyboard';
 import { findInSheet, sheetRoots, shownLevel, treeDepth, walkSheet } from '../utils/tree';
+import { safeUrl } from '../utils/url';
 import { subtreeBounds } from '../layout/layout';
 import { downloadBlob, downloadText, safeFilename } from '../io/download';
 import { sheetToMarkdown } from '../io/markdown';
@@ -640,7 +641,10 @@ export default function Editor() {
               onRelTarget={onRelTarget}
               onContextMenu={({ x, y, topicId, worldX, worldY }) => !pitch && topicMenu(x, y, topicId, worldX, worldY)}
               onOpenNote={openNote}
-              onOpenLink={(u) => window.open(u, '_blank', 'noopener')}
+              onOpenLink={(u) => {
+                const url = safeUrl(u);
+                if (url) window.open(url, '_blank', 'noopener');
+              }}
               pitchFocus={pitchFocus}
               readOnly={!!pitch}
               searchHits={hitSet}

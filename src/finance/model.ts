@@ -404,6 +404,18 @@ export function toMain(amount: number, cur: string, prefs: FinancePrefs): number
   return r && r > 0 ? amount * r : null;
 }
 
+/** Валюты операций за период, для которых не задан курс: их суммы в бюджетах и аналитике идут «как есть» */
+export function missingRates(d: FinanceData, r?: { from: string; to: string }): string[] {
+  const accs = accountMap(d);
+  const out = new Set<string>();
+  for (const t of d.transactions) {
+    if (r && (t.date < r.from || t.date > r.to)) continue;
+    const cur = txCurrency(d, t, accs);
+    if (toMain(1, cur, d.prefs) === null) out.add(cur);
+  }
+  return [...out].sort();
+}
+
 /** То же, но без курса сумма берётся как есть (для бюджетов и аналитики) */
 export const toMainLoose = (amount: number, cur: string, prefs: FinancePrefs) => toMain(amount, cur, prefs) ?? amount;
 

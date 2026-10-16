@@ -233,6 +233,8 @@ export function buildImport(d: FinanceData, rows: string[][], map: ColumnMap, ac
 
 const csvCell = (s: string) => (/[;"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
 const num = (x: number) => String(r2(x)).replace('.', ',');
+/** Текст, который Excel принял бы за формулу («=HYPERLINK(…)» из выписки банка), — с апострофом: покажется как текст */
+export const safeText = (s: string) => (/^[=+\-@\t\r]/.test(s) ? `'${s}` : s);
 
 /** CSV для Excel (разделитель «;», запятая в дробях, BOM) */
 export function exportCsv(d: FinanceData, list: Transaction[] = d.transactions): string {
@@ -252,12 +254,12 @@ export function exportCsv(d: FinanceData, list: Transaction[] = d.transactions):
         TYPE[t.type],
         num(signed),
         a?.currency ?? '',
-        a?.name ?? '',
-        t.categoryId ? (cats.get(t.categoryId)?.name ?? '') : '',
-        to?.name ?? '',
+        safeText(a?.name ?? ''),
+        safeText(t.categoryId ? (cats.get(t.categoryId)?.name ?? '') : ''),
+        safeText(to?.name ?? ''),
         t.type === 'transfer' ? num(t.toAmount ?? t.amount) : '',
-        t.note ?? '',
-        t.tags.join(', '),
+        safeText(t.note ?? ''),
+        safeText(t.tags.join(', ')),
       ]
         .map(csvCell)
         .join(';'),

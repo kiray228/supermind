@@ -28,6 +28,7 @@ import { runFinanceAi } from '../ai';
 import { IconTile } from '../../ui/icons';
 import { dayTitle, Money, Sheet, Stepper, TxRow, useToday } from './common';
 import { openTxSheet, showOps } from './state';
+import { RateWarning } from './RateWarning';
 
 export function Analytics({ data }: { data: FinanceData }) {
   const today = useToday();
@@ -90,6 +91,7 @@ export function Analytics({ data }: { data: FinanceData }) {
           />
         )}
       </div>
+      <RateWarning data={data} range={range} />
 
       <div className="card fn-stats">
         <Stat icon={<TrendDown size={15} weight="bold" />} label="Расходы" tone="expense" value={fmtMoney(s.expense, main, { compact: true })} />

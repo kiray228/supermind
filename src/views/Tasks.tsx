@@ -70,6 +70,7 @@ import { TaskCheck, TaskRow } from '../tasks/ui/TaskRow';
 import { SmartInput } from '../tasks/ui/QuickAdd';
 import '../tasks/ui/tasks.css';
 import { IconTile } from '../ui/icons';
+import { useToday } from '../ui/useToday';
 
 type Sel = { k: 'smart'; id: SmartId } | { k: 'list'; id: string } | { k: 'tag'; id: string } | { k: 'filter'; id: string } | { k: 'matrix' };
 type GroupBy = 'date' | 'priority' | 'list' | 'none';
@@ -204,7 +205,8 @@ export default function Tasks() {
   const [mapTasks, setMapTasks] = useState<MapTask[]>([]);
   const [listDlg, setListDlg] = useState<{ id?: string } | null>(null);
   const [filterDlg, setFilterDlg] = useState<TaskFilter | null>(null);
-  const today = todayYmd();
+  // приложение открыто через полночь — «Сегодня» и «Просрочено» сменяются сами
+  const today = useToday();
 
   useEffect(() => {
     void ensureTasks();

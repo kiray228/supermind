@@ -9,6 +9,7 @@ import { focusQuickInput } from '../ui/keyboard';
 import {
   advanceRepeat,
   pinRule,
+  pruneSkip,
   snapToRule,
   type ChecklistItem,
   DEFAULT_PREFS,
@@ -215,10 +216,10 @@ export function getTask(id: ID): TaskItem | undefined {
   return useTasks.getState().data?.tasks.find((t) => t.id === id);
 }
 
-type Snapshot = Pick<TaskItem, 'date' | 'repeatDone' | 'checklist' | 'done' | 'completedAt' | 'wontDo'> & { logged: boolean };
+type Snapshot = Pick<TaskItem, 'date' | 'repeatDone' | 'checklist' | 'done' | 'completedAt' | 'wontDo' | 'repeat'> & { logged: boolean };
 
 function snapshotOf(t: TaskItem, logged: boolean): Snapshot {
-  return { date: t.date, repeatDone: t.repeatDone, checklist: t.checklist, done: t.done, completedAt: t.completedAt, wontDo: t.wontDo, logged };
+  return { date: t.date, repeatDone: t.repeatDone, checklist: t.checklist, done: t.done, completedAt: t.completedAt, wontDo: t.wontDo, repeat: t.repeat, logged };
 }
 
 /** Вернуть задачу в состояние до выполнения (кнопка «Отменить») */
@@ -232,7 +233,8 @@ function restore(id: ID, snap: Snapshot) {
     x.done = snap.done;
     x.completedAt = snap.completedAt;
     x.wontDo = snap.wontDo;
-    for (const k of ['date', 'repeatDone', 'completedAt', 'wontDo'] as const) if (x[k] === undefined) delete x[k];
+    x.repeat = snap.repeat;
+    for (const k of ['date', 'repeatDone', 'completedAt', 'wontDo', 'repeat'] as const) if (x[k] === undefined) delete x[k];
     x.updatedAt = Date.now();
     if (snap.logged) unlogLast(d, id);
   });
@@ -266,6 +268,7 @@ export function toggleDone(id: ID) {
       x.date = next;
       x.repeatDone = (x.repeatDone ?? 0) + 1;
       x.checklist = x.checklist.map((c) => ({ ...c, done: false }));
+      if (x.repeat) x.repeat = pruneSkip(x.repeat, next);
     } else {
       x.done = true;
       x.completedAt = Date.now();
@@ -290,8 +293,94 @@ export function completeOccurrence(id: ID, date?: string): boolean {
   const t = getTask(id);
   if (!t || t.done || t.wontDo || t.deleted) return false;
   if (t.repeat && date && t.date && date < t.date) return false;
+  if (t.repeat?.skip?.includes(date ?? '')) return false;
+  // будущий повтор, а прошлый ещё не выполнен: отметить именно его, прошлый остаётся
+  if (t.repeat && date && t.date && date > t.date) {
+    const snap = snapshotOf(t, true);
+    mutateTasks((d) => {
+      const x = d.tasks.find((y) => y.id === id)!;
+      d.log.push({ taskId: x.id, title: x.title, listId: x.listId, at: Date.now(), date });
+      if (d.log.length > 5000) d.log.splice(0, d.log.length - 5000);
+      x.repeat = { ...x.repeat!, skip: [...new Set([...(x.repeat!.skip ?? []), date])].sort() };
+      x.updatedAt = Date.now();
+    });
+    toast(`Готово: повтор ${dayLabel(date).toLowerCase()}`, { label: 'Отменить', run: () => restore(id, snap) });
+    return true;
+  }
   toggleDone(id);
   return true;
+}
+
+/**
+ * Пропустить один повтор повторяющейся задачи (остальные остаются). Текущий — задача переходит к следующему;
+ * будущий — он просто исчезает из списков и напоминаний. Возвращает false, если задача не повторяется.
+ */
+export function skipOccurrence(id: ID, date: string): boolean {
+  const t = getTask(id);
+  if (!t?.repeat || !t.date) return false;
+  const snap = snapshotOf(t, false);
+  if (date > t.date) {
+    mutateTasks((d) => {
+      const x = d.tasks.find((y) => y.id === id);
+      if (!x?.repeat) return;
+      x.repeat = { ...x.repeat, skip: [...new Set([...(x.repeat.skip ?? []), date])].sort() };
+      x.updatedAt = Date.now();
+    });
+    toast(`Пропущен повтор ${dayLabel(date).toLowerCase()}`, { label: 'Вернуть', run: () => restore(id, snap) });
+    return true;
+  }
+  // текущий повтор: дальше, к следующему (после него — без ожидания сегодняшнего дня)
+  const next = advanceRepeat(t, t.date < todayYmd() ? todayYmd() : t.date);
+  mutateTasks((d) => {
+    const x = d.tasks.find((y) => y.id === id);
+    if (!x) return;
+    if (next) {
+      x.date = next;
+      x.repeatDone = (x.repeatDone ?? 0) + 1;
+      x.checklist = x.checklist.map((c) => ({ ...c, done: false }));
+      if (x.repeat) x.repeat = pruneSkip(x.repeat, next);
+    } else x.deleted = Date.now();
+    x.updatedAt = Date.now();
+  });
+  toast(next ? `Пропущено. Следующий — ${dayLabel(next).toLowerCase()}` : 'Это был последний повтор — задача удалена', { label: 'Вернуть', run: () => (next ? restore(id, snap) : restoreTask(id)) });
+  return true;
+}
+
+/** Перенести один повтор на другую дату: он становится отдельной задачей, серия остаётся как была */
+export function moveOccurrence(id: ID, from: string, to: string): TaskItem | null {
+  const t = getTask(id);
+  if (!t) return null;
+  if (!t.repeat || !t.date || from === t.date) {
+    updateTask(id, { date: to });
+    return t;
+  }
+  const snap = snapshotOf(t, false);
+  const copy = addTask({
+    title: t.title,
+    notes: t.notes,
+    listId: t.listId,
+    priority: t.priority,
+    tags: [...t.tags],
+    date: to,
+    time: t.time,
+    duration: t.duration,
+    reminders: [...t.reminders],
+    checklist: t.checklist.map((c) => ({ ...c, id: uid(), done: false })),
+  });
+  mutateTasks((d) => {
+    const x = d.tasks.find((y) => y.id === id);
+    if (!x?.repeat) return;
+    x.repeat = { ...x.repeat, skip: [...new Set([...(x.repeat.skip ?? []), from])].sort() };
+    x.updatedAt = Date.now();
+  });
+  toast(`Повтор перенесён на ${dayLabel(to).toLowerCase()}`, {
+    label: 'Отменить',
+    run: () => {
+      restore(id, snap);
+      if (copy) purgeTask(copy.id);
+    },
+  });
+  return copy;
 }
 
 /** «Не буду делать»: у повторяющейся задачи пропускается только этот повтор */

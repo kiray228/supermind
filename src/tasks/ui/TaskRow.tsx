@@ -4,7 +4,7 @@ import { Bell, Check, ListChecks, Network, Pin, Repeat, Timer, AlignLeft, Undo2 
 import { PRIORITY_META, addDaysYmd, todayYmd } from '../../utils/mapTasks';
 import { dayLabel, isOverdue, whenLabel, type TaskItem, type TaskList } from '../model';
 import { toast } from '../../store/appStore';
-import { openTask, purgeTask, restoreTask, toggleDone, trashTask, updateTask } from '../store';
+import { moveOccurrence, openTask, purgeTask, restoreTask, skipOccurrence, toggleDone, trashTask, updateTask } from '../store';
 import { mergeHandlers, useLongPress, useSwipeActions } from '../../ui/gestures';
 import { SwipeBg } from '../../ui/SwipeBg';
 import { DatePicker } from './DatePicker';
@@ -45,6 +45,9 @@ export function useTaskActions(task: TaskItem, occurrence?: string) {
 
   const future = !!occurrence && !!task.date && occurrence !== task.date;
   const trashed = !!task.deleted;
+  /** показанный повтор (у обычной задачи — её дата) */
+  const occ = occurrence ?? task.date;
+  const repeating = !!task.repeat && !!occ && !trashed;
   const done = () => {
     if (completing) return;
     if (future) {
@@ -52,14 +55,25 @@ export function useTaskActions(task: TaskItem, occurrence?: string) {
       return;
     }
     if (task.done) return toggleDone(task.id);
-    // короткая анимация «вычёркивания» перед исчезновением из списка
+    // короткая анимация «вычёркивания» перед исчезновением из списка, лёгкий отклик на телефоне
+    navigator.vibrate?.(10);
     setCompleting(true);
     setTimeout(() => {
       setCompleting(false);
       toggleDone(task.id);
     }, 260);
   };
+  /** удалить всю серию повторов (или обычную задачу) */
+  const removeAll = () => {
+    trashTask(task.id);
+    toast(repeating ? 'Задача удалена со всеми повторами' : 'Задача удалена', { label: 'Вернуть', run: () => restoreTask(task.id) });
+  };
   const remove = () => {
+    // у повторяющейся — только этот повтор (вся серия — из меню)
+    if (repeating) {
+      skipOccurrence(task.id, occ!);
+      return;
+    }
     if (trashed) {
       purgeTask(task.id);
       toast('Задача удалена навсегда');
@@ -85,7 +99,7 @@ export function useTaskActions(task: TaskItem, occurrence?: string) {
       onDelete={swipe.confirmDelete}
       rightLabel={trashed ? 'Вернуть' : task.done ? 'Не готово' : 'Выполнить'}
       rightIcon={trashed || task.done ? <Undo2 size={22} strokeWidth={2.4} /> : undefined}
-      deleteLabel={trashed ? 'Навсегда' : 'Удалить'}
+      deleteLabel={trashed ? 'Навсегда' : repeating ? 'Пропустить' : 'Удалить'}
     />
   );
   const overlays = (
@@ -121,9 +135,9 @@ export function useTaskActions(task: TaskItem, occurrence?: string) {
                     <button className="dlg-as-btn" onClick={act(done)}>
                       {task.done ? 'Отметить невыполненной' : 'Выполнить'}
                     </button>
-                    {!task.done && task.date !== tomorrow && (
-                      <button className="dlg-as-btn" onClick={act(() => updateTask(task.id, { date: tomorrow }))}>
-                        Перенести на завтра
+                    {!task.done && occ !== tomorrow && (
+                      <button className="dlg-as-btn" onClick={act(() => (repeating && future ? moveOccurrence(task.id, occ!, tomorrow) : updateTask(task.id, { date: tomorrow })))}>
+                        {repeating && future ? 'Перенести этот повтор на завтра' : 'Перенести на завтра'}
                       </button>
                     )}
                     <button className="dlg-as-btn" onClick={act(() => setPicking(true))}>
@@ -132,9 +146,20 @@ export function useTaskActions(task: TaskItem, occurrence?: string) {
                     <button className="dlg-as-btn" onClick={act(() => updateTask(task.id, { pinned: !task.pinned }))}>
                       {task.pinned ? 'Открепить' : 'Закрепить'}
                     </button>
-                    <button className="dlg-as-btn danger" onClick={act(remove)}>
-                      Удалить
-                    </button>
+                    {repeating ? (
+                      <>
+                        <button className="dlg-as-btn" onClick={act(remove)}>
+                          Пропустить этот повтор
+                        </button>
+                        <button className="dlg-as-btn danger" onClick={act(removeAll)}>
+                          Удалить все повторы
+                        </button>
+                      </>
+                    ) : (
+                      <button className="dlg-as-btn danger" onClick={act(remove)}>
+                        Удалить
+                      </button>
+                    )}
                   </>
                 )}
               </div>
@@ -147,10 +172,17 @@ export function useTaskActions(task: TaskItem, occurrence?: string) {
         )}
       {picking && (
         <DatePicker
-          value={task}
+          value={repeating && future ? { ...task, date: occ, repeat: undefined } : task}
           onClose={() => setPicking(false)}
           onDone={(v) => {
             setPicking(false);
+            // будущий повтор — переносится только он (отдельной задачей), серия остаётся
+            if (repeating && future) {
+              if (!v.date) return;
+              const c = moveOccurrence(task.id, occ!, v.date);
+              if (c && c.id !== task.id) updateTask(c.id, { time: v.time, duration: v.duration, reminders: v.reminders, ...(v.repeat ? { repeat: v.repeat } : {}) });
+              return;
+            }
             updateTask(task.id, { date: v.date, time: v.time, duration: v.duration, reminders: v.reminders, repeat: v.repeat });
           }}
         />

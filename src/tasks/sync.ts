@@ -65,6 +65,8 @@ export interface InAppReminder {
   briefing?: boolean;
   /** вечернее «серия под угрозой» (без привычки — «Открыть» ведёт в «Привычки») */
   saver?: boolean;
+  /** срок цели — «Открыть» ведёт в цель */
+  goalId?: string;
   /** второй мозг: вопрос дня или карточка (данные уведомления — в extra) */
   brain?: string;
   extra?: Record<string, string>;
@@ -188,7 +190,7 @@ async function plan(fromMs: number, toMs: number): Promise<Planned[]> {
     if (f.at >= fromMs)
       out.push({ id: hash(`${f.task.id}|${f.date}|${f.offset}`), at: f.at, title: f.task.title || 'Задача', body: reminderBody(f.task, f.date, f.at), extra: base });
     // «настойчивое» напоминание — ещё 3 раза, пока задача не выполнена
-    if (d.prefs.nag > 0 && f.offset === Math.max(...f.task.reminders))
+    if (d.prefs.nag > 0 && f.offset === Math.max(...f.task.reminders) && !nagSnoozed(f.task.id, f.date))
       for (let k = 1; k <= 3; k++) {
         const at = f.at + k * d.prefs.nag * 60000;
         if (at >= fromMs && at <= toMs) out.push({ id: hash(`${f.task.id}|${f.date}|nag${k}`), at, title: '⏰ ' + (f.task.title || 'Задача'), body: 'Ещё не выполнено · ' + reminderBody(f.task, f.date, at), extra: base });
@@ -230,6 +232,18 @@ async function plan(fromMs: number, toMs: number): Promise<Planned[]> {
       body: x.kind === 'owe' ? `Сегодня срок — верните ${amount}` : `Сегодня срок — вам должны вернуть ${amount}`,
       extra: { payId: `debt:${x.id}`, date: x.dueDate, sm: 1 },
     });
+  }
+  // сроки целей и этапов: за неделю, накануне и в день срока, в 09:00
+  try {
+    const [{ ensureGoals }, { goalReminders }, { makeTaskLookup }] = await Promise.all([import('../goals/store'), import('../goals/reminders'), import('../goals/model')]);
+    const goals = await ensureGoals();
+    for (const r of goalReminders(goals, makeTaskLookup(d.tasks), toYmd(new Date(fromMs)), toYmd(new Date(toMs)))) {
+      const at = fromYmd(r.day).getTime() + 9 * 3600000;
+      if (at < fromMs || at > toMs) continue;
+      out.push({ id: hash(r.key), at, title: r.title, body: r.body, extra: { goalId: r.goalId, date: r.day, sm: 1 } });
+    }
+  } catch {
+    /* цели не загрузились — остальные напоминания всё равно */
   }
   const p = await get<PlannerData>('planner').catch(() => undefined);
   // утренний брифинг: что на сегодня (пересчитывается при каждом изменении задач)
@@ -416,6 +430,8 @@ async function handleAction(action: string, ex: Record<string, string>, input?: 
         } else day.habits = [...new Set([...(day.habits ?? []), ex.habitId])];
         await (await import('../store/db')).savePlanner(p);
         window.dispatchEvent(new Event('sm-planner-changed'));
+        // отмечена — оставшиеся напоминания о ней сегодня и «серия под угрозой» не нужны
+        syncSoon(500);
         toast('Привычка отмечена');
       }
     } else useApp.getState().go('planner');
@@ -423,6 +439,13 @@ async function handleAction(action: string, ex: Record<string, string>, input?: 
   }
   if (ex.saver) {
     useApp.getState().go('habits');
+    return;
+  }
+  if (ex.goalId) {
+    useApp.getState().go('goals');
+    const { ensureGoals, openGoal } = await import('../goals/store');
+    await ensureGoals();
+    openGoal(ex.goalId);
     return;
   }
   if (ex.payId) {
@@ -446,7 +469,37 @@ async function handleAction(action: string, ex: Record<string, string>, input?: 
 }
 
 /** Отложенное напоминание (не трогает срок задачи) */
+// ---------- Отложенные «настойчивые» напоминания ----------
+
+const NAG_KEY = 'sm-nag-snoozed';
+
+function nagSnoozes(): Record<string, number> {
+  try {
+    return JSON.parse(localStorage.getItem(NAG_KEY) ?? '{}') as Record<string, number>;
+  } catch {
+    return {};
+  }
+}
+
+/** Этот повтор отложили — повторы «настойчивого» напоминания больше не нужны (отложенное придёт само) */
+function nagSnoozed(taskId: string, date: string): boolean {
+  return !!nagSnoozes()[`${taskId}|${date}`];
+}
+
+function snoozeNag(taskId: string, date: string) {
+  const m = nagSnoozes();
+  // старше двух суток — уже не нужны
+  for (const [k, at] of Object.entries(m)) if (at < Date.now() - 2 * 86400000) delete m[k];
+  m[`${taskId}|${date}`] = Date.now();
+  try {
+    localStorage.setItem(NAG_KEY, JSON.stringify(m));
+  } catch {
+    /* не страшно */
+  }
+}
+
 async function snoozeOne(t: TaskItem, minutes: number) {
+  if (t.date) snoozeNag(t.id, t.date);
   const at = Date.now() + minutes * 60000;
   if (isNative()) {
     const { LocalNotifications: LN } = await notifications();
@@ -507,7 +560,7 @@ async function syncNative() {
         largeBody: w.body,
         schedule: { at: new Date(w.at), allowWhileIdle: true },
         channelId: 'sm-reminders',
-        actionTypeId: w.extra.brain === 'question' ? 'sm-question' : w.extra.brain === 'cards' ? 'sm-card' : w.extra.habitId ? 'sm-habit' : w.extra.payId || w.extra.briefing || w.extra.saver ? undefined : 'sm-task',
+        actionTypeId: w.extra.brain === 'question' ? 'sm-question' : w.extra.brain === 'cards' ? 'sm-card' : w.extra.habitId ? 'sm-habit' : w.extra.payId || w.extra.briefing || w.extra.saver || w.extra.goalId ? undefined : 'sm-task',
         autoCancel: true,
         extra: { ...w.extra, sig: sig(w) },
       })),
@@ -529,9 +582,9 @@ function saveWebSnoozes() {
 }
 
 async function showWeb(title: string, body: string, data: Record<string, string>) {
-  const key = `${data.taskId ?? data.habitId ?? data.payId ?? data.brain ?? 'brief'}|${data.date ?? ''}|${Date.now()}`;
+  const key = `${data.taskId ?? data.habitId ?? data.payId ?? data.goalId ?? data.brain ?? 'brief'}|${data.date ?? ''}|${Date.now()}`;
   if (document.visibilityState === 'visible') {
-    useReminders.setState((s) => ({ items: [...s.items.filter((i) => i.taskId !== data.taskId || !data.taskId), { key, taskId: data.taskId, habitId: data.habitId, payId: data.payId, briefing: !!data.briefing, saver: !!data.saver, ...(data.brain ? { brain: data.brain, extra: data } : {}), date: data.date || undefined, title, body }] }));
+    useReminders.setState((s) => ({ items: [...s.items.filter((i) => i.taskId !== data.taskId || !data.taskId), { key, taskId: data.taskId, habitId: data.habitId, payId: data.payId, briefing: !!data.briefing, saver: !!data.saver, ...(data.goalId ? { goalId: data.goalId } : {}), ...(data.brain ? { brain: data.brain, extra: data } : {}), date: data.date || undefined, title, body }] }));
     playChime();
   }
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
@@ -539,7 +592,7 @@ async function showWeb(title: string, body: string, data: Record<string, string>
   if (pushActive()) return;
   const opts: NotificationOptions & { actions?: { action: string; title: string }[]; requireInteraction?: boolean } = {
     body,
-    tag: `${data.taskId ?? data.habitId ?? data.payId ?? data.brain ?? 'brief'}|${data.date ?? ''}`,
+    tag: `${data.taskId ?? data.habitId ?? data.payId ?? data.goalId ?? data.brain ?? 'brief'}|${data.date ?? ''}`,
     icon: './icon-192.png',
     badge: './icon-192.png',
     data,
@@ -792,6 +845,16 @@ export function initTaskSync() {
       syncSoon();
     }
   });
+  // сроки целей — тоже в напоминаниях: изменили цель — пересчитать
+  void import('../goals/store').then(({ useGoals }) => {
+    let pg = useGoals.getState().data;
+    useGoals.subscribe((s) => {
+      if (s.data === pg) return;
+      const first = !pg;
+      pg = s.data;
+      if (!first) syncSoon(3000);
+    });
+  });
   if (isNative()) {
     void setupNative().then(async () => {
       // как в TickTick: разрешение на уведомления спрашиваем при первом запуске
@@ -840,6 +903,10 @@ export function reminderAction(r: InAppReminder, action: 'done' | 'snooze' | 'op
   dismissReminder(r.key);
   if (r.brain) {
     if (action === 'open') void handleAction('open', r.extra ?? { brain: r.brain });
+    return;
+  }
+  if (r.goalId) {
+    if (action === 'open') void handleAction('open', { goalId: r.goalId });
     return;
   }
   if (r.payId || r.briefing) {

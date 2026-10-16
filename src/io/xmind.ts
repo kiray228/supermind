@@ -7,6 +7,7 @@ import type {
 import { uid } from '../utils/tree';
 import { DEFAULT_ROOT_TEXT, compact, loadZip, makeDoc, makeSheet, newZip, stripDirs, stripExt } from './common';
 import type { Zip } from './common';
+import { safeUrl } from '../utils/url';
 
 // ---------------------------------------------------------------------
 // Промежуточный формат (≈ Zen JSON)
@@ -264,7 +265,8 @@ async function convertTopic(x: XTopic, ctx: Ctx): Promise<Topic> {
 
   const plain = x.notes?.plain?.content ?? (x.notes?.realHTML?.content ? htmlToText(x.notes.realHTML.content) : '');
   if (plain && plain.trim()) t.note = plain.replace(/\r\n?/g, '\n');
-  if (x.href && !/^(xmind:|xap:)/i.test(x.href)) t.link = x.href;
+  const href = x.href && !/^(xmind:|xap:)/i.test(x.href) ? safeUrl(x.href) : null;
+  if (href) t.link = href;
 
   const markers: string[] = [];
   const groups = new Set<string>();

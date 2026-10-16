@@ -25,6 +25,7 @@ import { TaskRow } from '../tasks/ui/TaskRow';
 import '../tasks/ui/tasks.css';
 import { loadAllDocs, loadPlanner, savePlanner } from '../store/db';
 import { addDaysYmd, collectMapTasks, fromYmd, PRIORITY_META, todayYmd, toYmd, updateMapTask } from '../utils/mapTasks';
+import { useToday } from '../ui/useToday';
 import type { MapTask } from '../utils/mapTasks';
 import { openDoc } from '../actions';
 import { toast } from '../store/appStore';
@@ -101,7 +102,14 @@ export default function Planner() {
   /** лист «Пауза…» для привычки */
   const [pauseId, setPauseId] = useState<string | null>(null);
   const tasksDataState = useTasks((s) => s.data);
-  const today = todayYmd();
+  const today = useToday();
+  // открыт «сегодняшний» день, а наступил новый — показать новый
+  const prevToday = useRef(today);
+  useEffect(() => {
+    if (prevToday.current === today) return;
+    setDate((d) => (d === prevToday.current ? today : d));
+    prevToday.current = today;
+  }, [today]);
 
   useEffect(() => {
     let alive = true;
@@ -841,6 +849,23 @@ function Journal({ date, initial, onSave }: { date: string; initial: string; onS
     },
     [date],
   );
+  // приложение свернули или закрыли — сохранить сразу, не дожидаясь паузы в наборе
+  useEffect(() => {
+    const flush = () => {
+      const p = pending.current;
+      if (!p) return;
+      clearTimeout(p.timer);
+      pending.current = null;
+      saveRef.current(date, p.text);
+    };
+    const vis = () => document.visibilityState === 'hidden' && flush();
+    document.addEventListener('visibilitychange', vis);
+    window.addEventListener('pagehide', flush);
+    return () => {
+      document.removeEventListener('visibilitychange', vis);
+      window.removeEventListener('pagehide', flush);
+    };
+  }, [date]);
 
   const change = (v: string) => {
     setText(v);

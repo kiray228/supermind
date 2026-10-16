@@ -111,9 +111,13 @@ export default function Board() {
 
   // ----- загрузка / сохранение -----
 
-  const commit = useCallback((b: BoardData) => {
-    boardRef.current = b;
-    setBoard(b);
+  /** запись на диск — с паузой: набор текста в карточке не пишет базу на каждую букву */
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flushBoard = useCallback(() => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = null;
+    const b = boardRef.current;
+    if (!b) return;
     saveBoard(b)
       .then((saved) => {
         // пришедшее с другого устройства — показать, если здесь за это время ничего не меняли
@@ -125,6 +129,24 @@ export default function Board() {
       })
       .catch(() => toast('Не удалось сохранить доску'));
   }, []);
+  const commit = useCallback(
+    (b: BoardData) => {
+      boardRef.current = b;
+      setBoard(b);
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      saveTimer.current = setTimeout(flushBoard, 400);
+    },
+    [flushBoard],
+  );
+  // уход со страницы или в фон — сохранить сразу
+  useEffect(() => {
+    const vis = () => document.visibilityState === 'hidden' && saveTimer.current && flushBoard();
+    document.addEventListener('visibilitychange', vis);
+    return () => {
+      document.removeEventListener('visibilitychange', vis);
+      if (saveTimer.current) flushBoard();
+    };
+  }, [flushBoard]);
 
   const reloadMaps = useCallback(async () => {
     setLoadingMaps(true);

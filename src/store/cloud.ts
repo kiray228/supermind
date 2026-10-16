@@ -348,12 +348,15 @@ async function applyRemote(item: RemoteItem, changed: Set<string>) {
     changed.add(item.key);
     return;
   }
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 6; i++) {
     const local = await get(item.key);
-    if (dirtyAt(item.key) !== at) {
-      at = dirtyAt(item.key); // пока читали — новая правка; читаем заново
+    // пока читали — новая правка; читаем заново. Правки идут без конца — сливаем с последней прочитанной:
+    // пропустить нельзя, иначе версия с другого устройства потом затрётся при отправке
+    if (dirtyAt(item.key) !== at && i < 5) {
+      at = dirtyAt(item.key);
       continue;
     }
+    at = dirtyAt(item.key) ?? at;
     if (local === undefined) {
       // удалили здесь, а там изменили позже — вернуть
       if (item.updatedAt > at!) {

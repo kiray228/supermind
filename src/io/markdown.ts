@@ -4,6 +4,7 @@
 import type { Sheet, TaskStatus, Topic } from '../types';
 import { newTopic } from '../utils/tree';
 import { DEFAULT_ROOT_TEXT, oneLine } from './common';
+import { safeUrl } from '../utils/url';
 
 // =====================================================================
 // Экспорт
@@ -120,7 +121,7 @@ function parseInline(raw: string): Inline {
   if (labels.length) res.labels = labels;
   s = s.replace(RE_IMG, (_m, alt: string) => alt);
   s = s.replace(RE_LINK, (_m, text: string, url: string) => {
-    if (!res.link) res.link = url;
+    if (!res.link) res.link = safeUrl(url) ?? undefined;
     return text;
   });
   s = s.replace(RE_AUTOLINK, (_m, url: string) => {

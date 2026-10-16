@@ -3,6 +3,7 @@
  */
 import type { Boundary, FloatingTopic, MindDoc, Relationship, Sheet, StructureType, Summary, Topic } from '../types';
 import { uid } from '../utils/tree';
+import { safeUrl } from '../utils/url';
 import { DEFAULT_ROOT_TEXT, fileExt, makeDoc, makeSheet, stripExt } from './common';
 import { markdownToTopic } from './markdown';
 import { opmlToTopic } from './opml';
@@ -43,7 +44,9 @@ function normTopic(v: unknown, ids: Set<string>): Topic {
   if (t.markers && !Array.isArray(t.markers)) delete t.markers;
   if (t.labels && !Array.isArray(t.labels)) delete t.labels;
   if (t.note != null && typeof t.note !== 'string') delete t.note;
-  if (t.link != null && typeof t.link !== 'string') delete t.link;
+  // ссылки — только безопасные (файл карты мог прийти откуда угодно)
+  if (t.link != null && (typeof t.link !== 'string' || !safeUrl(t.link))) delete t.link;
+  else if (t.link) t.link = safeUrl(t.link)!;
   if (t.image && !(isObj(t.image) && typeof t.image.src === 'string')) delete t.image;
   if (t.task && !(isObj(t.task) && typeof t.task.status === 'string')) delete t.task;
   if (t.style && !isObj(t.style)) delete t.style;

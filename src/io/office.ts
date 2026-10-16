@@ -7,6 +7,7 @@ import {
   STATUS_TEXT, XML_DECL, escAttr, escXml, newZip, oneLine, stripDirs, topicPriority, topicProgress,
 } from './common';
 import type { Zip } from './common';
+import { isSafeUrl } from '../utils/url';
 
 // ---------------------------------------------------------------------
 // Общие части OOXML
@@ -124,9 +125,6 @@ function wRun(text: string, rPr = ''): string {
   return `<w:r>${rPr ? `<w:rPr>${rPr}</w:rPr>` : ''}${wText(text)}</w:r>`;
 }
 
-function isSafeUrl(u: string): boolean {
-  return /^(https?|mailto|ftp|tel):/i.test(u);
-}
 
 const DOCX_STYLES =
   XML_DECL +

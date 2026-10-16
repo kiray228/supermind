@@ -21,6 +21,7 @@ import {
 import { setBudget } from '../store';
 import { AmountInput, CatIcon, Money, Progress, Sheet, Stepper, useToday } from './common';
 import { showOps } from './state';
+import { RateWarning } from './RateWarning';
 
 interface Edit {
   categoryId?: string;
@@ -53,6 +54,7 @@ export function BudgetTab({ data }: { data: FinanceData }) {
   return (
     <div className="fn-stack">
       <Stepper label={monthTitle(month)} onPrev={() => setMonth(addMonthsYmd(month, -1))} onNext={() => setMonth(addMonthsYmd(month, 1))} onLabel={isCur ? undefined : () => setMonth(monthStart(today))} />
+      <RateWarning data={data} range={{ from: month, to: monthEnd(month) }} />
 
       <section className="card fn-panel fn-budget-total">
         <div className="fn-panel-head">

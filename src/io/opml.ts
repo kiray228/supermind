@@ -4,6 +4,7 @@
 import type { Sheet, Topic } from '../types';
 import { newTopic } from '../utils/tree';
 import { DEFAULT_ROOT_TEXT, escAttr, escXml, oneLine } from './common';
+import { safeUrl } from '../utils/url';
 
 function outline(t: Topic, depth: number): string {
   const pad = '  '.repeat(depth + 2);
@@ -43,7 +44,8 @@ function fromOutline(el: Element): Topic {
   const note = el.getAttribute('_note');
   if (note && note.trim()) t.note = note.replace(/\r\n?/g, '\n');
   const link = el.getAttribute('url') || el.getAttribute('htmlUrl') || el.getAttribute('xmlUrl');
-  if (link) t.link = link;
+  const safe = link ? safeUrl(link) : null;
+  if (safe) t.link = safe;
   const st = el.getAttribute('_status');
   if (st === 'checked') t.task = { status: 'done' };
   else if (st === 'unchecked' || st === 'indeterminate') t.task = { status: st === 'indeterminate' ? 'doing' : 'todo' };

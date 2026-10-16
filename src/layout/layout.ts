@@ -440,13 +440,24 @@ export function layoutSheet(sheet: Sheet): LayoutResult {
   // ---------- дерево отступами ----------
   const indent = 28 * sp;
   const iGap = 10 * sp;
+  // размеры веток считаются много раз на разных уровнях — запоминаем на время раскладки (иначе на больших картах O(n²))
+  const indWMemo = new Map<LNode, number>();
+  const indHMemo = new Map<LNode, number>();
   const indW = (n: LNode): number => {
-    const ks = kids(n);
-    return Math.max(n.w, ...ks.map((c) => indent + indW(c)));
+    let v = indWMemo.get(n);
+    if (v === undefined) {
+      v = kids(n).reduce((m, c) => Math.max(m, indent + indW(c)), n.w);
+      indWMemo.set(n, v);
+    }
+    return v;
   };
   const indH = (n: LNode): number => {
-    const ks = kids(n);
-    return n.h + ks.reduce((s, c) => s + iGap + indH(c), 0);
+    let v = indHMemo.get(n);
+    if (v === undefined) {
+      v = n.h + kids(n).reduce((s, c) => s + iGap + indH(c), 0);
+      indHMemo.set(n, v);
+    }
+    return v;
   };
   /** Размещает узел и потомков отступами; y — верх блока */
   const placeIndent = (n: LNode, x: number, y: number) => {
@@ -590,10 +601,15 @@ export function layoutSheet(sheet: Sheet): LayoutResult {
     }
   };
 
+  const subWMemo = new Map<LNode, number>();
   const subTreeWidthH = (n: LNode): number => {
-    const ks = kids(n);
-    if (!ks.length) return n.w;
-    return n.w + hGap(n) + Math.max(...ks.map(subTreeWidthH));
+    let v = subWMemo.get(n);
+    if (v === undefined) {
+      const ks = kids(n);
+      v = ks.length ? n.w + hGap(n) + ks.reduce((m, c) => Math.max(m, subTreeWidthH(c)), 0) : n.w;
+      subWMemo.set(n, v);
+    }
+    return v;
   };
 
   // центральная тема

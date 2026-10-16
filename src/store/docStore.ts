@@ -162,6 +162,17 @@ async function keepRemoteVersion(doc: MindDoc) {
 
 const HISTORY_LIMIT = 150;
 
+/** Только что добавленная тема: её первый текст — тот же шаг отмены, что и добавление */
+let freshId: ID | null = null;
+/** Тема, ввод в которой отменили «Отменить»/«Повторить»: поле закроется — набранное не записывать */
+let droppedEdit: ID | null = null;
+/** Поле ввода закрылось: записывать ли набранное (false — его отменили) */
+export function takeDroppedEdit(id: ID): boolean {
+  if (droppedEdit !== id) return false;
+  droppedEdit = null;
+  return true;
+}
+
 /** Пакет изменений (перетаскивание ползунка) — один шаг отмены */
 let batch: 'off' | 'open' | 'pushed' = 'off';
 export function beginBatch() {
@@ -176,6 +187,7 @@ export const useDoc = create<DocState>((set, get) => {
 
   const commit = (next: MindDoc, history = true) => {
     const { doc, past } = get();
+    if (history) freshId = null;
     if (history && batch === 'pushed') history = false;
     else if (history && batch === 'open') batch = 'pushed';
     next.updatedAt = Date.now();
@@ -237,6 +249,8 @@ export const useDoc = create<DocState>((set, get) => {
       const { past, doc, future } = get();
       if (!past.length || !doc) return;
       const prev = past[past.length - 1];
+      droppedEdit = get().editingId;
+      freshId = null;
       set({ doc: prev, past: past.slice(0, -1), future: [doc, ...future], editingId: null, pendingText: null, selection: cleanSelection(prev, get().selection) });
       scheduleSave();
     },
@@ -244,6 +258,8 @@ export const useDoc = create<DocState>((set, get) => {
       const { past, doc, future } = get();
       if (!future.length || !doc) return;
       const nxt = future[0];
+      droppedEdit = get().editingId;
+      freshId = null;
       set({ doc: nxt, past: [...past, doc], future: future.slice(1), editingId: null, pendingText: null, selection: cleanSelection(nxt, get().selection) });
       scheduleSave();
     },
@@ -269,6 +285,8 @@ export const useDoc = create<DocState>((set, get) => {
       } else set({ selection: arr, selectedRel: null });
     },
     setEditing(id) {
+      // ввод в новой теме закончился — следующая правка её текста уже отдельный шаг
+      if (id !== freshId) freshId = null;
       set({ editingId: id });
     },
     selectRel(id) {
@@ -293,10 +311,16 @@ export const useDoc = create<DocState>((set, get) => {
     },
 
     setText(id, text) {
-      get().mutate((s) => {
-        const f = findInSheet(s, id);
-        if (f) f.topic.text = text;
-      });
+      // первый текст новой темы — вместе с её добавлением: одно «Отменить» убирает тему целиком
+      const merge = id === freshId;
+      freshId = null;
+      get().mutate(
+        (s) => {
+          const f = findInSheet(s, id);
+          if (f) f.topic.text = text;
+        },
+        { history: !merge },
+      );
     },
     updateTopic(id, patch) {
       get().mutate((s) => {
@@ -346,6 +370,7 @@ export const useDoc = create<DocState>((set, get) => {
         f.topic.children.push(t);
       });
       set({ selection: [t.id], editingId: t.id });
+      freshId = t.id;
       return t.id;
     },
     addSibling(id, before, text) {
@@ -367,6 +392,7 @@ export const useDoc = create<DocState>((set, get) => {
         ff.parent.children.splice(ff.index + (before ? 0 : 1), 0, t);
       });
       set({ selection: [t.id], editingId: t.id });
+      freshId = t.id;
       return t.id;
     },
     addParent(id) {
@@ -382,6 +408,7 @@ export const useDoc = create<DocState>((set, get) => {
         t.children.push(moved);
       });
       set({ selection: [t.id], editingId: t.id });
+      freshId = t.id;
       return t.id;
     },
     addFloating(x, y) {
@@ -390,6 +417,7 @@ export const useDoc = create<DocState>((set, get) => {
         s.floating.push(t);
       });
       set({ selection: [t.id], editingId: t.id });
+      freshId = t.id;
       return t.id;
     },
     insertChildren(parentId, topics) {

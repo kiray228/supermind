@@ -154,11 +154,11 @@ function normalizeTx(t: Transaction): Transaction {
   return clean(t);
 }
 
-export function addTransaction(p: TxDraft, opts: { silent?: boolean } = {}): Transaction | null {
+export function addTransaction(p: TxDraft, opts: { silent?: boolean; id?: string } = {}): Transaction | null {
   const d = useFinance.getState().data;
   if (!d) return null;
   const now = Date.now();
-  const t = normalizeTx({ ...p, tags: p.tags ?? [], id: uid(), createdAt: now, updatedAt: now });
+  const t = normalizeTx({ ...p, tags: p.tags ?? [], id: opts.id ?? uid(), createdAt: now, updatedAt: now });
   const alert = !opts.silent && t.type === 'expense' ? budgetAlert(d, t) : null;
   mutateFinance((x) => {
     x.transactions.push(t);
@@ -339,7 +339,13 @@ export function paySubscription(id: string, date = todayYmd()): Transaction | nu
     return null;
   }
   const prevNext = s.nextDate;
-  const t = addTransaction({ type: 'expense', amount: s.amount, accountId: s.accountId, categoryId: s.categoryId, date, note: s.name, subscriptionId: s.id });
+  // id по подписке и сроку: оплату одного срока на двух устройствах синхронизация сольёт в одну операцию
+  const txId = `sub-${s.id}-${prevNext}`;
+  if (d.transactions.some((x) => x.id === txId)) {
+    toast('Этот платёж уже записан');
+    return null;
+  }
+  const t = addTransaction({ type: 'expense', amount: s.amount, accountId: s.accountId, categoryId: s.categoryId, date, note: s.name, subscriptionId: s.id }, { id: txId });
   mutateFinance((x) => {
     const y = x.subscriptions.find((z) => z.id === id);
     if (!y) return;
