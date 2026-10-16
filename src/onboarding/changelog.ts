@@ -1,5 +1,5 @@
 /** «Что нового»: главное в каждой версии. Новые версии — сверху. */
-import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge, MessageCircleQuestion, CloudOff, LayoutTemplate, SquareArrowOutUpRight, BellRing, Target, Timer, Lock, Crosshair, Move, GitMerge, EyeOff, CalendarRange, Fingerprint, ArrowUpDown, Banknote } from 'lucide-react';
+import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge, MessageCircleQuestion, CloudOff, LayoutTemplate, SquareArrowOutUpRight, BellRing, Target, Timer, Lock, Crosshair, Move, GitMerge, EyeOff, CalendarRange, Fingerprint, ArrowUpDown, Banknote, MonitorSmartphone, Coins, ListChecks, FileInput } from 'lucide-react';
 
 export interface ChangeItem {
   icon: typeof Sparkles;
@@ -15,6 +15,16 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.39',
+    title: 'Несколько задач сразу, курсы валют и одинаковые настройки',
+    items: [
+      { icon: ListChecks, title: 'Несколько задач сразу', text: 'Долгое нажатие на задачу → «Выбрать несколько» (на компьютере — Ctrl + щелчок): выполнить, перенести, сменить список, приоритет или тег, удалить — одним нажатием и с «Отменить».' },
+      { icon: Coins, title: 'Курсы валют сами', text: 'Финансы → «Валюты и курсы»: курсы обновляются раз в день из интернета. Счета в долларах, рублях или евро сразу считаются в общем итоге. Ввести курс вручную тоже можно.' },
+      { icon: MonitorSmartphone, title: 'Одинаковые настройки на всех устройствах', text: 'Тема, цвет, стекло, фон, модель Claude, анимации и что видит ассистент переходят на телефон и компьютер вместе с данными. API-ключ и код-пароль остаются на устройстве.' },
+      { icon: FileInput, title: 'Карты FreeMind и Freeplane', text: 'Импорт файлов .mm со значками, заметками, цветами и связями, и экспорт в .mm — открывается в FreeMind и Freeplane.' },
+    ],
+  },
   {
     version: '1.38',
     title: 'Отпечаток, регулярный доход и порядок привычек',

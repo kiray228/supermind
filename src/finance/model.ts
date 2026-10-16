@@ -109,6 +109,10 @@ export interface FinancePrefs {
   mainCurrency: string;
   /** курс: 1 единица валюты = rates[код] единиц основной валюты */
   rates: Record<string, number>;
+  /** курсы автоматически (finance/rates.ts); не задано — включены, пока нет курсов, введённых вручную */
+  autoRates?: boolean;
+  /** когда курсы последний раз обновлены автоматически */
+  ratesAt?: number;
   lastAccountId?: string;
   updatedAt: number;
 }

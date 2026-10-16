@@ -7,6 +7,7 @@ import { toast } from '../../store/appStore';
 import { moveOccurrence, openTask, purgeTask, restoreTask, skipOccurrence, toggleDone, trashTask, updateTask } from '../store';
 import { mergeHandlers, useLongPressDrag, useSwipeActions } from '../../ui/gestures';
 import { startTouchDrag } from './touchDrag';
+import { startSelect, toggleSelect, useBulk } from '../bulk';
 import { SwipeBg } from '../../ui/SwipeBg';
 import { DatePicker } from './DatePicker';
 import '../../ui/dialogs.css';
@@ -38,7 +39,7 @@ export function TaskCheck({ task, onToggle }: { task: Pick<TaskItem, 'done' | 'p
  * Разметка: обёртка ref={swipe.wrap} className={swipe.wrapClass}, первым — bg, строка — класс sw-row, style={swipe.style}, {...handlers}; overlays — после строки.
  */
 /** dragRow — строку можно перетащить пальцем (долгое нажатие и повести) */
-export function useTaskActions(task: TaskItem, occurrence?: string, dragRow?: RefObject<HTMLElement | null>) {
+export function useTaskActions(task: TaskItem, occurrence?: string, dragRow?: RefObject<HTMLElement | null>, selectable = false) {
   const [picking, setPicking] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -157,6 +158,11 @@ export function useTaskActions(task: TaskItem, occurrence?: string, dragRow?: Re
                     <button className="dlg-as-btn" onClick={act(() => updateTask(task.id, { pinned: !task.pinned }))}>
                       {task.pinned ? 'Открепить' : 'Закрепить'}
                     </button>
+                    {selectable && (
+                      <button className="dlg-as-btn" onClick={act(() => startSelect(task.id))}>
+                        Выбрать несколько
+                      </button>
+                    )}
                     {repeating ? (
                       <>
                         <button className="dlg-as-btn" onClick={act(remove)}>
@@ -212,7 +218,10 @@ export function TaskRow({
   tagColors,
   draggable,
   occurrence,
+  selectable,
 }: {
+  /** можно выбрать вместе с другими (раздел «Задачи») */
+  selectable?: boolean;
   /** дата показанного повтора (ежедневник/календарь); если это не текущий повтор — галочка недоступна */
   occurrence?: string;
   task: TaskItem;
@@ -238,27 +247,42 @@ export function TaskRow({
         : whenLabel(task, today);
   const checklistDone = task.checklist.filter((c) => c.done).length;
   const rowRef = useRef<HTMLDivElement>(null);
-  const { swipe, handlers, bg, overlays, done, completing, future } = useTaskActions(task, occurrence, draggable && !finePointer ? rowRef : undefined);
+  const { swipe, handlers, bg, overlays, done, completing, future } = useTaskActions(task, occurrence, draggable && !finePointer ? rowRef : undefined, selectable);
+  // режим выбора нескольких задач (tasks/bulk.ts): нажатие — выбрать, жесты и перетаскивание выключены
+  const picking = useBulk((s) => selectable && s.ids !== null);
+  const picked = useBulk((s) => !!s.ids?.includes(task.id));
 
   return (
     <div ref={swipe.wrap} className={`tk-row-wrap ${swipe.wrapClass}`}>
       {bg}
       <div
         ref={rowRef}
-        className={`tk-row sw-row${task.done ? ' is-done' : ''}${completing ? ' completing' : ''}`}
-        style={swipe.style}
-        onClick={() => openTask(task.id)}
-        {...handlers}
+        className={`tk-row sw-row${task.done ? ' is-done' : ''}${completing ? ' completing' : ''}${picking ? ' picking' : ''}${picked ? ' picked' : ''}`}
+        style={picking ? undefined : swipe.style}
+        onClick={(e) => {
+          if (picking) return toggleSelect(task.id);
+          // Ctrl/⌘ + щелчок — начать выбор нескольких
+          if (selectable && (e.ctrlKey || e.metaKey) && !task.deleted) return startSelect(task.id);
+          openTask(task.id);
+        }}
+        aria-selected={picking ? picked : undefined}
+        {...(picking ? {} : handlers)}
         // мышь — drag-and-drop браузера; палец — долгое нажатие и повести (touchDrag.ts)
-        draggable={draggable && finePointer}
+        draggable={draggable && finePointer && !picking}
         onDragStart={(e) => {
           e.dataTransfer.setData('text/sm-task', task.id);
           e.dataTransfer.effectAllowed = 'move';
         }}
       >
-        <span className={future ? 'tk-check-future' : undefined}>
-          <TaskCheck task={completing ? { ...task, done: true } : task} onToggle={done} />
-        </span>
+        {picking ? (
+          <span className={`tk-pick${picked ? ' on' : ''}`} aria-hidden>
+            {picked && <Check size={13} strokeWidth={3.2} />}
+          </span>
+        ) : (
+          <span className={future ? 'tk-check-future' : undefined}>
+            <TaskCheck task={completing ? { ...task, done: true } : task} onToggle={done} />
+          </span>
+        )}
         <div className="tk-body">
           <div className="tk-title">
             {task.pinned && <Pin size={12} className="tk-pin" />}

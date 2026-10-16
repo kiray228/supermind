@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { onBack } from '../../ui/dialogs';
 import { CaretLeft, DownloadSimple, FileArrowUp, HandCoins, Repeat, SlidersHorizontal, Tag, Wallet, type Icon } from '@phosphor-icons/react';
-import { ListRow } from '../../ui/list';
 import { IconTile, type Tone } from '../../ui/icons';
 import { todayYmd } from '../../utils/mapTasks';
 import { downloadText } from '../../io/download';
 import { toast } from '../../store/appStore';
 import { curSymbol, debtTotals, fmtMoney, parseMoneyInput, type FinanceData } from '../model';
 import { exportCsv } from '../csv';
-import { setFinancePrefs, useFinance } from '../store';
+import { refreshRates, setFinancePrefs, useFinance } from '../store';
+import { autoRatesOn, RATES_SOURCE, usedCurrencies } from '../rates';
+import { ListRow, ListSection, SwitchRow } from '../../ui/list';
 import { AccountsSection, CategoriesSection } from './Accounts';
 import { SubscriptionsSection } from './Recurring';
 import { ImportCsvSheet } from './ImportCsv';
@@ -93,14 +94,19 @@ function MenuRow({ icon, tone, title, sub, onClick }: { icon: Icon; tone: Tone; 
 function SettingsSection({ data }: { data: FinanceData }) {
   const main = data.prefs.mainCurrency;
   // валюты, которые встречаются в счетах и долгах
-  const used = useMemo(() => {
-    const s = new Set<string>();
-    for (const a of data.accounts) s.add(a.currency);
-    for (const d of data.debts) s.add(d.currency);
-    for (const c of Object.keys(data.prefs.rates)) s.add(c);
-    s.delete(main);
-    return [...s].sort();
-  }, [data.accounts, data.debts, data.prefs.rates, main]);
+  const used = useMemo(() => usedCurrencies(data), [data]);
+  const auto = autoRatesOn(data.prefs);
+  const [busy, setBusy] = useState(false);
+  const update = async () => {
+    setBusy(true);
+    const ok = await refreshRates(true);
+    setBusy(false);
+    toast(ok ? 'Курсы обновлены' : navigator.onLine === false ? 'Нет интернета — остались прежние курсы' : 'Не удалось получить курсы');
+  };
+  const setAuto = (v: boolean) => {
+    setFinancePrefs({ autoRates: v });
+    if (v) void update();
+  };
 
   // курсы пересчитываются относительно новой основной валюты (если её курс известен)
   const changeMain = (v: string) => {
@@ -112,6 +118,7 @@ function SettingsSection({ data }: { data: FinanceData }) {
       rates[main] = Math.round((1 / k) * 1e6) / 1e6;
     }
     setFinancePrefs({ mainCurrency: v, rates });
+    if (auto) void refreshRates(true);
   };
 
   return (
@@ -121,16 +128,56 @@ function SettingsSection({ data }: { data: FinanceData }) {
         <CurrencySelect value={main} onChange={changeMain} />
         <p className="tiny faint fn-m0">В ней считаются бюджеты, аналитика и общий итог. Валюта каждого счёта задаётся в его настройках.</p>
       </div>
+      <ListSection
+        footer={
+          auto ? (
+            <>
+              Раз в день, когда открываете финансы. {data.prefs.ratesAt ? `Обновлено ${ratesTime(data.prefs.ratesAt)}. ` : ''}
+              Источник —{' '}
+              <a href={RATES_SOURCE} target="_blank" rel="noreferrer">
+                ExchangeRate-API
+              </a>
+              .
+            </>
+          ) : (
+            'Курсы вводятся вручную ниже.'
+          )
+        }
+      >
+        <SwitchRow title="Курсы автоматически" subtitle="Из интернета, по курсу на сегодня" checked={auto} onChange={setAuto} />
+        {auto && <ListRow title={busy ? 'Обновляю…' : 'Обновить сейчас'} tone="accent" onClick={() => void update()} disabled={busy} />}
+      </ListSection>
       <div className="card fn-panel">
         <h3 className="fn-h3">Курсы валют</h3>
-        <p className="tiny faint fn-m0">Укажите вручную, сколько стоит 1 единица валюты в {curSymbol(main)}. Без курса суммы в другой валюте в итоги не пересчитываются.</p>
+        <p className="tiny faint fn-m0">
+          {auto ? `Сколько стоит 1 единица валюты в ${curSymbol(main)}.` : `Укажите вручную, сколько стоит 1 единица валюты в ${curSymbol(main)}.`} Без курса суммы в другой валюте в итоги не пересчитываются.
+        </p>
         {used.length === 0 && <p className="small muted fn-m0">Все счета в основной валюте — курсы не нужны.</p>}
-        {used.map((c) => (
-          <RateRow key={c + main} code={c} main={main} value={data.prefs.rates[c]} />
-        ))}
+        {used.map((c) =>
+          auto ? (
+            <div key={c + main} className="row fn-rate">
+              <span className="fn-rate-label">1 {curSymbol(c)} =</span>
+              <span className="fn-rate-auto">{data.prefs.rates[c] ? String(data.prefs.rates[c]).replace('.', ',') : '—'}</span>
+              <span className="fn-rate-label">{curSymbol(main)}</span>
+            </div>
+          ) : (
+            <RateRow key={c + main} code={c} main={main} value={data.prefs.rates[c]} />
+          ),
+        )}
       </div>
     </div>
   );
+}
+
+/** «сегодня в 12:25», «вчера в 09:10», «12.10 в 09:10» */
+function ratesTime(at: number): string {
+  const d = new Date(at);
+  const hm = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  const day = new Date(d).setHours(0, 0, 0, 0);
+  const today = new Date().setHours(0, 0, 0, 0);
+  if (day === today) return `сегодня в ${hm}`;
+  if (today - day === 86400000) return `вчера в ${hm}`;
+  return `${d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })} в ${hm}`;
 }
 
 function RateRow({ code, main, value }: { code: string; main: string; value?: number }) {

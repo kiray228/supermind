@@ -1,4 +1,5 @@
-/** Что ассистент видит из данных (настройка этого устройства): финансы и настроение можно скрыть */
+/** Что ассистент видит из данных (общая для устройств — store/sharedPrefs): финансы и настроение можно скрыть */
+import { shareLocal } from '../store/sharedPrefs';
 
 export interface AssistantPrivacy {
   /** финансы: траты, доходы, счета, подписки */
@@ -24,4 +25,5 @@ export function setAssistantPrivacy(p: Partial<AssistantPrivacy>) {
   } catch {
     /* не страшно */
   }
+  void shareLocal(KEY);
 }

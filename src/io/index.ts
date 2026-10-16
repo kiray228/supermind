@@ -8,11 +8,13 @@ import { DEFAULT_ROOT_TEXT, fileExt, makeDoc, makeSheet, stripExt } from './comm
 import { markdownToTopic } from './markdown';
 import { opmlToTopic } from './opml';
 import { importXmind } from './xmind';
+import { freemindToDoc } from './freemind';
 
 export { downloadBlob, downloadText, pickFile, safeFilename, isIOS } from './download';
 export { sheetToMarkdown, markdownToTopic, textToTopic, textToTopics } from './markdown';
 export { sheetToOpml, opmlToTopic } from './opml';
 export { importXmind, exportXmind } from './xmind';
+export { freemindToDoc, sheetToFreemind } from './freemind';
 export { exportDocx, exportXlsx, exportPptx, exportCsvTasks } from './office';
 export { buildExportSvg, exportSvgBlob, exportPng, exportPdf } from './exportImage';
 
@@ -134,7 +136,7 @@ function docFromTopic(root: Topic, filename: string): MindDoc {
 
 export async function importFile(file: File): Promise<MindDoc> {
   let ext = fileExt(file.name);
-  if (!ext || !['xmind', 'md', 'markdown', 'txt', 'opml', 'supermind', '2mind', 'json'].includes(ext)) {
+  if (!ext || !['xmind', 'md', 'markdown', 'txt', 'opml', 'mm', 'supermind', '2mind', 'json'].includes(ext)) {
     // определяем по содержимому
     const head = new Uint8Array(await file.slice(0, 4).arrayBuffer());
     if (head[0] === 0x50 && head[1] === 0x4b) ext = 'xmind';
@@ -142,6 +144,7 @@ export async function importFile(file: File): Promise<MindDoc> {
       const start = (await file.slice(0, 512).text()).replace(/^﻿/, '').trimStart();
       if (start.startsWith('{')) ext = 'json';
       else if (start.startsWith('<') && /<opml[\s>]/i.test(start)) ext = 'opml';
+      else if (start.startsWith('<') && /<map[\s>]/i.test(start)) ext = 'mm';
       else ext = 'md';
     }
   }
@@ -150,6 +153,8 @@ export async function importFile(file: File): Promise<MindDoc> {
       return importXmind(await file.arrayBuffer(), file.name);
     case 'opml':
       return docFromTopic(opmlToTopic(await file.text()), file.name);
+    case 'mm':
+      return freemindToDoc(await file.text(), file.name);
     case 'supermind':
     case '2mind':
     case 'json':

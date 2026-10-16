@@ -76,6 +76,10 @@ export async function setupCloud() {
     () => void window.dispatchEvent(new Event('sm-planner-changed')),
   );
   onRemoteChange(
+    (k) => k === 'ui-prefs',
+    async () => void (await import('./sharedPrefs')).applySharedPrefs(),
+  );
+  onRemoteChange(
     (k) => k === 'board',
     () => void window.dispatchEvent(new Event('sm-board-changed')),
   );

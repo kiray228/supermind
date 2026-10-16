@@ -31,6 +31,7 @@ import { APP_VERSION } from '../store/safety';
 import { IconTile } from '../ui/icons';
 import { ListCell, ListRow, ListSection, SelectRow, SwitchRow } from '../ui/list';
 import { celebrate, celebrationsOn, setCelebrations } from '../ui/celebrate';
+import { prefsShared, setPrefsShared } from '../store/sharedPrefs';
 import {
   Alarm,
   AndroidLogo,
@@ -52,6 +53,7 @@ import {
   Confetti,
   Desktop,
   WindowsLogo,
+  ArrowsClockwise,
 } from '@phosphor-icons/react';
 
 export default function Settings() {
@@ -68,6 +70,13 @@ export default function Settings() {
   const [show, setShow] = useState(false);
   const [testing, setTesting] = useState(false);
   const [cheers, setCheers] = useState(celebrationsOn);
+  const [shared, setShared] = useState(prefsShared);
+  // настройки изменили на другом устройстве
+  useEffect(() => {
+    const on = () => setCheers(celebrationsOn());
+    window.addEventListener('sm-prefs-changed', on);
+    return () => window.removeEventListener('sm-prefs-changed', on);
+  }, []);
 
   const saveKey = () => {
     setSettings({ apiKey: key.trim() });
@@ -216,6 +225,22 @@ export default function Settings() {
                 ))}
               </div>
             </ListCell>
+          </ListSection>
+
+          <ListSection
+            header="Устройства"
+            footer="Тема, цвет, стекло, фон, модель Claude, анимации, озвучка ответов, что видит ассистент и утренние уведомления мозга — одинаковые на всех устройствах аккаунта. API-ключ, код-пароль и защита экрана всегда остаются только на этом устройстве."
+          >
+            <SwitchRow
+              icon={<IconTile icon={ArrowsClockwise} tone="blue" size="list" />}
+              title="Одинаковые настройки"
+              subtitle={shared ? 'Изменения переходят на другие устройства' : 'Только на этом устройстве'}
+              checked={shared}
+              onChange={(v) => {
+                setPrefsShared(v);
+                setShared(v);
+              }}
+            />
           </ListSection>
 
           <DataCard />

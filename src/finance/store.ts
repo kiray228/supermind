@@ -4,6 +4,7 @@ import { blobSync } from '../store/blobSync';
 import { uid } from '../utils/tree';
 import { todayYmd } from '../utils/mapTasks';
 import { toast } from '../store/appStore';
+import { crossRates, fetchUsdRates, ratesStale, usedCurrencies } from './rates';
 import {
   accountMap,
   advanceSub,
@@ -416,6 +417,32 @@ export function removeDebtPayment(id: string, paymentId: string) {
 
 export function setFinancePrefs(patch: Partial<Omit<FinancePrefs, 'updatedAt'>>) {
   mutateFinance((d) => void (d.prefs = clean({ ...d.prefs, ...patch, updatedAt: Date.now() })));
+}
+
+let ratesBusy: Promise<boolean> | null = null;
+/**
+ * Обновить курсы из сети (если автокурсы включены и пора; force — сейчас). true — курсы обновлены.
+ * Без сети и при ошибке — false, прежние курсы остаются.
+ */
+export function refreshRates(force = false, fetcher?: typeof fetch): Promise<boolean> {
+  const d = useFinance.getState().data;
+  if (!d || !(force || ratesStale(d))) return Promise.resolve(false);
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return Promise.resolve(false);
+  ratesBusy ??= (async () => {
+    try {
+      const { rates } = await fetchUsdRates(fetcher);
+      const cur = useFinance.getState().data;
+      if (!cur) return false;
+      const fresh = crossRates(rates, cur.prefs.mainCurrency, usedCurrencies(cur));
+      setFinancePrefs({ rates: { ...cur.prefs.rates, ...fresh }, ratesAt: Date.now(), autoRates: true });
+      return Object.keys(fresh).length > 0;
+    } catch {
+      return false;
+    } finally {
+      ratesBusy = null;
+    }
+  })();
+  return ratesBusy;
 }
 
 export { upcomingPayments } from './model';

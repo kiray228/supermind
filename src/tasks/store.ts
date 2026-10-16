@@ -216,14 +216,14 @@ export function getTask(id: ID): TaskItem | undefined {
   return useTasks.getState().data?.tasks.find((t) => t.id === id);
 }
 
-type Snapshot = Pick<TaskItem, 'date' | 'repeatDone' | 'checklist' | 'done' | 'completedAt' | 'wontDo' | 'repeat'> & { logged: boolean };
+export type Snapshot = Pick<TaskItem, 'date' | 'repeatDone' | 'checklist' | 'done' | 'completedAt' | 'wontDo' | 'repeat'> & { logged: boolean };
 
-function snapshotOf(t: TaskItem, logged: boolean): Snapshot {
+export function snapshotOf(t: TaskItem, logged: boolean): Snapshot {
   return { date: t.date, repeatDone: t.repeatDone, checklist: t.checklist, done: t.done, completedAt: t.completedAt, wontDo: t.wontDo, repeat: t.repeat, logged };
 }
 
 /** Вернуть задачу в состояние до выполнения (кнопка «Отменить») */
-function restore(id: ID, snap: Snapshot) {
+export function restoreSnapshot(id: ID, snap: Snapshot) {
   mutateTasks((d) => {
     const x = d.tasks.find((y) => y.id === id);
     if (!x) return;
@@ -278,7 +278,7 @@ export function toggleDone(id: ID) {
   const undo = {
     label: 'Отменить',
     run: () => {
-      restore(id, snap);
+      restoreSnapshot(id, snap);
       if (t.source && !next) void updateMapTask(t.source.docId, t.source.topicId, { status: 'todo' }).catch(() => {});
     },
   };
@@ -304,7 +304,7 @@ export function completeOccurrence(id: ID, date?: string): boolean {
       x.repeat = { ...x.repeat!, skip: [...new Set([...(x.repeat!.skip ?? []), date])].sort() };
       x.updatedAt = Date.now();
     });
-    toast(`Готово: повтор ${dayLabel(date).toLowerCase()}`, { label: 'Отменить', run: () => restore(id, snap) });
+    toast(`Готово: повтор ${dayLabel(date).toLowerCase()}`, { label: 'Отменить', run: () => restoreSnapshot(id, snap) });
     return true;
   }
   toggleDone(id);
@@ -326,7 +326,7 @@ export function skipOccurrence(id: ID, date: string): boolean {
       x.repeat = { ...x.repeat, skip: [...new Set([...(x.repeat.skip ?? []), date])].sort() };
       x.updatedAt = Date.now();
     });
-    toast(`Пропущен повтор ${dayLabel(date).toLowerCase()}`, { label: 'Вернуть', run: () => restore(id, snap) });
+    toast(`Пропущен повтор ${dayLabel(date).toLowerCase()}`, { label: 'Вернуть', run: () => restoreSnapshot(id, snap) });
     return true;
   }
   // текущий повтор: дальше, к следующему (после него — без ожидания сегодняшнего дня)
@@ -342,7 +342,7 @@ export function skipOccurrence(id: ID, date: string): boolean {
     } else x.deleted = Date.now();
     x.updatedAt = Date.now();
   });
-  toast(next ? `Пропущено. Следующий — ${dayLabel(next).toLowerCase()}` : 'Это был последний повтор — задача удалена', { label: 'Вернуть', run: () => (next ? restore(id, snap) : restoreTask(id)) });
+  toast(next ? `Пропущено. Следующий — ${dayLabel(next).toLowerCase()}` : 'Это был последний повтор — задача удалена', { label: 'Вернуть', run: () => (next ? restoreSnapshot(id, snap) : restoreTask(id)) });
   return true;
 }
 
@@ -376,7 +376,7 @@ export function moveOccurrence(id: ID, from: string, to: string): TaskItem | nul
   toast(`Повтор перенесён на ${dayLabel(to).toLowerCase()}`, {
     label: 'Отменить',
     run: () => {
-      restore(id, snap);
+      restoreSnapshot(id, snap);
       if (copy) purgeTask(copy.id);
     },
   });
@@ -402,7 +402,7 @@ export function setWontDo(id: ID) {
     }
     x.updatedAt = Date.now();
   });
-  toast(next ? `Пропущено. Следующий — ${dayLabel(next).toLowerCase()}` : 'Отмечено «Не буду делать»', { label: 'Отменить', run: () => restore(id, snap) });
+  toast(next ? `Пропущено. Следующий — ${dayLabel(next).toLowerCase()}` : 'Отмечено «Не буду делать»', { label: 'Отменить', run: () => restoreSnapshot(id, snap) });
 }
 
 /** Изменить подзадачи по самому свежему состоянию задачи (правки подряд не перетирают друг друга) */

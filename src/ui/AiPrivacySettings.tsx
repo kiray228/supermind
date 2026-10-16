@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ChartPie, Smiley } from '@phosphor-icons/react';
 import { assistantPrivacy, setAssistantPrivacy } from '../assistant/privacy';
 import { IconTile } from './icons';
@@ -7,6 +7,12 @@ import { ListSection, SwitchRow } from './list';
 /** Настройки → «Что видит ассистент»: куда уходят данные и что можно не показывать */
 export function AiPrivacySettings() {
   const [p, setP] = useState(assistantPrivacy);
+  // изменили на другом устройстве
+  useEffect(() => {
+    const on = () => setP(assistantPrivacy());
+    window.addEventListener('sm-prefs-changed', on);
+    return () => window.removeEventListener('sm-prefs-changed', on);
+  }, []);
   const flip = (k: 'finance' | 'mood', v: boolean) => {
     setAssistantPrivacy({ [k]: v });
     setP(assistantPrivacy());

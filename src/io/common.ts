@@ -8,7 +8,7 @@ import { uid } from '../utils/tree';
 
 /** Значение accept для <input type="file"> */
 export const IMPORT_ACCEPT =
-  '.supermind,.2mind,.xmind,.md,.markdown,.txt,.opml,.json,text/markdown,text/plain,text/x-opml,application/json';
+  '.supermind,.2mind,.xmind,.mm,.md,.markdown,.txt,.opml,.json,text/markdown,text/plain,text/x-opml,application/json';
 
 // ---------- XML ----------
 

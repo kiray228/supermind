@@ -5,6 +5,7 @@
 import type { ID } from '../types';
 import { addDaysYmd, todayYmd } from '../utils/mapTasks';
 import { dueCards, type Grade, intervalLabel } from './cardsCore';
+import { shareLocal } from '../store/sharedPrefs';
 
 export interface BrainNotifyPrefs {
   question: boolean;
@@ -13,7 +14,7 @@ export interface BrainNotifyPrefs {
 
 const KEY = 'sm-brain-notify';
 
-/** Настройки этого устройства (по умолчанию — включено) */
+/** Настройки (общие для устройств — store/sharedPrefs; по умолчанию — включено) */
 export function brainNotifyPrefs(): BrainNotifyPrefs {
   try {
     const v = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<BrainNotifyPrefs>;
@@ -29,6 +30,7 @@ export function setBrainNotify(p: Partial<BrainNotifyPrefs>) {
   } catch {
     /* не страшно */
   }
+  void shareLocal(KEY);
   void import('../tasks/sync').then((m) => m.syncSoon(300)).catch(() => undefined);
 }
 

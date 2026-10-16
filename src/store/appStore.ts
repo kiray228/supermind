@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Settings } from '../types';
 import { DEFAULT_SETTINGS, saveSettings } from './db';
+import { shareSettings } from './sharedPrefs';
 
 export type View = 'home' | 'editor' | 'board' | 'planner' | 'settings' | 'tasks' | 'calendar' | 'focus' | 'notes' | 'goals' | 'finance' | 'assistant' | 'progress' | 'habits';
 
@@ -51,6 +52,7 @@ export const useApp = create<AppState>((set, get) => ({
     const s = { ...get().settings, ...patch };
     set({ settings: s });
     saveSettings(s);
+    void shareSettings(patch);
   },
   showToast(msg, action) {
     if (toastTimer) clearTimeout(toastTimer);

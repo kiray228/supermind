@@ -334,6 +334,7 @@
 .fn-rate { gap: 8px; }
 .fn-rate .input { flex: 1; min-width: 0; }
 .fn-rate-label { font-weight: 600; white-space: nowrap; }
+.fn-rate-auto { min-width: 0; font-variant-numeric: tabular-nums; font-size: 16px; padding: 8px 0; }
 
 .fn-import { width: min(640px, 100%); }
 .fn-import-start { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }

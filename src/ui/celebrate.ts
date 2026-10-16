@@ -1,9 +1,10 @@
 /**
  * Маленький праздник: конфетти на ~1 секунду + тактильный отклик.
  * Без библиотек (canvas), не перехватывает нажатия. При «уменьшить движение» — без анимации.
- * Отключается в Настройках («Анимации успехов») — флаг хранится на устройстве.
+ * Отключается в Настройках («Анимации успехов») — общая настройка для устройств (store/sharedPrefs).
  */
 import { haptic } from '../editor/touch';
+import { shareLocal } from '../store/sharedPrefs';
 
 const KEY = 'sm-celebrate';
 const COLORS = ['#ff9f0a', '#ff375f', '#30d158', '#0a84ff', '#bf5af2', '#ffd60a', '#64d2ff'];
@@ -24,6 +25,7 @@ export function setCelebrations(on: boolean) {
   } catch {
     /* хранилище недоступно */
   }
+  void shareLocal(KEY);
 }
 
 const reducedMotion = () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;

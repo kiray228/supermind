@@ -236,7 +236,7 @@ export default function Home() {
           <button className="home-chip" onClick={() => setTplOpen(true)}>
             <LayoutTemplate size={16} /> Шаблоны
           </button>
-          <button className="home-chip" onClick={doImport} title="Импорт файла (.xmind, .md, .opml)">
+          <button className="home-chip" onClick={doImport} title="Импорт файла (.xmind, .mm, .md, .opml)">
             <Upload size={16} /> Импорт
           </button>
         </div>

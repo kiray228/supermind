@@ -1,5 +1,6 @@
 /** Проговорить ответ вслух: Android — системный синтез речи (плагин), браузер и iPhone — speechSynthesis */
 import { isNative } from '../platform';
+import { shareLocal } from '../store/sharedPrefs';
 
 const KEY = 'sm-voice-speak';
 
@@ -17,6 +18,7 @@ export function setSpeakEnabled(on: boolean) {
   } catch {
     /* без сохранения */
   }
+  void shareLocal(KEY);
 }
 
 /** «12 500 ₸» → «12 500 тенге»: так синтезатор читает правильно */

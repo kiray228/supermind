@@ -37,7 +37,12 @@ export function Popover({
     <>
       <div className="menu-layer pop-shield" onPointerDown={onClose} />
       {pos && (
-        <div className="td-pop pop-float" style={{ left: pos.left, right: pos.right, top: pos.top, bottom: pos.bottom, maxHeight: pos.maxHeight }} onClick={(e) => e.stopPropagation()}>
+        // незаданные стороны — auto: иначе top из .td-pop растянет меню, открытое вверх, в полоску у края экрана
+        <div
+          className="td-pop pop-float"
+          style={{ left: pos.left ?? 'auto', right: pos.right ?? 'auto', top: pos.top ?? 'auto', bottom: pos.bottom ?? 'auto', maxHeight: pos.maxHeight }}
+          onClick={(e) => e.stopPropagation()}
+        >
           {children}
         </div>
       )}

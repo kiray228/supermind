@@ -424,3 +424,42 @@
   .tk-nav-sec .icon-btn { position: relative; }
   .tk-nav-sec .icon-btn::after { content: ''; position: absolute; inset: -6px; }
 }
+
+/* ---------- Выбор нескольких задач (tasks/bulk.ts) ---------- */
+.tk-row.picking { cursor: pointer; }
+.tk-row.picked { background: var(--accent-soft); }
+.tk-pick {
+  flex-shrink: 0; width: 22px; height: 22px; margin-top: -1px; border-radius: 50%; border: 1.5px solid var(--text-3);
+  display: inline-flex; align-items: center; justify-content: center; color: #fff; transition: background .15s, border-color .15s;
+}
+.tk-pick.on { background: var(--accent); border-color: var(--accent); }
+.tk-bulk {
+  position: fixed; z-index: 70; left: 50%; bottom: calc(20px + var(--safe-bottom)); transform: translateX(-50%);
+  width: min(560px, calc(100vw - 24px)); padding: 8px 10px 10px; border-radius: 22px;
+  background: var(--lg-sheet, var(--surface)); box-shadow: inset 0 0 0 0.5px var(--lg-border, var(--border)), var(--shadow-lg);
+  backdrop-filter: blur(24px) saturate(1.6); -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  animation: tk-bulk-in .24s cubic-bezier(.2, .9, .25, 1);
+}
+@keyframes tk-bulk-in { from { transform: translate(-50%, 16px); opacity: 0; } }
+.tk-bulk-top { display: flex; align-items: center; gap: 6px; padding: 0 2px 6px; }
+.tk-bulk-count { flex: 1; font-weight: 600; font-size: 15px; }
+.tk-bulk-all { border: none; background: none; color: var(--accent); font-weight: 600; font-size: 14px; padding: 6px 8px; border-radius: 10px; }
+.tk-bulk-all:disabled { opacity: .4; }
+.tk-bulk-acts { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
+.tk-bulk-acts button {
+  display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 2px 6px; border: none; border-radius: 14px;
+  background: var(--surface-2); color: var(--text); font-size: 11.5px; font-weight: 500; min-width: 0;
+}
+.tk-bulk-acts button span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tk-bulk-acts button:active { transform: scale(.94); }
+.tk-bulk-acts button.danger { color: var(--danger, #ef4444); }
+.tk-bulk-tag { display: flex; gap: 6px; align-items: center; padding: 4px 4px 6px; }
+.tk-bulk-tag .input { flex: 1; min-width: 0; height: 36px; }
+@media (max-width: 760px) {
+  .tk-bulk { bottom: calc(86px + var(--safe-bottom)); }
+}
+@media (max-width: 420px) {
+  .tk-bulk { padding: 6px 8px 8px; }
+  .tk-bulk-acts { gap: 3px; }
+  .tk-bulk-acts button { font-size: 10.5px; letter-spacing: -.01em; padding: 8px 0 6px; }
+}

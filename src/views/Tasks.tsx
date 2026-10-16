@@ -25,6 +25,7 @@ import {
   CalendarRange,
   CalendarX2,
   Layers,
+  SquareCheck as CheckSquare,
 } from 'lucide-react';
 import { useApp, toast } from '../store/appStore';
 import { loadAllDocs } from '../store/db';
@@ -67,6 +68,8 @@ import {
 } from '../tasks/store';
 import { exportTasksIcs } from '../tasks/sync';
 import { TaskCheck, TaskRow } from '../tasks/ui/TaskRow';
+import { BulkBar } from '../tasks/ui/BulkBar';
+import { endSelect, startSelect, useBulk } from '../tasks/bulk';
 import { registerDropZone } from '../tasks/ui/touchDrag';
 import { SmartInput } from '../tasks/ui/QuickAdd';
 import '../tasks/ui/tasks.css';
@@ -211,7 +214,10 @@ export default function Tasks() {
 
   useEffect(() => {
     void ensureTasks();
+    // ушли из раздела — выбор задач сбрасывается
+    return endSelect;
   }, []);
+  const bulkOn = useBulk((s) => s.ids !== null);
   // меню «⋯» закрывается касанием в любом другом месте
   useEffect(() => {
     if (!menu) return;
@@ -230,6 +236,7 @@ export default function Tasks() {
   }, [docsVersion]);
 
   const setSel = (s: Sel) => {
+    endSelect();
     setSelState(s);
     writeLS('sm-tasks-sel', s);
     setDrawer(false);
@@ -374,7 +381,7 @@ export default function Tasks() {
   );
 
   const renderRows = (ts: TaskItem[]) =>
-    ts.map((t) => <TaskRow key={t.id} task={t} list={data.lists.find((l) => l.id === t.listId)} showList={sel.k !== 'list'} tagColors={data.tagColors} draggable />);
+    ts.map((t) => <TaskRow key={t.id} task={t} list={data.lists.find((l) => l.id === t.listId)} showList={sel.k !== 'list'} tagColors={data.tagColors} draggable selectable />);
 
   const content = () => {
     if (sel.k === 'matrix' && !q) return <Matrix data={data} />;
@@ -470,6 +477,10 @@ export default function Tasks() {
     );
   };
 
+  // выбор нескольких: в обычных списках (не в матрице, корзине и выполненных)
+  const canBulk = !(sel.k === 'matrix' && !q) && !isTrash && !isCompleted;
+  const shownIds = [...groups.flatMap((g) => g.tasks.map((t) => t.id)), ...(showDone && !data.prefs.hideCompleted ? done.slice(0, 100).map((t) => t.id) : [])];
+
   const exportCurrent = () => void exportTasksIcs(sel.k === 'matrix' ? data.tasks.filter(isActive) : active);
 
   return (
@@ -538,6 +549,11 @@ export default function Tasks() {
                   </button>
                 ))}
                 <div className="sep" />
+                {canBulk && (
+                  <button onClick={() => startSelect()}>
+                    <CheckSquare size={16} /> Выбрать задачи
+                  </button>
+                )}
                 <button onClick={() => setPrefs({ hideCompleted: !data.prefs.hideCompleted })}>
                   <Layers size={16} /> {data.prefs.hideCompleted ? 'Показывать выполненные' : 'Скрыть выполненные'}
                 </button>
@@ -630,9 +646,13 @@ export default function Tasks() {
         <div className="page-body tk-main">{content()}</div>
       </div>
 
-      <button className="tk-fab" onClick={() => openQuickAdd(sel.k === 'matrix' ? {} : preset)} aria-label="Новая задача">
-        <Plus size={26} />
-      </button>
+      {bulkOn && canBulk ? (
+        <BulkBar visible={shownIds} />
+      ) : (
+        <button className="tk-fab" onClick={() => openQuickAdd(sel.k === 'matrix' ? {} : preset)} aria-label="Новая задача">
+          <Plus size={26} />
+        </button>
+      )}
 
       {drawer && (
         <div className="modal-backdrop tk-drawer-backdrop" onPointerDown={(e) => e.target === e.currentTarget && setDrawer(false)}>

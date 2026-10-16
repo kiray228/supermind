@@ -103,7 +103,12 @@ export default function App() {
   useEffect(() => {
     mark('app-mounted');
     initLargeTitles();
-    loadSettings().then((s) => useApp.setState({ settings: s }));
+    loadSettings()
+      .then((s) => useApp.setState({ settings: s }))
+      // общие настройки с других устройств (тема, цвет, модель ИИ…)
+      .then(() => import('./store/sharedPrefs'))
+      .then((m) => m.initSharedPrefs())
+      .catch(() => {});
     // задачи (счётчик на вкладке «Задачи»)
     void ensureTasks();
     // аккаунт и синхронизация между устройствами (экран входа ждёт только чтения аккаунта)

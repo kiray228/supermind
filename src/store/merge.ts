@@ -3,6 +3,7 @@
  * Наборы сущностей сливаются по id (свежее по updatedAt), удалённое не возвращается,
  * карты и заметки целиком — побеждает более свежая.
  */
+import { mergePrefs } from './sharedPrefs';
 
 export type Obj = Record<string, unknown>;
 export const isObj = (v: unknown): v is Obj => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -26,6 +27,8 @@ export function mergeValues(key: string, local: unknown, remote: unknown): unkno
     }
     return { ...remote, ...local, days, habits: mergeArray((local.habits as Obj[]) ?? [], (remote.habits as Obj[]) ?? [], {}, 'habit') };
   }
+  // общие настройки: каждая — от устройства, где её изменили позже
+  if (key === 'ui-prefs') return mergePrefs(local, remote);
   if (isObj(local) && isObj(remote)) return mergeBlob(local, remote);
   return local;
 }

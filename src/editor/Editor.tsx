@@ -23,6 +23,7 @@ import { subtreeBounds } from '../layout/layout';
 import { downloadBlob, downloadText, safeFilename } from '../io/download';
 import { sheetToMarkdown } from '../io/markdown';
 import { sheetToOpml } from '../io/opml';
+import { sheetToFreemind } from '../io/freemind';
 import { exportPdf, exportPng, exportSvgBlob } from '../io/exportImage';
 import { exportXmind } from '../io/xmind';
 import { exportDocx, exportPptx, exportXlsx } from '../io/office';
@@ -250,6 +251,7 @@ export default function Editor() {
           case 'pdf': await downloadBlob(await exportPdf(svg(), bg, doc.title), name + '.pdf'); break;
           case 'md': await downloadText(sheetToMarkdown(sheet), name + '.md', 'text/markdown'); break;
           case 'opml': await downloadText(sheetToOpml(sheet, doc.title), name + '.opml', 'text/x-opml'); break;
+          case 'mm': await downloadText(sheetToFreemind(sheet), name + '.mm', 'application/x-freemind'); break;
           case 'xmind': await downloadBlob(await exportXmind(doc), name + '.xmind'); break;
           case 'docx': await downloadBlob(await exportDocx(doc), name + '.docx'); break;
           case 'xlsx': await downloadBlob(await exportXlsx(doc), name + '.xlsx'); break;
@@ -288,6 +290,7 @@ export default function Editor() {
         { icon: <DownloadSimple size={16} />, label: 'PDF', onClick: () => exportAs('pdf') },
         { icon: <DownloadSimple size={16} />, label: 'SVG', onClick: () => exportAs('svg') },
         { icon: <DownloadSimple size={16} />, label: 'Xmind (.xmind)', onClick: () => exportAs('xmind') },
+        { icon: <DownloadSimple size={16} />, label: 'FreeMind / Freeplane (.mm)', onClick: () => exportAs('mm') },
         { icon: <DownloadSimple size={16} />, label: 'Word (.docx)', onClick: () => exportAs('docx') },
         { icon: <DownloadSimple size={16} />, label: 'Excel (.xlsx)', onClick: () => exportAs('xlsx') },
         { icon: <DownloadSimple size={16} />, label: 'PowerPoint (.pptx)', onClick: () => exportAs('pptx') },

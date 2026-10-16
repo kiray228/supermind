@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { ChartLineUp, DotsThree, Plus } from '@phosphor-icons/react';
-import { ensureFinance, useFinance } from '../finance/store';
+import { ensureFinance, refreshRates, useFinance } from '../finance/store';
+import { usedCurrencies } from '../finance/rates';
 import { Overview } from '../finance/ui/Overview';
 import { Operations } from '../finance/ui/Operations';
 import { BudgetTab } from '../finance/ui/BudgetTab';
@@ -30,6 +31,11 @@ export default function Finance() {
   useEffect(() => {
     ensureFinance().catch(() => toast('Не удалось загрузить финансы'));
   }, []);
+  // курсы валют — раз в день автоматически (и сразу, если у новой валюты нет курса)
+  const ratesKey = data ? usedCurrencies(data).join(',') + '|' + data.prefs.mainCurrency : '';
+  useEffect(() => {
+    if (ratesKey) void refreshRates();
+  }, [ratesKey]);
 
   const add = () => (tab === 'debts' ? openDebt({ kind: 'lent' }) : openTxSheet());
 
