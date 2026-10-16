@@ -2,7 +2,7 @@
  * Импорт из Obsidian: файлы хранилища (.md и картинки) → заметки с папками, датами и [[ссылками]].
  * Модуль без браузерных зависимостей — тесты гоняют его в Node; чтение архива и создание заметок — obsidianImportRun.ts.
  */
-import { normTitle, parseWiki } from './links';
+import { normTitle } from './links';
 import { type Block, markdownToBlocks, newBlock } from './model';
 
 export interface ImportedNote {
@@ -132,17 +132,22 @@ export interface ResolveCtx {
   titleOf: (target: string) => string | undefined;
 }
 
-/** [[цель#раздел|подпись]] → [[Название|подпись]] (раздел и блок отбрасываются, путь — тоже) */
+/** [[путь/цель#раздел|подпись]] → [[Название#раздел|подпись]] (путь отбрасывается, ссылки на блоки ^id — тоже) */
 export function convertWiki(inner: string, titleOf: (t: string) => string | undefined): string {
-  const { title, label } = parseWiki(inner);
-  const hash = title.search(/[#^]/);
-  const file = baseName(stripMd((hash >= 0 ? title.slice(0, hash) : title).trim()));
-  const section = hash >= 0 ? title.slice(hash + 1).replace(/^[#^]+/, '').trim() : '';
+  const bar = inner.indexOf('|');
+  const raw = (bar >= 0 ? inner.slice(0, bar) : inner).trim();
+  const own = bar >= 0 ? inner.slice(bar + 1).trim() : '';
+  const hash = raw.search(/[#^]/);
+  const file = baseName(stripMd((hash >= 0 ? raw.slice(0, hash) : raw).trim()));
+  const tail = hash >= 0 ? raw.slice(hash) : '';
+  // «#A#B» — вложенные заголовки: нужен последний; «#^id» — ссылка на блок, её нет
+  const section = /\^/.test(tail) ? '' : (tail.split('#').pop() ?? '').trim();
   // ссылка на раздел этой же заметки — просто текст
-  if (!file) return label !== title ? label : section;
+  if (!file) return own || section;
   const target = titleOf(file) ?? file;
-  const shown = label !== title ? label : file !== target ? file : '';
-  return shown && shown !== target ? `[[${target}|${shown}]]` : `[[${target}]]`;
+  const shown = own || (file !== target ? file : '');
+  const sec = section ? `#${section}` : '';
+  return shown && shown !== target ? `[[${target}${sec}|${shown}]]` : `[[${target}${sec}]]`;
 }
 
 /** Markdown Obsidian → блоки заметки. Картинки — блоки image с src = IMG_REF + путь (или текст, если файла нет) */
@@ -164,8 +169,9 @@ export function obsidianToBlocks(md: string, ctx: ResolveCtx): Block[] {
         const file = target.split('#')[0].trim();
         const alt = rest.join('|').trim();
         if (isImagePath(file)) return img(file, /^\d+(x\d+)?$/.test(alt) ? '' : alt);
-        // встроенная заметка — ссылкой на неё
-        return convertWiki(inner, ctx.titleOf);
+        // встроенная заметка (или её раздел) — встраивание: отдельной строкой
+        const w = convertWiki(inner.split('|')[0], ctx.titleOf);
+        return w.startsWith('[[') ? `\n!${w}\n` : w;
       })
       // ![подпись](путь)
       .replace(/!\[([^\]\n]*)\]\(<?([^)\s>]+)>?(?:\s+"[^"]*")?\)/g, (all, alt: string, src: string) => {

@@ -38,6 +38,8 @@ export interface NoteMeta {
   digest?: boolean;
   /** ссылка на статью, из которой сделана заметка */
   source?: string;
+  /** шаблон, по которому создана заметка (его общий текст в связях не участвует) */
+  tpl?: ID;
   /** в корзине с этого момента */
   trashed?: number;
   createdAt: number;
@@ -192,7 +194,7 @@ export function normalizeBody(raw: Partial<NoteBody> | undefined | null): NoteBo
 /** Убрать Markdown-разметку из строки */
 export function stripInline(s: string): string {
   return s
-    .replace(/\[\[([^[\]\n|]+)(?:\|([^[\]\n]+))?\]\]/g, (_, title: string, label?: string) => (label ?? title).trim())
+    .replace(/!?\[\[([^[\]\n|]+)(?:\|([^[\]\n]+))?\]\]/g, (_, title: string, label?: string) => (label ?? title.replace(/^(.*?\S)#(?=\S)/, '$1 › ')).trim())
     .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '$1')
     .replace(/\*\*(.+?)\*\*/g, '$1')
     .replace(/~~(.+?)~~/g, '$1')

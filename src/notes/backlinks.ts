@@ -65,10 +65,11 @@ export function snippetAround(text: string, occ: Occurrence, radius = 60): { bef
 export function retargetWiki(text: string, fromTitle: string, toTitle: string): string {
   const from = normTitle(fromTitle);
   return text.replace(/\[\[([^[\]\n]+?)\]\]/g, (all, inner: string) => {
-    const { title, label } = parseWiki(inner);
+    const { title, label, section } = parseWiki(inner);
     if (normTitle(title) !== from) return all;
+    const to = section ? `${toTitle}#${section}` : toTitle;
     const shown = inner.includes('|') ? label : title;
-    return normTitle(shown) === normTitle(toTitle) ? `[[${toTitle}]]` : `[[${toTitle}|${shown}]]`;
+    return normTitle(shown) === normTitle(toTitle) ? `[[${to}]]` : `[[${to}|${shown}]]`;
   });
 }
 

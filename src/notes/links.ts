@@ -363,12 +363,22 @@ const WIKI_RE = /\[\[([^[\]\n]{1,200}?)\]\]/g;
 /** Название для сравнения: без регистра, «ё» = «е», пробелы схлопнуты */
 export const normTitle = (s: string) => s.toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim();
 
-/** Разобрать [[ссылку]] или [[ссылку|подпись]] → { title, label } */
-export function parseWiki(inner: string): { title: string; label: string } {
+/** Раздел в ссылке: «Заметка#Раздел» (решётка вплотную к словам: «C# заметки» — это название) */
+const SECTION_RE = /^(.*?\S)#(?=\S)(.+)$/;
+
+/** Разобрать [[ссылку]], [[ссылку|подпись]] или [[ссылку#раздел]] → { title, label, section? } */
+export function parseWiki(inner: string): { title: string; label: string; section?: string } {
   const bar = inner.indexOf('|');
-  const title = (bar >= 0 ? inner.slice(0, bar) : inner).trim();
-  const label = (bar >= 0 ? inner.slice(bar + 1) : '').trim() || title;
-  return { title, label };
+  let title = (bar >= 0 ? inner.slice(0, bar) : inner).trim();
+  const m = SECTION_RE.exec(title);
+  let section = '';
+  if (m) {
+    // «#^id» — ссылка на блок: ведёт на саму заметку
+    if (m[2].startsWith('^')) title = m[1].trim();
+    else if ((section = m[2].replace(/^#+/, '').trim())) title = m[1].trim();
+  }
+  const label = (bar >= 0 ? inner.slice(bar + 1) : '').trim() || (section ? `${title} › ${section}` : title);
+  return section ? { title, label, section } : { title, label };
 }
 
 /** Явные ссылки текста — названия без повторов, в порядке появления */

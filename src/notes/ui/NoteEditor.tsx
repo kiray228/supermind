@@ -9,6 +9,8 @@ import {
   FolderInput,
   FolderPlus,
   GraduationCap,
+  Hash,
+  LayoutTemplate,
   Image as ImageIcon,
   Link2,
   Loader2,
@@ -32,7 +34,7 @@ import { downloadText, pickFile, safeFilename, isIOS } from '../../io/download';
 import { askText, onBack } from '../../ui/dialogs';
 import { addTask, ensureTasks, openTask } from '../../tasks/store';
 import { type Block, type BlockType, fmtDuration, isBodyEmpty, isTextBlock, LIST_TYPES, markdownToBlocks, MAX_AUDIO_SEC, newBlock, noteDate, noteToMarkdown, stripInline } from '../model';
-import { addFolder, backInTrail, duplicateNote, editOpenBody, hasNoteTrail, moveNote, openNote, sortedFolders, togglePin, trashNote, undoOpenBody, useNotes } from '../store';
+import { addFolder, backInTrail, duplicateNote, editOpenBody, hasNoteTrail, loadNoteBody, moveNote, openNote, sortedFolders, togglePin, trashNote, undoOpenBody, useNotes } from '../store';
 import { imageFileToDataUrl, type Recognizer, type Recording, recordingSupported, speechSupported, startRecognition, startRecording } from '../media';
 import { applyNoteAI, NOTE_AI_LABELS, type NoteAIKind, runNoteAI } from '../ai';
 import { autosize, BlockView, type BlockCtx } from './BlockView';
@@ -45,19 +47,53 @@ import { KIND_ICON } from './kindIcons';
 import { KIND_LABEL } from '../brainDocs';
 import { normTitle } from '../links';
 import { brainItems } from '../related';
+import { headingsOf, sectionBlocks } from '../embedCore';
+import { takeSection } from './wikiNav';
+import { createFromTemplate, isTemplateNote, openTemplates, templateFolderIds } from '../templates';
 
 type MenuState = { kind: 'type' | 'format' | 'block' | 'note' | 'folder'; anchor: MenuAnchor; blockId?: ID; replace?: boolean } | null;
 type RecState = { r: Recording; after: ID | null; final: string; recog: Recognizer | null; ended?: () => void };
 type FocusReq = { id: ID; start: number | 'end'; end?: number };
 type WikiState = { blockId: ID; from: number; query: string; anchor: HTMLElement; sel: number };
-type WikiOption = { title: string; kind: keyof typeof KIND_LABEL; create?: boolean };
+type WikiOption = { title: string; kind: keyof typeof KIND_LABEL; create?: boolean; section?: string };
 
 /** Набранное после «[[» до курсора — подсказка ссылки открыта */
 const WIKI_OPEN = /\[\[([^[\]\n|]{0,60})$/;
 const WIKI_MAX = 8;
 
+/** Заголовки заметок для подсказки «[[Заметка#…»: id → заголовки на момент updatedAt */
+const headCache = new Map<ID, { at: number; heads: string[] }>();
+const headLoading = new Set<ID>();
+
+/** «[[Заметка#раз…» — подсказать разделы этой заметки (заголовки подгружаются; загрузились — onLoaded) */
+function sectionOptions(query: string, onLoaded: () => void): WikiOption[] | null {
+  const hash = query.indexOf('#');
+  if (hash < 1) return null;
+  const k = normTitle(query.slice(0, hash));
+  const sec = normTitle(query.slice(hash + 1));
+  const n = useNotes.getState().data?.notes.find((x) => !x.trashed && normTitle(x.title) === k);
+  if (!n) return null;
+  const c = headCache.get(n.id);
+  if ((!c || c.at !== n.updatedAt) && !headLoading.has(n.id)) {
+    headLoading.add(n.id);
+    void loadNoteBody(n.id)
+      .then((b) => {
+        headCache.set(n.id, { at: n.updatedAt, heads: headingsOf(b.blocks) });
+        onLoaded();
+      })
+      .catch(() => undefined)
+      .finally(() => headLoading.delete(n.id));
+  }
+  return (c?.heads ?? [])
+    .filter((h) => normTitle(h).includes(sec))
+    .slice(0, WIKI_MAX)
+    .map((h) => ({ title: `${n.title}#${h}`, kind: 'note' as const, section: h }));
+}
+
 /** Варианты для [[ссылки]]: сначала начинающиеся с набранного, заметки — первыми; в конце — «Создать» */
-function wikiOptions(query: string, selfId: ID | null): WikiOption[] {
+function wikiOptions(query: string, selfId: ID | null, onLoaded: () => void = () => undefined): WikiOption[] {
+  const secs = sectionOptions(query, onLoaded);
+  if (secs) return secs;
   const q = normTitle(query);
   const seen = new Set<string>();
   const ranked: { o: WikiOption; r: number }[] = [];
@@ -102,6 +138,8 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
   const [viewer, setViewer] = useState<string | null>(null);
   /** подсказка [[ссылки]]: где началась и что уже набрано */
   const [wiki, setWiki] = useState<WikiState | null>(null);
+  /** подгрузились разделы заметки — перерисовать подсказку */
+  const refreshWiki = () => setWiki((w) => (w ? { ...w } : w));
 
   const tas = useRef(new Map<ID, HTMLTextAreaElement>());
   const titleRef = useRef<HTMLTextAreaElement>(null);
@@ -172,6 +210,22 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
     if (!body || !openId || autoFocused.current === openId) return;
     autoFocused.current = openId;
     if (isBodyEmpty(body) && window.matchMedia('(hover: hover)').matches) titleRef.current?.focus();
+  }, [body, openId]);
+
+  // пришли по [[ссылке#разделу]] — прокрутить к заголовку и подсветить его
+  useEffect(() => {
+    if (!body || !openId) return;
+    const sec = takeSection(openId);
+    if (!sec) return;
+    const id = sectionBlocks(body.blocks, sec)?.[0]?.id;
+    if (!id) return void toast(`Раздела «${sec}» в заметке нет`);
+    requestAnimationFrame(() => {
+      const el = document.querySelector<HTMLElement>(`.nt-b[data-id="${id}"]`);
+      if (!el) return;
+      el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      el.classList.add('is-flash');
+      setTimeout(() => el.classList.remove('is-flash'), 1700);
+    });
   }, [body, openId]);
 
   async function close() {
@@ -308,6 +362,29 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
   }
 
   /** Меню «+»: пустой текстовый блок меняет тип, иначе — новый блок после текущего */
+  /** «Встроить заметку»: абзац «![[» — откроется подсказка названий */
+  function startEmbed(blockId: ID | undefined, replace?: boolean) {
+    const id = blockId ?? anchorId();
+    const cur = id ? blocksNow().find((x) => x.id === id) : undefined;
+    const reuse = cur && cur.type === 'p' && (!cur.text?.trim() || (replace && cur.text === '/'));
+    const b = reuse ? cur : newBlock('p');
+    if (reuse) patch(b.id, { text: '![[' });
+    else insertBlocks(id ?? null, [{ ...b, text: '![[' }]);
+    focusBlock(b.id, 3);
+    // подсказка — когда поле появится
+    setTimeout(() => {
+      const el = tas.current.get(b.id);
+      if (el) setWiki({ blockId: b.id, from: 1, query: '', anchor: el, sel: 0 });
+    }, 60);
+  }
+
+  /** «Вставить шаблон»: выбрать шаблон — его блоки встанут после текущего (пустой абзац заменят) */
+  function pickTemplate(blockId: ID | undefined, replace?: boolean) {
+    const id = blockId ?? anchorId();
+    if (replace && id && blocksNow().find((x) => x.id === id)?.text === '/') patch(id, { text: '' });
+    openTemplates({ insert: (list) => insertBlocks(id ?? null, list, true) });
+  }
+
   function pickType(t: BlockType, blockId: ID | undefined, replace?: boolean) {
     const id = blockId ?? anchorId();
     // «/» из пустого блока убираем
@@ -471,7 +548,7 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
     if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     // подсказка [[ссылки]]: стрелки — выбор, Enter/Tab — вставить, Esc — закрыть
     if (wiki && wiki.blockId === b.id) {
-      const opts = wikiOptions(wiki.query, meta?.id ?? null);
+      const opts = wikiOptions(wiki.query, meta?.id ?? null, refreshWiki);
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault();
         const n = opts.length;
@@ -795,6 +872,7 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
   }
 
   const nums = listNumbers(body.blocks);
+  const isTpl = isTemplateNote(meta, templateFolderIds(data));
   const menuBlock = menu?.blockId ? body.blocks.find((b) => b.id === menu.blockId) : undefined;
   const menuBlockIdx = menuBlock ? body.blocks.indexOf(menuBlock) : -1;
   const focusedBlock = focusId ? body.blocks.find((b) => b.id === focusId) : undefined;
@@ -859,6 +937,17 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
               }
             }}
           />
+          {isTpl && (
+            <div className="nt-tpl-banner">
+              <LayoutTemplate size={16} />
+              <span className="grow">
+                <b>Это шаблон.</b> {'{{дата}}, {{время}}, {{задачи}}'} и другие подстановки заполнятся в новой заметке.
+              </span>
+              <button className="nt-ai-btn" onClick={() => void createFromTemplate(meta.id)}>
+                <Plus size={14} /> Заметка по шаблону
+              </button>
+            </div>
+          )}
           <div className="nt-info faint tiny">
             {noteDate(meta.updatedAt)}
             {!!meta.wordCount && ` · ${meta.wordCount} сл.`}
@@ -945,7 +1034,7 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
 
       {wiki &&
         (() => {
-          const opts = wikiOptions(wiki.query, meta.id);
+          const opts = wikiOptions(wiki.query, meta.id, refreshWiki);
           if (!opts.length) return null;
           return (
             <NtMenu anchor={wiki.anchor} onClose={() => setWiki(null)} keepFocus className="nt-wiki-menu">
@@ -955,9 +1044,9 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
                 return (
                   <MenuItem
                     key={o.kind + o.title + (o.create ? '+' : '')}
-                    icon={o.create ? <Plus size={17} /> : <Icon size={17} />}
-                    label={o.create ? `Создать «${o.title}»` : o.title}
-                    hint={o.create ? undefined : KIND_LABEL[o.kind]}
+                    icon={o.create ? <Plus size={17} /> : o.section ? <Hash size={17} /> : <Icon size={17} />}
+                    label={o.create ? `Создать «${o.title}»` : (o.section ?? o.title)}
+                    hint={o.create ? undefined : o.section ? 'Раздел' : KIND_LABEL[o.kind]}
                     active={i === Math.min(wiki.sel, opts.length - 1)}
                     onClick={() => chooseWiki(o.title)}
                   />
@@ -969,7 +1058,13 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
 
       {menu?.kind === 'type' && (
         <NtMenu anchor={menu.anchor} onClose={() => setMenu(null)} keepFocus>
-          <TypeMenuItems current={menu.replace ? undefined : focusedBlock?.type} withMedia onPick={(t) => pickType(t, menu.blockId, menu.replace)} />
+          <TypeMenuItems
+            current={menu.replace ? undefined : focusedBlock?.type}
+            withMedia
+            onPick={(t) => pickType(t, menu.blockId, menu.replace)}
+            onEmbed={() => startEmbed(menu.blockId, menu.replace)}
+            onTemplate={() => pickTemplate(menu.blockId, menu.replace)}
+          />
         </NtMenu>
       )}
       {menu?.kind === 'format' && (

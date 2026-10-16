@@ -10,6 +10,8 @@ import {
   Heading2,
   Heading3,
   Highlighter,
+  LayoutTemplate,
+  SquareArrowOutUpRight,
   Image as ImageIcon,
   Italic,
   Lightbulb,
@@ -50,7 +52,7 @@ const HINTS: Partial<Record<BlockType, string>> = { h1: '#', h2: '##', h3: '###'
 const TEXT_ORDER: BlockType[] = ['p', 'h1', 'h2', 'h3', 'bullet', 'number', 'todo', 'quote', 'callout', 'code'];
 
 /** Меню «+» / «/»: выбор типа блока */
-export function TypeMenuItems({ current, onPick, withMedia }: { current?: BlockType; onPick: (t: BlockType) => void; withMedia: boolean }) {
+export function TypeMenuItems({ current, onPick, withMedia, onEmbed, onTemplate }: { current?: BlockType; onPick: (t: BlockType) => void; withMedia: boolean; onEmbed?: () => void; onTemplate?: () => void }) {
   return (
     <>
       <MenuLabel>Блоки</MenuLabel>
@@ -65,6 +67,9 @@ export function TypeMenuItems({ current, onPick, withMedia }: { current?: BlockT
           <MenuItem icon={BLOCK_ICONS.audio} label="Голосовая запись" onClick={() => onPick('audio')} />
         </>
       )}
+      {(onEmbed || onTemplate) && <MenuSep />}
+      {onEmbed && <MenuItem icon={<SquareArrowOutUpRight size={17} />} label="Встроить заметку" hint="![[" onClick={onEmbed} />}
+      {onTemplate && <MenuItem icon={<LayoutTemplate size={17} />} label="Вставить шаблон" onClick={onTemplate} />}
     </>
   );
 }

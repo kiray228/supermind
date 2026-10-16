@@ -60,7 +60,13 @@ export async function ensureDailyNote(ymd = todayYmd()): Promise<ID | null> {
   // пока собирали задачи, заметку могли создать (двойное нажатие)
   const again = dailyNoteOf(ymd);
   if (again) return again;
-  const m = createNote({ title: dailyTitle(ymd), day: ymd, folderId: folder?.id, blocks: dailyBlocks({ ymd, tasks, goals, prev: prev?.title || undefined }) });
+  // свой шаблон «Заметка дня» — по нему, иначе стандартный
+  const { dailyTemplate, fromTemplate } = await import('./templates');
+  const tpl = dailyTemplate();
+  const title = dailyTitle(ymd);
+  const own = tpl ? await fromTemplate(tpl.id, { ymd, title, time: '', tasks, goals, prev: prev?.title || undefined }).catch(() => null) : null;
+  if (dailyNoteOf(ymd)) return dailyNoteOf(ymd)!;
+  const m = createNote({ title, day: ymd, folderId: folder?.id, blocks: own?.blocks ?? dailyBlocks({ ymd, tasks, goals, prev: prev?.title || undefined }), ...(own && tpl ? { tpl: tpl.id } : {}) });
   return m?.id ?? null;
 }
 

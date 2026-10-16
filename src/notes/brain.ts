@@ -8,6 +8,7 @@ import { ensureTasks } from '../tasks/store';
 import { type BrainKind, goalDoc, itemId, mapDoc, noteDoc, parseItemId, taskDoc } from './brainDocs';
 import type { NoteDoc } from './links';
 import { ensureNotes, loadNoteBody, useNotes } from './store';
+import { isTemplateNote, skeletonFor, templateFolderIds } from './templates';
 
 export interface BrainItem {
   /** id в общем индексе (у заметок — как есть, у остальных — с приставкой) */
@@ -28,8 +29,10 @@ export interface BrainItem {
 export async function collectItems(): Promise<BrainItem[]> {
   const out: BrainItem[] = [];
   const notes = useNotes.getState().data ?? (await ensureNotes());
+  // шаблоны — заготовки, а не мысли: в связях не участвуют
+  const tplFolders = templateFolderIds(notes);
   for (const n of notes.notes)
-    if (!n.trashed) out.push({ id: n.id, kind: 'note', title: n.title, at: n.updatedAt, preview: n.preview, ...(n.folderId ? { folderId: n.folderId } : {}) });
+    if (!n.trashed && !isTemplateNote(n, tplFolders)) out.push({ id: n.id, kind: 'note', title: n.title, at: n.updatedAt, preview: n.preview, ...(n.folderId ? { folderId: n.folderId } : {}) });
   // остальные разделы — по возможности: не загрузился один, связи остальных всё равно работают
   const [maps, tasks, goals] = await Promise.all([listDocs().catch(() => []), ensureTasks().catch(() => null), ensureGoals().catch(() => null)]);
   for (const m of maps) if (!m.trashed && !m.locked) out.push({ id: itemId('map', m.id), kind: 'map', title: m.title || 'Без названия', at: m.updatedAt, preview: m.topicCount ? `Карта · ${m.topicCount} тем` : 'Карта' });
@@ -49,7 +52,7 @@ export async function itemText(id: string): Promise<NoteDoc | null> {
   const { kind, raw } = parseItemId(id);
   if (kind === 'note') {
     const m = useNotes.getState().data?.notes.find((n) => n.id === raw);
-    return noteDoc(await loadNoteBody(raw), m?.day ? 'daily' : m?.source ? 'article' : 'plain');
+    return noteDoc(await loadNoteBody(raw), m?.day ? 'daily' : m?.source ? 'article' : 'plain', await skeletonFor(m?.tpl));
   }
   if (kind === 'map') {
     const doc = await loadDoc(raw);

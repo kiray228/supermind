@@ -3,12 +3,15 @@ import { Check, FileText, Lightbulb, Mic, MoreHorizontal } from 'lucide-react';
 import type { ID } from '../../types';
 import { type Block, type BlockType, fmtDuration } from '../model';
 import { hasMarkup, renderInline } from '../inline';
-import { findMentions, normTitle } from '../links';
+import { findMentions } from '../links';
 import { KIND_LABEL } from '../brainDocs';
 import { openItem } from '../brain';
-import { brainItem, itemByTitle, useLinks } from '../related';
-import { createNote, openLinkedNote, useNotes } from '../store';
+import { brainItem, useLinks } from '../related';
+import { useNotes } from '../store';
+import { parseEmbed } from '../embedCore';
 import { AudioPlayer } from './AudioPlayer';
+import { NoteEmbed } from './NoteEmbed';
+import { findByTitle, openWiki } from './wikiNav';
 
 /** Обработчики редактора (стабильный объект) */
 export interface BlockCtx {
@@ -60,24 +63,6 @@ function Handle({ id, ctx }: { id: ID; ctx: BlockCtx }) {
 
 // ---------- Ссылки в тексте ----------
 
-/** Единица по названию: по индексу связей, а пока он не собран — среди заметок */
-function findByTitle(title: string): string | undefined {
-  const it = itemByTitle(title);
-  if (it) return it.id;
-  const k = normTitle(title);
-  return useNotes.getState().data?.notes.find((n) => !n.trashed && normTitle(n.title) === k)?.id;
-}
-
-/** [[Ссылка]]: открыть, а если такой заметки нет — создать её (в той же папке) и открыть */
-function openWiki(title: string) {
-  const id = findByTitle(title);
-  if (id) return void openItem(id, { fromNote: true });
-  const s = useNotes.getState();
-  const folderId = s.data?.notes.find((n) => n.id === s.openId)?.folderId;
-  const m = createNote({ title: title.trim(), folderId });
-  if (m) openLinkedNote(m.id);
-}
-
 const INLINE_BASE = {
   onMention: (id: string) => void openItem(id, { fromNote: true }),
   onWiki: openWiki,
@@ -95,8 +80,10 @@ const TextBlock = memo(function TextBlock({ b, num, sole, ctx }: { b: Block; num
   // названия других заметок, карт и целей в тексте — ссылки (своё название — нет)
   const noteId = useNotes((st) => st.openId);
   const mx = useLinks((st) => st.mentions);
-  const mentions = useMemo(() => (mx && b.type !== 'code' && text ? findMentions(text, mx, noteId ?? undefined) : []), [mx, text, noteId, b.type]);
-  const ghost = !editing && b.type !== 'code' && (hasMarkup(text) || mentions.length > 0);
+  // «![[Заметка]]» целым абзацем — встроенная заметка
+  const embed = useMemo(() => (b.type === 'p' ? parseEmbed(text) : null), [b.type, text]);
+  const mentions = useMemo(() => (mx && !embed && b.type !== 'code' && text ? findMentions(text, mx, noteId ?? undefined) : []), [mx, text, noteId, b.type, embed]);
+  const ghost = !editing && b.type !== 'code' && (!!embed || hasMarkup(text) || mentions.length > 0);
 
   useLayoutEffect(() => autosize(ta.current), [text, ghost, b.type]);
 
@@ -118,7 +105,12 @@ const TextBlock = memo(function TextBlock({ b, num, sole, ctx }: { b: Block; num
         </span>
       )}
       <div className="nt-tb">
-        {ghost && <div className="nt-tb-view">{renderInline(text, 0, { ...INLINE_BASE, mentions })}</div>}
+        {ghost &&
+          (embed ? (
+            <NoteEmbed target={embed} selfId={noteId} onEdit={() => ta.current?.focus()} />
+          ) : (
+            <div className="nt-tb-view">{renderInline(text, 0, { ...INLINE_BASE, mentions })}</div>
+          ))}
         <textarea
           ref={(el) => {
             ta.current = el;

@@ -110,11 +110,17 @@ export function restoreCard(c: StudyCard) {
 interface CardsUi {
   /** идёт повторение */
   review: boolean;
+  /** повторение начать с этой карточки */
+  first?: ID;
+  /** и сразу показать ответ */
+  flipped?: boolean;
   /** открыт список карточек заметки */
   noteId: ID | null;
 }
 
 export const useCardsUi = create<CardsUi>(() => ({ review: false, noteId: null }));
-export const openCardsReview = () => useCardsUi.setState({ review: true, noteId: null });
+export const openCardsReview = () => useCardsUi.setState({ review: true, noteId: null, first: undefined, flipped: false });
+/** Повторение с этой карточки (из уведомления); flipped — сразу с ответом */
+export const openCardsAt = (first: ID, flipped = false) => useCardsUi.setState({ review: true, noteId: null, first, flipped });
 export const openNoteCards = (noteId: ID) => useCardsUi.setState({ noteId, review: false });
 export const closeCards = () => useCardsUi.setState({ review: false, noteId: null });

@@ -8,6 +8,7 @@ import type { TaskItem } from '../tasks/model';
 import type { MindDoc, Topic } from '../types';
 import type { NoteDoc } from './links';
 import type { NoteBody } from './model';
+import { type Skeleton, stripSkeleton } from './templatesCore';
 
 export type BrainKind = 'note' | 'map' | 'task' | 'goal';
 
@@ -36,8 +37,11 @@ const ARTICLE_LINE = /^Источник: \[[^\]]*\]\([^)]*\)$/;
 /** Какая заметка: обычная, заметка дня или сохранённая статья (у двух последних — свой шаблон) */
 export type NoteKind = 'plain' | 'daily' | 'article';
 
-/** Заметка: заголовки — отдельно (весомее), текст блоков. Заметка дня — без даты в названии; у дня и статьи — без шаблона */
-export function noteDoc(body: NoteBody, kind: NoteKind | boolean = 'plain'): NoteDoc {
+/**
+ * Заметка: заголовки — отдельно (весомее), текст блоков. Заметка дня — без даты в названии; у дня и статьи — без шаблона.
+ * sk — скелет своего шаблона, по которому создана заметка: его общий текст тоже не учитывается.
+ */
+export function noteDoc(body: NoteBody, kind: NoteKind | boolean = 'plain', sk: Skeleton | null = null): NoteDoc {
   const k: NoteKind = kind === true ? 'daily' : kind === false ? 'plain' : kind;
   const daily = k === 'daily';
   const heads = daily ? DAILY_HEAD : k === 'article' ? ARTICLE_HEAD : null;
@@ -47,11 +51,15 @@ export function noteDoc(body: NoteBody, kind: NoteKind | boolean = 'plain'): Not
   for (const b of body.blocks) {
     if (b.type === 'code') continue;
     if (heads && line && b.text && ((b.type.startsWith('h') && heads.has(b.text.trim().toLowerCase())) || line.test(b.text.trim()))) continue;
-    if (b.text) (b.type === 'h1' || b.type === 'h2' || b.type === 'h3' ? headings : text).push(b.text);
+    const head = b.type === 'h1' || b.type === 'h2' || b.type === 'h3';
+    const t = b.text && sk ? stripSkeleton(b.text, sk, head) : b.text;
+    if (t) (head ? headings : text).push(t);
     if (b.caption) text.push(b.caption);
     if (b.transcript) text.push(b.transcript);
   }
-  return { title: daily ? '' : body.title, headings, text: text.join('\n') };
+  // название, составленное шаблоном («Встреча 16 октября 2026»), — тоже шаблон
+  const title = daily || sk?.title?.test(body.title.trim()) ? '' : body.title;
+  return { title, headings, text: text.join('\n') };
 }
 
 /** Текст без HTML (темы карт могут быть с оформлением) */

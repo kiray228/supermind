@@ -94,9 +94,12 @@ export function buildVault(notes: VaultNote[], opts: VaultOpts = {}): VaultFile[
     // [[Название]] → [[имя файла|Название]], если имя файла отличается
     md = md.replace(/\[\[([^[\]\n]+?)\]\]/g, (all, inner: string) => {
       if (inner.startsWith('attachments/')) return all;
-      const { title, label } = parseWiki(inner);
+      const { title, label, section } = parseWiki(inner);
       const target = byTitle.get(normTitle(title));
-      return target ? link(target, label) : all;
+      if (!target) return all;
+      if (!section) return link(target, label);
+      // [[файл#Раздел]] — подпись, только если своя
+      return inner.includes('|') ? `[[${target}#${section}|${label}]]` : `[[${target}#${section}]]`;
     });
 
     const tags = [...new Set((opts.keywords?.get(n.id) ?? []).map(obsidianTag).filter((t): t is string => !!t))];

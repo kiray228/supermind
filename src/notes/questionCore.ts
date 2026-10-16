@@ -76,3 +76,33 @@ export function parseQuestion(answer: string): string | null {
 
 /** Вопрос без ИИ */
 export const fallbackQuestion = (title: string) => `«${title}» — это всё ещё так? Что изменилось с тех пор?`;
+
+/** Вопрос, заранее выбранный на день (для утреннего уведомления); ai — вопрос уже от ИИ */
+export interface PlannedQuestion {
+  noteId: string;
+  title: string;
+  question: string;
+  ai?: boolean;
+}
+export type QuestionPlan = Record<string, PlannedQuestion>;
+
+/**
+ * Заполнить план на дни: выбранное не меняется (пока заметка жива), новые дни — каждый со своей заметкой,
+ * без повторов с уже выбранными и недавно спрошенными. Прошедшие дни (раньше first) убираются.
+ */
+export function fillQuestionPlan(plan: QuestionPlan, days: string[], notes: QNote[], now: number, asked: Record<string, number> = {}): QuestionPlan {
+  const alive = new Map(notes.filter((n) => !n.trashed).map((n) => [n.id, n]));
+  const first = [...days].sort()[0] ?? '';
+  const out: QuestionPlan = {};
+  for (const [day, p] of Object.entries(plan)) if (day >= first && alive.has(p.noteId)) out[day] = { ...p, title: alive.get(p.noteId)!.title };
+  const taken: Record<string, number> = { ...asked };
+  for (const p of Object.values(out)) taken[p.noteId] = now;
+  for (const day of [...days].sort()) {
+    if (out[day]) continue;
+    const n = pickQuestionNote(notes, day, now, taken);
+    if (!n) continue;
+    out[day] = { noteId: n.id, title: n.title, question: fallbackQuestion(n.title) };
+    taken[n.id] = now;
+  }
+  return out;
+}

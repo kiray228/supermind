@@ -29,8 +29,15 @@ function CardsReview() {
   const cards = useNotes((s) => s.data?.cards);
   const notes = useNotes((s) => s.data?.notes);
   // очередь — снимок на начало повторения
-  const [queue, setQueue] = useState<string[]>(() => todaysCards().map((c) => c.id));
-  const [shown, setShown] = useState(false);
+  // из уведомления — с той карточки, о которой оно было
+  const start = useState(() => {
+    const { first, flipped } = useCardsUi.getState();
+    const ids = todaysCards().map((c) => c.id);
+    const at = first ? ids.indexOf(first) : -1;
+    return { ids: at > 0 ? [ids[at], ...ids.slice(0, at), ...ids.slice(at + 1)] : ids, flipped: at >= 0 && !!flipped };
+  })[0];
+  const [queue, setQueue] = useState<string[]>(start.ids);
+  const [shown, setShown] = useState(start.flipped);
   const [done, setDone] = useState(0);
   const [last, setLast] = useState<{ prev: StudyCard; queue: string[]; done: number } | null>(null);
   const [total] = useState(queue.length);

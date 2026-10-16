@@ -1,5 +1,5 @@
 /** «Что нового»: главное в каждой версии. Новые версии — сверху. */
-import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge, MessageCircleQuestion, CloudOff } from 'lucide-react';
+import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge, MessageCircleQuestion, CloudOff, LayoutTemplate, SquareArrowOutUpRight, BellRing } from 'lucide-react';
 
 export interface ChangeItem {
   icon: typeof Sparkles;
@@ -15,6 +15,15 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.34',
+    title: 'Шаблоны, встроенные заметки и ответ из шторки',
+    items: [
+      { icon: LayoutTemplate, title: 'Свои шаблоны заметок', text: 'Встреча, книга, проект — или свои: заметки папки «Шаблоны». Кнопка над «+» — новая заметка по шаблону; дата, время и задачи дня подставятся сами. Шаблон «Заметка дня» меняет вид заметки дня, а общий текст шаблона не путает связи.' },
+      { icon: SquareArrowOutUpRight, title: 'Встроить заметку', text: 'Строка «![[Заметка]]» или «![[Заметка#Раздел]]» показывает другую заметку прямо в тексте — и обновляется вместе с ней. В меню «/» → «Встроить заметку». Ссылка [[Заметка#Раздел]] открывает заметку сразу на нужном разделе.' },
+      { icon: BellRing, title: 'Вопрос дня и карточка — в уведомлении', text: 'Утром после «Плана на день»: вопрос по давней заметке — ответьте прямо в шторке, ответ ляжет в заметку дня. И карточка для повторения: «Показать ответ» или «✓ Помню».' },
+    ],
+  },
   {
     version: '1.33',
     title: 'Вопрос дня и ИИ без связи',

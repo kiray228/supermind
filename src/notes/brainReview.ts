@@ -8,6 +8,7 @@ import { newBlock, type Block } from './model';
 import { type Forgotten, LONG_WORDS, linkableTitle, RECENT_DAYS, reviewFindings, splitByHeadings } from './reviewCore';
 import { allDuplicates } from './mentionsRuntime';
 import { perfStart } from './perfLog';
+import { isTemplateNote, templateFolderIds } from './templates';
 import { brainTopics, type BrainTopic } from './digest';
 import { brainGraph, brainItems, ensureLinkIndex, rawFeatures } from './related';
 import { createNote, editOpenBody, flushNotes, loadNoteBody, saveNoteBody, useNotes } from './store';
@@ -51,7 +52,9 @@ async function review(now: number): Promise<BrainReview> {
     (near.get(e.b) ?? near.set(e.b, []).get(e.b)!).push({ id: e.a, score: e.score });
   }
   for (const list of near.values()) list.sort((x, y) => y.score - x.score);
-  const notes = (useNotes.getState().data?.notes ?? []).filter((n) => !n.trashed);
+  // шаблоны — заготовки: «одинокими» и «длинными» не считаются
+  const tplFolders = templateFolderIds();
+  const notes = (useNotes.getState().data?.notes ?? []).filter((n) => !n.trashed && !isTemplateNote(n, tplFolders));
   const items = brainItems();
   // названия, на которые есть [[ссылки]], и записи, в которых они есть
   const linkedTitles = new Set<string>();

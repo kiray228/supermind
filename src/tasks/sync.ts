@@ -65,6 +65,9 @@ export interface InAppReminder {
   briefing?: boolean;
   /** вечернее «серия под угрозой» (без привычки — «Открыть» ведёт в «Привычки») */
   saver?: boolean;
+  /** второй мозг: вопрос дня или карточка (данные уведомления — в extra) */
+  brain?: string;
+  extra?: Record<string, string>;
 }
 export const useReminders = create<{ items: InAppReminder[] }>(() => ({ items: [] }));
 export const dismissReminder = (key: string) => useReminders.setState((s) => ({ items: s.items.filter((i) => i.key !== key) }));
@@ -242,6 +245,9 @@ async function plan(fromMs: number, toMs: number): Promise<Planned[]> {
       out.push({ id: hash(`brief|${day}`), at, ...briefingFor(d.tasks, p, day, brain), extra: { briefing: 1, date: day, sm: 1 } });
     }
   }
+  // второй мозг: вопрос дня и карточка — сразу после «Плана на день»
+  const brainN = await import('../notes/brainNotify').then((m) => m.planBrainNotifications(fromMs, toMs, brief)).catch(() => []);
+  for (const b of brainN) out.push({ id: hash(b.key), at: b.at, title: b.title, body: b.body, extra: { ...b.extra, sm: 1 } });
   // привычки с напоминанием: только в запланированные дни и пока не выполнены
   if (p?.habits?.length) {
     const pdays = p.days ?? {};
@@ -376,18 +382,23 @@ function setupNative(): Promise<void> {
           ],
         },
         { id: 'sm-habit', actions: [{ id: 'habit-done', title: '✓ Отметить' }] },
+        ...(await import('../notes/brainNotify').then((m) => m.BRAIN_ACTION_TYPES).catch(() => [])),
       ],
     }).catch(() => {});
     await LN.addListener('localNotificationActionPerformed', (e) => {
       const ex = (e.notification.extra ?? {}) as Record<string, string>;
-      void handleAction(e.actionId, ex);
+      void handleAction(e.actionId, ex, e.inputValue);
     });
   })();
   return nativeReady;
 }
 
-/** Действие из уведомления: выполнено / отложить / открыть */
-async function handleAction(action: string, ex: Record<string, string>) {
+/** Действие из уведомления: выполнено / отложить / открыть; input — текст, набранный в шторке */
+async function handleAction(action: string, ex: Record<string, string>, input?: string) {
+  if (ex.brain) {
+    await import('../notes/brainNotify').then((m) => m.brainAction(action, ex, input));
+    return;
+  }
   const { ensureTasks } = await import('./store');
   await ensureTasks();
   if (ex.habitId) {
@@ -496,7 +507,7 @@ async function syncNative() {
         largeBody: w.body,
         schedule: { at: new Date(w.at), allowWhileIdle: true },
         channelId: 'sm-reminders',
-        actionTypeId: w.extra.habitId ? 'sm-habit' : w.extra.payId || w.extra.briefing || w.extra.saver ? undefined : 'sm-task',
+        actionTypeId: w.extra.brain === 'question' ? 'sm-question' : w.extra.brain === 'cards' ? 'sm-card' : w.extra.habitId ? 'sm-habit' : w.extra.payId || w.extra.briefing || w.extra.saver ? undefined : 'sm-task',
         autoCancel: true,
         extra: { ...w.extra, sig: sig(w) },
       })),
@@ -518,9 +529,9 @@ function saveWebSnoozes() {
 }
 
 async function showWeb(title: string, body: string, data: Record<string, string>) {
-  const key = `${data.taskId ?? data.habitId ?? data.payId ?? 'brief'}|${data.date ?? ''}|${Date.now()}`;
+  const key = `${data.taskId ?? data.habitId ?? data.payId ?? data.brain ?? 'brief'}|${data.date ?? ''}|${Date.now()}`;
   if (document.visibilityState === 'visible') {
-    useReminders.setState((s) => ({ items: [...s.items.filter((i) => i.taskId !== data.taskId || !data.taskId), { key, taskId: data.taskId, habitId: data.habitId, payId: data.payId, briefing: !!data.briefing, saver: !!data.saver, date: data.date || undefined, title, body }] }));
+    useReminders.setState((s) => ({ items: [...s.items.filter((i) => i.taskId !== data.taskId || !data.taskId), { key, taskId: data.taskId, habitId: data.habitId, payId: data.payId, briefing: !!data.briefing, saver: !!data.saver, ...(data.brain ? { brain: data.brain, extra: data } : {}), date: data.date || undefined, title, body }] }));
     playChime();
   }
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
@@ -528,7 +539,7 @@ async function showWeb(title: string, body: string, data: Record<string, string>
   if (pushActive()) return;
   const opts: NotificationOptions & { actions?: { action: string; title: string }[]; requireInteraction?: boolean } = {
     body,
-    tag: `${data.taskId ?? data.habitId ?? data.payId ?? 'brief'}|${data.date ?? ''}`,
+    tag: `${data.taskId ?? data.habitId ?? data.payId ?? data.brain ?? 'brief'}|${data.date ?? ''}`,
     icon: './icon-192.png',
     badge: './icon-192.png',
     data,
@@ -827,6 +838,10 @@ export function initTaskSync() {
 /** Действия из всплывающего напоминания внутри приложения */
 export function reminderAction(r: InAppReminder, action: 'done' | 'snooze' | 'open') {
   dismissReminder(r.key);
+  if (r.brain) {
+    if (action === 'open') void handleAction('open', r.extra ?? { brain: r.brain });
+    return;
+  }
   if (r.payId || r.briefing) {
     if (action === 'open') useApp.getState().go(r.payId ? 'finance' : 'assistant');
     return;

@@ -21,7 +21,7 @@ export interface InlineOpts {
   mentions?: InlineMention[];
   onMention?: (id: string) => void;
   /** нажали [[ссылку]] */
-  onWiki?: (title: string) => void;
+  onWiki?: (title: string, section?: string) => void;
   /** есть ли единица с таким названием (нет — ссылка показывается как «ещё не создана») */
   wikiExists?: (title: string) => boolean;
   /** подсказка при наведении на упоминание */
@@ -93,7 +93,7 @@ export function renderInline(text: string, depth = 0, opts?: InlineOpts): ReactN
     if (m.index > last) plain(text.slice(last, m.index), last);
     const key = `${depth}-${k++}`;
     if (m[1] !== undefined) {
-      const { title, label } = parseWiki(m[1]);
+      const { title, label, section } = parseWiki(m[1]);
       const exists = opts?.wikiExists?.(title) ?? true;
       out.push(
         <a
@@ -104,7 +104,7 @@ export function renderInline(text: string, depth = 0, opts?: InlineOpts): ReactN
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             stop(e);
-            opts?.onWiki?.(title);
+            opts?.onWiki?.(title, section);
           }}
         >
           {label}

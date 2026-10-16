@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { BookOpenText, Brain, ClipboardCopy, CloudOff, Compass, Copy, Equal, Gauge, GraduationCap, Link2, Loader2, MessageCircleQuestion, Mic, Newspaper, NotebookPen, Share2, Upload, Waypoints, X } from 'lucide-react';
+import { Bell, BookOpenText, Brain, ClipboardCopy, CloudOff, Compass, Copy, Equal, Gauge, GraduationCap, LayoutTemplate, Link2, Loader2, MessageCircleQuestion, Mic, Newspaper, NotebookPen, Share2, SquareArrowOutUpRight, Upload, Waypoints, X } from 'lucide-react';
 import { onBack } from '../../ui/dialogs';
 import { useNotes } from '../store';
 import { todaysCards } from '../cards';
@@ -7,6 +7,7 @@ import { markHubSeen } from '../hub';
 import { fmtMs, perfReport, perfSummary } from '../perfLog';
 import { processQueue, useAiQueue } from '../aiQueue';
 import { toast } from '../../store/appStore';
+import { brainNotifyPrefs, setBrainNotify } from '../brainNotify';
 
 export interface HubActions {
   graph: () => void;
@@ -54,7 +55,8 @@ export function BrainHub({ onClose, act }: { onClose: () => void; act: HubAction
       title: 'Связи — сами',
       items: [
         { icon: <Waypoints size={18} />, title: 'Связанные записи и граф', text: 'Приложение само находит важные слова и связывает заметки, карты, задачи и цели с общей темой. Внизу заметки — «Связи», на графе — всё сразу, с темами.', action: { label: 'Граф', run: go(act.graph) } },
-        { icon: <Link2 size={18} />, title: '[[Ссылки]] и упоминания', text: 'Наберите «[[» — появится подсказка названий. Названия других записей в тексте подсвечиваются сами, внизу — «Упоминается в».' },
+        { icon: <Link2 size={18} />, title: '[[Ссылки]] и упоминания', text: 'Наберите «[[» — появится подсказка названий, после «#» — разделы заметки. Названия других записей в тексте подсвечиваются сами, внизу — «Упоминается в».' },
+        { icon: <SquareArrowOutUpRight size={18} />, title: 'Встроить заметку', text: 'Строка «![[Заметка]]» или «![[Заметка#Раздел]]» показывает другую заметку прямо в тексте — и обновляется вместе с ней. В меню «/» → «Встроить заметку».' },
         { icon: <Equal size={18} />, title: 'Синонимы', text: 'ИИ найдёт слова одного понятия («бег» и «пробежка») — связи и поиск будут считать их одним словом.', action: { label: 'Синонимы', run: go(act.synonyms) } },
       ],
     },
@@ -63,7 +65,7 @@ export function BrainHub({ onClose, act }: { onClose: () => void; act: HubAction
       items: [
         { icon: <Brain size={18} />, title: 'Спросить у мозга', text: 'Вопрос своими словами — ответ из ваших записей, со ссылками на них.', action: { label: 'Спросить', run: go(act.ask) } },
         { icon: <BookOpenText size={18} />, title: 'Конспект темы', text: 'ИИ соберёт все записи темы в обзор: главное, решения, открытые вопросы. На графе: «Вид» → «Темы» → тема → «Конспект».' },
-        { icon: <MessageCircleQuestion size={18} />, title: 'Вопрос дня', text: 'Раз в день — вопрос по давней заметке: актуально ли, что изменилось. Ответ — в заметку дня и, если хочется, в саму заметку.' },
+        { icon: <MessageCircleQuestion size={18} />, title: 'Вопрос дня', text: 'Раз в день — вопрос по давней заметке: актуально ли, что изменилось. Приходит и утренним уведомлением — ответить можно прямо в шторке. Ответ — в заметку дня.' },
         { icon: <Compass size={18} />, title: 'Обзор мозга', text: 'Раз в неделю: забытые заметки, которые пригодятся сейчас, заметки без связей, дубли, длинные — разбить.', action: { label: 'Обзор', run: go(act.review) } },
         { icon: <Copy size={18} />, title: 'Дубли', text: 'Почти одинаковые заметки — объединить в одну или отметить «не дубль».', action: { label: 'Найти', run: go(act.duplicates) } },
       ],
@@ -71,7 +73,8 @@ export function BrainHub({ onClose, act }: { onClose: () => void; act: HubAction
     {
       title: 'Записывать быстро',
       items: [
-        { icon: <NotebookPen size={18} />, title: 'Заметка дня', text: 'Одна на день: задачи дня, мысли, итоги. Видна в календаре.', action: { label: 'Сегодня', run: lazy(() => import('../daily').then((m) => m.openDailyNote())) } },
+        { icon: <NotebookPen size={18} />, title: 'Заметка дня', text: 'Одна на день: задачи дня, мысли, итоги. Видна в календаре. Свой вид — шаблон «Заметка дня».', action: { label: 'Сегодня', run: lazy(() => import('../daily').then((m) => m.openDailyNote())) } },
+        { icon: <LayoutTemplate size={18} />, title: 'Шаблоны', text: 'Встреча, книга, проект — или свои: заметки папки «Шаблоны». Дата, время и задачи дня подставятся сами.', action: { label: 'Шаблоны', run: lazy(() => import('../templates').then((m) => m.openTemplates())) } },
         { icon: <Mic size={18} />, title: 'Голосом', text: '«Запиши в дневник: …», «Итоги дня: …». Длинную мысль ИИ сам разложит на заметку, задачи и запись в дневник.', action: { label: 'Сказать', run: lazy(() => import('../../voice/state').then((m) => m.openVoice())) } },
         { icon: <Newspaper size={18} />, title: 'Статья по ссылке', text: 'ИИ прочитает статью и сохранит главные мысли со ссылкой на источник.', action: { label: 'Ссылка', run: lazy(() => import('../article').then((m) => m.askArticle())) } },
         { icon: <Share2 size={18} />, title: '«Поделиться» из других приложений', text: 'Текст, ссылку или фото — в новую заметку, заметку дня или дописать в подходящую.' },
@@ -80,7 +83,7 @@ export function BrainHub({ onClose, act }: { onClose: () => void; act: HubAction
     {
       title: 'Помнить',
       items: [
-        { icon: <GraduationCap size={18} />, title: 'Карточки для повторения', text: 'В заметке «⋯» → «Карточки»: ИИ сделает вопросы и ответы, приложение покажет их, когда начнёте забывать.', action: { label: 'Повторить', run: lazy(() => import('../cards').then((m) => m.openCardsReview())) } },
+        { icon: <GraduationCap size={18} />, title: 'Карточки для повторения', text: 'В заметке «⋯» → «Карточки»: ИИ сделает вопросы и ответы, приложение покажет их, когда начнёте забывать. Утром карточка приходит уведомлением.', action: { label: 'Повторить', run: lazy(() => import('../cards').then((m) => m.openCardsReview())) } },
         { icon: <Upload size={18} />, title: 'Obsidian', text: 'Импорт хранилища (.zip или .md) и экспорт обратно — с папками и [[ссылками]].', action: { label: 'Импорт', run: go(act.importObsidian) } },
       ],
     },
@@ -206,6 +209,29 @@ function Health({ notes }: { notes: number }) {
       <button className="nt-ai-undo" onClick={() => void copy()}>
         <ClipboardCopy size={14} /> Скопировать отчёт о скорости
       </button>
+      <MorningPrefs />
     </section>
+  );
+}
+
+/** Утренние уведомления мозга на этом устройстве */
+function MorningPrefs() {
+  const [p, setP] = useState(brainNotifyPrefs);
+  const flip = (k: 'question' | 'cards') => {
+    setBrainNotify({ [k]: !p[k] });
+    setP(brainNotifyPrefs());
+  };
+  return (
+    <div className="nt-hub-prefs">
+      <div className="nt-hub-prefs-h">
+        <Bell size={14} /> Утром, после «Плана на день»
+      </div>
+      <label className="nt-hub-check">
+        <input type="checkbox" checked={p.question} onChange={() => flip('question')} /> Вопрос дня — ответить прямо в уведомлении
+      </label>
+      <label className="nt-hub-check">
+        <input type="checkbox" checked={p.cards} onChange={() => flip('cards')} /> Карточка для повторения
+      </label>
+    </div>
   );
 }

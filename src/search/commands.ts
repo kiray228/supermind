@@ -118,6 +118,18 @@ export function buildCommands(): Entry[] {
       },
     }),
     entry({
+      key: 'c:note-template',
+      kind: 'cmd',
+      title: 'Заметка по шаблону',
+      emoji: '🧩',
+      body: 'шаблон шаблоны заготовка встреча книга проект новая заметка template',
+      run: async () => {
+        await ensureNotes();
+        await nav('notes');
+        (await import('../notes/templates')).openTemplates();
+      },
+    }),
+    entry({
       key: 'c:new-goal',
       kind: 'cmd',
       title: 'Новая цель',

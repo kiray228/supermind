@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, Brain, Check, ChevronDown, Compass, Copy, CopyCheck, Download, Equal, GraduationCap, Newspaper, NotebookPen, FolderInput, FolderPlus, LayoutGrid, MoreHorizontal, Pencil, Pin, PinOff, Plus, RotateCcw, Search, StickyNote, Trash2, Upload, Waypoints, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Brain, Check, ChevronDown, Compass, Copy, CopyCheck, Download, Equal, GraduationCap, Newspaper, NotebookPen, FolderInput, FolderPlus, LayoutGrid, LayoutTemplate, MoreHorizontal, Pencil, Pin, PinOff, Plus, RotateCcw, Search, StickyNote, Trash2, Upload, Waypoints, X } from 'lucide-react';
 import type { ID } from '../types';
 import { confirmDialog } from '../ui/dialogs';
 import { toast } from '../store/appStore';
@@ -29,6 +29,8 @@ import { SynonymsSheet } from '../notes/ui/SynonymsSheet';
 import { BrainReviewSheet } from '../notes/ui/BrainReviewSheet';
 import { TopicDigest } from '../notes/ui/TopicDigest';
 import { CardsLayer } from '../notes/ui/CardsLayer';
+import { TemplatesLayer } from '../notes/ui/TemplatesSheet';
+import { isTemplateNote, listTemplates, openTemplates, templateFolderIds } from '../notes/templates';
 import { QuestionCard } from '../notes/ui/QuestionCard';
 import { BrainHub } from '../notes/ui/BrainHub';
 import { hubSeen, markHubSeen } from '../notes/hub';
@@ -279,12 +281,14 @@ export default function Notes() {
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: 0, pinned: 0, trash: 0 };
+    const tpl = templateFolderIds(data);
     for (const n of data?.notes ?? []) {
       if (n.trashed) {
         c.trash++;
         continue;
       }
-      c.all++;
+      // шаблоны — в своей папке, не во «Всех заметках»
+      if (!isTemplateNote(n, tpl)) c.all++;
       if (n.pinned) c.pinned++;
       if (n.folderId) c['f:' + n.folderId] = (c['f:' + n.folderId] ?? 0) + 1;
     }
@@ -323,9 +327,11 @@ export default function Notes() {
   const graphMode = mode === 'graph' && sel.k !== 'trash';
   const title = q ? 'Поиск' : sel.k === 'pinned' ? 'Закреплённые' : sel.k === 'trash' ? 'Корзина' : curFolder ? (curFolder.emoji ? curFolder.emoji + ' ' : '') + curFolder.name : 'Заметки';
 
+  const tplFolders = templateFolderIds(data);
   const inSel = (n: NoteMeta) => {
     if (sel.k === 'trash') return !!n.trashed;
     if (n.trashed) return false;
+    if (sel.k === 'all' && isTemplateNote(n, tplFolders)) return false;
     if (sel.k === 'pinned') return !!n.pinned;
     if (sel.k === 'folder') return n.folderId === sel.id;
     return true;
@@ -344,6 +350,13 @@ export default function Notes() {
     if (sel.k === 'trash') setSel({ k: 'all' });
     setQuery(null);
     if (m) void openNote(m.id);
+  };
+
+  const hasTemplates = listTemplates(data).length > 0;
+  const fromTemplate = () => {
+    if (sel.k === 'trash') setSel({ k: 'all' });
+    setQuery(null);
+    openTemplates({ folderId: sel.k === 'folder' ? sel.id : undefined });
   };
 
   const navItem = (key: string, s: Sel, icon: ReactNode, name: string, count: number, color?: string, extra?: ReactNode) => {
@@ -489,6 +502,11 @@ export default function Notes() {
           <Plus size={26} />
         </button>
       )}
+      {!openId && !(graphMode && graphSel) && !isTrash && hasTemplates && (
+        <button className="nt-fab nt-fab-mini" onClick={fromTemplate} aria-label="Новая заметка по шаблону" title="Новая заметка по шаблону">
+          <LayoutTemplate size={20} />
+        </button>
+      )}
 
       {drawer && (
         <div className="modal-backdrop nt-drawer-backdrop" onPointerDown={(e) => e.target === e.currentTarget && setDrawer(false)}>
@@ -523,6 +541,7 @@ export default function Notes() {
         />
       )}
       <CardsLayer />
+      <TemplatesLayer />
 
       {folderDlg && (
         <FolderDialog
@@ -541,6 +560,7 @@ export default function Notes() {
           ))}
           <MenuSep />
           <MenuItem icon={<FolderPlus size={17} />} label="Новая папка" onClick={() => setFolderDlg({})} />
+          <MenuItem icon={<LayoutTemplate size={17} />} label="Шаблоны заметок" onClick={fromTemplate} />
           <MenuItem icon={<Brain size={17} />} label="Второй мозг: что умеет" onClick={() => setHub(true)} />
           <MenuItem icon={<Newspaper size={17} />} label="Статья по ссылке" onClick={() => void import('../notes/article').then((m) => m.askArticle())} />
           <MenuItem icon={<Compass size={17} />} label="Обзор мозга" onClick={() => setReviewSheet(true)} />
