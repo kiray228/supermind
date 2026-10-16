@@ -50,6 +50,57 @@ public class WidgetBridgePlugin extends Plugin {
         call.resolve(r);
     }
 
+    /** Есть ли отпечаток или распознавание лица, которые можно использовать для входа */
+    @PluginMethod
+    public void biometricAvailable(PluginCall call) {
+        int r = androidx.biometric.BiometricManager.from(getContext())
+            .canAuthenticate(androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_WEAK);
+        JSObject o = new JSObject();
+        o.put("available", r == androidx.biometric.BiometricManager.BIOMETRIC_SUCCESS);
+        call.resolve(o);
+    }
+
+    /** Системное окно отпечатка: ok = true — подтверждено; отмена или «Ввести код» — ok = false */
+    @PluginMethod
+    public void biometricVerify(PluginCall call) {
+        if (!(getActivity() instanceof androidx.fragment.app.FragmentActivity)) {
+            call.reject("no activity");
+            return;
+        }
+        androidx.fragment.app.FragmentActivity act = (androidx.fragment.app.FragmentActivity) getActivity();
+        String title = call.getString("title", "SuperMind");
+        String subtitle = call.getString("subtitle", "");
+        String negative = call.getString("negative", "Отмена");
+        act.runOnUiThread(() -> {
+            androidx.biometric.BiometricPrompt prompt = new androidx.biometric.BiometricPrompt(
+                act,
+                androidx.core.content.ContextCompat.getMainExecutor(act),
+                new androidx.biometric.BiometricPrompt.AuthenticationCallback() {
+                    @Override
+                    public void onAuthenticationSucceeded(androidx.biometric.BiometricPrompt.AuthenticationResult result) {
+                        JSObject o = new JSObject();
+                        o.put("ok", true);
+                        call.resolve(o);
+                    }
+
+                    @Override
+                    public void onAuthenticationError(int code, CharSequence message) {
+                        JSObject o = new JSObject();
+                        o.put("ok", false);
+                        o.put("error", String.valueOf(message));
+                        call.resolve(o);
+                    }
+                }
+            );
+            androidx.biometric.BiometricPrompt.PromptInfo.Builder info = new androidx.biometric.BiometricPrompt.PromptInfo.Builder()
+                .setTitle(title)
+                .setNegativeButtonText(negative)
+                .setAllowedAuthenticators(androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_WEAK);
+            if (!subtitle.isEmpty()) info.setSubtitle(subtitle);
+            prompt.authenticate(info.build());
+        });
+    }
+
     /** Прятать содержимое в списке недавних приложений (FLAG_SECURE — заодно запрещает скриншоты) */
     @PluginMethod
     public void setSecure(PluginCall call) {

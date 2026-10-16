@@ -129,12 +129,8 @@ export function setBiometric(on: boolean) {
 export async function biometricAvailable(): Promise<boolean> {
   const { isNative } = await import('../platform');
   if (!isNative()) return false;
-  try {
-    const { NativeBiometric } = await import('@capgo/capacitor-native-biometric');
-    return (await NativeBiometric.isAvailable({ useFallback: false })).isAvailable;
-  } catch {
-    return false;
-  }
+  const { nativeBiometricAvailable } = await import('../native/widget');
+  return nativeBiometricAvailable();
 }
 
 /** идёт проверка отпечатка: системное окно может «свернуть» приложение — это не уход в фон */
@@ -146,13 +142,11 @@ export async function unlockWithBiometric(): Promise<boolean> {
   if (bioActive || !lockConfig() || !biometricOn() || !(await biometricAvailable())) return false;
   bioActive = true;
   try {
-    const { NativeBiometric } = await import('@capgo/capacitor-native-biometric');
-    await NativeBiometric.verifyIdentity({ title: 'SuperMind', subtitle: 'Разблокировать приложение', negativeButtonText: 'Ввести код', maxAttempts: 3 });
+    const { nativeBiometricVerify } = await import('../native/widget');
+    if (!(await nativeBiometricVerify({ title: 'SuperMind', subtitle: 'Разблокировать приложение', negative: 'Ввести код' }))) return false;
     localStorage.removeItem(FAILS);
     useLock.setState({ locked: false });
     return true;
-  } catch {
-    return false;
   } finally {
     bioActive = false;
     bioDoneAt = Date.now();

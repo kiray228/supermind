@@ -39,6 +39,8 @@ type PendingAction =
 interface WidgetBridgePlugin {
   update(o: { json: string }): Promise<void>;
   setSecure(o: { on: boolean }): Promise<void>;
+  biometricAvailable(): Promise<{ available: boolean }>;
+  biometricVerify(o: { title: string; subtitle?: string; negative?: string }): Promise<{ ok: boolean; error?: string }>;
   consumePending(): Promise<{ actions: PendingAction[] }>;
   addListener(event: 'pending', fn: () => void): Promise<PluginListenerHandle>;
 }
@@ -47,6 +49,18 @@ const WidgetBridge = registerPlugin<WidgetBridgePlugin>('WidgetBridge');
 
 /** Android: прятать содержимое в «недавних» и запретить скриншоты */
 export const setSecureWindow = (on: boolean) => WidgetBridge.setSecure({ on }).catch(() => undefined);
+
+/** Android: есть ли отпечаток / лицо для входа */
+export const nativeBiometricAvailable = () =>
+  WidgetBridge.biometricAvailable()
+    .then((r) => r.available)
+    .catch(() => false);
+
+/** Android: окно отпечатка; true — подтверждено */
+export const nativeBiometricVerify = (o: { title: string; subtitle?: string; negative?: string }) =>
+  WidgetBridge.biometricVerify(o)
+    .then((r) => r.ok)
+    .catch(() => false);
 
 const DAYS_AHEAD = 7;
 const MAX_TASKS = 80;
