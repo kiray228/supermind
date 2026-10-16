@@ -55,6 +55,8 @@
 .tk-groups { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
 .tk-group { border-radius: var(--radius-group); background: var(--surface); overflow: hidden; transition: box-shadow .15s; }
 .tk-group.drop-over, .tk-kcol.drop-over, .tk-quad.drop-over { box-shadow: 0 0 0 2px var(--accent); }
+.tk-drag-ghost { opacity: .94; box-shadow: 0 14px 34px rgba(0, 0, 0, .28); border-radius: 12px; background: var(--surface); transition: none !important; }
+.tk-row.tk-drag-src { opacity: .35; }
 .tk-group-head {
   display: flex; align-items: center; gap: 6px; width: 100%; height: 44px; padding: 0 16px; border: none; background: none;
   color: var(--gc, var(--text)); font-weight: 600; font-size: 15px; letter-spacing: -0.02em; text-align: left;

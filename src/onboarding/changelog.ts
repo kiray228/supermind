@@ -1,5 +1,5 @@
 /** «Что нового»: главное в каждой версии. Новые версии — сверху. */
-import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge, MessageCircleQuestion, CloudOff, LayoutTemplate, SquareArrowOutUpRight, BellRing, Target, Timer } from 'lucide-react';
+import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge, MessageCircleQuestion, CloudOff, LayoutTemplate, SquareArrowOutUpRight, BellRing, Target, Timer, Lock, Crosshair, Move } from 'lucide-react';
 
 export interface ChangeItem {
   icon: typeof Sparkles;
@@ -15,6 +15,15 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.36',
+    title: 'Код-пароль, фокус на ветке и задачи пальцем',
+    items: [
+      { icon: Lock, title: 'Код-пароль', text: 'Настройки → «Защита»: код из 4–6 цифр при запуске и при возврате в приложение (сразу или через 1, 5, 15 минут). Хранится только на этом устройстве.' },
+      { icon: Crosshair, title: 'Фокус на ветке карты', text: 'Меню темы → «Фокус на ветке» (Alt+F): на экране только эта ветка, вверху путь «Вся карта › … » — чтобы вернуться. Esc — снова вся карта.' },
+      { icon: Move, title: 'Задачи — перетаскиванием пальцем', text: 'Подержите задачу и ведите: в другую группу, колонку канбана или квадрант матрицы, у края экрана список прокрутится сам. Подержали и отпустили — как раньше, меню.' },
+    ],
+  },
   {
     version: '1.35',
     title: 'Повторы по одному, сроки целей и надёжность',

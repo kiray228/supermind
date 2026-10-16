@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import {
   CalendarDays,
   CalendarPlus,
@@ -67,6 +67,7 @@ import {
 } from '../tasks/store';
 import { exportTasksIcs } from '../tasks/sync';
 import { TaskCheck, TaskRow } from '../tasks/ui/TaskRow';
+import { registerDropZone } from '../tasks/ui/touchDrag';
 import { SmartInput } from '../tasks/ui/QuickAdd';
 import '../tasks/ui/tasks.css';
 import { IconTile } from '../ui/icons';
@@ -723,11 +724,21 @@ function Collapsible({
   );
 }
 
-/** Приёмник перетаскивания задач (мышь) */
+/** Приёмник перетаскивания задач: мышью (drag-and-drop) и пальцем (touchDrag) */
 function DropZone({ className, children, onDrop, enabled }: { className: string; children: ReactNode; onDrop?: (id: string) => void; enabled: boolean }) {
   const [over, setOver] = useState(false);
+  const ref = useRef<HTMLElement>(null);
+  const dropRef = useRef(onDrop);
+  useEffect(() => {
+    dropRef.current = onDrop;
+  });
+  useEffect(() => {
+    if (!enabled || !ref.current) return;
+    return registerDropZone({ el: ref.current, onDrop: (id) => dropRef.current?.(id), setOver });
+  }, [enabled]);
   return (
     <section
+      ref={ref}
       className={`${className}${over ? ' drop-over' : ''}`}
       onDragOver={(e) => {
         if (!enabled || !e.dataTransfer.types.includes('text/sm-task')) return;

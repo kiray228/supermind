@@ -3,8 +3,9 @@ import {
   CaretLeft, ArrowCounterClockwise, ArrowClockwise, Sparkle, SlidersHorizontal, MagnifyingGlass, DotsThree, Plus, ArrowElbowDownRight, Trash, BezierCurve, Selection,
   BracketsCurly, Minus, CornersOut, PresentationChart, ArrowsOutSimple, DownloadSimple, Lock, LockOpen, Graph, TreeView, ChartBarHorizontal, X, CaretRight,
   Keyboard, Copy, Scissors, ClipboardText, FilePlus, PencilSimple, ArrowsInLineVertical, ArrowLineUp, CopySimple, NotePencil, CloudArrowUp, Check, Palette, ArrowsLeftRight,
-  Export, CaretDown, Stack, ClockCounterClockwise, type Icon,
+  Export, CaretDown, Stack, ClockCounterClockwise, Crosshair, type Icon,
 } from '@phosphor-icons/react';
+import { focusPath, focusSheet } from './focus';
 import { useDoc, topicSide } from '../store/docStore';
 import { toast } from '../store/appStore';
 import { leaveEditor } from '../actions';
@@ -67,6 +68,14 @@ const isMobile = () => window.matchMedia('(max-width: 760px)').matches;
 export default function Editor() {
   const doc = useDoc((s) => s.doc);
   const sheet = useDoc((s) => s.sheet());
+  // фокус на ветке: на холсте — только она (вид, лист не меняется)
+  const focusId = useDoc((s) => s.focusId);
+  const viewSheet = useMemo(() => (sheet ? (focusSheet(sheet, focusId) ?? sheet) : null), [sheet, focusId]);
+  const focusTrail = useMemo(() => (sheet && focusId && viewSheet !== sheet ? focusPath(sheet, focusId) : []), [sheet, focusId, viewSheet]);
+  // ветку удалили (или отменили её создание) — выйти из фокуса
+  useEffect(() => {
+    if (focusId && sheet && viewSheet === sheet) useDoc.getState().setFocus(null);
+  }, [focusId, sheet, viewSheet]);
   const selection = useDoc((s) => s.selection);
   const selectedRel = useDoc((s) => s.selectedRel);
   const canUndo = useDoc((s) => s.past.length > 0);
@@ -362,7 +371,8 @@ export default function Editor() {
       return;
     }
     const f = findInSheet(sheet, topicId);
-    const isRoot = topicId === sheet.root.id;
+    // ветка в фокусе — здесь как центральная тема
+    const isRoot = topicId === sheet.root.id || topicId === focusId;
     setMenu({
       x, y,
       items: [
@@ -376,6 +386,11 @@ export default function Editor() {
         ...(f?.parent?.id === sheet.root.id && sheet.structure === 'map'
           ? [{ icon: <ArrowsLeftRight size={16} />, label: topicSide(sheet, topicId) === 'left' ? 'Перенести направо' : 'Перенести налево', onClick: () => st.setSide(topicId, topicSide(sheet, topicId) === 'left' ? 'right' : 'left') }]
           : []),
+        ...(topicId !== sheet.root.id && f?.topic.children.length
+          ? [{ icon: <Crosshair size={16} />, label: topicId === focusId ? 'Показать всю карту' : 'Фокус на ветке', kbd: 'Alt+F', onClick: () => st.setFocus(topicId === focusId ? null : topicId) }]
+          : focusId === topicId
+            ? [{ icon: <Crosshair size={16} />, label: 'Показать всю карту', kbd: 'Alt+F', onClick: () => st.setFocus(null) }]
+            : []),
         { icon: <BezierCurve size={16} />, label: 'Связь', onClick: startRel },
         { icon: <Selection size={16} />, label: 'Граница', onClick: () => st.addBoundary(topicId) },
         { icon: <BracketsCurly size={16} />, label: 'Итог', onClick: () => st.addSummary(topicId) },
@@ -450,7 +465,16 @@ export default function Editor() {
       if (k === 'Escape') {
         if (relMode) setRelMode(false);
         else if (zen) setZen(false);
+        // ничего не выделено — Esc выходит из фокуса на ветке
+        else if (s.focusId && !s.selection.length) s.setFocus(null);
         else s.select(null);
+        return;
+      }
+      // Alt+F — фокус на выделенной ветке / вся карта
+      if (e.altKey && !mod && e.code === 'KeyF' && mode === 'map') {
+        e.preventDefault();
+        const id = s.selection[s.selection.length - 1];
+        s.setFocus(s.focusId && (!id || id === s.focusId) ? null : (id ?? null));
         return;
       }
       if (e.altKey && !mod && /^Digit\d$/.test(e.code)) {
@@ -636,7 +660,7 @@ export default function Editor() {
           {mode === 'map' && (
             <MapCanvas
               ref={canvas}
-              sheet={sheet}
+              sheet={viewSheet ?? sheet}
               relMode={relMode}
               onRelTarget={onRelTarget}
               onContextMenu={({ x, y, topicId, worldX, worldY }) => !pitch && topicMenu(x, y, topicId, worldX, worldY)}
@@ -650,6 +674,24 @@ export default function Editor() {
               searchHits={hitSet}
               onViewChange={onViewChange}
             />
+          )}
+          {mode === 'map' && focusTrail.length > 0 && !pitch && (
+            <div className="ed-focusbar glass" role="navigation" aria-label="Фокус на ветке">
+              <button className="ed-focus-crumb" onClick={() => st.setFocus(null)} title="Показать всю карту (Esc)">
+                <Crosshair size={15} /> Вся карта
+              </button>
+              {focusTrail.map((t, i) => (
+                <span key={t.id} className="ed-focus-step">
+                  <CaretRight size={12} className="faint" />
+                  <button className="ed-focus-crumb" disabled={i === focusTrail.length - 1} onClick={() => st.setFocus(t.id)}>
+                    {t.text.trim().slice(0, 40) || 'Без названия'}
+                  </button>
+                </span>
+              ))}
+              <button className="icon-btn" onClick={() => st.setFocus(null)} aria-label="Выйти из фокуса">
+                <X size={16} />
+              </button>
+            </div>
           )}
           {mode === 'outline' && <Outliner />}
           {mode === 'gantt' && <Gantt />}
@@ -917,6 +959,7 @@ const KEYS: [string, string][] = [
   ['Ctrl+↑/↓', 'Переместить тему выше/ниже'],
   ['Ctrl+/', 'Свернуть / развернуть'],
   ['Alt+1…9 / Alt+0', 'Показать 1…9 уровней / все'],
+  ['Alt+F', 'Фокус на ветке / вся карта'],
   ['Ctrl+C / X / V / D', 'Копировать / вырезать / вставить / дублировать'],
   ['Ctrl+Z / Ctrl+Shift+Z', 'Отменить / повторить'],
   ['Ctrl+B / Ctrl+I', 'Жирный / курсив'],

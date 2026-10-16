@@ -48,6 +48,9 @@ interface DocState {
   saving: boolean;
   /** счётчик для "сфокусировать камеру на теме" */
   focusReq: { id: ID; n: number } | null;
+  /** фокус на ветке: на холсте только эта тема с потомками (вид, в карту не сохраняется) */
+  focusId: ID | null;
+  setFocus(id: ID | null): void;
 
   open(doc: MindDoc, password?: string | null): void;
   close(): void;
@@ -214,6 +217,13 @@ export const useDoc = create<DocState>((set, get) => {
     clipboardText: null,
     saving: false,
     focusReq: null,
+    focusId: null,
+
+    setFocus(id) {
+      const s = get().sheet();
+      const real = id && s && id !== s.root.id && findInSheet(s, id) ? id : null;
+      set({ focusId: real, editingId: null, selectedRel: null, ...(real ? { selection: [real] } : {}) });
+    },
 
     open(doc, password = null) {
       // на телефоне ничего не выделяем: первый тап по теме — выбор, а не редактирование
@@ -221,11 +231,11 @@ export const useDoc = create<DocState>((set, get) => {
       markOpened(doc);
       // версия «до правок» — в историю (для карт с паролем история не ведётся)
       if (!password) void snapshot(doc).catch(() => {});
-      set({ doc, password, selection: touch ? [] : [activeSheet(doc).root.id], editingId: null, pendingText: null, past: [], future: [], selectedRel: null });
+      set({ doc, password, selection: touch ? [] : [activeSheet(doc).root.id], editingId: null, pendingText: null, past: [], future: [], selectedRel: null, focusId: null });
     },
     close() {
       flushSave();
-      set({ doc: null, password: null, selection: [], editingId: null, past: [], future: [] });
+      set({ doc: null, password: null, selection: [], editingId: null, past: [], future: [], focusId: null });
     },
     sheet() {
       const d = get().doc;
@@ -379,8 +389,8 @@ export const useDoc = create<DocState>((set, get) => {
       const s = get().sheet();
       const f = s && findInSheet(s, tid);
       if (!f) return null;
-      if (!f.parent) {
-        // у корня/плавающей нет соседей — добавляем ребёнка
+      if (!f.parent || tid === get().focusId) {
+        // у корня/плавающей (и у ветки в фокусе — она здесь центр) нет соседей — добавляем ребёнка
         return get().addChild(tid, text);
       }
       const t = newTopic(text ?? defaultTopicText(s, f.parent));
@@ -773,7 +783,7 @@ export const useDoc = create<DocState>((set, get) => {
       const d = get().doc;
       if (!d) return;
       const next = { ...d, activeSheet: id };
-      set({ doc: next, selection: [next.sheets.find((s) => s.id === id)!.root.id], editingId: null, pendingText: null, selectedRel: null });
+      set({ doc: next, selection: [next.sheets.find((s) => s.id === id)!.root.id], editingId: null, pendingText: null, selectedRel: null, focusId: null });
       scheduleSave();
     },
     setTitle(title) {

@@ -3,6 +3,7 @@ import { Eye, EyeOff } from 'lucide-react';
 import { canInstallPwa, installPwa, isDesktopApp, isNative, onInstallChange, WINDOWS_SETUP_URL } from '../platform';
 import { AccountCard, PushCard } from '../ui/AccountCard';
 import { DataCard } from '../ui/DataCard';
+import { LockSettings } from '../ui/LockSettings';
 import { ACCENTS, DEFAULT_ACCENT } from '../ui/appearance';
 import { isIOS } from '../io/download';
 import { ensureTasks, setPrefs, useTasks } from '../tasks/store';
@@ -97,6 +98,7 @@ export default function Settings() {
       <div className="page-body">
         <div className="settings">
           <AccountCard />
+          <LockSettings />
 
           <ListSection
             header="Искусственный интеллект"

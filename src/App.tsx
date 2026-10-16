@@ -20,6 +20,11 @@ import { IconTile, SectionIcon, type SectionId } from './ui/icons';
 import './ui/appearance.css';
 import './app.css';
 import { mark, whenIdle } from './perf';
+import { initLock } from './ui/lock';
+import { LockScreen } from './ui/LockScreen';
+
+// код-пароль — до первой отрисовки: содержимое не мелькнёт перед экраном блокировки
+initLock();
 
 const Editor = lazy(() => import('./editor/Editor'));
 const Board = lazy(() => import('./views/Board'));
@@ -286,6 +291,7 @@ export default function App() {
       )}
       <AuthGate />
       <DialogHost />
+      <LockScreen />
       {deferred && (
         <Suspense fallback={null}>
           <OnboardingHost />

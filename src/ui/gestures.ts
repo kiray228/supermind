@@ -61,6 +61,85 @@ export function useLongPress(fn: () => void) {
 }
 
 
+/**
+ * Долгое нажатие с перетаскиванием (телефон): палец ~0.5 с без сдвига — «взяли»; отпустили на месте — меню,
+ * повели — onDrag (дальше перетаскивание ведёт сам вызывающий). Без onDrag — меню сразу, как useLongPress.
+ * Мышь: правая кнопка — меню.
+ */
+export function useLongPressDrag(onMenu: () => void, onDrag?: (x: number, y: number) => void) {
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const start = useRef<{ x: number; y: number } | null>(null);
+  /** взяли и ждём: отпустят (меню) или поведут (перетаскивание) */
+  const held = useRef<{ x: number; y: number } | null>(null);
+  const fired = useRef(false);
+  const stopScroll = useRef<(() => void) | null>(null);
+  const release = () => {
+    stopScroll.current?.();
+    stopScroll.current = null;
+  };
+  useEffect(
+    () => () => {
+      clearTimeout(timer.current);
+      release();
+    },
+    [],
+  );
+  const cancel = () => {
+    clearTimeout(timer.current);
+    start.current = null;
+    held.current = null;
+    release();
+  };
+  return {
+    onPointerDown: (e: ReactPointerEvent) => {
+      fired.current = false;
+      if (e.pointerType === 'mouse') return;
+      start.current = { x: e.clientX, y: e.clientY };
+      clearTimeout(timer.current);
+      timer.current = setTimeout(() => {
+        fired.current = true;
+        const s = start.current;
+        start.current = null;
+        haptic();
+        if (!onDrag || !s) return onMenu();
+        held.current = s;
+        // взяли — страница больше не прокручивается под пальцем, иначе браузер отберёт жест
+        const block = (ev: TouchEvent) => ev.cancelable && ev.preventDefault();
+        window.addEventListener('touchmove', block, { passive: false });
+        stopScroll.current = () => window.removeEventListener('touchmove', block);
+      }, 450);
+    },
+    onPointerMove: (e: ReactPointerEvent) => {
+      const s = start.current;
+      if (s && Math.hypot(e.clientX - s.x, e.clientY - s.y) > 10) cancel();
+      const h = held.current;
+      if (h && onDrag && Math.hypot(e.clientX - h.x, e.clientY - h.y) > 8) {
+        held.current = null;
+        release();
+        onDrag(e.clientX, e.clientY);
+      }
+    },
+    onPointerUp: () => {
+      const wasHeld = !!held.current;
+      cancel();
+      if (wasHeld) onMenu();
+    },
+    onPointerCancel: () => cancel(),
+    onClickCapture: (e: ReactMouseEvent) => {
+      if (!fired.current) return;
+      fired.current = false;
+      e.stopPropagation();
+      e.preventDefault();
+    },
+    onContextMenu: (e: ReactMouseEvent) => {
+      e.preventDefault();
+      if (fired.current) return;
+      cancel();
+      onMenu();
+    },
+  };
+}
+
 type Handlers = {
   onPointerDown?: (e: ReactPointerEvent) => void;
   onPointerMove?: (e: ReactPointerEvent) => void;
@@ -187,6 +266,13 @@ export function useSwipeActions({ onDelete, onRight }: { onDelete?: () => void; 
       remove();
     },
     close: () => setDx(0),
+    /** жест перехватили (перетаскивание) — строку на место, свайп не продолжать */
+    abort: () => {
+      drag.current = null;
+      moved.current = false;
+      setDragging(false);
+      setDx(0);
+    },
     bind,
   };
 }

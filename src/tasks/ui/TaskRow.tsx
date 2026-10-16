@@ -1,11 +1,12 @@
-import { useState, type CSSProperties } from 'react';
+import { useRef, useState, type CSSProperties, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { Bell, Check, ListChecks, Network, Pin, Repeat, Timer, AlignLeft, Undo2 } from 'lucide-react';
 import { PRIORITY_META, addDaysYmd, todayYmd } from '../../utils/mapTasks';
 import { dayLabel, isOverdue, whenLabel, type TaskItem, type TaskList } from '../model';
 import { toast } from '../../store/appStore';
 import { moveOccurrence, openTask, purgeTask, restoreTask, skipOccurrence, toggleDone, trashTask, updateTask } from '../store';
-import { mergeHandlers, useLongPress, useSwipeActions } from '../../ui/gestures';
+import { mergeHandlers, useLongPressDrag, useSwipeActions } from '../../ui/gestures';
+import { startTouchDrag } from './touchDrag';
 import { SwipeBg } from '../../ui/SwipeBg';
 import { DatePicker } from './DatePicker';
 import '../../ui/dialogs.css';
@@ -36,7 +37,8 @@ export function TaskCheck({ task, onToggle }: { task: Pick<TaskItem, 'done' | 'p
  * влево — удалить с «Вернуть» (в корзине — навсегда), долгое нажатие / правая кнопка — лист действий.
  * Разметка: обёртка ref={swipe.wrap} className={swipe.wrapClass}, первым — bg, строка — класс sw-row, style={swipe.style}, {...handlers}; overlays — после строки.
  */
-export function useTaskActions(task: TaskItem, occurrence?: string) {
+/** dragRow — строку можно перетащить пальцем (долгое нажатие и повести) */
+export function useTaskActions(task: TaskItem, occurrence?: string, dragRow?: RefObject<HTMLElement | null>) {
   const [picking, setPicking] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -84,8 +86,17 @@ export function useTaskActions(task: TaskItem, occurrence?: string) {
   };
 
   // сенсорный экран: вправо — выполнить (в корзине — восстановить), влево — удалить; долгое нажатие — меню
-  const press = useLongPress(() => setMenu(true));
+  // долгое нажатие: отпустили — меню; повели — перетаскивание (если строку можно перетаскивать)
   const swipe = useSwipeActions({ onDelete: remove, onRight: trashed ? () => restoreTask(task.id) : future ? undefined : done });
+  const press = useLongPressDrag(
+    () => setMenu(true),
+    dragRow && !task.deleted
+      ? (x, y) => {
+          swipe.abort();
+          if (dragRow.current) startTouchDrag(task.id, dragRow.current, x, y);
+        }
+      : undefined,
+  );
   const handlers = mergeHandlers(press, swipe.bind);
   const act = (fn: () => void) => () => {
     setMenu(false);
@@ -226,17 +237,19 @@ export function TaskRow({
         ? whenLabel(task, today).replace(/^Сегодня, /, '')
         : whenLabel(task, today);
   const checklistDone = task.checklist.filter((c) => c.done).length;
-  const { swipe, handlers, bg, overlays, done, completing, future } = useTaskActions(task, occurrence);
+  const rowRef = useRef<HTMLDivElement>(null);
+  const { swipe, handlers, bg, overlays, done, completing, future } = useTaskActions(task, occurrence, draggable && !finePointer ? rowRef : undefined);
 
   return (
     <div ref={swipe.wrap} className={`tk-row-wrap ${swipe.wrapClass}`}>
       {bg}
       <div
+        ref={rowRef}
         className={`tk-row sw-row${task.done ? ' is-done' : ''}${completing ? ' completing' : ''}`}
         style={swipe.style}
         onClick={() => openTask(task.id)}
         {...handlers}
-        // на iPhone долгое нажатие перетаскивало бы строку вместо меню — перетаскивание только мышью
+        // мышь — drag-and-drop браузера; палец — долгое нажатие и повести (touchDrag.ts)
         draggable={draggable && finePointer}
         onDragStart={(e) => {
           e.dataTransfer.setData('text/sm-task', task.id);
