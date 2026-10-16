@@ -38,11 +38,15 @@ type PendingAction =
 
 interface WidgetBridgePlugin {
   update(o: { json: string }): Promise<void>;
+  setSecure(o: { on: boolean }): Promise<void>;
   consumePending(): Promise<{ actions: PendingAction[] }>;
   addListener(event: 'pending', fn: () => void): Promise<PluginListenerHandle>;
 }
 
 const WidgetBridge = registerPlugin<WidgetBridgePlugin>('WidgetBridge');
+
+/** Android: прятать содержимое в «недавних» и запретить скриншоты */
+export const setSecureWindow = (on: boolean) => WidgetBridge.setSecure({ on }).catch(() => undefined);
 
 const DAYS_AHEAD = 7;
 const MAX_TASKS = 80;

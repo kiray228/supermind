@@ -4,6 +4,7 @@ import { canInstallPwa, installPwa, isDesktopApp, isNative, onInstallChange, WIN
 import { AccountCard, PushCard } from '../ui/AccountCard';
 import { DataCard } from '../ui/DataCard';
 import { LockSettings } from '../ui/LockSettings';
+import { AiPrivacySettings } from '../ui/AiPrivacySettings';
 import { ACCENTS, DEFAULT_ACCENT } from '../ui/appearance';
 import { isIOS } from '../io/download';
 import { ensureTasks, setPrefs, useTasks } from '../tasks/store';
@@ -144,6 +145,8 @@ export default function Settings() {
               disabled={!key.trim() || testing}
             />
           </ListSection>
+
+          <AiPrivacySettings />
 
           <TaskSettings />
 

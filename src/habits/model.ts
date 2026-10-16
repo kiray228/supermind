@@ -48,8 +48,13 @@ export const activeHabits = (list: Habit[] | undefined) => (list ?? []).filter(i
 export function freqOf(h: Habit): HabitFreq {
   if (h.freq === 'weekdays' && h.days?.length) return 'weekdays';
   if (h.freq === 'weekly' && (h.perWeek ?? 0) > 0) return 'weekly';
+  if (h.freq === 'every' && (h.everyDays ?? 0) > 1) return 'every';
   return 'daily';
 }
+/** раз в столько дней (2–30) */
+export const everyDaysOf = (h: Habit) => Math.min(30, Math.max(2, Math.round(h.everyDays ?? 2)));
+/** день отсчёта «раз в N дней»: заданный, иначе день создания */
+const everyFromOf = (h: Habit) => h.everyFrom ?? (h.createdAt ? toYmd(new Date(h.createdAt)) : '2024-01-01');
 export const perWeekOf = (h: Habit) => Math.min(7, Math.max(1, Math.round(h.perWeek ?? 3)));
 export const targetOf = (h: Habit) => Math.max(1, Math.round(h.target ?? 1));
 export const isCounter = (h: Habit) => targetOf(h) > 1;
@@ -121,6 +126,10 @@ export function plural(n: number, forms: [string, string, string]): string {
 
 export function freqLabel(h: Habit): string {
   const f = freqOf(h);
+  if (f === 'every') {
+    const n = everyDaysOf(h);
+    return n === 2 ? 'Через день' : `Раз в ${n} ${plural(n, ['день', 'дня', 'дней'])}`;
+  }
   if (f === 'weekly') {
     const n = perWeekOf(h);
     return `${n} ${plural(n, ['раз', 'раза', 'раз'])} в неделю`;
@@ -318,7 +327,13 @@ export function mondayOf(ymd: string): string {
 
 /** Запланирована ли привычка на день недели (N раз в неделю — в любой день) */
 export function scheduledOn(h: Habit, ymd: string): boolean {
-  if (freqOf(h) !== 'weekdays') return true;
+  const f = freqOf(h);
+  if (f === 'every') {
+    // каждый N-й день от дня отсчёта (и до него — по тому же шагу назад)
+    const diff = Math.round((fromYmd(ymd).getTime() - fromYmd(everyFromOf(h)).getTime()) / 86400000);
+    return ((diff % everyDaysOf(h)) + everyDaysOf(h)) % everyDaysOf(h) === 0;
+  }
+  if (f !== 'weekdays') return true;
   return h.days!.includes(fromYmd(ymd).getDay());
 }
 
@@ -354,7 +369,7 @@ export function dueOn(days: Days, h: Habit, ymd: string): boolean {
   if (frozenOn(days, h, ymd)) return false;
   const f = freqOf(h);
   if (f === 'daily') return true;
-  if (f === 'weekdays') return scheduledOn(h, ymd);
+  if (f === 'weekdays' || f === 'every') return scheduledOn(h, ymd) || doneOn(days, h, ymd);
   return doneOn(days, h, ymd) || weekCount(days, h, ymd, ymd) < weekGoal(days, h, ymd);
 }
 
@@ -539,9 +554,18 @@ export function cleanHabit(h: Habit): Habit {
   } else if (f === 'weekdays') {
     out.days = [...new Set(out.days)].sort();
     delete out.perWeek;
+  } else if (f === 'every') {
+    out.everyDays = everyDaysOf(out);
+    out.everyFrom ??= toYmd(new Date());
+    delete out.days;
+    delete out.perWeek;
   } else {
     out.perWeek = perWeekOf(out);
     delete out.days;
+  }
+  if (f !== 'every') {
+    delete out.everyDays;
+    delete out.everyFrom;
   }
   // несколько раз в день: времена по порядку без повторов; цель и первое время — из них
   const times = [...new Set((out.times ?? []).filter((t) => /^\d{2}:\d{2}$/.test(t)))].sort();

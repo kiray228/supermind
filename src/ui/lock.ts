@@ -107,6 +107,31 @@ export async function tryUnlock(pin: string, now = Date.now()): Promise<'ok' | '
 
 export const lockNow = () => lockConfig() && useLock.setState({ locked: true });
 
+// ---------- Android: прятать содержимое в списке недавних приложений ----------
+
+const SECURE = 'sm-secure-window';
+export const secureWindow = () => {
+  try {
+    return localStorage.getItem(SECURE) === '1';
+  } catch {
+    return false;
+  }
+};
+async function applySecure(on: boolean) {
+  const { isNative } = await import('../platform');
+  if (!isNative()) return;
+  const { setSecureWindow } = await import('../native/widget');
+  await setSecureWindow(on);
+}
+export function setSecure(on: boolean) {
+  try {
+    localStorage.setItem(SECURE, on ? '1' : '0');
+  } catch {
+    /* не страшно */
+  }
+  void applySecure(on);
+}
+
 let started = false;
 
 /** При запуске — заперто (если код включён); после паузы в фоне дольше заданного — снова */
@@ -115,6 +140,7 @@ export function initLock() {
   useLock.setState({ enabled: !!cfg, locked: !!cfg });
   if (started || typeof document === 'undefined') return;
   started = true;
+  if (secureWindow()) void applySecure(true);
   let hiddenAt = 0;
   document.addEventListener('visibilitychange', () => {
     const c = lockConfig();

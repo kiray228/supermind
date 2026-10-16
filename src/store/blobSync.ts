@@ -8,31 +8,60 @@ import { get, remoteRev, set } from './kv';
 import { isObj, mergeValues, type Obj } from './merge';
 
 const sigOf = (x: Obj) => JSON.stringify({ ...x, updatedAt: 0 });
+const isIdList = (v: unknown): v is Obj[] => Array.isArray(v) && v.every((x) => isObj(x) && typeof x.id === 'string');
+
+/**
+ * Изменённая сущность: её вложенные списки с id (шаги, этапы, платежи, пункты чек-листа) тоже получают
+ * отметки — изменённым и новым пунктам время, удалённым — gone['item:id']. Так слияние двух устройств
+ * не теряет отметку шага, сделанную на одном, из-за правки названия на другом.
+ */
+function stampNested(next: Obj, prev: Obj | undefined, now: number, gone: Record<string, number>): Obj {
+  let out: Obj | null = null;
+  for (const [field, arr] of Object.entries(next)) {
+    if (!isIdList(arr)) continue;
+    const before = isIdList(prev?.[field]) ? new Map((prev![field] as Obj[]).map((x) => [x.id as string, x])) : new Map<string, Obj>();
+    let changed = false;
+    const list = arr.map((x) => {
+      const p = before.get(x.id as string);
+      before.delete(x.id as string);
+      if (p && sigOf(p) === sigOf(x)) return x;
+      changed = true;
+      return { ...stampNested(x, p, now, gone), updatedAt: Math.max(now, Number(x.updatedAt) || 0) };
+    });
+    for (const id of before.keys()) gone[`item:${id}`] = now;
+    if (changed) (out ??= { ...next })[field] = list;
+  }
+  return out ?? next;
+}
 
 /**
  * Изменённые с прошлой записи сущности (элементы массивов с id) получают свежую отметку времени —
  * так при слиянии правка побеждает, даже если код, менявший её, забыл обновить updatedAt.
  */
-function stampChanged<T>(next: T, prev: T | null): { value: T; stamped: boolean } {
+export function stampChanged<T>(next: T, prev: T | null): { value: T; stamped: boolean } {
   if (!isObj(next)) return { value: next, stamped: false };
   const now = Date.now();
   let stamped = false;
   const out: Obj = { ...next };
+  const gone: Record<string, number> = {};
   for (const [field, arr] of Object.entries(next)) {
     if (!Array.isArray(arr) || !arr.every((x) => isObj(x) && typeof x.id === 'string')) continue;
-    const before = isObj(prev) && Array.isArray(prev[field]) ? new Map((prev[field] as Obj[]).map((x) => [x.id as string, sigOf(x)])) : new Map<string, string>();
+    const before = isObj(prev) && Array.isArray(prev[field]) ? new Map((prev[field] as Obj[]).map((x) => [x.id as string, x])) : new Map<string, Obj>();
     let changed = false;
     const list = (arr as Obj[]).map((x) => {
-      if (before.get(x.id as string) === sigOf(x)) return x;
+      const p = before.get(x.id as string);
+      if (p && sigOf(p) === sigOf(x)) return x;
       if (before.size === 0 && !isObj(prev)) return x; // первая запись — ничего не сравниваем
       changed = true;
-      return { ...x, updatedAt: Math.max(now, Number(x.updatedAt) || 0) };
+      return { ...stampNested(x, p, now, gone), updatedAt: Math.max(now, Number(x.updatedAt) || 0) };
     });
     if (changed) {
       out[field] = list;
       stamped = true;
     }
   }
+  // удалённые вложенные пункты — в отметки об удалении (синхронизируются вместе с данными)
+  if (Object.keys(gone).length) out.gone = { ...((isObj(next.gone) ? next.gone : {}) as Obj), ...gone };
   return { value: (stamped ? out : next) as T, stamped };
 }
 

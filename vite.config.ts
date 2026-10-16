@@ -8,7 +8,10 @@ function serviceWorker(): Plugin {
     name: 'supermind-sw',
     apply: 'build',
     generateBundle(_, bundle) {
-      const files = Object.keys(bundle).filter((f) => !f.endsWith('.map'))
+      // тяжёлое и нужное немногим (PDF-экспорт, SDK Claude для своего ключа) не скачиваем при установке:
+      // загрузится и закэшируется при первом использовании (обработчик fetch ниже кладёт ответы в кэш)
+      const optional = /(^|\/)(jspdf\.|html2canvas[.-]|purify\.es-|index\.es-|sdk-)/
+      const files = Object.keys(bundle).filter((f) => !f.endsWith('.map') && !optional.test(f))
       const assets = ['./', './index.html', ...files.map((f) => './' + f), './icon.svg', './icon-192.png', './icon-512.png', './manifest.webmanifest', './apple-touch-icon.png']
       const version = Date.now().toString(36)
       const code = `const CACHE = 'supermind-${version}';

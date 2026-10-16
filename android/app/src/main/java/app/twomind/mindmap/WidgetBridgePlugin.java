@@ -50,6 +50,21 @@ public class WidgetBridgePlugin extends Plugin {
         call.resolve(r);
     }
 
+    /** Прятать содержимое в списке недавних приложений (FLAG_SECURE — заодно запрещает скриншоты) */
+    @PluginMethod
+    public void setSecure(PluginCall call) {
+        boolean on = Boolean.TRUE.equals(call.getBoolean("on", false));
+        if (getActivity() == null) {
+            call.resolve();
+            return;
+        }
+        getActivity().runOnUiThread(() -> {
+            if (on) getActivity().getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE);
+            else getActivity().getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE);
+            call.resolve();
+        });
+    }
+
     /** Новые действия в очереди — приложение заберёт их сразу, если запущено */
     static void notifyPending() {
         WidgetBridgePlugin p = instance.get();

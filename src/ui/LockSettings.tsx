@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { LockKey, Timer, Password } from '@phosphor-icons/react';
+import { EyeSlash, LockKey, Timer, Password } from '@phosphor-icons/react';
 import { toast } from '../store/appStore';
 import { IconTile } from './icons';
 import { ListRow, ListSection, SelectRow, SwitchRow } from './list';
-import { disableLock, LOCK_AFTER_OPTIONS, lockConfig, setLockAfter, setPin, useLock } from './lock';
+import { disableLock, LOCK_AFTER_OPTIONS, lockConfig, secureWindow, setLockAfter, setPin, setSecure, useLock } from './lock';
+import { isNative } from '../platform';
 import { PinPad } from './LockScreen';
 import { onBack } from './dialogs';
 
@@ -64,6 +65,7 @@ export function LockSettings() {
   const enabled = useLock((s) => s.enabled);
   const [setup, setSetup] = useState(false);
   const [after, setAfter] = useState(() => lockConfig()?.after ?? 1);
+  const [secure, setSecureState] = useState(secureWindow);
 
   return (
     <ListSection
@@ -97,6 +99,18 @@ export function LockSettings() {
           />
           <ListRow icon={<IconTile icon={Password} tone="gray" size="list" />} title="Сменить код" chevron onClick={() => setSetup(true)} />
         </>
+      )}
+      {isNative() && (
+        <SwitchRow
+          icon={<IconTile icon={EyeSlash} tone="indigo" size="list" />}
+          title="Прятать в недавних"
+          subtitle="Вместо содержимого — пустой экран в списке приложений. Скриншоты при этом недоступны"
+          checked={secure}
+          onChange={(v) => {
+            setSecure(v);
+            setSecureState(v);
+          }}
+        />
       )}
       {setup && (
         <PinSetup

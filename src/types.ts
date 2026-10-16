@@ -208,8 +208,8 @@ export interface PlannerDay {
 /** Часть дня, в которой показывается привычка */
 export type HabitPart = 'morning' | 'day' | 'evening' | 'any';
 
-/** Как часто: каждый день, по дням недели или N раз в неделю */
-export type HabitFreq = 'daily' | 'weekdays' | 'weekly';
+/** Как часто: каждый день, по дням недели, N раз в неделю или раз в N дней */
+export type HabitFreq = 'daily' | 'weekdays' | 'weekly' | 'every';
 
 /** Пауза привычки: дни с from по to включительно */
 export interface HabitPause {
@@ -233,6 +233,10 @@ export interface Habit {
   days?: number[];
   /** для freq = 'weekly': сколько раз в неделю */
   perWeek?: number;
+  /** для freq = 'every': раз в столько дней (2–30) */
+  everyDays?: number;
+  /** для freq = 'every': с какого дня отсчёт (YYYY-MM-DD) */
+  everyFrom?: string;
   /** время привычки HH:MM */
   time?: string;
   /**

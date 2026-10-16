@@ -64,8 +64,42 @@ function mergeBlob(local: Obj, remote: Obj): Obj {
   return out;
 }
 
+/** Массив сущностей с id (шаги, этапы, платежи, пункты чек-листа…) */
+const isIdList = (v: unknown): v is Obj[] => Array.isArray(v) && v.length > 0 && v.every((x) => isObj(x) && typeof x.id === 'string');
+
 /**
- * Сущности по id: свежая версия побеждает. Отметка об удалении скрывает сущность,
+ * Одна сущность изменена на двух устройствах: поля — от более свежей (newer), а вложенные списки
+ * с id сливаются по пунктам — у каждого пункта своё время изменения (его ставит запись, blobSync).
+ * Пункт только у старой версии остаётся, если у него есть своё время (добавлен там после 1.37)
+ * и нет отметки об удалении (gone['item:id']); пункт без времени — как раньше, по свежей версии.
+ */
+export function deepMerge(newer: Obj, older: Obj, gone: Record<string, number>): Obj {
+  const out: Obj = { ...newer };
+  for (const field of new Set([...Object.keys(newer), ...Object.keys(older)])) {
+    const a = newer[field];
+    const b = older[field];
+    if (!isIdList(a) && !isIdList(b)) continue;
+    const la = (Array.isArray(a) ? a : []) as Obj[];
+    const lb = (Array.isArray(b) ? b : []) as Obj[];
+    if (!la.every((x) => isObj(x) && typeof x.id === 'string') || !lb.every((x) => isObj(x) && typeof x.id === 'string')) continue;
+    const removed = (x: Obj) => (gone[`item:${x.id}`] ?? 0) >= stamp(x) && (gone[`item:${x.id}`] ?? 0) > 0;
+    const inB = new Map(lb.map((x) => [x.id as string, x]));
+    const list: Obj[] = [];
+    for (const x of la) {
+      const y = inB.get(x.id as string);
+      inB.delete(x.id as string);
+      const m = y ? (stamp(y) > stamp(x) ? deepMerge(y, x, gone) : deepMerge(x, y, gone)) : x;
+      if (!removed(m)) list.push(m);
+    }
+    // добавленные на другом устройстве (с отметкой времени), не удалённые здесь
+    for (const y of inB.values()) if (stamp(y) > 0 && !removed(y)) list.push(y);
+    out[field] = list;
+  }
+  return out;
+}
+
+/**
+ * Сущности по id: свежая версия побеждает (вложенные списки — по пунктам, см. deepMerge). Отметка об удалении скрывает сущность,
  * только если она не моложе последнего изменения (восстановленное из копии не удаляется снова).
  */
 function mergeArray(local: Obj[], remote: Obj[], gone: Record<string, number>, singular: string): Obj[] {
@@ -74,7 +108,8 @@ function mergeArray(local: Obj[], remote: Obj[], gone: Record<string, number>, s
   for (const x of local) byId.set(x.id as string, x);
   for (const x of remote) {
     const cur = byId.get(x.id as string);
-    if (!cur || stamp(x) > stamp(cur)) byId.set(x.id as string, x);
+    if (!cur) byId.set(x.id as string, x);
+    else if (cur !== x) byId.set(x.id as string, stamp(x) > stamp(cur) ? deepMerge(x, cur, gone) : deepMerge(cur, x, gone));
   }
   // порядок: как на этом устройстве, новые — в конце
   const order = [...local.map((x) => x.id as string), ...remote.map((x) => x.id as string)];

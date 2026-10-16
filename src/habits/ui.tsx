@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { Archive, ArchiveRestore, Bell, BellOff, Check, ChevronDown, ChevronRight, Flame, Minus, Pause, Pencil, Plus, Snowflake, Trash2, Trophy, X } from 'lucide-react';
 import type { Habit, HabitFreq, HabitPart, PlannerData } from '../types';
-import { addDaysYmd, fromYmd } from '../utils/mapTasks';
+import { addDaysYmd, fromYmd, todayYmd } from '../utils/mapTasks';
 import { uid } from '../utils/tree';
 import {
   activeHabits,
@@ -24,6 +24,7 @@ import {
   PARTS,
   pausedOn,
   perWeekOf,
+  everyDaysOf,
   pauseUntilLabel,
   reminderTimeOf,
   scheduledOn,
@@ -59,7 +60,7 @@ function metaParts(h: Habit, days: Days, date: string): string[] {
   else if (h.duration) out.push(durationLabel(h.duration));
   const f = freqOf(h);
   if (f === 'weekly') out.push(`${weekCount(days, h, date)} из ${weekGoal(days, h, date)} за неделю`);
-  else if (f === 'weekdays') out.push(freqLabel(h));
+  else if (f === 'weekdays' || f === 'every') out.push(freqLabel(h));
   const fz = frozenOn(days, h, date);
   if (fz) out.unshift(fz === 'skip' ? '❄️ пропуск' : `⏸ на паузе ${pauseUntilLabel(h, date) ?? ''}`.trim());
   return out;
@@ -404,6 +405,7 @@ const FREQS: { id: HabitFreq; label: string }[] = [
   { id: 'daily', label: 'Каждый день' },
   { id: 'weekdays', label: 'По дням' },
   { id: 'weekly', label: 'N в неделю' },
+  { id: 'every', label: 'Раз в N дней' },
 ];
 
 export function HabitEditor({
@@ -536,6 +538,7 @@ export function HabitEditor({
                   freq: o.id === 'daily' ? undefined : o.id,
                   days: o.id === 'weekdays' ? (d.days?.length ? d.days : [1, 3, 5]) : d.days,
                   perWeek: o.id === 'weekly' ? (d.perWeek ?? 3) : d.perWeek,
+                  everyDays: o.id === 'every' ? (d.everyDays ?? 2) : d.everyDays,
                 })
               }
             >
@@ -550,6 +553,14 @@ export function HabitEditor({
                 {WD_SHORT_BY_DAY[wd]}
               </button>
             ))}
+          </div>
+        )}
+        {freq === 'every' && (
+          <div className="hb-stepper-row">
+            <Stepper value={everyDaysOf(d)} min={2} max={30} onChange={(v) => up({ everyDays: v })} />
+            <span className="muted small">
+              {freqLabel({ ...d, freq: 'every', everyDays: everyDaysOf(d) })} — отсчёт {d.everyFrom && d.everyFrom !== todayYmd() ? `с ${d.everyFrom.split('-').reverse().slice(0, 2).join('.')}` : 'с сегодня'}
+            </span>
           </div>
         )}
         {freq === 'weekly' && (
@@ -685,7 +696,7 @@ export function HabitEditor({
             ? 'Напоминаний не будет.'
             : remindMode === 'each'
               ? `Напомним в ${times.filter(Boolean).join(', ') || '…'}, если этот приём ещё не отмечен.`
-              : `Напомним в ${d.remind || d.time}${freq === 'daily' ? ' каждый день' : freq === 'weekdays' ? ' в выбранные дни' : ', пока цель недели не выполнена'}, если привычка ещё не отмечена.`}
+              : `Напомним в ${d.remind || d.time}${freq === 'daily' ? ' каждый день' : freq === 'weekdays' ? ' в выбранные дни' : freq === 'every' ? ' в дни по графику' : ', пока цель недели не выполнена'}, если привычка ещё не отмечена.`}
         </div>
 
         <div className="modal-actions hb-editor-actions">

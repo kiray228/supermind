@@ -7,6 +7,7 @@ import { categoryMap, fmtMoney, monthEnd, monthStart, sortedAccounts, sortedCate
 import { ensureNotes } from '../notes/store';
 import { isActive, WEEKDAYS, type TaskItem, type TasksData } from '../tasks/model';
 import { addDaysYmd } from '../utils/mapTasks';
+import { assistantPrivacy } from './privacy';
 import { byPriorityThenTime, computeBriefing, loadBriefingInputs, type BriefingInputs } from './briefing';
 
 const cut = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
@@ -126,9 +127,13 @@ export async function buildContext(inputs?: BriefingInputs): Promise<string> {
   );
   parts.push(goalsBlock(inp.goals, inp.tasks));
   if (b.goals.length) parts.push(`Сроки целей и этапов на неделе: ${b.goals.map((g) => `${g.title} — ${g.date}`).join('; ')}`);
-  parts.push(financeBlock(inp.finance, today));
-  if (b.payments.length) parts.push(`Платежи по подпискам на неделе: ${b.payments.slice(0, 8).map((p) => `${p.title} ${fmtMoney(p.amount, p.currency)} — ${p.date}`).join('; ')}`);
-  if (b.moods.length) parts.push(`Настроение (дневник, последние дни): ${b.moods.map((m) => `${m.date.slice(5)} ${m.mood}`).join(', ')}`);
+  // что пользователь разрешил показывать ассистенту (Настройки → «Что видит ассистент»)
+  const privacy = assistantPrivacy();
+  if (privacy.finance) {
+    parts.push(financeBlock(inp.finance, today));
+    if (b.payments.length) parts.push(`Платежи по подпискам на неделе: ${b.payments.slice(0, 8).map((p) => `${p.title} ${fmtMoney(p.amount, p.currency)} — ${p.date}`).join('; ')}`);
+  } else parts.push('Финансы: пользователь скрыл их от ассистента — не спрашивай и не придумывай суммы');
+  if (privacy.mood && b.moods.length) parts.push(`Настроение (дневник, последние дни): ${b.moods.map((m) => `${m.date.slice(5)} ${m.mood}`).join(', ')}`);
   try {
     const n = await ensureNotes();
     const notes = n.notes

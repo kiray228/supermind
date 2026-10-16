@@ -1,5 +1,5 @@
 /** «Что нового»: главное в каждой версии. Новые версии — сверху. */
-import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge, MessageCircleQuestion, CloudOff, LayoutTemplate, SquareArrowOutUpRight, BellRing, Target, Timer, Lock, Crosshair, Move } from 'lucide-react';
+import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge, MessageCircleQuestion, CloudOff, LayoutTemplate, SquareArrowOutUpRight, BellRing, Target, Timer, Lock, Crosshair, Move, GitMerge, EyeOff, CalendarRange } from 'lucide-react';
 
 export interface ChangeItem {
   icon: typeof Sparkles;
@@ -15,6 +15,15 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.37',
+    title: 'Синхронизация без потерь и приватность',
+    items: [
+      { icon: GitMerge, title: 'Правки с двух устройств — обе', text: 'Отметили шаг цели на телефоне, а на компьютере — другой шаг или новое название? Теперь сохранится всё. Так же с платежами по долгам и пунктами чек-листа задачи.' },
+      { icon: EyeOff, title: 'Что видит ассистент', text: 'Настройки → «Что видит ассистент»: можно не показывать ему финансы и настроение, и там же — куда уходит сводка. На Android в «Защите» можно прятать приложение в списке недавних.' },
+      { icon: CalendarRange, title: 'Привычки «раз в N дней»', text: 'Полить цветы раз в 3 дня, сменить постель раз в неделю — частота «Раз в N дней» в редакторе привычки.' },
+    ],
+  },
   {
     version: '1.36',
     title: 'Код-пароль, фокус на ветке и задачи пальцем',
