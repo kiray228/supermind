@@ -30,3 +30,26 @@
 .sp-item-body { min-width: 0; }
 .sp-item-text { font-size: 15px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .sp-item-meta { font-size: 12px; color: var(--text-2); margin-top: 2px; }
+
+/* Ответ поддержки (у пользователя и во «Входящих») */
+.sp-reply { margin-top: 6px; padding: 8px 12px; border-radius: 12px; background: color-mix(in srgb, var(--accent) 10%, var(--surface-2)); font-size: 15px; line-height: 1.4; white-space: pre-wrap; }
+.sp-reply span { display: block; font-size: 12px; color: var(--text-2); margin-bottom: 2px; }
+
+/* Входящие владельца */
+.modal.sp-inbox { width: min(640px, 100%); }
+.sp-card { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 16px; background: var(--surface-2); }
+.sp-card-head { display: flex; align-items: center; gap: 10px; }
+.sp-card-head .sp-item-body { flex: 1; }
+.sp-card-who { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-card-text { font-size: 16px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+.sp-card-img { max-width: 100%; max-height: 360px; align-self: flex-start; border-radius: 12px; border: 0.5px solid var(--border); }
+.sp-status { flex-shrink: 0; max-width: 46%; min-height: 32px; border: 0; border-radius: 999px; padding: 0 10px; font: inherit; font-size: 13px; font-weight: 600; background: var(--surface); color: var(--text); cursor: pointer; }
+.sp-status.new { background: #f0302a; color: #fff; }
+.sp-status.planned, .sp-status.seen { background: color-mix(in srgb, var(--accent) 18%, var(--surface)); color: var(--accent); }
+.sp-status.done { background: #2fb550; color: #fff; }
+.sp-field { display: flex; flex-direction: column; gap: 4px; }
+.sp-field > span { font-size: 12px; color: var(--text-2); }
+.sp-field textarea { width: 100%; resize: vertical; border: 0; outline: none; border-radius: 12px; background: var(--surface); color: var(--text); font: inherit; font-size: 15px; line-height: 1.4; padding: 8px 12px; }
+.sp-card-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.sp-card-actions .btn { display: inline-flex; align-items: center; gap: 6px; }
+.sp-link { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-size: 15px; cursor: pointer; }

@@ -26,7 +26,8 @@ import { useApp, toast } from '../store/appStore';
 import { AI_MODELS, streamText, AIError } from '../ai/claude';
 import { openWhatsNew } from '../onboarding/state';
 import { openSupport, SupportHost } from '../ui/Support';
-import { Bug, Lightbulb } from '@phosphor-icons/react';
+import { InboxHost, openInbox, useSupportAdmin } from '../ui/SupportInbox';
+import { Bug, Lightbulb, Tray } from '@phosphor-icons/react';
 import { APP_VERSION } from '../store/safety';
 import { IconTile } from '../ui/icons';
 import { ListCell, ListRow, ListSection, SelectRow, SwitchRow } from '../ui/list';
@@ -59,6 +60,7 @@ import {
 export default function Settings() {
   const settings = useApp((s) => s.settings);
   const setSettings = useApp((s) => s.setSettings);
+  const support = useSupportAdmin();
   const [key, setKey] = useState(settings.apiKey);
   // настройки читаются из базы после запуска: раздел, открытый сразу, сначала видит пустой ключ —
   // подхватить сохранённый, иначе «Сохранить»/«Проверить» стёрли бы его
@@ -263,8 +265,18 @@ export default function Settings() {
           <ListSection header="Поддержка" footer="Нашли ошибку или есть идея? Напишите — ответим на почту аккаунта.">
             <ListRow icon={<IconTile icon={Bug} tone="red" size="list" />} title="Сообщить о проблеме" chevron onClick={() => openSupport('problem')} />
             <ListRow icon={<IconTile icon={Lightbulb} tone="yellow" size="list" />} title="Предложить идею" chevron onClick={() => openSupport('idea')} />
+            {support.admin && (
+              <ListRow
+                icon={<IconTile icon={Tray} tone="blue" size="list" />}
+                title="Входящие поддержки"
+                subtitle={support.openCount ? `Новых: ${support.openCount}` : 'Обращения пользователей'}
+                chevron
+                onClick={openInbox}
+              />
+            )}
           </ListSection>
           <SupportHost />
+          <InboxHost />
 
           <ListSection
             header="О приложении"

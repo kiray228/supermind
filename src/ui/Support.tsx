@@ -1,6 +1,6 @@
 /**
  * Поддержка: сообщить о проблеме или предложить идею. Обращение уходит на сервер (POST /feedback),
- * владелец получает письмо и отвечает пользователю на email аккаунта.
+ * владелец получает письмо и отвечает из «Входящих» (SupportInbox): ответ приходит на email и виден здесь.
  */
 import { useEffect, useState } from 'react';
 import { create } from 'zustand';
@@ -19,7 +19,19 @@ interface Item {
   text: string;
   status: string;
   at: number;
+  reply?: string;
+  repliedAt?: number;
 }
+
+/** Статусы обращения — как их видит пользователь (и владелец во «Входящих») */
+export const STATUS_LABEL: Record<string, string> = {
+  new: 'Получено',
+  seen: 'Прочитано',
+  planned: 'В планах',
+  answered: 'Есть ответ',
+  done: 'Решено',
+  rejected: 'Не планируется',
+};
 
 const useSupport = create<{ open: Kind | null }>(() => ({ open: null }));
 export const openSupport = (kind: Kind = 'problem') => useSupport.setState({ open: kind });
@@ -195,8 +207,14 @@ function SupportSheet({ initial }: { initial: Kind }) {
                 <div className="sp-item-body">
                   <div className="sp-item-text">{it.text}</div>
                   <div className="sp-item-meta">
-                    №{it.id} · {when(it.at)} · {it.status === 'done' ? 'Решено' : it.status === 'answered' ? 'Есть ответ' : 'Получено'}
+                    №{it.id} · {when(it.at)} · {STATUS_LABEL[it.status] ?? 'Получено'}
                   </div>
+                  {it.reply && (
+                    <div className="sp-reply">
+                      <span>Ответ поддержки{it.repliedAt ? ` · ${when(it.repliedAt)}` : ''}</span>
+                      {it.reply}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
