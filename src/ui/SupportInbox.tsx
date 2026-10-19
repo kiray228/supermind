@@ -8,6 +8,7 @@ import { create } from 'zustand';
 import { Bug, Lightbulb, ArrowClockwise, Image as ImageIcon, PaperPlaneTilt } from '@phosphor-icons/react';
 import { api, useCloud } from '../store/cloud';
 import { toast } from '../store/appStore';
+import { confirmDialog } from './dialogs';
 import { STATUS_LABEL } from './Support';
 import './support.css';
 
@@ -128,9 +129,18 @@ function InboxCard({ it, onChange }: { it: InboxItem; onChange: (c: Partial<Inbo
   const [busy, setBusy] = useState(false);
 
   const save = async (change: { status?: string; note?: string }) => {
+    // «Решено» — предложить письмо пользователю (у него обращение сменит статус и без письма)
+    const notify =
+      change.status === 'done' &&
+      it.status !== 'done' &&
+      (await confirmDialog('Сообщить пользователю?', `${it.email} получит письмо: «${it.kind === 'idea' ? 'Ваша идея теперь в SuperMind' : 'Проблема исправлена'} — обновите приложение».`, {
+        okText: 'Отправить письмо',
+        cancelText: 'Без письма',
+      }));
     try {
-      await api(`/admin/feedback/${it.id}`, { method: 'PATCH', body: JSON.stringify(change) });
+      const r = await api<{ mailed?: boolean }>(`/admin/feedback/${it.id}`, { method: 'PATCH', body: JSON.stringify({ ...change, ...(notify ? { notify } : {}) }) });
       onChange(change);
+      if (notify) toast(r.mailed ? 'Письмо отправлено' : 'Статус сохранён, письмо не ушло');
     } catch (e) {
       toast(e instanceof Error ? e.message : String(e));
     }

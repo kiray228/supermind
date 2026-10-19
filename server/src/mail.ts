@@ -115,3 +115,25 @@ export function replyMail(to: string, f: { id: string; kind: string; text: strin
 <div style="white-space:pre-wrap;font-size:14px;line-height:1.5;color:#3c3c43;background:#f2f2f7;border-radius:12px;padding:12px 14px">${esc(quote)}</div></div>`,
   };
 }
+
+/** Обращение решено — письмо пользователю: проблема исправлена или идея сделана */
+export function doneMail(to: string, f: { id: string; kind: string; text: string; replyTo?: string }): Mail {
+  const idea = f.kind === 'idea';
+  const head = idea ? 'Ваша идея теперь в SuperMind' : 'Проблема, о которой вы писали, исправлена';
+  const body = idea
+    ? 'Спасибо, что предложили! Обновите приложение до последней версии, чтобы попробовать.'
+    : 'Спасибо, что сообщили! Обновите приложение до последней версии. Если что-то всё ещё не так, просто ответьте на это письмо.';
+  const quote = f.text.length > 600 ? f.text.slice(0, 600) + '…' : f.text;
+  return {
+    to,
+    replyTo: f.replyTo,
+    subject: `SuperMind · ${idea ? 'идея' : 'обращение'} №${f.id}: ${idea ? 'сделано' : 'исправлено'}`,
+    text: `${head}.\n\n${body}\n\n— Команда SuperMind\n\nВы писали (№${f.id}):\n${quote}`,
+    html: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;max-width:560px">
+<p style="margin:0 0 8px;font-size:18px;font-weight:600">${head}</p>
+<p style="margin:0 0 14px;font-size:16px;line-height:1.5">${body}</p>
+<p style="margin:0 0 18px;font-size:15px;color:#3c3c43">— Команда SuperMind</p>
+<p style="margin:0 0 4px;color:#8e8e93;font-size:13px">Вы писали (№${esc(f.id)}):</p>
+<div style="white-space:pre-wrap;font-size:14px;line-height:1.5;color:#3c3c43;background:#f2f2f7;border-radius:12px;padding:12px 14px">${esc(quote)}</div></div>`,
+  };
+}

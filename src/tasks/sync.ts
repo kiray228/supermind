@@ -461,6 +461,12 @@ async function handleAction(action: string, ex: Record<string, string>, input?: 
     useApp.getState().go('assistant');
     return;
   }
+  // новое обращение в поддержку (push владельцу) — «Входящие»
+  if (ex.inbox) {
+    useApp.getState().go('settings');
+    (await import('../ui/SupportInbox')).openInbox();
+    return;
+  }
   const t = ex.taskId ? getTask(ex.taskId) : undefined;
   if (!t) return;
   if (action === 'done') {

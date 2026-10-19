@@ -17,7 +17,7 @@ import { hashPassword, newToken, tokenHash, verifyPassword } from './crypto.ts';
 import { ensureSchema, type Row, type Sql } from './sql.ts';
 import { generateVapidKeys, sendPush, type PushResult, type PushSubscription, type VapidKeys } from './webpush.ts';
 import type { NextDueMark, NextDueStore } from './objectStore.ts';
-import { envMailer, feedbackMail, replyMail, resetMail, type Mailer } from './mail.ts';
+import { doneMail, envMailer, feedbackMail, replyMail, resetMail, type Mailer } from './mail.ts';
 import { commandPrompt, envAi, parseAiJson, type Ai } from './ai.ts';
 import { fetchPublicPage, isPublicIp, WebError, type FetchPage } from './web.ts';
 import { randomInt } from 'node:crypto';
@@ -315,6 +315,7 @@ export function createApp(deps: Deps) {
         console.error('feedback mail', e); // обращение сохранено в базе — письмо не главное
       }
     }
+    await notifyAdmins(id, kind, text);
     return json({ id, ok: true }, 201);
   }
 
@@ -456,6 +457,36 @@ export function createApp(deps: Deps) {
     });
   }
 
+  /** Push владельцам о новом обращении (на все их устройства с уведомлениями); ошибки не мешают обращению */
+  async function notifyAdmins(id: string, kind: string, text: string) {
+    if (!admins.size) return;
+    try {
+      const devices = await sql.query(
+        `SELECT d.id, d.endpoint, d.p256dh, d.auth FROM devices d JOIN users u ON u.id = d.user_id WHERE lower(u.email) = ANY($1::text[])`,
+        [[...admins]],
+      );
+      if (!devices.length) return;
+      const keys = await vapidKeys();
+      const payload = {
+        title: `SuperMind · ${kind === 'idea' ? 'идея' : 'проблема'} №${id}`,
+        body: text.length > 200 ? text.slice(0, 200) + '…' : text,
+        data: { inbox: '1', feedbackId: id },
+      };
+      await Promise.all(
+        devices.map(async ([deviceId, endpoint, p256dh, auth]) => {
+          try {
+            const r = await push({ endpoint: endpoint!, p256dh: p256dh!, auth: auth! }, payload, keys);
+            if (r.gone) await sql.query(`DELETE FROM devices WHERE id = $1`, [deviceId]);
+          } catch {
+            /* push-сервис недоступен — обращение всё равно во «Входящих» */
+          }
+        }),
+      );
+    } catch (e) {
+      console.error('feedback push', e);
+    }
+  }
+
   async function adminFeedbackImage(request: Request, id: string) {
     await adminOf(request);
     const rows = await sql.query(`SELECT image FROM feedback WHERE id = $1`, [id]);
@@ -463,17 +494,30 @@ export function createApp(deps: Deps) {
     return json({ image: rows[0][0] });
   }
 
-  /** Статус и заметка-разбор (заметку видит только владелец) */
+  /** Статус и заметка-разбор (заметку видит только владелец); notify — письмо пользователю, что обращение решено */
   async function adminFeedbackPatch(request: Request, id: string) {
     await adminOf(request);
-    const b = await body<{ status?: string; note?: string }>(request);
+    const b = await body<{ status?: string; note?: string; notify?: boolean }>(request);
     if (b.status !== undefined && !FEEDBACK_STATUSES.includes(String(b.status))) throw new HttpError(400, 'Неизвестный статус');
     const rows = await sql.query(
-      `UPDATE feedback SET status = coalesce($2, status), note = coalesce($3, note), updated_at = now() WHERE id = $1 RETURNING id`,
+      `WITH old AS (SELECT status FROM feedback WHERE id = $1)
+       UPDATE feedback SET status = coalesce($2, status), note = coalesce($3, note), updated_at = now() WHERE id = $1
+       RETURNING (SELECT status FROM old), email, kind, text`,
       [id, b.status ?? null, typeof b.note === 'string' ? b.note.slice(0, 20_000) : null],
     );
     if (!rows[0]) throw new HttpError(404, 'Обращение не найдено');
-    return json({ ok: true });
+    const [was, email, kind, text] = rows[0] as string[];
+    let mailed = false;
+    // письмо — только при переходе в «Решено», повторный выбор статуса письмо не дублирует
+    if (b.notify === true && b.status === 'done' && was !== 'done' && mail && email && (await mailBudget('other'))) {
+      try {
+        await mail(doneMail(email, { id, kind, text, replyTo: supportTo || undefined }));
+        mailed = true;
+      } catch (e) {
+        console.error('done mail', e);
+      }
+    }
+    return json({ ok: true, mailed });
   }
 
   /** Ответ пользователю: виден в «Мои обращения» и уходит письмом (ответ на письмо придёт в поддержку) */

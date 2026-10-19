@@ -152,7 +152,15 @@ test('поддержка: обращение сохраняется, письм�
 });
 
 test('входящие поддержки: владелец видит все обращения, меняет статус и отвечает', async () => {
-  const adminApp = createApp({ mail: async (m) => void mails.push(m), supportEmail: 'owner@b.cd', adminEmails: ['Boss@b.cd'], sql, pushHostOk: () => true });
+  const pushed: { endpoint: string; payload: { title: string; data: Record<string, string> } }[] = [];
+  const adminApp = createApp({
+    mail: async (m) => void mails.push(m),
+    supportEmail: 'owner@b.cd',
+    adminEmails: ['Boss@b.cd'],
+    sql,
+    pushHostOk: () => true,
+    push: async (sub, payload) => (pushed.push({ endpoint: sub.endpoint, payload: payload as (typeof pushed)[number]['payload'] }), { status: 201, gone: false }),
+  });
   const req = async <T = Record<string, unknown>>(method: string, path: string, body?: unknown, token?: string) => {
     const r = await adminApp.fetch(
       new Request('http://x' + path, {
@@ -165,7 +173,13 @@ test('входящие поддержки: владелец видит все о
   };
   const boss = (await req<{ token: string }>('POST', '/auth/register', { email: 'boss@b.cd', password: '12345678' })).data.token;
   const user = (await req<{ token: string }>('POST', '/auth/register', { name: 'Аня', email: 'anya@b.cd', password: '12345678' })).data.token;
+  // у владельца включены уведомления — о новом обращении приходит push, открывающий «Входящие»
+  await req('POST', '/devices', { subscription: { endpoint: 'https://push.example/boss', keys: { p256dh: 'p', auth: 'a' } } }, boss);
+  await req('POST', '/devices', { subscription: { endpoint: 'https://push.example/anya', keys: { p256dh: 'p', auth: 'a' } } }, user);
   const id = (await req<{ id: string }>('POST', '/feedback', { kind: 'problem', text: 'Будильник без звука', image: 'aGVsbG8=' }, user)).data.id;
+  assert.deepEqual(pushed.map((x) => x.endpoint), ['https://push.example/boss']);
+  assert.match(pushed[0].payload.title, new RegExp(`проблема №${id}`));
+  assert.equal(pushed[0].payload.data.inbox, '1');
 
   // не владельцу — нельзя
   assert.equal((await req('GET', '/admin/feedback', undefined, user)).status, 403);
@@ -201,8 +215,17 @@ test('входящие поддержки: владелец видит все о
   assert.equal(own.reply, 'Спасибо! Сделаем звук в приложении.');
   assert.equal(own.note, undefined);
 
+  // «Решено» с письмом пользователю — один раз, повторный выбор статуса письмо не дублирует
+  let mailsBefore = mails.length;
+  assert.equal((await req<{ mailed: boolean }>('PATCH', `/admin/feedback/${id}`, { status: 'done', notify: true }, boss)).data.mailed, true);
+  assert.equal(mails.length, mailsBefore + 1);
+  assert.equal(mails[mailsBefore].to, 'anya@b.cd');
+  assert.match(mails[mailsBefore].subject, /исправлено/);
+  mailsBefore = mails.length;
+  assert.equal((await req<{ mailed: boolean }>('PATCH', `/admin/feedback/${id}`, { status: 'done', notify: true }, boss)).data.mailed, false);
+  assert.equal(mails.length, mailsBefore);
+
   // решённые уходят из открытых, но видны во «всех»
-  await req('PATCH', `/admin/feedback/${id}`, { status: 'done' }, boss);
   assert.equal((await req<Inbox>('GET', '/admin/feedback', undefined, boss)).data.items.some((x) => x.id === id), false);
   assert.equal((await req<Inbox>('GET', '/admin/feedback?status=all', undefined, boss)).data.items.some((x) => x.id === id), true);
   assert.equal((await req('PATCH', '/admin/feedback/999999', { status: 'done' }, boss)).status, 404);
