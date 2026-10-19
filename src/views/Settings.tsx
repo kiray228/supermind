@@ -10,13 +10,16 @@ import { isIOS } from '../io/download';
 import { ensureTasks, setPrefs, useTasks } from '../tasks/store';
 import { ALLDAY_REMINDER_OPTIONS, TIMED_REMINDER_OPTIONS } from '../tasks/model';
 import {
+  alarmFullScreen,
   enableCalendarSync,
   exactAlarmState,
   exportTasksIcs,
   listPhoneCalendars,
   notifyPermission,
+  openAlarmFullScreenSettings,
   openExactAlarmSettings,
   requestNotifyPermission,
+  testAlarm,
   STREAK_SAVER_DEFAULT,
   syncCalendar,
   type NotifyPermission,
@@ -348,6 +351,7 @@ function TaskSettings() {
   const data = useTasks((s) => s.data);
   const [perm, setPerm] = useState<NotifyPermission | null>(null);
   const [exact, setExact] = useState<'granted' | 'denied' | 'n/a'>('n/a');
+  const [fullScreen, setFullScreen] = useState<'granted' | 'denied' | 'n/a'>('n/a');
   const [cals, setCals] = useState<PhoneCalendar[]>([]);
   const native = isNative();
 
@@ -355,6 +359,7 @@ function TaskSettings() {
     void ensureTasks();
     void notifyPermission().then(setPerm);
     void exactAlarmState().then(setExact);
+    void alarmFullScreen().then(setFullScreen);
   }, []);
   useEffect(() => {
     if (native && data?.prefs.calendarSync) void listPhoneCalendars().then((c) => setCals(c.filter((x) => x.writable)));
@@ -410,6 +415,25 @@ function TaskSettings() {
             }
           />
         )}
+        {native && fullScreen === 'denied' && (
+          <ListRow
+            icon={<IconTile icon={Alarm} tone="orange" size="list" />}
+            title="Будильник не откроется на заблокированном экране"
+            subtitle="Разрешите «Полноэкранные уведомления» — звонить он будет и так"
+            trailing={
+              <button className="btn btn-sm btn-tinted" onClick={() => void openAlarmFullScreenSettings().then(() => alarmFullScreen().then(setFullScreen))}>
+                Разрешить
+              </button>
+            }
+          />
+        )}
+        <ListRow
+          icon={<IconTile icon={Alarm} tone="orange" size="list" />}
+          title="Проверить будильник"
+          subtitle={native ? 'Напоминание-будильник: включается в окне даты задачи → «Как будильник»' : 'Звонит, пока SuperMind открыт. Включается в окне даты задачи → «Как будильник»'}
+          chevron
+          onClick={() => void testAlarm()}
+        />
       </ListSection>
 
       <PushCard />

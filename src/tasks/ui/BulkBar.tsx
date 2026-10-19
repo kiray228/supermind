@@ -170,7 +170,7 @@ export function BulkBar({ visible }: { visible: string[] }) {
           onDone={(v) => {
             setPicking(false);
             if (!v.date) return;
-            run(() => bulkUpdate(ids, { date: v.date, time: v.time, duration: v.duration, reminders: v.reminders, repeat: v.repeat }, 'Новая дата'));
+            run(() => bulkUpdate(ids, { date: v.date, time: v.time, duration: v.duration, reminders: v.reminders, repeat: v.repeat, alarm: v.alarm }, 'Новая дата'));
           }}
         />
       )}

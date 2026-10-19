@@ -197,10 +197,10 @@ export function useTaskActions(task: TaskItem, occurrence?: string, dragRow?: Re
             if (repeating && future) {
               if (!v.date) return;
               const c = moveOccurrence(task.id, occ!, v.date);
-              if (c && c.id !== task.id) updateTask(c.id, { time: v.time, duration: v.duration, reminders: v.reminders, ...(v.repeat ? { repeat: v.repeat } : {}) });
+              if (c && c.id !== task.id) updateTask(c.id, { time: v.time, duration: v.duration, reminders: v.reminders, alarm: v.alarm, ...(v.repeat ? { repeat: v.repeat } : {}) });
               return;
             }
-            updateTask(task.id, { date: v.date, time: v.time, duration: v.duration, reminders: v.reminders, repeat: v.repeat });
+            updateTask(task.id, { date: v.date, time: v.time, duration: v.duration, reminders: v.reminders, repeat: v.repeat, alarm: v.alarm });
           }}
         />
       )}

@@ -13,6 +13,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(SmCalendarPlugin.class);
         registerPlugin(WidgetBridgePlugin.class);
+        registerPlugin(SmAlarmPlugin.class);
         restored = savedInstanceState != null;
         super.onCreate(savedInstanceState);
     }

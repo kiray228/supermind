@@ -1,4 +1,4 @@
-import { BellRing, X } from 'lucide-react';
+import { AlarmClock, BellRing, X } from 'lucide-react';
 import { dismissReminder, reminderAction, useReminders } from '../sync';
 import './tasks.css';
 
@@ -9,11 +9,9 @@ export function ReminderStack() {
   return (
     <div className="rm-stack" role="alert">
       {items.slice(-3).map((r) => (
-        <div key={r.key} className="rm-card">
+        <div key={r.key} className={`rm-card${r.alarm ? ' rm-alarm' : ''}`}>
           <div className="rm-head">
-            <span className="rm-ico">
-              <BellRing size={18} />
-            </span>
+            <span className="rm-ico">{r.alarm ? <AlarmClock size={18} /> : <BellRing size={18} />}</span>
             <div className="grow">
               <div className="rm-title">{r.title}</div>
               {r.body && <div className="small muted">{r.body}</div>}
@@ -23,6 +21,11 @@ export function ReminderStack() {
             </button>
           </div>
           <div className="rm-actions">
+            {r.alarm && (
+              <button className="btn btn-sm" onClick={() => dismissReminder(r.key)}>
+                Выключить
+              </button>
+            )}
             {r.taskId && (
               <button className="btn btn-sm" onClick={() => reminderAction(r, 'snooze')}>
                 Отложить 10 мин

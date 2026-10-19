@@ -53,6 +53,9 @@ self.addEventListener('push', (e) => {
     data,
     tag,
     renotify: !!tag,
+    // будильник: не исчезает сам и долго вибрирует (звук своим быть не может — у веб-уведомлений только системный)
+    requireInteraction: data.alarm === '1',
+    vibrate: data.alarm === '1' ? [800, 400, 800, 400, 800, 400, 800, 400, 800] : undefined,
     icon: './icon-192.png',
     badge: './icon-192.png',
     actions: data.taskId ? [{ action: 'done', title: '✓ Выполнено' }, { action: 'snooze', title: 'Отложить 10 мин' }] : [],

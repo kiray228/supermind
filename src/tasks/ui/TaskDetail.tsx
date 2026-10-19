@@ -418,7 +418,7 @@ function TaskDetail({ task, onClose }: { task: TaskItem; onClose: () => void }) 
           onClose={() => setPicking(false)}
           onDone={(v) => {
             setPicking(false);
-            save({ date: v.date, time: v.time, duration: v.duration, reminders: v.reminders, repeat: v.repeat });
+            save({ date: v.date, time: v.time, duration: v.duration, reminders: v.reminders, repeat: v.repeat, alarm: v.alarm });
             if (v.date && v.reminders.length && todayYmd() <= v.date) void askNotifyIfNeeded();
           }}
         />

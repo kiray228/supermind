@@ -92,7 +92,7 @@ export function SmartInput({
   const submit = () => {
     const title = parsed.title.trim();
     if (!title) return;
-    const t = addTask({ ...preset, title, date, time, duration, repeat, priority, listId, tags, reminders });
+    const t = addTask({ ...preset, title, date, time, duration, repeat, priority, listId, tags, reminders, ...(manual.alarm ? { alarm: true } : {}) });
     if (!t) return;
     setText('');
     setManual({});
@@ -232,11 +232,11 @@ export function SmartInput({
       )}
       {picking && (
         <DatePicker
-          value={{ date, time, duration, repeat, reminders }}
+          value={{ date, time, duration, repeat, reminders, alarm: manual.alarm }}
           onClose={() => setPicking(false)}
           onDone={(v) => {
             setPicking(false);
-            setManual((m) => ({ ...m, date: v.date, time: v.time, duration: v.duration, repeat: v.repeat, reminders: v.reminders }));
+            setManual((m) => ({ ...m, date: v.date, time: v.time, duration: v.duration, repeat: v.repeat, reminders: v.reminders, alarm: v.alarm }));
             requestAnimationFrame(() => ref.current?.focus());
           }}
         />

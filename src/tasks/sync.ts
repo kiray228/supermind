@@ -9,6 +9,7 @@ import { todayYmd, toYmd, addDaysYmd, fromYmd } from '../utils/mapTasks';
 import { isIOS, downloadText } from '../io/download';
 import { dayLabel, isActive, minutesOf, reminderFires, startAt, timeOf, whenLabel, type TaskItem } from './model';
 import { buildIcs, taskDescription, toRRule, utcStamp } from './ics';
+import { primeAlarmAudio, ringWeb, SmAlarm, stopWeb, type NativeAlarm } from './alarm';
 import { completeOccurrence, getTask, openTask, tasksData, useTasks } from './store';
 import * as hm from '../habits/model';
 
@@ -70,9 +71,15 @@ export interface InAppReminder {
   /** второй мозг: вопрос дня или карточка (данные уведомления — в extra) */
   brain?: string;
   extra?: Record<string, string>;
+  /** будильник: звенит, пока не выключат */
+  alarm?: boolean;
 }
 export const useReminders = create<{ items: InAppReminder[] }>(() => ({ items: [] }));
 export const dismissReminder = (key: string) => useReminders.setState((s) => ({ items: s.items.filter((i) => i.key !== key) }));
+// будильник замолкает, когда на экране не осталось будильников (выключили, отложили или отметили)
+useReminders.subscribe((s) => {
+  if (!s.items.some((i) => i.alarm)) stopWeb();
+});
 
 // ================= Разрешения =================
 
@@ -186,11 +193,11 @@ async function plan(fromMs: number, toMs: number): Promise<Planned[]> {
   // иначе пересчёт расписания после основного напоминания отменял бы уже запланированные повторы
   const back = d.prefs.nag > 0 ? 3 * d.prefs.nag * 60000 : 0;
   for (const f of reminderFires(d.tasks, fromMs - back, toMs)) {
-    const base = { taskId: f.task.id, date: f.date, sm: 1 };
+    const base = { taskId: f.task.id, date: f.date, sm: 1, ...(f.task.alarm ? { alarm: 1 } : {}) };
     if (f.at >= fromMs)
-      out.push({ id: hash(`${f.task.id}|${f.date}|${f.offset}`), at: f.at, title: f.task.title || 'Задача', body: reminderBody(f.task, f.date, f.at), extra: base });
-    // «настойчивое» напоминание — ещё 3 раза, пока задача не выполнена
-    if (d.prefs.nag > 0 && f.offset === Math.max(...f.task.reminders) && !nagSnoozed(f.task.id, f.date))
+      out.push({ id: hash(`${f.task.id}|${f.date}|${f.offset}`), at: f.at, title: (f.task.alarm ? '⏰ ' : '') + (f.task.title || 'Задача'), body: reminderBody(f.task, f.date, f.at), extra: base });
+    // «настойчивое» напоминание — ещё 3 раза, пока задача не выполнена (будильник звенит и так)
+    if (d.prefs.nag > 0 && !f.task.alarm && f.offset === Math.max(...f.task.reminders) && !nagSnoozed(f.task.id, f.date))
       for (let k = 1; k <= 3; k++) {
         const at = f.at + k * d.prefs.nag * 60000;
         if (at >= fromMs && at <= toMs) out.push({ id: hash(`${f.task.id}|${f.date}|nag${k}`), at, title: '⏰ ' + (f.task.title || 'Задача'), body: 'Ещё не выполнено · ' + reminderBody(f.task, f.date, at), extra: base });
@@ -540,11 +547,16 @@ async function snoozeOne(t: TaskItem, minutes: number, forDate?: string) {
 }
 
 async function syncNative() {
+  // задачи ещё не загружены — пустое расписание отменило бы все уведомления и будильники
+  if (!tasksData()) return;
   await setupNative();
   const { LocalNotifications: LN } = await notifications();
   if ((await notifyPermission()) !== 'granted') return;
   const now = Date.now();
-  const want = (await plan(now + 5000, now + HORIZON_DAYS * 86400000)).slice(0, MAX_NATIVE);
+  const planned = (await plan(now + 5000, now + HORIZON_DAYS * 86400000)).slice(0, MAX_NATIVE);
+  // будильники — системным будильником Android (звонит, пока не выключат); без нативного плагина — обычным уведомлением
+  const alarmsOk = await syncAlarms(planned.filter((p) => p.extra.alarm));
+  const want = alarmsOk ? planned.filter((p) => !p.extra.alarm) : planned;
   const pending = (await LN.getPending()).notifications;
   const sig = (p: { title?: string; body?: string; at: number }) => `${p.at}|${p.title}|${p.body}`;
   const wantById = new Map(want.map((w) => [w.id, w]));
@@ -581,6 +593,63 @@ async function syncNative() {
   }
 }
 
+/** Расписание будильников в нативный плагин; false — плагина нет (старая сборка), будильники уйдут уведомлениями */
+async function syncAlarms(list: Planned[]): Promise<boolean> {
+  try {
+    const alarms: NativeAlarm[] = list.slice(0, 100).map((p) => ({
+      id: p.id,
+      at: p.at,
+      title: p.title.replace(/^⏰ /, ''),
+      body: p.body,
+      taskId: String(p.extra.taskId ?? ''),
+      date: String(p.extra.date ?? ''),
+    }));
+    await SmAlarm.sync({ alarms });
+    // отложенные на самом будильнике: задачу уже выполнили — не звонить
+    const stale = (await SmAlarm.list()).alarms.filter((a) => a.snooze && a.taskId && !isActiveTask(a.taskId)).map((a) => a.id);
+    if (stale.length) await SmAlarm.cancel({ ids: stale });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** «Готово», нажатое на будильнике, — отметить задачу (сразу или при следующем открытии приложения) */
+async function takeAlarmActions() {
+  try {
+    const { actions } = await SmAlarm.takeActions();
+    if (!actions.length) return;
+    const { ensureTasks } = await import('./store');
+    await ensureTasks();
+    let n = 0;
+    for (const a of actions) if (a.action === 'done' && a.taskId && completeOccurrence(a.taskId, a.date || undefined)) n++;
+    if (n) toast(n === 1 ? 'Задача отмечена с будильника' : `Отмечено с будильника: ${n}`);
+  } catch {
+    /* старая сборка без будильников */
+  }
+}
+
+/** Проверка будильника: на Android — настоящий, в веб-версии — сигнал на 5 секунд */
+export async function testAlarm() {
+  if (isNative()) {
+    await SmAlarm.test();
+    return;
+  }
+  ringWeb();
+  setTimeout(stopWeb, 5000);
+}
+
+/** Android 14+: разрешено ли показывать будильник поверх экрана блокировки */
+export async function alarmFullScreen(): Promise<'granted' | 'denied' | 'n/a'> {
+  if (!isNative()) return 'n/a';
+  try {
+    return (await SmAlarm.fullScreenAllowed()).allowed ? 'granted' : 'denied';
+  } catch {
+    return 'n/a';
+  }
+}
+export const openAlarmFullScreenSettings = () => SmAlarm.openFullScreenSettings().catch(() => {});
+
 // ---------- Веб (браузер, PWA на iPhone/Android): уведомления, пока приложение открыто ----------
 
 const LAST_KEY = 'sm-notify-last';
@@ -596,9 +665,12 @@ function saveWebSnoozes() {
 
 async function showWeb(title: string, body: string, data: Record<string, string>) {
   const key = `${data.taskId ?? data.habitId ?? data.payId ?? data.goalId ?? data.brain ?? 'brief'}|${data.date ?? ''}|${Date.now()}`;
-  if (document.visibilityState === 'visible') {
-    useReminders.setState((s) => ({ items: [...s.items.filter((i) => i.taskId !== data.taskId || !data.taskId), { key, taskId: data.taskId, habitId: data.habitId, payId: data.payId, briefing: !!data.briefing, saver: !!data.saver, ...(data.goalId ? { goalId: data.goalId } : {}), ...(data.brain ? { brain: data.brain, extra: data } : {}), date: data.date || undefined, title, body }] }));
-    playChime();
+  const alarm = data.alarm === '1';
+  // будильник — и когда окно свёрнуто: звенит, пока не выключат
+  if (document.visibilityState === 'visible' || alarm) {
+    useReminders.setState((s) => ({ items: [...s.items.filter((i) => i.taskId !== data.taskId || !data.taskId), { key, taskId: data.taskId, habitId: data.habitId, payId: data.payId, briefing: !!data.briefing, saver: !!data.saver, ...(data.goalId ? { goalId: data.goalId } : {}), ...(data.brain ? { brain: data.brain, extra: data } : {}), ...(alarm ? { alarm } : {}), date: data.date || undefined, title, body }] }));
+    if (alarm) ringWeb();
+    else playChime();
   }
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
   // с push системное уведомление присылает сервер — второе не нужно
@@ -609,7 +681,8 @@ async function showWeb(title: string, body: string, data: Record<string, string>
     icon: './icon-192.png',
     badge: './icon-192.png',
     data,
-    requireInteraction: !!tasksData()?.prefs.nag,
+    requireInteraction: alarm || !!tasksData()?.prefs.nag,
+    ...(alarm ? { vibrate: [800, 400, 800, 400, 800, 400, 800], renotify: true } : {}),
     actions: data.taskId
       ? [
           { action: 'done', title: '✓ Выполнено' },
@@ -658,7 +731,7 @@ async function webTick() {
     saveWebSnoozes();
     for (const s of fire) {
       const t = getTask(s.taskId);
-      if (t && !t.done) await showWeb(t.title, 'Отложенное напоминание · ' + reminderBody(t, t.date ?? todayYmd()), { taskId: t.id, date: t.date ?? '' });
+      if (t && !t.done) await showWeb((t.alarm ? '⏰ ' : '') + t.title, 'Отложенное напоминание · ' + reminderBody(t, t.date ?? todayYmd()), { taskId: t.id, date: t.date ?? '', ...(t.alarm ? { alarm: '1' } : {}) });
     }
   }
 }
@@ -885,8 +958,14 @@ export function initTaskSync() {
       if (!asked && (await notifyPermission()) === 'prompt') await requestNotifyPermission();
     });
     void import('@capacitor/app').then(({ App }) =>
-      App.addListener('resume', () => syncSoon(300)),
+      App.addListener('resume', () => {
+        syncSoon(300);
+        void takeAlarmActions();
+      }),
     );
+    // «Готово» на будильнике: пока приложение открыто — сразу, иначе — при запуске
+    void SmAlarm.addListener('actions', () => void takeAlarmActions()).catch(() => {});
+    setTimeout(() => void takeAlarmActions(), 1500);
   } else {
     try {
       webSnoozes = JSON.parse(localStorage.getItem('sm-snoozes') ?? '[]');
@@ -894,6 +973,7 @@ export function initTaskSync() {
       webSnoozes = [];
     }
     webTimer ??= setInterval(() => void webTick(), 15000);
+    primeAlarmAudio();
     document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && void webTick());
     setTimeout(() => void webTick(), 3000);
     // нажатие на уведомление / кнопку в нём (из service worker)

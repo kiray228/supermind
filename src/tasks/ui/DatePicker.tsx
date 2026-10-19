@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Bell, CalendarClock, ChevronLeft, ChevronRight, Clock, Plus, Repeat, Sun, Sunrise, CalendarX2, X, CalendarRange } from 'lucide-react';
+import { AlarmClock, Bell, CalendarClock, ChevronLeft, ChevronRight, Clock, Plus, Repeat, Sun, Sunrise, CalendarX2, X, CalendarRange } from 'lucide-react';
 import { addDaysYmd, fromYmd, todayYmd, toYmd } from '../../utils/mapTasks';
 import {
   ALLDAY_REMINDER_OPTIONS,
@@ -17,10 +17,20 @@ import {
   type TaskItem,
 } from '../model';
 import { tasksData } from '../store';
+import { Switch } from '../../ui/list';
+import { isNative } from '../../platform';
+import { isIOS } from '../../io/download';
 
-export type When = Pick<TaskItem, 'date' | 'time' | 'duration' | 'reminders' | 'repeat'>;
+export type When = Pick<TaskItem, 'date' | 'time' | 'duration' | 'reminders' | 'repeat' | 'alarm'>;
 
 const DURATIONS = [15, 30, 45, 60, 90, 120, 180];
+
+/** Что умеет будильник на этом устройстве */
+const ALARM_HINT = isNative()
+  ? 'Звонит громко и по кругу, пока не выключите, — даже на заблокированном экране'
+  : isIOS()
+    ? 'Звонит, пока SuperMind открыт. Закрытое приложение на iPhone звонить не может — придёт обычное уведомление'
+    : 'Звонит громко и по кругу, пока SuperMind открыт (можно свёрнутым)';
 
 /** Выбор даты, времени, длительности, напоминаний и повтора (как в TickTick) */
 export function DatePicker({ value, onDone, onClose }: { value: When; onDone: (v: When) => void; onClose: () => void }) {
@@ -131,6 +141,16 @@ export function DatePicker({ value, onDone, onClose }: { value: When; onDone: (v
               </span>
             ))}
           </div>
+          {v.reminders.length > 0 && (
+            <label className="dp-row dp-alarm">
+              <AlarmClock className="dp-ico" />
+              <span className="grow">
+                Как будильник
+                <small>{ALARM_HINT}</small>
+              </span>
+              <Switch checked={!!v.alarm} onChange={(on) => setV((x) => ({ ...x, alarm: on || undefined }))} />
+            </label>
+          )}
           {addRem && (
             <div className="dp-rem-pick">
               {remOptions.map((o) => (
