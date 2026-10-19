@@ -4,8 +4,11 @@ import './index.css';
 import App from './App';
 import { setupPlatform } from './platform';
 import { mark, reportPerf } from './perf';
+import { installErrorReporting } from './ui/errorReport';
 
 mark('main');
+// ошибки — в журнал для диагностики и (если не выключено) в отчёты владельцу
+installErrorReporting();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

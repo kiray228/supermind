@@ -53,3 +53,30 @@
 .sp-card-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .sp-card-actions .btn { display: inline-flex; align-items: center; gap: 6px; }
 .sp-link { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-size: 15px; cursor: pointer; }
+
+/* Вопросы, переписка и ошибки */
+.sp-kind.question { background: #1667ff; }
+.sp-history .sp-item-body { flex: 1; }
+.sp-item-head { display: block; width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.sp-item-text.full { display: block; -webkit-line-clamp: unset; white-space: pre-wrap; }
+.sp-dot { color: var(--accent); font-weight: 600; }
+.sp-answer { align-self: stretch; text-align: left; white-space: pre-wrap; font-size: 16px; line-height: 1.45; padding: 12px 14px; border-radius: 14px; background: var(--surface-2); }
+.sp-thread { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.sp-msg { max-width: 88%; align-self: flex-start; padding: 8px 12px; border-radius: 14px; background: var(--surface-2); font-size: 15px; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
+.sp-card .sp-msg { background: var(--surface); }
+.sp-msg.mine { align-self: flex-end; background: color-mix(in srgb, var(--accent) 16%, var(--surface-2)); }
+.sp-msg.ai:not(.mine) { background: color-mix(in srgb, #7c3aed 14%, var(--surface-2)); }
+.sp-msg > span { display: flex; align-items: center; gap: 3px; font-size: 12px; color: var(--text-2); margin-bottom: 2px; }
+.sp-compose { display: flex; gap: 8px; align-items: flex-end; margin-top: 8px; }
+.sp-compose textarea { flex: 1; min-width: 0; resize: vertical; border: 0; outline: none; border-radius: 12px; background: var(--surface-2); color: var(--text); font: inherit; font-size: 15px; line-height: 1.4; padding: 8px 12px; }
+.sp-compose .btn { min-height: 40px; display: inline-flex; align-items: center; }
+.sp-filter { display: flex; gap: 6px; margin-top: -4px; }
+.sp-filter button { min-height: 32px; padding: 0 12px; border-radius: 999px; border: 0; background: var(--surface-2); color: var(--text-2); font: inherit; font-size: 14px; cursor: pointer; }
+.sp-filter button.active { background: var(--text); color: var(--bg); }
+.sp-card-links { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.sp-card-links:empty { display: none; }
+.sp-pre { margin: 0; max-height: 280px; overflow: auto; padding: 10px 12px; border-radius: 12px; background: var(--surface); font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.sp-mono { font: 14px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.sp-status.ignored { opacity: 0.7; }
+details > summary.sp-link { list-style: none; }
+details > summary.sp-link::-webkit-details-marker { display: none; }

@@ -209,10 +209,10 @@ test('входящие поддержки: владелец видит все о
   assert.match(m.text, /Будильник без звука/);
 
   // пользователь видит ответ у себя, заметку — нет
-  const mine = await req<{ items: { id: string; status: string; reply?: string; note?: string }[] }>('GET', '/feedback', undefined, user);
+  const mine = await req<{ items: { id: string; status: string; messages: { author: string; text: string }[]; note?: string }[] }>('GET', '/feedback', undefined, user);
   const own = mine.data.items.find((x) => x.id === id)!;
   assert.equal(own.status, 'answered');
-  assert.equal(own.reply, 'Спасибо! Сделаем звук в приложении.');
+  assert.deepEqual(own.messages.map((x) => [x.author, x.text]), [['support', 'Спасибо! Сделаем звук в приложении.']]);
   assert.equal(own.note, undefined);
 
   // «Решено» с письмом пользователю — один раз, повторный выбор статуса письмо не дублирует
@@ -491,4 +491,113 @@ test('вход и регистрация: ограничение по IP; вос
   await call('POST', '/auth/forgot', { email: 'victim@b.cd' });
   await sql.query(`UPDATE password_resets SET created_at = now() - interval '3 hours' WHERE email = 'victim@b.cd'`);
   assert.equal((await call('POST', '/auth/forgot', { email: 'victim@b.cd' })).status, 429, 'шестой код за сутки');
+});
+
+test('поддержка: автоответ ИИ на вопрос, переписка в обращении, сведения для диагностики', async () => {
+  const pushed: string[] = [];
+  const supApp = createApp({
+    mail: async (m) => void mails.push(m),
+    supportEmail: 'owner@b.cd',
+    adminEmails: ['chief@b.cd'],
+    sql,
+    pushHostOk: () => true,
+    push: async (_sub, payload) => (pushed.push((payload as { title: string }).title), { status: 201, gone: false }),
+    ai: async (system, user) => {
+      assert.match(system, /СПРАВКА/);
+      return typeof user === 'string' && user.includes('погод') ? 'НЕ_ЗНАЮ' : 'Откройте Задачи и нажмите «+».';
+    },
+  });
+  const req = async <T = Record<string, unknown>>(method: string, path: string, body?: unknown, token?: string) => {
+    const r = await supApp.fetch(
+      new Request('http://x' + path, {
+        method,
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      }),
+    );
+    return { status: r.status, data: (await r.json()) as T };
+  };
+  const chief = (await req<{ token: string }>('POST', '/auth/register', { email: 'chief@b.cd', password: '12345678' })).data.token;
+  const user = (await req<{ token: string }>('POST', '/auth/register', { email: 'q@b.cd', password: '12345678' })).data.token;
+  const other = (await req<{ token: string }>('POST', '/auth/register', { email: 'q2@b.cd', password: '12345678' })).data.token;
+  await req('POST', '/devices', { subscription: { endpoint: 'https://push.example/chief', keys: { p256dh: 'p', auth: 'a' } } }, chief);
+
+  // вопрос из справки — ответ сразу, статус «Есть ответ»
+  const q = await req<{ id: string; answer?: string }>('POST', '/feedback', { kind: 'question', text: 'Как добавить задачу?', diag: { errors: [{ message: 'boom' }] } }, user);
+  assert.equal(q.status, 201);
+  assert.equal(q.data.answer, 'Откройте Задачи и нажмите «+».');
+  assert.match(pushed.at(-1)!, /вопрос №\d+ · ИИ ответил/);
+  // вне справки — без автоответа, ждёт человека
+  const q2 = await req<{ id: string; answer?: string }>('POST', '/feedback', { kind: 'question', text: 'Какая завтра погода?' }, user);
+  assert.equal(q2.data.answer, undefined);
+
+  type Mine = { items: { id: string; kind: string; status: string; messages: { author: string; text: string }[] }[] };
+  let mine = await req<Mine>('GET', '/feedback', undefined, user);
+  const item = mine.data.items.find((x) => x.id === q.data.id)!;
+  assert.equal(item.kind, 'question');
+  assert.equal(item.status, 'answered');
+  assert.deepEqual(item.messages.map((x) => x.author), ['ai']);
+  assert.equal(mine.data.items.find((x) => x.id === q2.data.id)!.status, 'new');
+
+  // «не помогло» — сообщение в обращение, у владельца оно снова новое; в чужое обращение — нельзя
+  assert.equal((await req('POST', `/feedback/${q.data.id}/messages`, { text: 'Не помогло, кнопки нет' }, other)).status, 404);
+  assert.equal((await req('POST', `/feedback/${q.data.id}/messages`, { text: 'Не помогло, кнопки нет' }, user)).status, 201);
+  assert.match(pushed.at(-1)!, /новое сообщение/);
+  type Inbox = { items: { id: string; status: string; hasDiag: boolean; messages: { author: string; text: string }[] }[] };
+  let inbox = await req<Inbox>('GET', '/admin/feedback', undefined, chief);
+  let it = inbox.data.items.find((x) => x.id === q.data.id)!;
+  assert.equal(it.status, 'new');
+  assert.equal(it.hasDiag, true);
+  assert.deepEqual(it.messages.map((x) => x.author), ['ai', 'user']);
+  const diag = await req<{ diag: { errors: { message: string }[] } }>('GET', `/admin/feedback/${q.data.id}/diag`, undefined, chief);
+  assert.equal(diag.data.diag.errors[0].message, 'boom');
+  assert.equal((await req('GET', `/admin/feedback/${q2.data.id}/diag`, undefined, chief)).status, 404);
+
+  // ответ владельца — третье сообщение, пользователь видит всю переписку
+  await req('POST', `/admin/feedback/${q.data.id}/reply`, { text: 'Кнопка «+» внизу справа' }, chief);
+  mine = await req<Mine>('GET', '/feedback', undefined, user);
+  assert.deepEqual(mine.data.items.find((x) => x.id === q.data.id)!.messages.map((x) => x.author), ['ai', 'user', 'support']);
+  inbox = await req<Inbox>('GET', '/admin/feedback', undefined, chief);
+  it = inbox.data.items.find((x) => x.id === q.data.id)!;
+  assert.equal(it.status, 'answered');
+});
+
+test('отчёты об ошибках: без входа, одинаковые ошибки — одна строка, владелец разбирает', async () => {
+  const errApp = createApp({ mail: null, adminEmails: ['err-boss@b.cd'], sql, pushHostOk: () => true });
+  const req = async <T = Record<string, unknown>>(method: string, path: string, body?: unknown, token?: string) => {
+    const r = await errApp.fetch(
+      new Request('http://x' + path, {
+        method,
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      }),
+    );
+    return { status: r.status, data: (await r.json()) as T };
+  };
+  const err = (line: number, file: string) => ({
+    message: `Cannot read properties of undefined (reading 'title') at item ${line}`,
+    stack: `TypeError: x\n    at render (https://kiray228.github.io/supermind/assets/${file}:1:${line})`,
+    version: '1.43.0',
+    platform: 'Android · приложение',
+    view: 'tasks',
+  });
+  assert.equal((await req('POST', '/errors', { errors: [err(10, 'index-AbCdEf12.js'), err(99, 'index-ZyXwVu98.js')] })).status, 200);
+  await req('POST', '/errors', { errors: [{ ...err(5, 'index-Qq11Ww22.js'), count: 3 }, { message: '' }, 'мусор'] });
+  await req('POST', '/errors', { errors: [{ ...err(5, 'index-Qq11Ww22.js'), version: '1.44.0' }] });
+
+  const boss = (await req<{ token: string }>('POST', '/auth/register', { email: 'err-boss@b.cd', password: '12345678' })).data.token;
+  const user = (await req<{ token: string }>('POST', '/auth/register', { email: 'err-user@b.cd', password: '12345678' })).data.token;
+  assert.equal((await req('GET', '/admin/errors', undefined, user)).status, 403);
+  type Errs = { items: { id: string; message: string; version: string; count: number; status: string; note: string }[] };
+  let list = await req<Errs>('GET', '/admin/errors', undefined, boss);
+  const mine = list.data.items.filter((x) => x.message.startsWith('Cannot read properties'));
+  assert.equal(mine.length, 2, 'одна ошибка в двух версиях');
+  const v43 = mine.find((x) => x.version === '1.43.0')!;
+  assert.equal(v43.count, 5);
+  assert.equal((await req('PATCH', `/admin/errors/${v43.id}`, { status: 'wrong' }, boss)).status, 400);
+  assert.equal((await req('PATCH', `/admin/errors/${v43.id}`, { status: 'done', note: 'Исправлено в 1.44' }, boss)).status, 200);
+  list = await req<Errs>('GET', '/admin/errors', undefined, boss);
+  assert.equal(list.data.items.some((x) => x.id === v43.id), false);
+  list = await req<Errs>('GET', '/admin/errors?status=all', undefined, boss);
+  assert.equal(list.data.items.find((x) => x.id === v43.id)!.note, 'Исправлено в 1.44');
 });

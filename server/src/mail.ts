@@ -83,7 +83,7 @@ export function resetMail(to: string, name: string, code: string): Mail {
 
 /** Обращение в поддержку — письмо владельцу */
 export function feedbackMail(to: string, f: { id: string; kind: string; text: string; email: string; name: string; meta: string; image?: string }): Mail {
-  const title = f.kind === 'idea' ? 'Идея' : 'Проблема';
+  const title = f.kind === 'idea' ? 'Идея' : f.kind === 'question' ? 'Вопрос' : 'Проблема';
   return {
     to,
     replyTo: f.email,
@@ -101,18 +101,19 @@ export function feedbackMail(to: string, f: { id: string; kind: string; text: st
 
 /** Ответ владельца на обращение — письмо пользователю (ответить можно прямо на письмо) */
 export function replyMail(to: string, f: { id: string; kind: string; text: string; reply: string; replyTo?: string }): Mail {
-  const title = f.kind === 'idea' ? 'вашу идею' : 'ваше обращение';
+  const title = f.kind === 'idea' ? 'вашу идею' : f.kind === 'question' ? 'ваш вопрос' : 'ваше обращение';
   const quote = f.text.length > 600 ? f.text.slice(0, 600) + '…' : f.text;
   return {
     to,
     replyTo: f.replyTo,
     subject: `SuperMind · ответ на ${title} №${f.id}`,
-    text: `${f.reply}\n\n— Команда SuperMind\n\nВы писали (№${f.id}):\n${quote}`,
+    text: `${f.reply}\n\n— Команда SuperMind\n\nВы писали (№${f.id}):\n${quote}\n\nПродолжить разговор можно в приложении: Настройки → Поддержка → Мои обращения.`,
     html: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;max-width:560px">
 <div style="white-space:pre-wrap;font-size:16px;line-height:1.5">${esc(f.reply)}</div>
 <p style="margin:14px 0 18px;font-size:15px;color:#3c3c43">— Команда SuperMind</p>
 <p style="margin:0 0 4px;color:#8e8e93;font-size:13px">Вы писали (№${esc(f.id)}):</p>
-<div style="white-space:pre-wrap;font-size:14px;line-height:1.5;color:#3c3c43;background:#f2f2f7;border-radius:12px;padding:12px 14px">${esc(quote)}</div></div>`,
+<div style="white-space:pre-wrap;font-size:14px;line-height:1.5;color:#3c3c43;background:#f2f2f7;border-radius:12px;padding:12px 14px">${esc(quote)}</div>
+<p style="margin:14px 0 0;color:#8e8e93;font-size:13px">Продолжить разговор можно в приложении: Настройки → Поддержка → Мои обращения.</p></div>`,
   };
 }
 

@@ -131,6 +131,34 @@ export const SCHEMA = [
   `ALTER TABLE feedback ADD COLUMN IF NOT EXISTS replied_at timestamptz`,
   `ALTER TABLE feedback ADD COLUMN IF NOT EXISTS note text NOT NULL DEFAULT ''`,
   `ALTER TABLE feedback ADD COLUMN IF NOT EXISTS updated_at timestamptz`,
+  // сведения для диагностики (последние ошибки, синхронизация) — только если пользователь согласился
+  `ALTER TABLE feedback ADD COLUMN IF NOT EXISTS diag text`,
+  // переписка в обращении: уточнения пользователя, ответы поддержки и автоответ ИИ
+  `CREATE TABLE IF NOT EXISTS feedback_messages (
+    id bigserial PRIMARY KEY,
+    feedback_id bigint NOT NULL REFERENCES feedback(id) ON DELETE CASCADE,
+    author text NOT NULL,
+    text text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`,
+  `CREATE INDEX IF NOT EXISTS feedback_messages_fb ON feedback_messages (feedback_id, id)`,
+  // отчёты об ошибках приложения: одна строка на ошибку (отпечаток) в каждой версии
+  `CREATE TABLE IF NOT EXISTS client_errors (
+    id bigserial PRIMARY KEY,
+    fingerprint text NOT NULL,
+    version text NOT NULL,
+    message text NOT NULL,
+    stack text NOT NULL DEFAULT '',
+    platform text NOT NULL DEFAULT '',
+    view text NOT NULL DEFAULT '',
+    count integer NOT NULL DEFAULT 1,
+    first_at timestamptz NOT NULL DEFAULT now(),
+    last_at timestamptz NOT NULL DEFAULT now(),
+    status text NOT NULL DEFAULT 'new',
+    note text NOT NULL DEFAULT '',
+    UNIQUE (fingerprint, version)
+  )`,
+  `CREATE INDEX IF NOT EXISTS client_errors_last ON client_errors (last_at DESC)`,
   `CREATE TABLE IF NOT EXISTS ai_usage (
     user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     day date NOT NULL,

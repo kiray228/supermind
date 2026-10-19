@@ -1,20 +1,21 @@
 /**
  * Входящие поддержки — только для владельца (сервер пускает адреса из ADMIN_EMAILS).
- * Все обращения пользователей: статус, разбор (видит только владелец) и ответ — он уходит письмом
- * и виден пользователю в «Мои обращения».
+ *  · Обращения: переписка с пользователем (ответ уходит письмом и виден ему в «Мои обращения»), статус, разбор
+ *    (видит только владелец), снимок экрана и сведения для диагностики.
+ *  · Ошибки: автоматические отчёты приложения — что падает, сколько раз, в какой версии.
  */
 import { useEffect, useState } from 'react';
 import { create } from 'zustand';
-import { Bug, Lightbulb, ArrowClockwise, Image as ImageIcon, PaperPlaneTilt } from '@phosphor-icons/react';
+import { ArrowClockwise, Image as ImageIcon, PaperPlaneTilt, Stethoscope, Bug } from '@phosphor-icons/react';
 import { api, useCloud } from '../store/cloud';
 import { toast } from '../store/appStore';
 import { confirmDialog } from './dialogs';
-import { STATUS_LABEL } from './Support';
+import { KIND_ICON, STATUS_LABEL, Thread, when, type Kind, type Msg } from './Support';
 import './support.css';
 
 interface InboxItem {
   id: string;
-  kind: 'problem' | 'idea';
+  kind: Kind;
   text: string;
   status: string;
   at: number;
@@ -22,18 +23,34 @@ interface InboxItem {
   name: string;
   meta: string;
   hasImage: boolean;
-  reply: string;
-  repliedAt: number | null;
+  hasDiag: boolean;
+  note: string;
+  messages: Msg[];
+}
+
+interface ClientError {
+  id: string;
+  message: string;
+  stack: string;
+  version: string;
+  platform: string;
+  view: string;
+  count: number;
+  firstAt: number;
+  lastAt: number;
+  status: string;
   note: string;
 }
 
 const STATUSES = ['new', 'seen', 'planned', 'answered', 'done', 'rejected'] as const;
+const ERROR_STATUS: Record<string, string> = { new: 'Новая', seen: 'Просмотрена', planned: 'В планах', done: 'Исправлена', ignored: 'Не важно' };
+const NAMES: Record<Msg['author'], string> = { user: 'Пользователь', support: 'Вы', ai: 'Автоответ ИИ' };
 
 const useInbox = create<{ open: boolean; admin: boolean; checkedFor?: string; openCount?: number }>(() => ({ open: false, admin: false }));
 export const openInbox = () => useInbox.setState({ open: true });
 const close = () => useInbox.setState({ open: false });
 
-/** Владелец ли этот аккаунт (спрашиваем сервер один раз на вход) и сколько открытых обращений */
+/** Владелец ли этот аккаунт (спрашиваем сервер один раз на вход) и сколько новых обращений */
 export function useSupportAdmin(): { admin: boolean; openCount?: number } {
   const token = useCloud((s) => s.account?.token);
   const admin = useInbox((s) => s.admin);
@@ -54,7 +71,7 @@ export function useSupportAdmin(): { admin: boolean; openCount?: number } {
   return { admin, openCount };
 }
 
-const when = (ms: number) => new Date(ms).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export function InboxHost() {
   const open = useInbox((s) => s.open);
@@ -62,30 +79,41 @@ export function InboxHost() {
 }
 
 function InboxSheet() {
+  const [tab, setTab] = useState<'feedback' | 'errors'>('feedback');
   const [all, setAll] = useState(false);
   const [items, setItems] = useState<InboxItem[] | null>(null);
+  const [errors, setErrors] = useState<ClientError[] | null>(null);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState(false);
 
   const load = async () => {
     setBusy(true);
     try {
-      const r = await api<{ items: InboxItem[]; counts: Record<string, number> }>(`/admin/feedback${all ? '?status=all' : ''}`);
-      setItems(r.items);
-      setCounts(r.counts);
-      useInbox.setState({ openCount: r.counts.new ?? 0 });
+      const q = all ? '?status=all' : '';
+      if (tab === 'feedback') {
+        const r = await api<{ items: InboxItem[]; counts: Record<string, number> }>(`/admin/feedback${q}`);
+        setItems(r.items);
+        setCounts(r.counts);
+        useInbox.setState({ openCount: r.counts.new ?? 0 });
+      } else {
+        const r = await api<{ items: ClientError[]; counts: Record<string, number> }>(`/admin/errors${q}`);
+        setErrors(r.items);
+        setCounts(r.counts);
+      }
     } catch (e) {
-      toast(e instanceof Error ? e.message : String(e));
-      setItems([]);
+      toast(errText(e));
+      if (tab === 'feedback') setItems([]);
+      else setErrors([]);
     } finally {
       setBusy(false);
     }
   };
-  useEffect(() => void load(), [all]);
+  useEffect(() => void load(), [all, tab]);
 
-  const patch = (id: string, change: Partial<InboxItem>) => setItems((list) => list?.map((x) => (x.id === id ? { ...x, ...change } : x)) ?? null);
-  const open = Object.entries(counts).reduce((n, [st, c]) => (st === 'done' || st === 'rejected' ? n : n + c), 0);
+  const closed = tab === 'feedback' ? ['done', 'rejected'] : ['done', 'ignored'];
+  const open = Object.entries(counts).reduce((n, [st, c]) => (closed.includes(st) ? n : n + c), 0);
   const total = Object.values(counts).reduce((n, c) => n + c, 0);
+  const list = tab === 'feedback' ? items : errors;
 
   return (
     <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && close()}>
@@ -101,6 +129,14 @@ function InboxSheet() {
         </div>
 
         <div className="segmented sp-seg">
+          <button className={tab === 'feedback' ? 'active' : ''} onClick={() => setTab('feedback')}>
+            Обращения
+          </button>
+          <button className={tab === 'errors' ? 'active' : ''} onClick={() => setTab('errors')}>
+            <Bug size={16} /> Ошибки
+          </button>
+        </div>
+        <div className="sp-filter">
           <button className={!all ? 'active' : ''} onClick={() => setAll(false)}>
             Открытые · {open}
           </button>
@@ -109,24 +145,44 @@ function InboxSheet() {
           </button>
         </div>
 
-        {items === null ? (
+        {list === null ? (
           <p className="sp-note">Загружаю…</p>
-        ) : items.length === 0 ? (
-          <p className="sp-note">{all ? 'Обращений пока нет' : 'Все обращения разобраны'}</p>
+        ) : list.length === 0 ? (
+          <p className="sp-note">{tab === 'errors' ? (all ? 'Отчётов об ошибках пока нет' : 'Открытых ошибок нет') : all ? 'Обращений пока нет' : 'Все обращения разобраны'}</p>
+        ) : tab === 'feedback' ? (
+          items!.map((it) => <InboxCard key={it.id} it={it} onChange={(c) => setItems((l) => l?.map((x) => (x.id === it.id ? { ...x, ...c } : x)) ?? null)} />)
         ) : (
-          items.map((it) => <InboxCard key={it.id} it={it} onChange={(c) => patch(it.id, c)} />)
+          errors!.map((er) => <ErrorCard key={er.id} er={er} onChange={(c) => setErrors((l) => l?.map((x) => (x.id === er.id ? { ...x, ...c } : x)) ?? null)} />)
         )}
       </div>
     </div>
   );
 }
 
+/** Разбор — заметка только для владельца (её же пишет ежедневный разбор Claude) */
+function NoteField({ value, onSave }: { value: string; onSave: (note: string) => void }) {
+  const [note, setNote] = useState(value);
+  return (
+    <label className="sp-field">
+      <span>Разбор (видите только вы)</span>
+      <textarea
+        rows={note ? Math.min(8, note.split('\n').length + 1) : 1}
+        value={note}
+        placeholder="Причина, что сделать, ветка с исправлением…"
+        onChange={(e) => setNote(e.target.value)}
+        onBlur={() => note !== value && onSave(note)}
+      />
+    </label>
+  );
+}
+
 function InboxCard({ it, onChange }: { it: InboxItem; onChange: (c: Partial<InboxItem>) => void }) {
-  const [note, setNote] = useState(it.note);
   const [reply, setReply] = useState('');
   const [replying, setReplying] = useState(false);
   const [image, setImage] = useState<string | null>(null);
+  const [diag, setDiag] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const Icon = KIND_ICON[it.kind] ?? Bug;
 
   const save = async (change: { status?: string; note?: string }) => {
     // «Решено» — предложить письмо пользователю (у него обращение сменит статус и без письма)
@@ -142,37 +198,41 @@ function InboxCard({ it, onChange }: { it: InboxItem; onChange: (c: Partial<Inbo
       onChange(change);
       if (notify) toast(r.mailed ? 'Письмо отправлено' : 'Статус сохранён, письмо не ушло');
     } catch (e) {
-      toast(e instanceof Error ? e.message : String(e));
+      toast(errText(e));
     }
   };
 
   const send = async () => {
     setBusy(true);
     try {
-      const r = await api<{ mailed: boolean }>(`/admin/feedback/${it.id}/reply`, { method: 'POST', body: JSON.stringify({ text: reply.trim() }) });
-      onChange({ reply: reply.trim(), repliedAt: Date.now(), status: 'answered' });
+      const text = reply.trim();
+      const r = await api<{ mailed: boolean }>(`/admin/feedback/${it.id}/reply`, { method: 'POST', body: JSON.stringify({ text }) });
+      onChange({ messages: [...it.messages, { author: 'support', text, at: Date.now() }], status: 'answered' });
       setReply('');
       setReplying(false);
       toast(r.mailed ? 'Ответ отправлен на почту' : 'Ответ сохранён — письмо не ушло, пользователь увидит его в приложении');
     } catch (e) {
-      toast(e instanceof Error ? e.message : String(e));
+      toast(errText(e));
     } finally {
       setBusy(false);
     }
   };
 
-  const showImage = async () => {
+  const load = async (what: 'image' | 'diag') => {
     try {
-      setImage((await api<{ image: string }>(`/admin/feedback/${it.id}/image`)).image);
+      if (what === 'image') setImage((await api<{ image: string }>(`/admin/feedback/${it.id}/image`)).image);
+      else setDiag(JSON.stringify((await api<{ diag: unknown }>(`/admin/feedback/${it.id}/diag`)).diag, null, 2));
     } catch (e) {
-      toast(e instanceof Error ? e.message : String(e));
+      toast(errText(e));
     }
   };
 
   return (
     <div className="sp-card">
       <div className="sp-card-head">
-        <span className={`sp-kind ${it.kind}`}>{it.kind === 'idea' ? <Lightbulb size={16} weight="fill" /> : <Bug size={16} weight="fill" />}</span>
+        <span className={`sp-kind ${it.kind}`}>
+          <Icon size={16} weight="fill" />
+        </span>
         <div className="sp-item-body">
           <div className="sp-card-who">{it.name || it.email}</div>
           <div className="sp-item-meta">
@@ -192,32 +252,24 @@ function InboxCard({ it, onChange }: { it: InboxItem; onChange: (c: Partial<Inbo
       <div className="sp-card-text">{it.text}</div>
       {it.meta && <div className="sp-item-meta">{it.meta}</div>}
 
-      {it.hasImage &&
-        (image ? (
-          <img className="sp-card-img" src={`data:image/jpeg;base64,${image}`} alt="Снимок экрана" />
-        ) : (
-          <button className="sp-link" onClick={() => void showImage()}>
-            <ImageIcon size={16} weight="duotone" /> Показать снимок
+      <div className="sp-card-links">
+        {it.hasImage && !image && (
+          <button className="sp-link" onClick={() => void load('image')}>
+            <ImageIcon size={16} weight="duotone" /> Снимок экрана
           </button>
-        ))}
+        )}
+        {it.hasDiag && diag === null && (
+          <button className="sp-link" onClick={() => void load('diag')}>
+            <Stethoscope size={16} weight="duotone" /> Сведения для диагностики
+          </button>
+        )}
+      </div>
+      {image && <img className="sp-card-img" src={`data:image/jpeg;base64,${image}`} alt="Снимок экрана" />}
+      {diag !== null && <pre className="sp-pre">{diag}</pre>}
 
-      <label className="sp-field">
-        <span>Разбор (видите только вы)</span>
-        <textarea
-          rows={note ? 3 : 1}
-          value={note}
-          placeholder="Причина, что сделать, ветка с исправлением…"
-          onChange={(e) => setNote(e.target.value)}
-          onBlur={() => note !== it.note && void save({ note })}
-        />
-      </label>
+      <Thread messages={it.messages} mine={['support']} names={NAMES} />
 
-      {it.reply && (
-        <div className="sp-reply">
-          <span>Ваш ответ · {it.repliedAt ? when(it.repliedAt) : ''}</span>
-          {it.reply}
-        </div>
-      )}
+      <NoteField value={it.note} onSave={(note) => void save({ note })} />
 
       {replying ? (
         <div className="sp-field">
@@ -233,9 +285,54 @@ function InboxCard({ it, onChange }: { it: InboxItem; onChange: (c: Partial<Inbo
         </div>
       ) : (
         <button className="sp-link" onClick={() => setReplying(true)}>
-          <PaperPlaneTilt size={16} weight="duotone" /> {it.reply ? 'Ответить ещё' : 'Ответить'}
+          <PaperPlaneTilt size={16} weight="duotone" /> {it.messages.some((m) => m.author === 'support') ? 'Ответить ещё' : 'Ответить'}
         </button>
       )}
+    </div>
+  );
+}
+
+function ErrorCard({ er, onChange }: { er: ClientError; onChange: (c: Partial<ClientError>) => void }) {
+  const save = async (change: { status?: string; note?: string }) => {
+    try {
+      await api(`/admin/errors/${er.id}`, { method: 'PATCH', body: JSON.stringify(change) });
+      onChange(change);
+    } catch (e) {
+      toast(errText(e));
+    }
+  };
+  return (
+    <div className="sp-card">
+      <div className="sp-card-head">
+        <span className="sp-kind problem">
+          <Bug size={16} weight="fill" />
+        </span>
+        <div className="sp-item-body">
+          <div className="sp-card-who">
+            ×{er.count} · версия {er.version || '?'}
+          </div>
+          <div className="sp-item-meta">
+            {er.platform}
+            {er.view ? ` · раздел ${er.view}` : ''} · последняя {when(er.lastAt)}
+            {er.firstAt !== er.lastAt ? ` · первая ${when(er.firstAt)}` : ''}
+          </div>
+        </div>
+        <select className={`sp-status ${er.status}`} value={er.status} onChange={(e) => void save({ status: e.target.value })} aria-label="Статус">
+          {Object.entries(ERROR_STATUS).map(([s, label]) => (
+            <option key={s} value={s}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="sp-card-text sp-mono">{er.message}</div>
+      {er.stack && (
+        <details>
+          <summary className="sp-link">Стек</summary>
+          <pre className="sp-pre">{er.stack}</pre>
+        </details>
+      )}
+      <NoteField value={er.note} onSave={(note) => void save({ note })} />
     </div>
   );
 }

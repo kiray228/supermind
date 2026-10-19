@@ -1,5 +1,6 @@
 import { Component, type ReactNode } from 'react';
 import { useApp } from '../store/appStore';
+import { recordError } from './errorReport';
 
 /**
  * Ошибка при отрисовке раздела (например, повреждённая карта из файла) — вместо белого экрана
@@ -14,6 +15,7 @@ export class ViewBoundary extends Component<{ children: ReactNode }, { error: Er
 
   componentDidCatch(error: Error) {
     console.error('Раздел не отрисовался', error);
+    recordError(error, 'crash');
   }
 
   render() {

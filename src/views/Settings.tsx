@@ -27,7 +27,8 @@ import { AI_MODELS, streamText, AIError } from '../ai/claude';
 import { openWhatsNew } from '../onboarding/state';
 import { openSupport, SupportHost } from '../ui/Support';
 import { InboxHost, openInbox, useSupportAdmin } from '../ui/SupportInbox';
-import { Bug, Lightbulb, Tray } from '@phosphor-icons/react';
+import { Bug, Lightbulb, Question, Tray, Warning } from '@phosphor-icons/react';
+import { errorReportsOn, setErrorReports } from '../ui/errorReport';
 import { APP_VERSION } from '../store/safety';
 import { IconTile } from '../ui/icons';
 import { ListCell, ListRow, ListSection, SelectRow, SwitchRow } from '../ui/list';
@@ -61,6 +62,7 @@ export default function Settings() {
   const settings = useApp((s) => s.settings);
   const setSettings = useApp((s) => s.setSettings);
   const support = useSupportAdmin();
+  const [errorReports, setErrorReportsState] = useState(errorReportsOn);
   const [key, setKey] = useState(settings.apiKey);
   // настройки читаются из базы после запуска: раздел, открытый сразу, сначала видит пустой ключ —
   // подхватить сохранённый, иначе «Сохранить»/«Проверить» стёрли бы его
@@ -262,12 +264,26 @@ export default function Settings() {
             />
           </ListSection>
 
-          <ListSection header="Поддержка" footer="Нашли ошибку или есть идея? Напишите — ответим на почту аккаунта.">
+          <ListSection
+            header="Поддержка"
+            footer="Нашли ошибку, есть идея или вопрос? Напишите — ответим в приложении и на почту аккаунта. Отчёты об ошибках содержат только текст ошибки, версию и устройство — без ваших данных."
+          >
             <ListRow icon={<IconTile icon={Bug} tone="red" size="list" />} title="Сообщить о проблеме" chevron onClick={() => openSupport('problem')} />
             <ListRow icon={<IconTile icon={Lightbulb} tone="yellow" size="list" />} title="Предложить идею" chevron onClick={() => openSupport('idea')} />
+            <ListRow icon={<IconTile icon={Question} tone="blue" size="list" />} title="Задать вопрос" subtitle="На частые вопросы ИИ ответит сразу" chevron onClick={() => openSupport('question')} />
+            <SwitchRow
+              icon={<IconTile icon={Warning} tone="orange" size="list" />}
+              title="Отправлять отчёты об ошибках"
+              subtitle="Помогает находить и исправлять сбои"
+              checked={errorReports}
+              onChange={(v) => {
+                setErrorReports(v);
+                setErrorReportsState(v);
+              }}
+            />
             {support.admin && (
               <ListRow
-                icon={<IconTile icon={Tray} tone="blue" size="list" />}
+                icon={<IconTile icon={Tray} tone="violet" size="list" />}
                 title="Входящие поддержки"
                 subtitle={support.openCount ? `Новых: ${support.openCount}` : 'Обращения пользователей'}
                 chevron
