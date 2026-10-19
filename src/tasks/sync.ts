@@ -40,7 +40,7 @@ interface SmCalendarPlugin {
   checkAccess(): Promise<{ granted: boolean }>;
   requestAccess(): Promise<{ granted: boolean }>;
   listCalendars(): Promise<{ calendars: PhoneCalendar[] }>;
-  upsertEvent(o: { id?: string; calendarId?: string; title: string; description: string; start: number; end: number; allDay: boolean; rrule?: string; exdate?: string }): Promise<{ id: string }>;
+  upsertEvent(o: { id?: string; taskId?: string; calendarId?: string; title: string; description: string; start: number; end: number; allDay: boolean; rrule?: string; exdate?: string }): Promise<{ id: string }>;
   deleteEvents(o: { ids: string[] }): Promise<{ deleted: number }>;
   listEvents(o: { from: number; to: number }): Promise<{ events: PhoneEvent[] }>;
   insertWithPrompt(o: { title: string; description: string; start: number; end: number; allDay: boolean; rrule?: string }): Promise<void>;
@@ -551,7 +551,17 @@ async function syncNative() {
   if (!tasksData()) return;
   await setupNative();
   const { LocalNotifications: LN } = await notifications();
-  if ((await notifyPermission()) !== 'granted') return;
+  if ((await notifyPermission()) !== 'granted') {
+    // уведомления запретили: будильники без уведомления нечем выключить — снять все (и выполненные не зазвонят)
+    await syncAlarms([]);
+    try {
+      const left = (await SmAlarm.list()).alarms.map((x) => x.id);
+      if (left.length) await SmAlarm.cancel({ ids: left });
+    } catch {
+      /* без плагина будильника */
+    }
+    return;
+  }
   const now = Date.now();
   const planned = (await plan(now + 5000, now + HORIZON_DAYS * 86400000)).slice(0, MAX_NATIVE);
   // будильники — системным будильником Android (звонит, пока не выключат); без нативного плагина — обычным уведомлением
@@ -594,6 +604,12 @@ async function syncNative() {
 }
 
 /** Расписание будильников в нативный плагин; false — плагина нет (старая сборка), будильники уйдут уведомлениями */
+/** «2026-10-20 09:00» — время будильника «как на часах» (для смены часового пояса) */
+const localStamp = (ms: number) => {
+  const d = new Date(ms);
+  return `${toYmd(d)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
+
 async function syncAlarms(list: Planned[]): Promise<boolean> {
   try {
     const alarms: NativeAlarm[] = list.slice(0, 100).map((p) => ({
@@ -603,6 +619,7 @@ async function syncAlarms(list: Planned[]): Promise<boolean> {
       body: p.body,
       taskId: String(p.extra.taskId ?? ''),
       date: String(p.extra.date ?? ''),
+      local: localStamp(p.at),
     }));
     await SmAlarm.sync({ alarms });
     // отложенные на самом будильнике: задачу уже выполнили — не звонить
@@ -760,6 +777,29 @@ function playChime() {
 // ================= Календарь телефона (Android) =================
 
 const CAL_INDEX = 'calsync';
+const CAL_LOCAL = 'sm-cal-id';
+
+/**
+ * Календарь телефона — свой у каждого устройства (номер календаря имеет смысл только на этом телефоне).
+ * Раньше выбор хранился в общих настройках задач — он остаётся запасным вариантом.
+ */
+export function phoneCalendarId(d: { prefs: { calendarId?: string } }): string | undefined {
+  try {
+    const v = localStorage.getItem(CAL_LOCAL);
+    if (v !== null) return v || undefined;
+  } catch {
+    /* хранилище недоступно */
+  }
+  return d.prefs.calendarId;
+}
+
+export function setPhoneCalendarId(id: string | undefined) {
+  try {
+    localStorage.setItem(CAL_LOCAL, id ?? '');
+  } catch {
+    /* хранилище недоступно */
+  }
+}
 type CalIndex = Record<string, { id: string; sig: string; cal?: string }>;
 
 function eventFor(t: TaskItem) {
@@ -795,7 +835,7 @@ export async function syncCalendar(): Promise<void> {
     for (const [taskId, e] of Object.entries(idx)) {
       const t = byId.get(taskId);
       // событие в другом календаре (сменили календарь) — удалить и создать заново
-      const moved = enabled && (e.cal ?? '') !== (d.prefs.calendarId ?? '');
+      const moved = enabled && (e.cal ?? '') !== (phoneCalendarId(d) ?? '');
       if (!enabled || !t || t.deleted || !t.date || t.wontDo || moved) remove.push([taskId, e.id]);
     }
     if (remove.length) {
@@ -809,12 +849,12 @@ export async function syncCalendar(): Promise<void> {
       for (const t of d.tasks) {
         if (t.deleted || !t.date || t.wontDo || (t.done && t.date < since)) continue;
         const ev = eventFor(t);
-        const sig = JSON.stringify([ev, d.prefs.calendarId ?? '']);
+        const sig = JSON.stringify([ev, phoneCalendarId(d) ?? '']);
         const cur = idx[t.id];
         if (cur?.sig === sig) continue;
         try {
-          const r = await SmCalendar.upsertEvent({ ...ev, id: cur?.id, calendarId: d.prefs.calendarId });
-          idx[t.id] = { id: r.id, sig, cal: d.prefs.calendarId ?? '' };
+          const r = await SmCalendar.upsertEvent({ ...ev, id: cur?.id, taskId: t.id, calendarId: phoneCalendarId(d) });
+          idx[t.id] = { id: r.id, sig, cal: phoneCalendarId(d) ?? '' };
         } catch {
           /* календарь недоступен — попробуем позже */
         }

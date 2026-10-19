@@ -143,7 +143,13 @@ export async function unlockWithBiometric(): Promise<boolean> {
   bioActive = true;
   try {
     const { nativeBiometricVerify } = await import('../native/widget');
-    if (!(await nativeBiometricVerify({ title: 'SuperMind', subtitle: 'Разблокировать приложение', negative: 'Ввести код' }))) return false;
+    // окно отпечатка могло не открыться (приложение уходило в фон) — тогда ответа не будет вовсе;
+    // без предела ожидания отметка «идёт проверка» осталась бы навсегда и замок больше не включался бы
+    const ok = await Promise.race([
+      nativeBiometricVerify({ title: 'SuperMind', subtitle: 'Разблокировать приложение', negative: 'Ввести код' }),
+      new Promise<boolean>((r) => setTimeout(() => r(false), 60_000)),
+    ]);
+    if (!ok) return false;
     localStorage.removeItem(FAILS);
     useLock.setState({ locked: false });
     return true;

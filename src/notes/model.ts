@@ -185,8 +185,14 @@ export function emptyBody(): NoteBody {
 }
 
 export function normalizeBody(raw: Partial<NoteBody> | undefined | null): NoteBody {
-  const blocks = Array.isArray(raw?.blocks) ? raw!.blocks.filter((b) => b && b.id && b.type) : [];
-  return { title: raw?.title ?? '', blocks: blocks.length ? blocks : [newBlock('p')], updatedAt: raw?.updatedAt ?? 0 };
+  // заголовок и текст блоков — строки (число из повреждённых данных уронило бы открытие заметки и поиск)
+  const blocks = Array.isArray(raw?.blocks)
+    ? raw!.blocks
+        .filter((b) => b && typeof b.id === 'string' && typeof b.type === 'string')
+        .map((b) => (b.text !== undefined && typeof b.text !== 'string' ? { ...b, text: String(b.text ?? '') } : b))
+    : [];
+  const title = typeof raw?.title === 'string' ? raw.title : raw?.title == null ? '' : String(raw.title);
+  return { title, blocks: blocks.length ? blocks : [newBlock('p')], updatedAt: Number(raw?.updatedAt) || 0 };
 }
 
 // ---------- Текст ----------

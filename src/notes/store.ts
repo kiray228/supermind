@@ -30,6 +30,7 @@ interface NotesState {
   openId: ID | null;
   openBody: NoteBody | null;
   canUndo: boolean;
+  canRedo?: boolean;
   /** текст открытой заметки ещё не пришёл на это устройство (или не прочитался) — редактор не показывается */
   openMissing?: boolean;
 }
@@ -175,6 +176,19 @@ async function writeNow(id: ID, body: NoteBody): Promise<void> {
   }
 }
 
+/** Добавить блоки в конец заметки (открытой — через редактор, иначе — в сохранённый текст) */
+export async function appendBlocksToNote(id: ID, blocks: Block[]) {
+  const s = useNotes.getState();
+  if (s.openId === id && s.openBody) {
+    editOpenBody((bd) => void (bd.blocks = [...bd.blocks, ...blocks]));
+    return;
+  }
+  if (!s.data?.notes.some((n) => n.id === id && !n.trashed)) return;
+  const body = await loadNoteBody(id).catch(() => null);
+  if (!body) return;
+  saveNoteBody(id, { ...body, blocks: [...body.blocks, ...blocks] });
+}
+
 /** Сохранить всё несохранённое сразу */
 export async function flushNotes(): Promise<void> {
   await Promise.all([...pending.keys()].map(writeBody));
@@ -198,6 +212,7 @@ export async function reloadNotes(): Promise<void> {
   if (!d.notes.some((n) => n.id === openId)) {
     useNotes.setState({ openId: null, openBody: null, canUndo: false });
     undo = [];
+    redo = [];
     return;
   }
   if (pending.has(openId)) return;
@@ -209,6 +224,7 @@ export async function reloadNotes(): Promise<void> {
   const sig = (b: NoteBody) => JSON.stringify([b.title, b.blocks]);
   if (sig(disk) !== sig(s.openBody)) {
     undo = [];
+    redo = [];
     useNotes.setState({ openBody: disk, canUndo: false });
   }
 }
@@ -223,7 +239,11 @@ if (typeof document !== 'undefined') {
 // ---------- Открытая заметка ----------
 
 let undo: NoteBody[] = [];
+/** отменённые шаги — для «Повторить» (Ctrl+Shift+Z / Ctrl+Y); любая новая правка их сбрасывает */
+let redo: NoteBody[] = [];
 let lastTypeAt = 0;
+/** начало текущего шага набора: при непрерывном наборе новый шаг каждые 4 с (иначе одно «Отменить» стирало минуты) */
+let groupAt = 0;
 /** Цепочка переходов по связанным заметкам: «назад» возвращает к предыдущей, а не к списку */
 let trail: ID[] = [];
 
@@ -234,6 +254,7 @@ export async function openNote(id: ID | null, keepTrail = false) {
   if (s.openId && s.openId !== id) closeCurrent();
   if (!id || id !== s.openId) useNotes.setState({ openMissing: false });
   undo = [];
+  redo = [];
   lastTypeAt = 0;
   if (!id) {
     useNotes.setState({ openId: null, openBody: null, canUndo: false });
@@ -291,14 +312,16 @@ export function editOpenBody(fn: (b: NoteBody) => NoteBody | void, kind: 'struct
   const s = useNotes.getState();
   if (!s.openId || !s.openBody) return;
   const now = Date.now();
-  if (kind === 'struct' || now - lastTypeAt > 1500) {
+  if (kind === 'struct' || now - lastTypeAt > 1500 || now - groupAt > 4000) {
     undo.push(s.openBody);
     if (undo.length > 100) undo.shift();
+    groupAt = now;
   }
   lastTypeAt = kind === 'type' ? now : 0;
+  redo = [];
   const draft: NoteBody = { ...s.openBody, blocks: [...s.openBody.blocks] };
   const next = fn(draft) ?? draft;
-  useNotes.setState({ openBody: next, canUndo: true });
+  useNotes.setState({ openBody: next, canUndo: true, canRedo: false });
   saveNoteBody(s.openId, next);
 }
 
@@ -307,8 +330,20 @@ export function undoOpenBody() {
   const prev = undo.pop();
   if (!s.openId || !prev) return;
   lastTypeAt = 0;
-  useNotes.setState({ openBody: prev, canUndo: undo.length > 0 });
+  if (s.openBody) redo.push(s.openBody);
+  useNotes.setState({ openBody: prev, canUndo: undo.length > 0, canRedo: redo.length > 0 });
   saveNoteBody(s.openId, prev);
+}
+
+/** Повторить отменённое */
+export function redoOpenBody() {
+  const s = useNotes.getState();
+  const next = redo.pop();
+  if (!s.openId || !next) return;
+  lastTypeAt = 0;
+  if (s.openBody) undo.push(s.openBody);
+  useNotes.setState({ openBody: next, canUndo: true, canRedo: redo.length > 0 });
+  saveNoteBody(s.openId, next);
 }
 
 // ---------- Заметки ----------
@@ -346,6 +381,7 @@ export function trashNote(id: ID) {
   if (useNotes.getState().openId === id) {
     void writeBody(id);
     undo = [];
+    redo = [];
     useNotes.setState({ openId: null, openBody: null, canUndo: false });
   }
   mutateNotes((d) => {
@@ -373,6 +409,7 @@ export function purgeNote(id: ID) {
   textCache.delete(id);
   if (useNotes.getState().openId === id) {
     undo = [];
+    redo = [];
     useNotes.setState({ openId: null, openBody: null, canUndo: false });
   }
   mutateNotes((d) => {

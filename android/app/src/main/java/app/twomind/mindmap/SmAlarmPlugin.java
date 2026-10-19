@@ -63,7 +63,9 @@ public class SmAlarmPlugin extends Plugin {
                     .put("title", a.optString("title", "Задача"))
                     .put("body", a.optString("body", ""))
                     .put("taskId", a.optString("taskId", ""))
-                    .put("date", a.optString("date", "")));
+                    .put("date", a.optString("date", ""))
+                    // местное время «как на часах»: при смене часового пояса будильник звонит в те же 09:00
+                    .put("local", a.optString("local", "")));
             }
         } catch (JSONException e) {
             call.reject("bad alarms: " + e.getMessage());
@@ -75,13 +77,15 @@ public class SmAlarmPlugin extends Plugin {
             if (!next.has(k)) AlarmScheduler.cancel(c, Integer.parseInt(k));
         }
         int set = 0;
+        long now = System.currentTimeMillis();
         Iterator<String> nextKeys = next.keys();
         while (nextKeys.hasNext()) {
             String k = nextKeys.next();
             JSONObject a = next.optJSONObject(k);
-            JSONObject was = old.optJSONObject(k);
             if (a == null) continue;
-            if (was == null || was.optLong("at") != a.optLong("at")) {
+            // все будущие — заново (дёшево, заменяет прежний): после «Остановить» приложения или
+            // «убийцы батареи» системные будильники стёрты, а в нашем списке время то же
+            if (a.optLong("at") > now) {
                 AlarmScheduler.set(c, Integer.parseInt(k), a.optLong("at"));
                 set++;
             }

@@ -133,14 +133,14 @@ public class TodayWidget extends AppWidgetProvider {
     /** Действия из intent активности: кнопки виджета (sm_action) и «Поделиться» (ACTION_SEND) */
     /** не больше стольких картинок за раз и такого размера каждая */
     private static final int MAX_SHARED_IMAGES = 10;
-    private static final long MAX_SHARED_BYTES = 25L * 1024 * 1024;
+    private static final long MAX_SHARED_BYTES = 15L * 1024 * 1024;
 
     /**
      * Присланные картинки — копией в files/shared (ссылка content:// живёт недолго):
      * приложение прочитает их, вставит в заметку и удалит. Пути — относительно files.
      */
-    static JSONArray copySharedImages(Context ctx, Intent intent) {
-        JSONArray out = new JSONArray();
+    /** Ссылки на присланные картинки из intent (быстро, в главном потоке) */
+    static List<Uri> sharedUris(Intent intent) {
         List<Uri> uris = new ArrayList<>();
         try {
             if (Intent.ACTION_SEND_MULTIPLE.equals(intent.getAction())) {
@@ -155,18 +155,34 @@ public class TodayWidget extends AppWidgetProvider {
                 for (int i = 0; i < clip.getItemCount(); i++) if (clip.getItemAt(i).getUri() != null) uris.add(clip.getItemAt(i).getUri());
             }
         } catch (RuntimeException ignored) {
-            return out;
+            return new ArrayList<>();
         }
+        return uris;
+    }
+
+    /**
+     * Скопировать картинки (долго: фото из облака скачиваются) — только в фоновом потоке.
+     * Принимаются только content:// чужих приложений, тип — со слов источника и только image/*.
+     */
+    static JSONArray copySharedImages(Context ctx, List<Uri> uris) {
+        JSONArray out = new JSONArray();
         if (uris.isEmpty()) return out;
         java.io.File dir = new java.io.File(ctx.getFilesDir(), "shared");
         if (!dir.exists() && !dir.mkdirs()) return out;
         android.content.ContentResolver cr = ctx.getContentResolver();
         long stamp = System.currentTimeMillis();
         int n = 0;
+        String ownAuthority = ctx.getPackageName() + ".fileprovider";
         for (Uri u : uris) {
             if (n >= MAX_SHARED_IMAGES) break;
-            String type = cr.getType(u);
-            if (type == null) type = intent.getType();
+            // file:// и наши собственные файлы — нельзя (иначе в заметку можно было бы «прислать» личные файлы приложения)
+            if (u == null || !"content".equals(u.getScheme()) || ownAuthority.equals(u.getAuthority())) continue;
+            String type;
+            try {
+                type = cr.getType(u);
+            } catch (RuntimeException e) {
+                continue;
+            }
             if (type == null || !type.startsWith("image/")) continue;
             String ext = type.contains("png") ? "png" : type.contains("webp") ? "webp" : type.contains("gif") ? "gif" : type.contains("heic") || type.contains("heif") ? "heic" : "jpg";
             java.io.File f = new java.io.File(dir, stamp + "_" + n + "." + ext);
@@ -211,23 +227,37 @@ public class TodayWidget extends AppWidgetProvider {
             if (Intent.ACTION_SEND.equals(intent.getAction()) || Intent.ACTION_SEND_MULTIPLE.equals(intent.getAction())) {
                 CharSequence text = intent.getCharSequenceExtra(Intent.EXTRA_TEXT);
                 String subject = intent.getStringExtra(Intent.EXTRA_SUBJECT);
-                JSONArray images = copySharedImages(ctx, intent);
-                boolean hasText = text != null && text.toString().trim().length() > 0;
-                if (hasText || images.length() > 0) {
-                    JSONObject o = new JSONObject();
-                    o.put("type", "share");
-                    o.put("text", hasText ? text.toString() : "");
-                    if (subject != null) o.put("title", subject);
-                    if (images.length() > 0) o.put("images", images);
-                    queue(ctx, o);
-                }
+                final List<Uri> uris = sharedUris(intent);
+                final boolean hasText = text != null && text.toString().trim().length() > 0;
+                final String textStr = hasText ? text.toString() : "";
+                final Context app = ctx.getApplicationContext();
                 intent.removeExtra(Intent.EXTRA_TEXT);
                 intent.removeExtra(Intent.EXTRA_STREAM);
                 intent.setAction(Intent.ACTION_MAIN);
+                if (!hasText && uris.isEmpty()) return;
+                // картинки копируются в фоне (фото из облака скачиваются — в главном потоке приложение зависало),
+                // потом действие встаёт в очередь и приложение получает сигнал
+                new Thread(() -> {
+                    try {
+                        JSONArray images = copySharedImages(app, uris);
+                        if (!hasText && images.length() == 0) return;
+                        JSONObject o = new JSONObject();
+                        o.put("type", "share");
+                        o.put("text", textStr);
+                        if (subject != null) o.put("title", subject);
+                        if (images.length() > 0) o.put("images", images);
+                        queue(app, o);
+                        WidgetBridgePlugin.notifyPending();
+                    } catch (JSONException | RuntimeException ignored) {
+                    }
+                }, "sm-share").start();
                 return;
             }
             String a = intent.getStringExtra(EXTRA_ACTION);
             if (a == null) return;
+            // «выполнить» и «отметить привычку» приходят только от наших виджетов (широковещательно, без экспорта);
+            // в запуске активности их мог бы подложить кто угодно
+            if ("complete".equals(a) || "habit".equals(a)) return;
             JSONObject o = new JSONObject();
             o.put("type", a);
             String id = intent.getStringExtra("sm_id");
@@ -238,7 +268,8 @@ public class TodayWidget extends AppWidgetProvider {
             if (date != null) o.put("date", date);
             queue(ctx, o);
             intent.removeExtra(EXTRA_ACTION);
-        } catch (JSONException ignored) {
+        } catch (JSONException | RuntimeException ignored) {
+            // испорченные данные в intent — пропустить, не падать
         }
     }
 

@@ -72,6 +72,14 @@ public class WidgetBridgePlugin extends Plugin {
         String subtitle = call.getString("subtitle", "");
         String negative = call.getString("negative", "Отмена");
         act.runOnUiThread(() -> {
+            // окно уже не на экране (приложение уходит в фон) — системное окно не откроется и не ответит
+            if (!act.getLifecycle().getCurrentState().isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED) || act.isFinishing()) {
+                JSObject o = new JSObject();
+                o.put("ok", false);
+                o.put("error", "not resumed");
+                call.resolve(o);
+                return;
+            }
             androidx.biometric.BiometricPrompt prompt = new androidx.biometric.BiometricPrompt(
                 act,
                 androidx.core.content.ContextCompat.getMainExecutor(act),

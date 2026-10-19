@@ -96,6 +96,39 @@ public class SmCalendarPlugin extends Plugin {
         call.resolve(r);
     }
 
+    /** Пометка в описании событий, созданных до 1.46 (тогда без CUSTOM_APP_PACKAGE) */
+    private static final String LEGACY_MARK = "— SuperMind";
+
+    /**
+     * Событие создано этим приложением: помечено нашим пакетом (или старое — с подписью в описании).
+     * Номера событий и календарей — только этого телефона: после переноса на новый телефон (резервная копия)
+     * или синхронизации настроек они могли бы указывать на чужие события — их не трогаем.
+     */
+    private boolean ownedEvent(ContentResolver cr, long id) {
+        String[] proj = { CalendarContract.Events.CUSTOM_APP_PACKAGE, CalendarContract.Events.DESCRIPTION, CalendarContract.Events.DELETED };
+        Uri uri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, id);
+        try (Cursor c = cr.query(uri, proj, null, null, null)) {
+            if (c == null || !c.moveToFirst()) return false;
+            if (!c.isNull(2) && c.getInt(2) == 1) return false;
+            String pkg = c.isNull(0) ? null : c.getString(0);
+            if (pkg != null) return pkg.equals(getContext().getPackageName());
+            String desc = c.isNull(1) ? "" : c.getString(1);
+            return desc.trim().endsWith(LEGACY_MARK);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** Календарь есть на этом телефоне, виден и доступен для записи */
+    private boolean writableCalendar(ContentResolver cr, long id) {
+        String[] proj = { CalendarContract.Calendars.CALENDAR_ACCESS_LEVEL, CalendarContract.Calendars.VISIBLE };
+        try (Cursor c = cr.query(ContentUris.withAppendedId(CalendarContract.Calendars.CONTENT_URI, id), proj, null, null, null)) {
+            return c != null && c.moveToFirst() && c.getInt(0) >= CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR && c.getInt(1) == 1;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     /** Первый доступный для записи календарь (основной — в приоритете) */
     private long defaultCalendarId(ContentResolver cr) {
         String[] proj = { CalendarContract.Calendars._ID, CalendarContract.Calendars.IS_PRIMARY, CalendarContract.Calendars.CALENDAR_ACCESS_LEVEL };
@@ -150,7 +183,14 @@ public class SmCalendarPlugin extends Plugin {
         ContentResolver cr = getContext().getContentResolver();
         String id = call.getString("id");
         String calId = call.getString("calendarId");
-        long cal = calId != null && !calId.isEmpty() ? Long.parseLong(calId) : defaultCalendarId(cr);
+        long cal = -1;
+        try {
+            if (calId != null && !calId.isEmpty()) cal = Long.parseLong(calId);
+        } catch (NumberFormatException ignored) {
+            cal = -1;
+        }
+        // выбранного календаря на этом телефоне нет (выбран на другом) — основной
+        if (cal < 0 || !writableCalendar(cr, cal)) cal = defaultCalendarId(cr);
         if (cal < 0) {
             call.reject("no-calendar");
             return;
@@ -169,6 +209,10 @@ public class SmCalendarPlugin extends Plugin {
         v.put(CalendarContract.Events.ALL_DAY, allDay ? 1 : 0);
         v.put(CalendarContract.Events.EVENT_TIMEZONE, allDay ? "UTC" : TimeZone.getDefault().getID());
         v.put(CalendarContract.Events.HAS_ALARM, 0);
+        // пометка «наше событие»: только такие обновляем и удаляем
+        v.put(CalendarContract.Events.CUSTOM_APP_PACKAGE, getContext().getPackageName());
+        String taskId = call.getString("taskId");
+        if (taskId != null && !taskId.isEmpty()) v.put(CalendarContract.Events.CUSTOM_APP_URI, "supermind://task/" + taskId);
         if (recurring) {
             // у повторяющихся событий Android требует DURATION вместо DTEND
             long mins = Math.max(1, (end - start) / 60000L);
@@ -187,8 +231,15 @@ public class SmCalendarPlugin extends Plugin {
         }
 
         try {
-            if (id != null && !id.isEmpty()) {
-                Uri uri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, Long.parseLong(id));
+            long eid = -1;
+            try {
+                if (id != null && !id.isEmpty()) eid = Long.parseLong(id);
+            } catch (NumberFormatException ignored) {
+                eid = -1;
+            }
+            // чужое событие (номер с другого телефона) не трогаем — создаём своё
+            if (eid >= 0 && ownedEvent(cr, eid)) {
+                Uri uri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, eid);
                 int n = cr.update(uri, v, null, null);
                 if (n > 0) {
                     JSObject r = new JSObject();
@@ -221,7 +272,10 @@ public class SmCalendarPlugin extends Plugin {
         int n = 0;
         try {
             for (int i = 0; ids != null && i < ids.length(); i++) {
-                Uri uri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, Long.parseLong(ids.getString(i)));
+                long eid = Long.parseLong(ids.getString(i));
+                // удаляем только свои события
+                if (!ownedEvent(cr, eid)) continue;
+                Uri uri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, eid);
                 n += cr.delete(uri, null, null);
             }
         } catch (JSONException | NumberFormatException e) {

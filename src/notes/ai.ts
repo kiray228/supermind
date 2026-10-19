@@ -10,6 +10,11 @@ export const NOTE_AI_LABELS: Record<NoteAIKind, string> = {
 };
 
 const LIMIT = 60000;
+/**
+ * «Улучшить текст» заменяет весь текст заметки ответом ИИ — длинную заметку модель не вернёт целиком
+ * (предел ответа), и конец пропал бы. Длиннее этого — не улучшаем целиком.
+ */
+export const IMPROVE_LIMIT = 12000;
 
 const PROMPTS: Record<NoteAIKind, string> = {
   summary:
@@ -24,14 +29,20 @@ const PROMPTS: Record<NoteAIKind, string> = {
 export async function runNoteAI(kind: NoteAIKind, body: NoteBody, onText?: (s: string) => void, signal?: AbortSignal): Promise<string> {
   const src = kind === 'improve' ? { ...body, blocks: body.blocks.filter((b) => b.type !== 'image' && b.type !== 'audio') } : body;
   let md = noteToMarkdown(src, { noTitle: true });
+  if (kind === 'improve' && md.length > IMPROVE_LIMIT)
+    throw new Error('заметка слишком длинная, чтобы улучшить её целиком — разделите её на части (конец иначе мог бы пропасть)');
   if (md.length > LIMIT) md = md.slice(0, LIMIT) + '\n…';
-  return streamText({
+  const answer = await streamText({
     system: PROMPTS[kind],
     messages: [{ role: 'user', content: `Заметка «${body.title.trim() || 'Без названия'}»:\n"""\n${md}\n"""` }],
     onText,
     signal,
     effort: kind === 'improve' ? 'medium' : 'low',
   });
+  // улучшенный текст заметно короче исходного — ответ оборвался: не заменяем им заметку
+  if (kind === 'improve' && answer.trim().length < md.trim().length * 0.6)
+    throw new Error('ИИ вернул неполный текст — заметка не изменена');
+  return answer;
 }
 
 /** Применить ответ ИИ к блокам заметки */

@@ -95,6 +95,8 @@ export interface NativeAlarm {
   body: string;
   taskId: string;
   date: string;
+  /** время «как на часах» (yyyy-MM-dd HH:mm): при смене часового пояса будильник звонит в то же время */
+  local?: string;
   snooze?: number;
 }
 

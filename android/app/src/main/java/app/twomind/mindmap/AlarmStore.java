@@ -18,8 +18,31 @@ final class AlarmStore {
 
     private AlarmStore() {}
 
+    private static boolean migrated = false;
+
+    /**
+     * Хранилище, доступное до первой разблокировки после перезагрузки (direct boot): иначе после ночного
+     * обновления системы утренний будильник молчал бы, пока телефон не разблокируют.
+     * Прежний список (из обычного хранилища) переносится сюда один раз — когда телефон разблокирован.
+     */
     private static SharedPreferences prefs(Context c) {
-        return c.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        Context dc = c;
+        if (android.os.Build.VERSION.SDK_INT >= 24) {
+            dc = c.createDeviceProtectedStorageContext();
+            if (!migrated) {
+                android.os.UserManager um = (android.os.UserManager) c.getSystemService(Context.USER_SERVICE);
+                if (um != null && um.isUserUnlocked()) {
+                    try {
+                        // старого файла нет — переносить нечего (moveSharedPreferencesFrom ничего не затирает)
+                        java.io.File old = new java.io.File(c.getApplicationInfo().dataDir, "shared_prefs/" + PREFS + ".xml");
+                        if (old.exists()) dc.moveSharedPreferencesFrom(c, PREFS);
+                    } catch (RuntimeException ignored) {
+                    }
+                    migrated = true;
+                }
+            }
+        }
+        return dc.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
     /** id → { at, title, body, taskId, date, snooze? } */

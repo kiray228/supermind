@@ -22,6 +22,8 @@ import {
   testAlarm,
   STREAK_SAVER_DEFAULT,
   syncCalendar,
+  phoneCalendarId,
+  setPhoneCalendarId,
   type NotifyPermission,
   type PhoneCalendar,
 } from '../tasks/sync';
@@ -353,6 +355,8 @@ function TaskSettings() {
   const [exact, setExact] = useState<'granted' | 'denied' | 'n/a'>('n/a');
   const [fullScreen, setFullScreen] = useState<'granted' | 'denied' | 'n/a'>('n/a');
   const [cals, setCals] = useState<PhoneCalendar[]>([]);
+  // календарь — свой у каждого телефона (номер календаря на другом устройстве означает другое)
+  const [calId, setCalId] = useState(() => (data ? (phoneCalendarId(data) ?? '') : ''));
   const native = isNative();
 
   useEffect(() => {
@@ -506,12 +510,16 @@ function TaskSettings() {
             {p.calendarSync && cals.length > 0 && (
               <SelectRow
                 title="Календарь"
-                value={p.calendarId ?? ''}
+                value={calId}
                 options={[
                   { value: '', label: 'Основной календарь' },
                   ...cals.map((c) => ({ value: c.id, label: `${c.name}${c.account && c.account !== c.name ? ` (${c.account})` : ''}` })),
                 ]}
-                onChange={(v) => setPrefs({ calendarId: v || undefined })}
+                onChange={(v) => {
+                  setPhoneCalendarId(v || undefined);
+                  setCalId(v);
+                  void syncCalendar();
+                }}
               />
             )}
             <SwitchRow

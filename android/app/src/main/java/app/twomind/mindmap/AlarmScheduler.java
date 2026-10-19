@@ -45,8 +45,26 @@ final class AlarmScheduler {
         }
     }
 
+    /** «yyyy-MM-dd HH:mm» в текущем часовом поясе → миллисекунды; -1 — не разобрать */
+    private static long localToMillis(String local) {
+        if (local == null || local.isEmpty()) return -1;
+        try {
+            java.text.SimpleDateFormat f = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.ROOT);
+            f.setTimeZone(java.util.TimeZone.getDefault());
+            java.util.Date d = f.parse(local);
+            return d == null ? -1 : d.getTime();
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+
     /** После перезагрузки, обновления приложения или смены времени: заново поставить будущие будильники */
     static void restoreAll(Context c) {
+        restoreAll(c, false);
+    }
+
+    /** tzChanged — сменился часовой пояс: время берётся «как на часах» (local), а не прежний момент */
+    static void restoreAll(Context c, boolean tzChanged) {
         JSONObject all = AlarmStore.all(c);
         long now = System.currentTimeMillis();
         JSONObject keep = new JSONObject();
@@ -56,8 +74,25 @@ final class AlarmScheduler {
             JSONObject a = all.optJSONObject(k);
             if (a == null) continue;
             long at = a.optLong("at");
-            // пропущенный за последние 10 минут (телефон перезагружался) — прозвенит сейчас
-            if (at < now - 10 * 60_000L) continue;
+            if (tzChanged) {
+                long local = localToMillis(a.optString("local", ""));
+                if (local > 0) {
+                    at = local;
+                    try {
+                        a.put("at", at);
+                    } catch (Exception ignored) {
+                    }
+                }
+            }
+            // пропущенный за последние 10 минут (телефон перезагружался) — прозвенит сейчас;
+            // давно прошедший (в новом поясе это время уже было) — убрать и системный будильник
+            if (at < now - 10 * 60_000L) {
+                try {
+                    cancel(c, Integer.parseInt(k));
+                } catch (NumberFormatException ignored) {
+                }
+                continue;
+            }
             try {
                 keep.put(k, a);
                 set(c, Integer.parseInt(k), Math.max(at, now + 3000));

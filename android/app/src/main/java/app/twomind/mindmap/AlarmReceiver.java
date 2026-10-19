@@ -36,7 +36,7 @@ public class AlarmReceiver extends BroadcastReceiver {
             act(c, a, intent.getExtras());
         } else {
             // BOOT_COMPLETED, MY_PACKAGE_REPLACED, TIME_SET, TIMEZONE_CHANGED
-            AlarmScheduler.restoreAll(c);
+            AlarmScheduler.restoreAll(c, Intent.ACTION_TIMEZONE_CHANGED.equals(a));
         }
     }
 
@@ -48,7 +48,39 @@ public class AlarmReceiver extends BroadcastReceiver {
             .putExtra("body", alarm.optString("body", ""))
             .putExtra("taskId", alarm.optString("taskId", ""))
             .putExtra("date", alarm.optString("date", ""));
-        ContextCompat.startForegroundService(c, s);
+        try {
+            ContextCompat.startForegroundService(c, s);
+        } catch (RuntimeException e) {
+            // Android 12: точные будильники запрещены в настройках — срабатывание «почти точное», и запускать
+            // звонок из фона система не даёт. Не падаем: хотя бы громкое уведомление о задаче
+            fallbackNotify(c, alarm);
+        }
+    }
+
+    /** Уведомление вместо звонка (канал напоминаний со звуком, если он есть) */
+    private static void fallbackNotify(Context c, JSONObject alarm) {
+        try {
+            android.app.NotificationManager nm = (android.app.NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm == null) return;
+            String channel = "sm-reminders";
+            if (android.os.Build.VERSION.SDK_INT >= 26 && nm.getNotificationChannel(channel) == null) {
+                AlarmService.ensureChannel(c);
+                channel = AlarmService.CHANNEL;
+            }
+            Intent open = c.getPackageManager().getLaunchIntentForPackage(c.getPackageName());
+            android.app.PendingIntent tap = android.app.PendingIntent.getActivity(
+                c, 0, open == null ? new Intent() : open, android.app.PendingIntent.FLAG_UPDATE_CURRENT | android.app.PendingIntent.FLAG_IMMUTABLE);
+            androidx.core.app.NotificationCompat.Builder b = new androidx.core.app.NotificationCompat.Builder(c, channel)
+                .setSmallIcon(c.getApplicationInfo().icon)
+                .setContentTitle("⏰ " + alarm.optString("title", "Задача"))
+                .setContentText(alarm.optString("body", ""))
+                .setPriority(androidx.core.app.NotificationCompat.PRIORITY_MAX)
+                .setCategory(androidx.core.app.NotificationCompat.CATEGORY_ALARM)
+                .setAutoCancel(true)
+                .setContentIntent(tap);
+            nm.notify(new Random().nextInt(700_000) + 1, b.build());
+        } catch (RuntimeException ignored) {
+        }
     }
 
     /** Кнопка будильника (в уведомлении или на экране будильника) */

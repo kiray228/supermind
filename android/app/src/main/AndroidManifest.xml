@@ -111,6 +111,7 @@
         <!-- Напоминания-будильники: экран поверх блокировки, звенящий сервис, срабатывание и восстановление после перезагрузки -->
         <activity
             android:name=".AlarmActivity"
+            android:directBootAware="true"
             android:excludeFromRecents="true"
             android:exported="false"
             android:launchMode="singleInstance"
@@ -120,12 +121,16 @@
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
         <service
             android:name=".AlarmService"
+            android:directBootAware="true"
             android:exported="false"
             android:foregroundServiceType="systemExempted|mediaPlayback" />
         <receiver
             android:name=".AlarmReceiver"
+            android:directBootAware="true"
             android:exported="false">
             <intent-filter>
+                <!-- после перезагрузки — ещё до разблокировки (будильник должен звонить и тогда) -->
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
                 <action android:name="android.intent.action.TIME_SET" />

@@ -36,8 +36,12 @@ describe('общие настройки устройств', () => {
 
   test('изменение темы записывается в общий список, API-ключ — никогда', async () => {
     useApp.getState().setSettings({ theme: 'dark', apiKey: 'sk-test-local' });
-    await settle();
-    const p = sp.normalizePrefs(await kv.get(sp.PREFS_KEY));
+    // запись асинхронная: под нагрузкой (весь набор тестов параллельно) 20 мс бывает мало — ждём до 2 с
+    let p = sp.normalizePrefs(await kv.get(sp.PREFS_KEY));
+    for (let i = 0; i < 100 && p.v['settings.theme'] !== 'dark'; i++) {
+      await settle();
+      p = sp.normalizePrefs(await kv.get(sp.PREFS_KEY));
+    }
     assert.equal(p.v['settings.theme'], 'dark');
     assert.ok(p.at['settings.theme'] > 1000);
     assert.ok(!JSON.stringify(p).includes('sk-test-local'));

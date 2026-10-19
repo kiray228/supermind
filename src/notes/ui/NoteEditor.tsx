@@ -33,8 +33,8 @@ import { AIError } from '../../ai/claude';
 import { downloadText, pickFile, safeFilename, isIOS } from '../../io/download';
 import { askText, onBack } from '../../ui/dialogs';
 import { addTask, ensureTasks, openTask } from '../../tasks/store';
-import { type Block, type BlockType, fmtDuration, isBodyEmpty, isTextBlock, LIST_TYPES, markdownToBlocks, MAX_AUDIO_SEC, newBlock, noteDate, noteToMarkdown, stripInline } from '../model';
-import { addFolder, backInTrail, duplicateNote, editOpenBody, hasNoteTrail, loadNoteBody, moveNote, openNote, sortedFolders, togglePin, trashNote, undoOpenBody, useNotes } from '../store';
+import { type Block, type BlockType, type NoteBody, fmtDuration, isBodyEmpty, isTextBlock, LIST_TYPES, markdownToBlocks, MAX_AUDIO_SEC, newBlock, noteDate, noteToMarkdown, stripInline } from '../model';
+import { addFolder, appendBlocksToNote, backInTrail, duplicateNote, editOpenBody, hasNoteTrail, loadNoteBody, moveNote, openNote, redoOpenBody, sortedFolders, togglePin, trashNote, undoOpenBody, useNotes } from '../store';
 import { imageFileToDataUrl, type Recognizer, type Recording, recordingSupported, speechSupported, startRecognition, startRecording } from '../media';
 import { applyNoteAI, NOTE_AI_LABELS, type NoteAIKind, runNoteAI } from '../ai';
 import { autosize, BlockView, type BlockCtx } from './BlockView';
@@ -52,7 +52,20 @@ import { takeSection } from './wikiNav';
 import { createFromTemplate, isTemplateNote, openTemplates, templateFolderIds } from '../templates';
 
 type MenuState = { kind: 'type' | 'format' | 'block' | 'note' | 'folder'; anchor: MenuAnchor; blockId?: ID; replace?: boolean } | null;
-type RecState = { r: Recording; after: ID | null; final: string; recog: Recognizer | null; ended?: () => void };
+/** noteId — заметка, в которой начали запись (запись идёт туда, даже если открыли другую) */
+type RecState = { r: Recording; noteId: ID; after: ID | null; final: string; recog: Recognizer | null; ended?: () => void };
+
+/** Сохранить незаконченную запись в её заметку (ушли из заметки во время записи — не терять минуты голоса) */
+async function saveRecordingTo(st: RecState) {
+  try {
+    st.recog?.abort();
+    const { src, duration } = await st.r.stop();
+    await appendBlocksToNote(st.noteId, [newBlock('audio', { src, duration, ...(st.final.trim() ? { transcript: st.final.trim() } : {}) })]);
+    toast('Голосовая запись сохранена в заметку, где её начали');
+  } catch {
+    /* запись не удалась — сохранять нечего */
+  }
+}
 type FocusReq = { id: ID; start: number | 'end'; end?: number };
 type WikiState = { blockId: ID; from: number; query: string; anchor: HTMLElement; sel: number };
 type WikiOption = { title: string; kind: keyof typeof KIND_LABEL; create?: boolean; section?: string };
@@ -198,8 +211,9 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
   // при уходе со страницы — остановить запись и диктовку
   useEffect(
     () => () => {
-      recRef.current?.r.cancel();
-      recRef.current?.recog?.abort();
+      // запись не выбрасываем: сохраняется в свою заметку
+      if (recRef.current) void saveRecordingTo(recRef.current);
+      recRef.current = null;
       dictRef.current?.recog?.abort();
       aiAbort.current?.abort();
     },
@@ -415,11 +429,19 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
     focusBlock(id, r.start, r.end);
   }
 
+  /** Картинка готова (сжатие занимает время): в заметку, где её добавили, даже если открыли другую */
+  function placeImage(noteId: ID | null, after: ID | null, src: string) {
+    const img = newBlock('image', { src });
+    if (noteId && useNotes.getState().openId !== noteId) void appendBlocksToNote(noteId, [img]);
+    else insertBlocks(after, [img]);
+  }
+
   function pickImage(after: ID | null) {
+    const noteId = openId;
     void pickFile('image/*').then(async (f) => {
       if (!f) return;
       try {
-        insertBlocks(after, [newBlock('image', { src: await imageFileToDataUrl(f) })]);
+        placeImage(noteId, after, await imageFileToDataUrl(f));
       } catch (e) {
         toast(e instanceof Error ? e.message : 'Не удалось добавить изображение');
       }
@@ -469,7 +491,12 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
     if (b.type === 'p') {
       const sc = detectShortcut(old, value);
       if (sc) {
-        if (sc.type === 'divider') return convert(id, 'divider');
+        if (sc.type === 'divider') {
+          const p = newBlock('p');
+          editOpenBody((bd) => void bd.blocks.splice(i, 1, newBlock('divider'), p));
+          focusBlock(p.id, 0);
+          return;
+        }
         const caret = Math.max(0, el.selectionStart - (value.length - sc.text.length));
         editOpenBody((bd) => void (bd.blocks[i] = { id, type: sc.type, text: sc.text, ...(sc.type === 'todo' ? { checked: !!sc.checked } : {}) }));
         focusBlock(id, caret);
@@ -532,6 +559,11 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
     if (mod && (key === 'z' || key === 'я') && !e.shiftKey) {
       e.preventDefault();
       undoOpenBody();
+      return;
+    }
+    if (mod && (((key === 'z' || key === 'я') && e.shiftKey) || key === 'y' || key === 'н')) {
+      e.preventDefault();
+      redoOpenBody();
       return;
     }
     if (mod && (key === 'b' || key === 'и')) {
@@ -610,36 +642,52 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
   }
 
   function onPaste(e: ClipboardEvent<HTMLTextAreaElement>, b: Block, el: HTMLTextAreaElement) {
-    const file = Array.from(e.clipboardData?.files ?? []).find((f) => f.type.startsWith('image/'));
+    const text = e.clipboardData?.getData('text/plain') ?? '';
+    // картинка — только если текста нет: Excel и OneNote кладут в буфер и текст, и картинку ячеек
+    const file = text.trim() ? undefined : Array.from(e.clipboardData?.files ?? []).find((f) => f.type.startsWith('image/'));
     if (file) {
       e.preventDefault();
+      const noteId = openId;
       void imageFileToDataUrl(file)
-        .then((src) => insertBlocks(b.id, [newBlock('image', { src })]))
+        .then((src) => placeImage(noteId, b.id, src))
         .catch(() => toast('Не удалось вставить изображение'));
       return;
     }
-    const text = e.clipboardData?.getData('text/plain') ?? '';
     if (b.type === 'code' || !text.includes('\n')) return;
     const parsed = markdownToBlocks(text);
-    if (parsed.length < 2) return;
+    // один многострочный блок (код, цитата) — тоже разбираем сами: иначе браузер вставит текст как есть,
+    // и быстрые сочетания разберут его неверно (лишние ```, «> » внутри цитаты)
+    if (!parsed.length) return;
     e.preventDefault();
     const s = el.selectionStart;
     const before = el.value.slice(0, s);
     const after = el.value.slice(el.selectionEnd);
     const replaceHead = !before && b.type === 'p';
     // первый вставленный блок — не текст (разделитель): к тексту он не приклеивается, а идёт следом
-    const glue = replaceHead || isTextBlock(parsed[0]);
+    // один блок другого вида (код, цитата) в середину текста — отдельным блоком, а не приклеенным текстом
+    const single = parsed.length === 1;
+    const glue = replaceHead || (isTextBlock(parsed[0]) && !(single && parsed[0].type !== 'p'));
     const first = glue ? parsed[0] : newBlock('p');
     const rest = glue ? parsed.slice(1) : parsed;
     const last = rest[rest.length - 1];
     editOpenBody((bd) => {
       const i = bd.blocks.findIndex((x) => x.id === b.id);
       if (i < 0) return;
-      const head: Block = replaceHead ? { ...first, id: b.id } : { ...b, text: before + (first.text ?? '') };
-      const tail = isTextBlock(last) ? [...rest.slice(0, -1), { ...last, text: (last.text ?? '') + after }] : after ? [...rest, newBlock('p', { text: after })] : rest;
+      // всё уместилось в первый блок — хвост строки остаётся в нём же
+      const restEmpty = !rest.length;
+      const head: Block = replaceHead
+        ? { ...first, id: b.id, ...(restEmpty && after ? { text: (first.text ?? '') + after } : {}) }
+        : { ...b, text: before + (first.text ?? '') + (restEmpty ? after : '') };
+      const tail = restEmpty
+        ? []
+        : last && isTextBlock(last)
+          ? [...rest.slice(0, -1), { ...last, text: (last.text ?? '') + after }]
+          : after
+            ? [...rest, newBlock('p', { text: after })]
+            : rest;
       bd.blocks.splice(i, 1, head, ...tail);
-      const lt = tail[tail.length - 1];
-      if (lt && isTextBlock(lt)) focusBlock(lt.id, (lt.text ?? '').length - after.length);
+      const lt = tail.length ? tail[tail.length - 1] : head;
+      if (lt && isTextBlock(lt)) focusBlock(lt.id, Math.max(0, (lt.text ?? '').length - after.length));
     });
   }
 
@@ -699,7 +747,7 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
           void stopRec();
         },
       });
-      const st: RecState = { r, after, final: '', recog: null };
+      const st: RecState = { r, noteId: openId!, after, final: '', recog: null };
       recRef.current = st;
       setRec({ sec: 0, text: '' });
       // на iPhone распознавание во время записи может заглушить микрофон — там только запись
@@ -731,7 +779,10 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
       : Promise.resolve();
     try {
       const [{ src, duration }] = await Promise.all([st.r.stop(), waitText]);
-      if (useNotes.getState().openBody) insertBlocks(st.after, [newBlock('audio', { src, duration, ...(st.final.trim() ? { transcript: st.final.trim() } : {}) })]);
+      const audio = newBlock('audio', { src, duration, ...(st.final.trim() ? { transcript: st.final.trim() } : {}) });
+      // пока сохранялось, открыли другую заметку — запись в свою, а не в открытую
+      if (useNotes.getState().openId === st.noteId && useNotes.getState().openBody) insertBlocks(st.after, [audio]);
+      else await appendBlocksToNote(st.noteId, [audio]);
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Не удалось сохранить запись');
     } finally {
@@ -760,6 +811,13 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
     try {
       const res = await runNoteAI(kind, b, (s) => setAi((x) => (x ? { ...x, chars: s.length } : x)), ac.signal);
       if (useNotes.getState().openId !== id) return;
+      // «улучшить» заменяет текст ответом по тексту на момент запроса: что набрали за это время — пропало бы
+      const now = useNotes.getState().openBody;
+      const textOf = (x: NoteBody) => JSON.stringify(x.blocks.filter((k) => k.type !== 'image' && k.type !== 'audio').map((k) => [k.type, k.text ?? '']));
+      if (kind === 'improve' && now && textOf(now) !== textOf(b)) {
+        toast('Заметку изменили, пока ИИ работал, — улучшение не применено. Запустите ещё раз');
+        return;
+      }
       editOpenBody((bd) => void (bd.blocks = applyNoteAI(kind, bd.blocks, res)));
       toast(kind === 'improve' ? 'Текст улучшен' : 'Готово', { label: 'Отменить', run: undoOpenBody });
     } catch (e) {
@@ -914,7 +972,24 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
   );
 
   return (
-    <div className={`nt-editor${kb ? ' kb-open' : ''}`}>
+    <div
+      className={`nt-editor${kb ? ' kb-open' : ''}`}
+      // картинку перетащили в заметку — вставить (иначе браузер открыл бы файл и ушёл со страницы)
+      onDragOver={(e) => {
+        if (e.dataTransfer?.types?.includes('Files')) e.preventDefault();
+      }}
+      onDrop={(e) => {
+        const files = Array.from(e.dataTransfer?.files ?? []).filter((f) => f.type.startsWith('image/'));
+        if (!files.length) return;
+        e.preventDefault();
+        const noteId = openId;
+        const after = focusId ?? body.blocks[body.blocks.length - 1]?.id ?? null;
+        for (const f of files.slice(0, 10))
+          void imageFileToDataUrl(f)
+            .then((src) => placeImage(noteId, after, src))
+            .catch(() => toast('Не удалось вставить изображение'));
+      }}
+    >
       <div className="nt-ed-head">
         <button className="icon-btn nt-back" onClick={() => void close()} aria-label={hasNoteTrail() ? 'Назад к предыдущей заметке' : 'Назад к заметкам'}>
           <ChevronLeft />
