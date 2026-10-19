@@ -2,7 +2,7 @@ import { registerPlugin } from '@capacitor/core';
 import { get, set } from '../store/kv';
 import { create } from 'zustand';
 import type { PlannerData } from '../types';
-import { isNative } from '../platform';
+import { isAndroidApp, isNative } from '../platform';
 import { pushActive, uploadSchedule } from '../store/push';
 import { useApp, toast } from '../store/appStore';
 import { todayYmd, toYmd, addDaysYmd, fromYmd } from '../utils/mapTasks';
@@ -648,7 +648,7 @@ async function takeAlarmActions() {
 
 /** Проверка будильника: на Android — настоящий, в веб-версии — сигнал на 5 секунд */
 export async function testAlarm() {
-  if (isNative()) {
+  if (isAndroidApp()) {
     await SmAlarm.test();
     return;
   }
@@ -909,7 +909,7 @@ export async function addTaskToCalendar(t: TaskItem) {
     toast('Сначала укажите дату задачи');
     return;
   }
-  if (isNative()) {
+  if (isAndroidApp()) {
     const d = tasksData();
     if (d?.prefs.calendarSync) {
       await syncCalendar();

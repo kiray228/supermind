@@ -5,7 +5,7 @@ import { toast } from '../store/appStore';
 import { IconTile } from './icons';
 import { ListRow, ListSection, SelectRow, SwitchRow } from './list';
 import { biometricAvailable, biometricOn, disableLock, LOCK_AFTER_OPTIONS, lockConfig, secureWindow, setBiometric, setLockAfter, setPin, setSecure, useLock } from './lock';
-import { isNative } from '../platform';
+import { isAndroidApp } from '../platform';
 import { PinPad } from './LockScreen';
 import { onBack } from './dialogs';
 
@@ -117,7 +117,7 @@ export function LockSettings() {
           <ListRow icon={<IconTile icon={Password} tone="gray" size="list" />} title="Сменить код" chevron onClick={() => setSetup(true)} />
         </>
       )}
-      {isNative() && (
+      {isAndroidApp() && (
         <SwitchRow
           icon={<IconTile icon={EyeSlash} tone="indigo" size="list" />}
           title="Прятать в недавних"

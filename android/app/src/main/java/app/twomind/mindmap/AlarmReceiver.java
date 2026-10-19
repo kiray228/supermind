@@ -35,7 +35,7 @@ public class AlarmReceiver extends BroadcastReceiver {
         } else if (ACTION_STOP.equals(a) || ACTION_SNOOZE.equals(a) || ACTION_DONE.equals(a)) {
             act(c, a, intent.getExtras());
         } else {
-            // BOOT_COMPLETED, MY_PACKAGE_REPLACED, TIME_SET, TIMEZONE_CHANGED
+            // BOOT_COMPLETED, MY_PACKAGE_REPLACED, TIME_SET, TIMEZONE_CHANGED, SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED
             AlarmScheduler.restoreAll(c, Intent.ACTION_TIMEZONE_CHANGED.equals(a));
         }
     }

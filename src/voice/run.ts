@@ -189,7 +189,7 @@ export async function interpret(text: string): Promise<{ actions: VoiceAction[];
   // «выпил стакан воды» — если похоже на привычку, отмечаем без ИИ
   const md = local.actions[0];
   if (md?.type === 'mark_done' && (await findDone(md.query, false, md.kind))) return { actions: local.actions, via: 'local' };
-  if (!aiOff && useCloud.getState().account) {
+  if (!aiOff && useCloud.getState().account && (await (await import('../ai/consent')).askAiConsent('server'))) {
     try {
       const now = new Date();
       const r = await api<{ actions: unknown[] }>('/ai/command', {

@@ -1,6 +1,6 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
-import { canInstallPwa, installPwa, isDesktopApp, isNative, onInstallChange, WINDOWS_SETUP_URL } from '../platform';
+import { canInstallPwa, installPwa, isAndroidApp, isDesktopApp, isIOSApp, isNative, onInstallChange, WINDOWS_SETUP_URL } from '../platform';
 import { AccountCard, PushCard } from '../ui/AccountCard';
 import { DataCard } from '../ui/DataCard';
 import { LockSettings } from '../ui/LockSettings';
@@ -256,6 +256,7 @@ export default function Settings() {
 
           {!isNative() && !isDesktopApp() && <DesktopInstall />}
 
+          {!isNative() && (
           <ListSection header="Установка на телефон">
             <ListRow
               icon={<IconTile icon={AppleLogo} tone="gray" size="list" />}
@@ -268,6 +269,7 @@ export default function Settings() {
               subtitle="Установите APK-файл SuperMind или в Chrome откройте меню ⋮ → «Установить приложение»."
             />
           </ListSection>
+          )}
 
           <ListSection
             header="Поддержка"
@@ -358,6 +360,8 @@ function TaskSettings() {
   // календарь — свой у каждого телефона (номер календаря на другом устройстве означает другое)
   const [calId, setCalId] = useState(() => (data ? (phoneCalendarId(data) ?? '') : ''));
   const native = isNative();
+  // будильники и календарь телефона — свои плагины только в приложении для Android
+  const android = isAndroidApp();
 
   useEffect(() => {
     void ensureTasks();
@@ -366,8 +370,8 @@ function TaskSettings() {
     void alarmFullScreen().then(setFullScreen);
   }, []);
   useEffect(() => {
-    if (native && data?.prefs.calendarSync) void listPhoneCalendars().then((c) => setCals(c.filter((x) => x.writable)));
-  }, [native, data?.prefs.calendarSync]);
+    if (android && data?.prefs.calendarSync) void listPhoneCalendars().then((c) => setCals(c.filter((x) => x.writable)));
+  }, [android, data?.prefs.calendarSync]);
 
   if (!data) return null;
   const p = data.prefs;
@@ -407,7 +411,7 @@ function TaskSettings() {
             }
           />
         )}
-        {native && exact === 'denied' && (
+        {android && exact === 'denied' && (
           <ListRow
             icon={<IconTile icon={Alarm} tone="orange" size="list" />}
             title="Точные будильники выключены"
@@ -419,7 +423,7 @@ function TaskSettings() {
             }
           />
         )}
-        {native && fullScreen === 'denied' && (
+        {android && fullScreen === 'denied' && (
           <ListRow
             icon={<IconTile icon={Alarm} tone="orange" size="list" />}
             title="Будильник не откроется на заблокированном экране"
@@ -434,7 +438,7 @@ function TaskSettings() {
         <ListRow
           icon={<IconTile icon={Alarm} tone="orange" size="list" />}
           title="Проверить будильник"
-          subtitle={native ? 'Напоминание-будильник: включается в окне даты задачи → «Как будильник»' : 'Звонит, пока SuperMind открыт. Включается в окне даты задачи → «Как будильник»'}
+          subtitle={android ? 'Напоминание-будильник: включается в окне даты задачи → «Как будильник»' : 'Звонит, пока SuperMind открыт. Включается в окне даты задачи → «Как будильник»'}
           chevron
           onClick={() => void testAlarm()}
         />
@@ -487,12 +491,14 @@ function TaskSettings() {
       <ListSection
         header="Календарь телефона"
         footer={
-          native
+          android
             ? undefined
-            : 'Автоматическая запись в календарь работает в приложении для Android. Здесь можно выгрузить задачи файлом .ics — его принимают Календарь iPhone, Google Календарь и Outlook.'
+            : isIOSApp()
+              ? 'Выгрузите задачи файлом .ics — Календарь iPhone добавит их вместе с напоминаниями.'
+              : 'Автоматическая запись в календарь работает в приложении для Android. Здесь можно выгрузить задачи файлом .ics — его принимают Календарь iPhone, Google Календарь и Outlook.'
         }
       >
-        {native && (
+        {android && (
           <>
             <SwitchRow
               icon={<IconTile icon={CalendarBlank} tone="red" size="list" />}

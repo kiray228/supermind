@@ -1,5 +1,7 @@
 /**
  * Вход обязателен: пока нет аккаунта, вместо приложения — экран регистрации/входа.
+ * Кроме iPhone: App Store не разрешает требовать вход, если приложение работает и без него (правило 5.1.1) —
+ * там можно «Продолжить без аккаунта» (данные только на устройстве, войти можно позже в Настройках).
  * Данные на устройстве при этом не трогаются: после входа они уходят в аккаунт.
  * Забыли пароль — код на почту (POST /auth/forgot), затем код + новый пароль (POST /auth/reset).
  */
@@ -7,6 +9,7 @@ import { useEffect, useState } from 'react';
 import { Eye, EyeOff, Cloud, ShieldCheck, Smartphone } from 'lucide-react';
 import { InstallAppButton } from './InstallAppButton';
 import { login, register, requestReset, resetPassword, useCloud } from '../store/cloud';
+import { isIOSApp } from '../platform';
 import './auth.css';
 
 type Mode = 'register' | 'login' | 'forgot' | 'reset';
@@ -27,6 +30,15 @@ const BUTTON: Record<Mode, string> = {
 
 const digits = (s: string) => s.replace(/\D/g, '');
 
+const LOCAL_ONLY = 'sm-local-only';
+function localOnly(): boolean {
+  try {
+    return isIOSApp() && localStorage.getItem(LOCAL_ONLY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 export function AuthGate() {
   const { account, ready, error } = useCloud();
   const [mode, setMode] = useState<Mode>('register');
@@ -37,6 +49,7 @@ export function AuthGate() {
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
+  const [skipped, setSkipped] = useState(localOnly);
 
   // сессия истекла — сразу форма входа с понятным сообщением
   useEffect(() => {
@@ -46,7 +59,7 @@ export function AuthGate() {
     }
   }, [ready, account, error]);
 
-  if (account) return null;
+  if (account || skipped) return null;
   if (!ready)
     return (
       <div className="auth-gate auth-loading" aria-busy="true">
@@ -195,6 +208,25 @@ export function AuthGate() {
           </ul>
         )}
         {!recovering && <InstallAppButton className="auth-download" iconSize={18} />}
+        {!recovering && isIOSApp() && (
+          <>
+            <button
+              type="button"
+              className="auth-link"
+              onClick={() => {
+                try {
+                  localStorage.setItem(LOCAL_ONLY, '1');
+                } catch {
+                  /* не сохранится — спросим при следующем запуске */
+                }
+                setSkipped(true);
+              }}
+            >
+              Продолжить без аккаунта
+            </button>
+            <p className="auth-note">Данные останутся только на этом iPhone. Войти и включить синхронизацию можно позже в Настройках.</p>
+          </>
+        )}
       </div>
     </div>
   );

@@ -41,6 +41,7 @@ export const hasOwnKey = () => !!useApp.getState().settings.apiKey.trim();
 
 /** Бесплатный ИИ на сервере (Gemini): без ключа, с дневным лимитом на пользователя */
 async function serverText({ system, messages, onText, signal }: StreamOpts): Promise<string> {
+  await (await import('./consent')).requireAiConsent('server');
   const { api } = await import('../store/cloud');
   try {
     const r = await api<{ text: string }>('/ai/chat', { method: 'POST', body: JSON.stringify({ system, messages }), signal });
@@ -62,6 +63,7 @@ export async function streamText(opts: StreamOpts): Promise<string> {
   if (!hasOwnKey()) return serverText(opts);
   const { system, messages, onText, signal, effort = 'medium' } = opts;
   const { c, Anthropic } = await client();
+  await (await import('./consent')).requireAiConsent('claude');
   const model = useApp.getState().settings.model || AI_MODELS[0].id;
   const isHaiku = model.startsWith('claude-haiku');
   const supportsFallback = model === 'claude-opus-5-5' || model === 'claude-sonnet-5-5';

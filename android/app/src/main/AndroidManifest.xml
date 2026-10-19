@@ -135,6 +135,8 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
                 <action android:name="android.intent.action.TIME_SET" />
                 <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <!-- пользователь разрешил точные будильники: поставленные «почти точно» — заново, точно -->
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
             </intent-filter>
         </receiver>
         <provider
@@ -152,7 +154,8 @@
     <uses-permission android:name="android.permission.READ_CALENDAR" />
     <uses-permission android:name="android.permission.WRITE_CALENDAR" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <!-- точные будильники: USE_EXACT_ALARM Google Play разрешает только будильникам и календарям, поэтому
+         просим SCHEDULE_EXACT_ALARM — пользователь включает его сам (Android 14+), без него будильник звонит «почти точно» -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- будильники: экран поверх блокировки, звонок из фона, после перезагрузки -->

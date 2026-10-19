@@ -17,8 +17,10 @@ import {
   type TaskItem,
 } from '../model';
 import { tasksData } from '../store';
+import { exactAlarmState, openExactAlarmSettings } from '../sync';
+import { confirmDialog } from '../../ui/dialogs';
 import { Switch } from '../../ui/list';
-import { isNative } from '../../platform';
+import { isAndroidApp, isNative } from '../../platform';
 import { isIOS } from '../../io/download';
 
 export type When = Pick<TaskItem, 'date' | 'time' | 'duration' | 'reminders' | 'repeat' | 'alarm'>;
@@ -26,9 +28,17 @@ export type When = Pick<TaskItem, 'date' | 'time' | 'duration' | 'reminders' | '
 const DURATIONS = [15, 30, 45, 60, 90, 120, 180];
 
 /** Что умеет будильник на этом устройстве */
-const ALARM_HINT = isNative()
+/** Android 14+: точные будильники выключены по умолчанию — без них будильник может опоздать на несколько минут */
+async function askExactAlarms() {
+  if (!isAndroidApp() || (await exactAlarmState()) !== 'denied') return;
+  if (await confirmDialog('Разрешить точные будильники?', 'Иначе Android может прозвенеть на несколько минут позже. Включите «Будильники и напоминания» для SuperMind.', { okText: 'Открыть настройки' })) await openExactAlarmSettings();
+}
+
+const ALARM_HINT = isAndroidApp()
   ? 'Звонит громко и по кругу, пока не выключите, — даже на заблокированном экране'
-  : isIOS()
+  : isNative()
+    ? 'На iPhone придёт уведомление со звуком — звонить по кругу, как будильник, умеет только приложение для Android'
+    : isIOS()
     ? 'Звонит, пока SuperMind открыт. Закрытое приложение на iPhone звонить не может — придёт обычное уведомление'
     : 'Звонит громко и по кругу, пока SuperMind открыт (можно свёрнутым)';
 
@@ -148,7 +158,7 @@ export function DatePicker({ value, onDone, onClose }: { value: When; onDone: (v
                 Как будильник
                 <small>{ALARM_HINT}</small>
               </span>
-              <Switch checked={!!v.alarm} onChange={(on) => setV((x) => ({ ...x, alarm: on || undefined }))} />
+              <Switch checked={!!v.alarm} onChange={(on) => { setV((x) => ({ ...x, alarm: on || undefined })); if (on) void askExactAlarms(); }} />
             </label>
           )}
           {addRem && (

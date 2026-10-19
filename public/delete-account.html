@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SuperMind — удаление аккаунта</title>
+<link rel="icon" href="icon-192.png">
+<link rel="stylesheet" href="legal.css">
+</head>
+<body>
+<main>
+<h1>Удаление аккаунта SuperMind</h1>
+<p class="muted">Delete your SuperMind account</p>
+
+<p>Будут удалены навсегда: аккаунт (email, имя, пароль), все синхронизированные данные (карты, задачи, заметки, дневник, финансы, настройки), облачные резервные копии и сеансы входа. Данные на ваших устройствах останутся, пока вы не удалите приложение.</p>
+<p>Обращения в поддержку отвязываются от аккаунта. Чтобы удалить и их, напишите на <a href="mailto:SUPPORT_EMAIL">SUPPORT_EMAIL</a>.</p>
+<p>Проще всего удалить аккаунт в приложении: <b>Настройки → Синхронизация → «Удалить аккаунт»</b>. Без приложения — здесь:</p>
+
+<form id="f">
+  <label>Email<input id="email" type="email" autocomplete="username" required></label>
+  <label>Пароль<input id="password" type="password" autocomplete="current-password" required></label>
+  <button id="go" type="submit">Удалить аккаунт навсегда</button>
+  <div id="status" class="status" role="status"></div>
+</form>
+
+<p class="muted">Забыли пароль? Восстановите его в приложении (экран входа → «Забыли пароль?») или напишите на <a href="mailto:SUPPORT_EMAIL">SUPPORT_EMAIL</a> с адреса аккаунта — удалим вручную в течение 7 дней.</p>
+
+<hr>
+<div lang="en">
+<p>This permanently deletes your account (email, name, password), all synced content (maps, tasks, notes, journal, finance, settings), cloud backups and sessions. Data on your devices stays until you uninstall the app. In the app: <b>Settings → Sync → Delete account</b>, or use the form above. Can't sign in? Email <a href="mailto:SUPPORT_EMAIL">SUPPORT_EMAIL</a> from your account address and we'll delete it within 7 days.</p>
+<p><a href="privacy.html">Privacy policy</a></p>
+</div>
+</main>
+<script>
+  const API = 'https://br-soft-term-b1xn6yim-supermind.compute.c-5.eu-central-1.aws.neon.tech';
+  const $ = (id) => document.getElementById(id);
+  const say = (text, error) => {
+    $('status').textContent = text;
+    $('status').className = 'status' + (error ? ' error' : '');
+  };
+  async function call(path, method, body, token) {
+    const r = await fetch(API + path, {
+      method,
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
+      body: JSON.stringify(body),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || 'Ошибка ' + r.status);
+    return data;
+  }
+  $('f').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = $('email').value.trim();
+    const password = $('password').value;
+    if (!confirm('Удалить аккаунт ' + email + ' и все данные в облаке навсегда?')) return;
+    $('go').disabled = true;
+    say('Удаляем…');
+    try {
+      const { token } = await call('/auth/login', 'POST', { email, password });
+      await call('/account', 'DELETE', { password }, token);
+      $('f').reset();
+      say('Аккаунт удалён. Account deleted.');
+    } catch (err) {
+      say(err instanceof Error ? err.message : String(err), true);
+    } finally {
+      $('go').disabled = false;
+    }
+  });
+</script>
+</body>
+</html>

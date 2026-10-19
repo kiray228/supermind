@@ -5,6 +5,10 @@ import { leaveEditor } from './actions';
 import { runBack } from './ui/dialogs';
 
 export const isNative = () => Capacitor.isNativePlatform();
+/** Приложение для Android (APK, Google Play): виджеты, будильники, календарь телефона — свои плагины на Java */
+export const isAndroidApp = () => isNative() && Capacitor.getPlatform() === 'android';
+/** Приложение для iPhone и iPad (App Store) */
+export const isIOSApp = () => isNative() && Capacitor.getPlatform() === 'ios';
 /** Запущено в программе для Windows: метку ставит программа (прежняя версия на Electron — в User-Agent) */
 export const isDesktopApp = () => '__SUPERMIND_DESKTOP__' in window || navigator.userAgent.includes('SuperMind-Desktop');
 export const WINDOWS_SETUP_URL = 'https://github.com/kiray228/supermind/releases/download/windows/SuperMind-Setup.exe';
