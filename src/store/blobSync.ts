@@ -24,7 +24,7 @@ function stampNested(next: Obj, prev: Obj | undefined, now: number, gone: Record
     const list = arr.map((x) => {
       const p = before.get(x.id as string);
       before.delete(x.id as string);
-      if (p && sigOf(p) === sigOf(x)) return x;
+      if (p === x || (p && sigOf(p) === sigOf(x))) return x;
       changed = true;
       return { ...stampNested(x, p, now, gone), updatedAt: Math.max(now, Number(x.updatedAt) || 0) };
     });
@@ -50,7 +50,8 @@ export function stampChanged<T>(next: T, prev: T | null): { value: T; stamped: b
     let changed = false;
     const list = (arr as Obj[]).map((x) => {
       const p = before.get(x.id as string);
-      if (p && sigOf(p) === sigOf(x)) return x;
+      // тот же объект (не изменялся — изменения копируют только тронутое) — без перевода в JSON
+      if (p === x || (p && sigOf(p) === sigOf(x))) return x;
       if (before.size === 0 && !isObj(prev)) return x; // первая запись — ничего не сравниваем
       changed = true;
       return { ...stampNested(x, p, now, gone), updatedAt: Math.max(now, Number(x.updatedAt) || 0) };

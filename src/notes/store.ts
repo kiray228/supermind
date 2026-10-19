@@ -164,13 +164,15 @@ async function writeNow(id: ID, body: NoteBody): Promise<void> {
     return;
   }
   textCache.set(id, { at: body.updatedAt, text: searchNorm(body.title + '\n' + bodyPlainText(body)) });
-  mutateNotes((d) => {
-    const m = d.notes.find((n) => n.id === id);
-    if (m) {
-      Object.assign(m, metaFromBody(body, size));
-      m.updatedAt = body.updatedAt;
-    }
-  });
+  // только эта карточка — без копирования всего индекса (на каждую паузу в наборе)
+  const cur = useNotes.getState().data;
+  const i = cur ? cur.notes.findIndex((n) => n.id === id) : -1;
+  if (cur && i >= 0) {
+    const notes = cur.notes.slice();
+    notes[i] = { ...structuredClone(cur.notes[i]), ...metaFromBody(body, size), updatedAt: body.updatedAt };
+    useNotes.setState({ data: { ...cur, notes } });
+    index.schedule();
+  }
 }
 
 /** Сохранить всё несохранённое сразу */

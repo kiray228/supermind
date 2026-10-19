@@ -1,5 +1,5 @@
 /** «Что нового»: главное в каждой версии. Новые версии — сверху. */
-import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge, MessageCircleQuestion, CloudOff, LayoutTemplate, SquareArrowOutUpRight, BellRing, Target, Timer, Lock, Crosshair, Move, GitMerge, EyeOff, CalendarRange, Fingerprint, ArrowUpDown, Banknote, MonitorSmartphone, Coins, ListChecks, FileInput, Split, CornerDownRight, KeyRound, Keyboard, LifeBuoy, Zap, FileSpreadsheet } from 'lucide-react';
+import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge, MessageCircleQuestion, CloudOff, LayoutTemplate, SquareArrowOutUpRight, BellRing, Target, Timer, Lock, Crosshair, Move, GitMerge, EyeOff, CalendarRange, Fingerprint, ArrowUpDown, Banknote, MonitorSmartphone, Coins, ListChecks, FileInput, Split, CornerDownRight, KeyRound, Keyboard, LifeBuoy, Zap, FileSpreadsheet, Gauge as GaugeIcon, MessagesSquare } from 'lucide-react';
 
 export interface ChangeItem {
   icon: typeof Sparkles;
@@ -15,6 +15,16 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.43',
+    title: 'Мгновенные отметки и быстрые большие карты',
+    items: [
+      { icon: Zap, title: 'Отметки и правки — мгновенно', text: 'Отметить задачу, поправить её, добавить или изменить операцию, сохранить заметку — теперь в десятки раз быстрее при тысячах записей: меняется только то, что вы тронули.' },
+      { icon: GaugeIcon, title: 'Большие карты не тормозят', text: 'Правка темы на карте из тысяч тем показывается примерно в 5 раз быстрее: перерисовываются только изменившиеся темы.' },
+      { icon: MessagesSquare, title: 'Поддержка прямо в приложении', text: 'Настройки → «Поддержка» → «Задать вопрос»: ИИ сразу отвечает по справке, а если ответа нет — вопрос получит человек. В обращении можно переписываться, ответы и статус видны в «Мои обращения».' },
+      { icon: LifeBuoy, title: 'Отчёты об ошибках', text: 'Если что-то сломалось, приложение само отправит короткий отчёт без ваших данных — так ошибки исправляются быстрее. Отключается в Настройках.' },
+    ],
+  },
   {
     version: '1.42',
     title: 'Защита сервера, точный импорт выписок и скорость',

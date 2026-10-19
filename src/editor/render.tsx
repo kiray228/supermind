@@ -128,6 +128,25 @@ export interface NodeViewProps {
   highlight?: boolean;
 }
 
+/**
+ * Подпись темы для сравнения: раскладка после каждой правки выдаёт новые объекты всех тем — без сравнения
+ * по содержимому перерисовывалась бы вся карта (тысячи узлов). Считается один раз на объект.
+ */
+const nodeSigs = new WeakMap<LNode, string>();
+function nodeSig(n: LNode): string {
+  let s = nodeSigs.get(n);
+  if (s === undefined) {
+    const { children: _c, image, ...t } = n.topic;
+    // картинку целиком не сравниваем (может весить мегабайты): размер и начало данных
+    const img = image ? [image.w, image.h, image.src.length, image.src.slice(0, 80), image.src.slice(-40)] : null;
+    s = JSON.stringify([n.x, n.y, n.w, n.h, n.color, n.style, n.lines, n.content, n.hidden, n.side, n.vdir, n.level, n.depth, n.index, n.toggle, n.parentId, t, img, _c.length]);
+    nodeSigs.set(n, s);
+  }
+  return s;
+}
+const sameNodeProps = (a: NodeViewProps, b: NodeViewProps) =>
+  a.selected === b.selected && a.editing === b.editing && a.dim === b.dim && a.dropHint === b.dropHint && a.highlight === b.highlight && (a.n === b.n || nodeSig(a.n) === nodeSig(b.n));
+
 export const NodeView = memo(function NodeView({ n, selected, editing, dim, dropHint, highlight }: NodeViewProps) {
   const s = n.style;
   const c = n.content;
@@ -207,7 +226,7 @@ export const NodeView = memo(function NodeView({ n, selected, editing, dim, drop
       )}
     </g>
   );
-});
+}, sameNodeProps);
 
 function dueColor(due: string, status?: string) {
   if (status === 'done') return '#16a34a';

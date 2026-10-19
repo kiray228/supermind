@@ -149,6 +149,26 @@ export function mutateTasks(fn: (d: TasksData) => void) {
 
 export const tasksData = () => useTasks.getState().data;
 
+/**
+ * Изменить одну задачу без копирования всего блока: копируется только она, остальные задачи —
+ * те же объекты (сравнение при сохранении их пропускает, подписчики строк не перерисовываются).
+ * fn получает копию задачи и поверхностную копию данных: поля верхнего уровня (журнал, отметки удаления)
+ * можно заменять, но не менять на месте.
+ */
+export function mutateTask(id: ID, fn: (x: TaskItem, d: TasksData) => void) {
+  const cur = useTasks.getState().data;
+  if (!cur) return;
+  const i = cur.tasks.findIndex((t) => t.id === id);
+  if (i < 0) return;
+  const tasks = cur.tasks.slice();
+  const x = structuredClone(cur.tasks[i]);
+  tasks[i] = x;
+  const d: TasksData = { ...cur, tasks };
+  fn(x, d);
+  useTasks.setState({ data: d });
+  store.schedule();
+}
+
 // ---------- Задачи ----------
 
 export function defaultReminders(d: TasksData, timed: boolean): number[] {
@@ -188,11 +208,9 @@ export function addTask(p: Partial<TaskItem>): TaskItem | null {
 }
 
 export function updateTask(id: ID, patch: Partial<TaskItem>) {
-  mutateTasks((d) => {
-    const i = d.tasks.findIndex((t) => t.id === id);
-    if (i < 0) return;
-    const old = d.tasks[i];
-    const next: TaskItem = { ...old, ...patch, updatedAt: Date.now() };
+  mutateTask(id, (next, d) => {
+    const old = { ...next };
+    Object.assign(next, patch, { updatedAt: Date.now() });
     // как в TickTick: при появлении даты/времени — напоминания по умолчанию
     if (('date' in patch || 'time' in patch) && !('reminders' in patch) && next.date) {
       if (!old.date || !!old.time !== !!next.time) next.reminders = defaultReminders(d, !!next.time);
@@ -209,7 +227,6 @@ export function updateTask(id: ID, patch: Partial<TaskItem>) {
       next.repeat = pinRule(next.repeat, next.date);
     }
     for (const k of Object.keys(next) as (keyof TaskItem)[]) if (next[k] === undefined) delete next[k];
-    d.tasks[i] = next;
   });
 }
 
@@ -225,9 +242,7 @@ export function snapshotOf(t: TaskItem, logged: boolean): Snapshot {
 
 /** Вернуть задачу в состояние до выполнения (кнопка «Отменить») */
 export function restoreSnapshot(id: ID, snap: Snapshot) {
-  mutateTasks((d) => {
-    const x = d.tasks.find((y) => y.id === id);
-    if (!x) return;
+  mutateTask(id, (x, d) => {
     x.date = snap.date;
     x.repeatDone = snap.repeatDone;
     x.checklist = snap.checklist;
@@ -247,8 +262,7 @@ export function toggleDone(id: ID) {
   if (!t) return;
   if (t.done || t.wontDo) {
     const wasDone = t.done;
-    mutateTasks((d) => {
-      const x = d.tasks.find((y) => y.id === id)!;
+    mutateTask(id, (x, d) => {
       x.done = false;
       delete x.wontDo;
       delete x.completedAt;
@@ -262,8 +276,7 @@ export function toggleDone(id: ID) {
   const snap = snapshotOf(t, true);
   const adv = t.repeat ? advanceRepeatSteps(t, todayYmd()) : null;
   const next = adv?.next ?? null;
-  mutateTasks((d) => {
-    const x = d.tasks.find((y) => y.id === id)!;
+  mutateTask(id, (x, d) => {
     // повтор: чек-лист сейчас сбросится — отмеченные пункты остаются в журнале (их опыт не пропадёт)
     const ck = next ? x.checklist.filter((c) => c.done).length : 0;
     pushLog(d, { taskId: x.id, title: x.title, listId: x.listId, at: Date.now(), date: x.date, ...(ck ? { ck } : {}) });
@@ -300,8 +313,7 @@ export function completeOccurrence(id: ID, date?: string): boolean {
   // будущий повтор, а прошлый ещё не выполнен: отметить именно его, прошлый остаётся
   if (t.repeat && date && t.date && date > t.date) {
     const snap = snapshotOf(t, true);
-    mutateTasks((d) => {
-      const x = d.tasks.find((y) => y.id === id)!;
+    mutateTask(id, (x, d) => {
       pushLog(d, { taskId: x.id, title: x.title, listId: x.listId, at: Date.now(), date });
       x.repeat = { ...x.repeat!, skip: [...new Set([...(x.repeat!.skip ?? []), date])].sort() };
       x.updatedAt = Date.now();
@@ -322,9 +334,8 @@ export function skipOccurrence(id: ID, date: string): boolean {
   if (!t?.repeat || !t.date) return false;
   const snap = snapshotOf(t, false);
   if (date > t.date) {
-    mutateTasks((d) => {
-      const x = d.tasks.find((y) => y.id === id);
-      if (!x?.repeat) return;
+    mutateTask(id, (x) => {
+      if (!x.repeat) return;
       x.repeat = { ...x.repeat, skip: [...new Set([...(x.repeat.skip ?? []), date])].sort() };
       x.updatedAt = Date.now();
     });
@@ -334,9 +345,7 @@ export function skipOccurrence(id: ID, date: string): boolean {
   // текущий повтор: дальше, к следующему (после него — без ожидания сегодняшнего дня)
   const adv = advanceRepeatSteps(t, t.date < todayYmd() ? todayYmd() : t.date);
   const next = adv?.next ?? null;
-  mutateTasks((d) => {
-    const x = d.tasks.find((y) => y.id === id);
-    if (!x) return;
+  mutateTask(id, (x) => {
     if (next) {
       x.date = next;
       x.repeatDone = (x.repeatDone ?? 0) + (adv?.steps ?? 1);
@@ -370,9 +379,8 @@ export function moveOccurrence(id: ID, from: string, to: string): TaskItem | nul
     reminders: [...t.reminders],
     checklist: t.checklist.map((c) => ({ ...c, id: uid(), done: false })),
   });
-  mutateTasks((d) => {
-    const x = d.tasks.find((y) => y.id === id);
-    if (!x?.repeat) return;
+  mutateTask(id, (x) => {
+    if (!x.repeat) return;
     x.repeat = { ...x.repeat, skip: [...new Set([...(x.repeat.skip ?? []), from])].sort() };
     x.updatedAt = Date.now();
   });
@@ -393,9 +401,7 @@ export function setWontDo(id: ID) {
   const snap = snapshotOf(t, false);
   const adv = t.repeat ? advanceRepeatSteps(t, todayYmd()) : null;
   const next = adv?.next ?? null;
-  mutateTasks((d) => {
-    const x = d.tasks.find((y) => y.id === id);
-    if (!x) return;
+  mutateTask(id, (x) => {
     if (next) {
       x.date = next;
       x.repeatDone = (x.repeatDone ?? 0) + (adv?.steps ?? 1);
@@ -411,9 +417,7 @@ export function setWontDo(id: ID) {
 
 /** Изменить подзадачи по самому свежему состоянию задачи (правки подряд не перетирают друг друга) */
 export function updateChecklist(id: ID, fn: (c: ChecklistItem[]) => ChecklistItem[]) {
-  mutateTasks((d) => {
-    const x = d.tasks.find((y) => y.id === id);
-    if (!x) return;
+  mutateTask(id, (x) => {
     const now = Date.now();
     const was = new Map(x.checklist.map((c) => [c.id, c.done]));
     // время отметки пункта — опыт засчитывается в день отметки, а не в день последней правки задачи
@@ -436,16 +440,19 @@ const LOG_CAP = 5000;
  * их и так засчитывает completedAt.
  */
 export function pushLog(d: TasksData, entry: CompletionLog) {
-  d.log.push(entry);
+  // новые массив и объекты (не меняем на месте: прежнее состояние могут ещё читать)
+  d.log = [...d.log, entry];
   if (d.log.length <= LOG_CAP) return;
-  const cut = d.log.splice(0, d.log.length - LOG_CAP);
+  const cut = d.log.slice(0, d.log.length - LOG_CAP);
+  d.log = d.log.slice(-LOG_CAP);
   const byId = new Map(d.tasks.map((t) => [t.id, t]));
-  const arch = (d.logArchive ??= {});
+  const arch = (d.logArchive = { ...(d.logArchive ?? {}) });
   for (const l of cut) {
     const t = byId.get(l.taskId);
     if (t?.done && t.completedAt) continue;
     const at = new Date(l.at);
-    const a = (arch[toYmd(at)] ??= { n: 0, hi: 0, med: 0, early: 0, late: 0 });
+    const k = toYmd(at);
+    const a = (arch[k] = { ...(arch[k] ?? { n: 0, hi: 0, med: 0, early: 0, late: 0 }) });
     a.n++;
     if (t?.priority === 1) a.hi++;
     else if (t?.priority === 2) a.med++;
@@ -460,9 +467,7 @@ export function trashTask(id: ID) {
   updateTask(id, { deleted: Date.now() });
 }
 export function restoreTask(id: ID) {
-  mutateTasks((d) => {
-    const x = d.tasks.find((y) => y.id === id);
-    if (!x) return;
+  mutateTask(id, (x) => {
     delete x.deleted;
     // свежая отметка — восстановление побеждает удаление и на других устройствах
     x.updatedAt = Date.now();
@@ -472,8 +477,9 @@ export function restoreTask(id: ID) {
 export function unlogLast(d: TasksData, id: ID) {
   const li = d.log.map((l) => l.taskId).lastIndexOf(id);
   if (li < 0) return;
-  const [l] = d.log.splice(li, 1);
-  (d.gone ??= {})[`log:${l.taskId}|${l.at}`] = Date.now();
+  const l = d.log[li];
+  d.log = d.log.filter((_, j) => j !== li);
+  d.gone = { ...(d.gone ?? {}), [`log:${l.taskId}|${l.at}`]: Date.now() };
 }
 
 /** Отметка «удалено навсегда» для синхронизации */

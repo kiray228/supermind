@@ -88,6 +88,16 @@ export function flushFinance(): Promise<void> {
 }
 
 /** Изменить данные: fn получает копию, сохранение — автоматически через 250 мс */
+/** Заменить одну операцию / добавить операцию без копирования всего блока (остальные — те же объекты) */
+function patchFinance(fn: (d: FinanceData) => FinanceData | void) {
+  const cur = useFinance.getState().data;
+  if (!cur) return;
+  const d = fn(cur);
+  if (!d) return;
+  useFinance.setState({ data: d });
+  store.schedule();
+}
+
 export function mutateFinance(fn: (d: FinanceData) => void) {
   const cur = useFinance.getState().data;
   if (!cur) return;
@@ -161,12 +171,13 @@ export function addTransaction(p: TxDraft, opts: { silent?: boolean; id?: string
   const now = Date.now();
   const t = normalizeTx({ ...p, tags: p.tags ?? [], id: opts.id ?? uid(), createdAt: now, updatedAt: now });
   const alert = !opts.silent && t.type === 'expense' ? budgetAlert(d, t) : null;
-  mutateFinance((x) => {
-    x.transactions.push(t);
+  patchFinance((x) => ({
+    ...x,
+    transactions: [...x.transactions, t],
     // последний счёт — удобство этого устройства: время изменения настроек не трогаем,
     // иначе при слиянии он перетёр бы курсы и валюту, изменённые на другом устройстве
-    if (x.prefs.lastAccountId !== t.accountId) x.prefs = { ...x.prefs, lastAccountId: t.accountId };
-  });
+    prefs: x.prefs.lastAccountId !== t.accountId ? { ...x.prefs, lastAccountId: t.accountId } : x.prefs,
+  }));
   if (alert) toast(alert);
   return t;
 }
@@ -186,17 +197,19 @@ export function removeTransactions(ids: string[]) {
 }
 
 export function updateTransaction(id: string, patch: Partial<Transaction>) {
-  mutateFinance((d) => {
+  patchFinance((d) => {
     const i = d.transactions.findIndex((t) => t.id === id);
     if (i < 0) return;
-    d.transactions[i] = normalizeTx({ ...d.transactions[i], ...patch, id, updatedAt: Date.now() });
+    const transactions = d.transactions.slice();
+    transactions[i] = normalizeTx({ ...structuredClone(d.transactions[i]), ...patch, id, updatedAt: Date.now() });
+    return { ...d, transactions };
   });
 }
 
 export function deleteTransaction(id: string, undo = true) {
   const t = useFinance.getState().data?.transactions.find((x) => x.id === id);
   if (!t) return;
-  mutateFinance((d) => removeIn(d, 'transactions', id));
+  patchFinance((d) => ({ ...d, transactions: d.transactions.filter((x) => x.id !== id), gone: { ...(d.gone ?? {}), [id]: Date.now() } }));
   if (undo) toast('Операция удалена', { label: 'Отменить', run: () => mutateFinance((d) => upsertIn(d, 'transactions', t)) });
 }
 
