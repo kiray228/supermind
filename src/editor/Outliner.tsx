@@ -95,7 +95,13 @@ function Row({ t, depth }: { t: Topic; depth: number }) {
   return (
     <div className="ol-node">
       <div className={`ol-row ${selected ? 'sel' : ''} depth-${Math.min(depth, 3)}`} style={{ paddingLeft: depth * 22 }}>
-        <button className={`ol-toggle ${t.children.length ? '' : 'hidden'} ${t.collapsed ? '' : 'open'}`} onClick={() => st.toggleCollapse(t.id)}>
+        <button
+          className={`ol-toggle ${t.children.length ? '' : 'hidden'} ${t.collapsed ? '' : 'open'}`}
+          onClick={() => st.toggleCollapse(t.id)}
+          aria-label={t.collapsed ? 'Развернуть ветку' : 'Свернуть ветку'}
+          aria-expanded={t.children.length ? !t.collapsed : undefined}
+          tabIndex={t.children.length ? 0 : -1}
+        >
           <ChevronRight size={15} />
         </button>
         <span className="ol-bullet" />

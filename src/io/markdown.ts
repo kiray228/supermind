@@ -322,6 +322,12 @@ const RE_PLAIN_BULLET = /^(?:[-*+•–·▪◦]|\d{1,9}[.)])[ \t]+/;
 
 /** Список тем верхнего уровня из текста с отступами (табы или пробелы, маркеры списков допустимы) */
 export function textToTopics(text: string): Topic[] {
+  // заголовки Markdown («# Тема», «## Подтема») — вложенность по уровням заголовков, как при импорте файла
+  // (иначе вставленный конспект с заголовками превращался в плоский список)
+  if (/^[ \t]*#{1,6}[ \t]+\S/m.test(text)) {
+    const root = markdownToTopic(text);
+    return root.text === DEFAULT_ROOT_TEXT && !root.note ? root.children : [root];
+  }
   const lines = text.replace(/^﻿/, '').replace(/\r\n?/g, '\n').split('\n');
   const out: Topic[] = [];
   const stack: { indent: number; topic: Topic }[] = [];

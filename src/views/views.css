@@ -401,3 +401,6 @@
 
 /* iOS: долгое нажатие на карточку не вызывает системное меню */
 .kb-card, .kb-card-main, [data-col-id] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+
+/* фокус с клавиатуры на ползунке — видно */
+.kb-range:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }

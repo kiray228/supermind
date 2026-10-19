@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, useId } from 'react';
 import { create } from 'zustand';
 import './dialogs.css';
 
@@ -41,6 +41,7 @@ export function confirmDialog(title: string, message?: string, opts: { okText?: 
 
 const OVERLAYS = '.modal-backdrop, .menu-layer, .kb-menu-backdrop';
 
+
 /** Есть ли открытое окно/меню поверх экрана */
 export function hasOverlay(): boolean {
   return !!document.querySelector(OVERLAYS);
@@ -81,18 +82,21 @@ const isPhone = () => window.matchMedia('(max-width: 640px)').matches;
 
 function Dialog({ req }: { req: DialogReq }) {
   const [value, setValue] = useState(req.value ?? '');
+  const msgId = useId();
+  const cancelRef = useRef<HTMLButtonElement>(null);
   const [phone] = useState(isPhone);
   const ref = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
   const okRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     setTimeout(() => {
-      if (req.kind === 'confirm') okRef.current?.focus({ preventScroll: true });
+      // опасное действие (удалить) — фокус на «Отмене»: случайный Enter ничего не удалит
+      if (req.kind === 'confirm') (req.danger ? cancelRef.current : okRef.current)?.focus({ preventScroll: true });
       else {
         ref.current?.focus();
         ref.current?.select();
       }
     }, 30);
-  }, [req.kind]);
+  }, [req.kind, req.danger]);
   const done = (v: string | boolean | null) => {
     useDialogs.setState((s) => ({ queue: s.queue.slice(1) }));
     req.resolve(v);
@@ -107,17 +111,21 @@ function Dialog({ req }: { req: DialogReq }) {
   if (req.kind === 'confirm' && phone)
     return (
       <div className="modal-backdrop dlg-backdrop dlg-as-backdrop" onPointerDown={(e) => e.target === e.currentTarget && cancel()}>
-        <div className="dlg-as" role="alertdialog" aria-label={req.title} onKeyDown={onKey}>
+        <div className="dlg-as" role="alertdialog" aria-label={req.title} aria-describedby={req.message ? msgId : undefined} onKeyDown={onKey}>
           <div className="dlg-as-group">
             <div className="dlg-as-head">
               <div className="dlg-as-title">{req.title}</div>
-              {req.message && <div className="dlg-as-msg">{req.message}</div>}
+              {req.message && (
+                <div className="dlg-as-msg" id={msgId}>
+                  {req.message}
+                </div>
+              )}
             </div>
             <button ref={okRef} className={`dlg-as-btn${req.danger ? ' danger' : ''}`} onClick={ok}>
               {okText}
             </button>
           </div>
-          <button className="dlg-as-btn dlg-as-cancel" onClick={cancel}>
+          <button ref={cancelRef} className="dlg-as-btn dlg-as-cancel" onClick={cancel}>
             {cancelText}
           </button>
         </div>
@@ -164,14 +172,14 @@ function Dialog({ req }: { req: DialogReq }) {
   // компьютер — окно-предупреждение iOS/macOS по центру
   return (
     <div className="modal-backdrop dlg-backdrop" onPointerDown={(e) => e.target === e.currentTarget && cancel()}>
-      <div className={`modal dlg-alert${req.kind !== 'confirm' ? ' has-field' : ''}`} role={req.kind === 'confirm' ? 'alertdialog' : 'dialog'} aria-label={req.title} onKeyDown={onKey}>
+      <div className={`modal dlg-alert${req.kind !== 'confirm' ? ' has-field' : ''}`} role={req.kind === 'confirm' ? 'alertdialog' : 'dialog'} aria-label={req.title} aria-describedby={req.message ? msgId : undefined} onKeyDown={onKey}>
         <div className="dlg-alert-body">
           <h2>{req.title}</h2>
-          {req.message && <p>{req.message}</p>}
+          {req.message && <p id={msgId}>{req.message}</p>}
           {field}
         </div>
         <div className="dlg-alert-actions">
-          <button className="dlg-alert-btn" onClick={cancel}>
+          <button ref={cancelRef} className="dlg-alert-btn" onClick={cancel}>
             {cancelText}
           </button>
           <button ref={okRef} className={`dlg-alert-btn dlg-alert-ok${req.danger ? ' danger' : ''}`} onClick={ok}>

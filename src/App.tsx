@@ -1,9 +1,10 @@
 import { lazy, Suspense, useEffect, useState, useSyncExternalStore } from 'react';
-import { useApp, type View } from './store/appStore';
+import { holdToast, useApp, type View } from './store/appStore';
 import { listDocs, loadSettings, saveDoc } from './store/db';
 import { get as idbGet, set as idbSet } from './store/kv';
 import { welcomeDoc } from './templates';
 import { DialogHost, closeTopOverlay } from './ui/dialogs';
+import { installFocusManager } from './ui/focusManager';
 import { AuthGate } from './ui/AuthGate';
 import Home from './views/Home';
 import { flushSave } from './store/docStore';
@@ -103,6 +104,7 @@ export default function App() {
 
   useEffect(() => {
     mark('app-mounted');
+    installFocusManager();
     initLargeTitles();
     loadSettings()
       .then((s) => useApp.setState({ settings: s }))
@@ -181,6 +183,12 @@ export default function App() {
     const apply = () => {
       const dark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
       document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      // для следующего запуска: index.html ставит тему до загрузки приложения (без вспышки другой темы)
+      try {
+        localStorage.setItem('sm-theme', theme);
+      } catch {
+        /* хранилище недоступно */
+      }
       document.querySelector('meta[name=theme-color]')?.setAttribute('content', dark ? '#000000' : '#f2f2f7');
     };
     apply();
@@ -213,7 +221,7 @@ export default function App() {
           {/* неотправленные в облако изменения — только когда есть повод */}
           <SyncNavButton />
           {NAV.map((n) => (
-            <button key={n.id} className={`nav-item ${view === n.id ? 'active' : ''}${n.phone ? '' : ' nav-desk'}`} onClick={() => go(n.id)}>
+            <button key={n.id} className={`nav-item ${view === n.id ? 'active' : ''}${n.phone ? '' : ' nav-desk'}`} onClick={() => go(n.id)} aria-current={view === n.id ? 'page' : undefined}>
               <span className="nav-ico">
                 <SectionIcon section={n.id} size={24} weight={view === n.id ? 'fill' : 'regular'} />
                 {n.id === 'tasks' && todayCount > 0 && <i className="nav-badge">{todayCount > 99 ? '99+' : todayCount}</i>}
@@ -310,9 +318,13 @@ export default function App() {
           <ProgressWatcher />
         </Suspense>
       )}
+      {/* объявление для экранного диктора — область всегда на месте, меняется только текст */}
+      <div className="sr-only" role="status" aria-live="polite">
+        {toastMsg ?? ''}
+      </div>
       {toastMsg && (
-        <div className={`toast${toastAction ? ' has-action' : ''}`}>
-          <span>{toastMsg}</span>
+        <div className={`toast${toastAction ? ' has-action' : ''}`} onMouseEnter={() => holdToast(true)} onMouseLeave={() => holdToast(false)} onFocus={() => holdToast(true)} onBlur={() => holdToast(false)}>
+          <span aria-hidden="true">{toastMsg}</span>
           {toastAction && (
             <button
               className="toast-btn"

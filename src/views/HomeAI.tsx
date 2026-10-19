@@ -42,7 +42,7 @@ export default function AICreate({ onClose }: { onClose(): void }) {
         <div className="row">
           <div className="ai-badge-lg"><Sparkles size={18} /></div>
           <h2 className="grow">Создать карту с ИИ</h2>
-          <button className="icon-btn" onClick={() => { ac?.abort(); onClose(); }}><X /></button>
+          <button className="icon-btn" onClick={() => { ac?.abort(); onClose(); }} aria-label="Закрыть"><X /></button>
         </div>
         {(
           <>

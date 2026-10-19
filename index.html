@@ -25,6 +25,16 @@
     </style>
   </head>
   <body>
+    <script>
+      // выбранная тема — до загрузки приложения (иначе первые кадры — в теме системы)
+      try {
+        var t = localStorage.getItem('sm-theme');
+        if (t === 'dark' || t === 'light') {
+          document.documentElement.dataset.theme = t;
+          document.documentElement.style.background = t === 'dark' ? '#0f1115' : '#f6f7f9';
+        }
+      } catch (e) {}
+    </script>
     <div id="root"><div class="boot"><img src="./icon-192.png" alt="" /><span>SuperMind</span></div></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

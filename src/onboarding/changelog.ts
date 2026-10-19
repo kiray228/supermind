@@ -1,5 +1,5 @@
 /** «Что нового»: главное в каждой версии. Новые версии — сверху. */
-import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge, MessageCircleQuestion, CloudOff, LayoutTemplate, SquareArrowOutUpRight, BellRing, Target, Timer, Lock, Crosshair, Move, GitMerge, EyeOff, CalendarRange, Fingerprint, ArrowUpDown, Banknote, MonitorSmartphone, Coins, ListChecks, FileInput, Split, CornerDownRight, KeyRound, Keyboard, LifeBuoy, Zap, FileSpreadsheet, Gauge as GaugeIcon, MessagesSquare } from 'lucide-react';
+import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge, MessageCircleQuestion, CloudOff, LayoutTemplate, SquareArrowOutUpRight, BellRing, Target, Timer, Lock, Crosshair, Move, GitMerge, EyeOff, CalendarRange, Fingerprint, ArrowUpDown, Banknote, MonitorSmartphone, Coins, ListChecks, FileInput, Split, CornerDownRight, KeyRound, Keyboard, LifeBuoy, Zap, FileSpreadsheet, Gauge as GaugeIcon, MessagesSquare, Accessibility, Focus } from 'lucide-react';
 
 export interface ChangeItem {
   icon: typeof Sparkles;
@@ -15,6 +15,16 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.45',
+    title: 'Надёжный фокус на ветке и удобство для всех',
+    items: [
+      { icon: Focus, title: 'Фокус на ветке — без сюрпризов', text: 'Ctrl+A, стрелки, поиск, Ctrl+D и перетаскивание в фокусе на ветке работают только с ней — раньше «Выделить всё» и Delete могли стереть всю карту.' },
+      { icon: Lock, title: 'Код-пароль не попадает в карту', text: 'Если на компьютере открыта карта, цифры кода на экране блокировки больше не заменяют текст выбранной темы.' },
+      { icon: Accessibility, title: 'Удобнее с клавиатуры и экранным диктором', text: 'Окна держат фокус и возвращают его, уведомления озвучиваются и не исчезают под мышью, в опасных подтверждениях фокус на «Отмене», второстепенный текст контрастнее, тема не мигает при запуске.' },
+      { icon: Network, title: 'Карты: мелочи', text: 'Вставка текста с заголовками Markdown — по уровням, «рыбья кость» без наложений, новый родитель главной темы — на её стороне, касание полосы в Ганте не меняет даты.' },
+    ],
+  },
   {
     version: '1.44',
     title: 'Напоминания-будильники',

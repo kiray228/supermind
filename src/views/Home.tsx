@@ -344,7 +344,7 @@ export default function Home() {
       {tplOpen && (
         <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && setTplOpen(false)}>
           <div className="modal" style={{ width: 'min(760px,100%)' }}>
-            <div className="row"><h2 className="grow">Шаблоны</h2><button className="icon-btn" onClick={() => setTplOpen(false)}><X /></button></div>
+            <div className="row"><h2 className="grow">Шаблоны</h2><button className="icon-btn" onClick={() => setTplOpen(false)} aria-label="Закрыть"><X /></button></div>
             <div className="tpl-grid">
               {TEMPLATES.map((t) => (
                 <button key={t.id} className="tpl-card" onClick={() => { setTplOpen(false); createAndOpen(docFromTemplate(t)); }}>
@@ -365,7 +365,24 @@ export default function Home() {
 function DocCard({ d, onOpen, onMenu }: { d: DocMeta; onOpen: () => void; onMenu: (anchor: HTMLElement | null) => void }) {
   const press = useLongPress(() => onMenu(null));
   return (
-    <div className={`doc-card${d.trashed ? ' trashed' : ''}`} onClick={onOpen} {...press}>
+    <div
+      className={`doc-card${d.trashed ? ' trashed' : ''}`}
+      onClick={onOpen}
+      {...press}
+      role="button"
+      tabIndex={0}
+      aria-label={`Открыть карту «${d.title || 'Без названия'}»`}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return;
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onOpen();
+        } else if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
+          e.preventDefault();
+          onMenu(e.currentTarget);
+        }
+      }}
+    >
       <div className="doc-thumb" style={{ ['--acc' as string]: d.accent ?? 'var(--accent)' }}>
         {d.locked ? <MapThumb accent={d.accent ?? 'var(--accent)'} /> : <MapThumb preview={d.preview} accent={d.accent ?? 'var(--accent)'} />}
         {d.locked && <span className="doc-lock"><Lock size={13} /></span>}
@@ -395,7 +412,21 @@ function DocCard({ d, onOpen, onMenu }: { d: DocMeta; onOpen: () => void; onMenu
 function ContinueCard({ d, onOpen, onMenu }: { d: DocMeta; onOpen: () => void; onMenu: (anchor: HTMLElement | null) => void }) {
   const press = useLongPress(() => onMenu(null));
   return (
-    <div className="home-continue" onClick={onOpen} {...press} style={{ ['--acc' as string]: d.accent ?? 'var(--accent)' }}>
+    <div
+      className="home-continue"
+      onClick={onOpen}
+      {...press}
+      role="button"
+      tabIndex={0}
+      aria-label={`Продолжить: «${d.title || 'Без названия'}»`}
+      onKeyDown={(e) => {
+        if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
+      style={{ ['--acc' as string]: d.accent ?? 'var(--accent)' }}
+    >
       <div className="home-continue-thumb">
         {d.locked ? <MapThumb accent={d.accent ?? 'var(--accent)'} /> : <MapThumb preview={d.preview} accent={d.accent ?? 'var(--accent)'} big />}
         {d.starred && <span className="doc-star"><Star size={13} fill="currentColor" /></span>}

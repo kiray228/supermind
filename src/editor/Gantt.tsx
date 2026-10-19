@@ -88,7 +88,8 @@ export function Gantt() {
   const onUp = () => {
     const d = dragRef.current;
     dragRef.current = null;
-    if (d && preview && preview.id === d.id) {
+    // простое касание (даты не сдвинулись) — ничего не записываем и не добавляем шаг отмены
+    if (d && preview && preview.id === d.id && (preview.s.getTime() !== d.s.getTime() || preview.e.getTime() !== d.e.getTime())) {
       const t = rows.find((r) => r.t.id === d.id)!.t;
       useDoc.getState().updateTopic(d.id, { task: { ...t.task!, start: ymd(preview.s), due: ymd(preview.e) } });
     }

@@ -3,6 +3,7 @@ import type {
   Boundary, FloatingTopic, ID, LineStyle, LockedDoc, MindDoc, Relationship, Sheet, StructureType, Summary, Topic, TopicStyle,
 } from '../types';
 import { clone, findInSheet, isAncestor, newTopic, reId, uid, visibleOrder, pathTo } from '../utils/tree';
+import { focusSheet } from '../editor/focus';
 import { saveDoc, saveLocked } from './db';
 import { mapSides } from '../layout/layout';
 import { encryptDoc } from '../utils/crypto';
@@ -462,6 +463,11 @@ export const useDoc = create<DocState>((set, get) => {
       get().mutate((sh) => {
         const ff = findInSheet(sh, tid!);
         if (!ff || !ff.parent) return;
+        // главная тема карты: новый родитель встаёт на её сторону, у неё сторона больше не нужна
+        if (ff.parent.id === sh.root.id && sh.structure === 'map') {
+          t.side = ff.topic.side ?? topicSide(sh, ff.topic.id);
+          delete ff.topic.side;
+        }
         const [moved] = ff.parent.children.splice(ff.index, 1, t);
         t.children.push(moved);
       });
@@ -517,7 +523,9 @@ export const useDoc = create<DocState>((set, get) => {
         sh.boundaries = sh.boundaries.filter((b) => !removed.has(b.topicId));
         sh.summaries = sh.summaries.filter((b) => !removed.has(b.topicId));
       });
-      set({ selection: nextSel ? [nextSel] : [], editingId: null });
+      // сосед мог быть потомком другой удалённой темы — выбранной остаётся существующая
+      const d = get().doc;
+      set({ selection: d ? cleanSelection(d, nextSel ? [nextSel] : []) : [], editingId: null });
     },
     toggleCollapse(id, value) {
       get().mutate((s) => {
@@ -681,7 +689,9 @@ export const useDoc = create<DocState>((set, get) => {
       set({ selection: [copy.id] });
     },
     navigate(dir) {
-      const s = get().sheet();
+      // в фокусе на ветке — по видимому дереву (тема-фокус — его центр, выше неё не уходим)
+      const real = get().sheet();
+      const s = real ? (focusSheet(real, get().focusId) ?? real) : null;
       const cur = target();
       if (!s || !cur) return;
       const f = findInSheet(s, cur);

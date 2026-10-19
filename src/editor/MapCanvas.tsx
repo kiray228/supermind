@@ -773,7 +773,8 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas(p
           const f = sheet.floating.find((x) => x.id === d.id)!;
           // плавающая хранит центр корня; сдвигаем на разницу
           st.moveFloating(d.id, f.x + (nx - (n.x + n.w / 2)), f.y + (ny - (n.y + n.h / 2)));
-        } else st.detach(d.id, nx, ny);
+        } else if (!useDoc.getState().focusId) st.detach(d.id, nx, ny);
+        // в фокусе на ветке плавающих тем нет: оторванная тема пропала бы из вида — остаётся на месте
       }
       st.select(d.id);
     }

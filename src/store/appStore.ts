@@ -32,9 +32,19 @@ function initialView(): View {
 
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
+function cachedTheme(): Settings['theme'] {
+  try {
+    const t = localStorage.getItem('sm-theme');
+    return t === 'dark' || t === 'light' || t === 'system' ? t : DEFAULT_SETTINGS.theme;
+  } catch {
+    return DEFAULT_SETTINGS.theme;
+  }
+}
+
 export const useApp = create<AppState>((set, get) => ({
   view: initialView(),
-  settings: DEFAULT_SETTINGS,
+  // тема — сразу из прошлого запуска (настройки читаются из базы позже, иначе мелькнула бы другая тема)
+  settings: { ...DEFAULT_SETTINGS, theme: cachedTheme() },
   toast: null,
   toastAction: null,
   docsVersion: 0,
@@ -62,3 +72,10 @@ export const useApp = create<AppState>((set, get) => ({
 }));
 
 export const toast = (msg: string, action?: { label: string; run: () => void }) => useApp.getState().showToast(msg, action);
+
+/** Сообщение под мышью или в фокусе — не исчезает (успеть нажать «Отменить»); ушли — ещё немного */
+export function holdToast(hold: boolean) {
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = null;
+  if (!hold && useApp.getState().toast) toastTimer = setTimeout(() => useApp.setState({ toast: null, toastAction: null }), 2500);
+}

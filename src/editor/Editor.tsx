@@ -120,14 +120,15 @@ export default function Editor() {
 
   // ---------- поиск ----------
   const hits = useMemo(() => {
-    if (!sheet || !search?.trim()) return [] as string[];
+    if (!viewSheet || !search?.trim()) return [] as string[];
     const q = search.trim().toLowerCase();
     const out: string[] = [];
-    walkSheet(sheet, (t) => {
+    // в фокусе на ветке — совпадения только в ней (переход к невидимой теме ничего не показал бы)
+    walkSheet(viewSheet, (t) => {
       if (t.text.toLowerCase().includes(q) || t.note?.toLowerCase().includes(q) || t.labels?.some((l) => l.toLowerCase().includes(q))) out.push(t.id);
     });
     return out;
-  }, [sheet, search]);
+  }, [viewSheet, search]);
   const hitSet = useMemo(() => new Set(hits), [hits]);
   const gotoHit = (i: number) => {
     if (!hits.length) return;
@@ -140,6 +141,8 @@ export default function Editor() {
   // ---------- презентация ----------
   const startPitch = () => {
     if (!sheet) return;
+    // слайды — по всей карте: фокус на ветке снимаем
+    if (st.focusId) st.setFocus(null);
     const slides = [sheet.root.id];
     for (const c of sheet.root.children) {
       slides.push(c.id);
@@ -495,8 +498,9 @@ export default function Editor() {
       const sel = s.selection[s.selection.length - 1];
       if (mod && isKey(e, 'c')) { s.copy(); return; }
       if (mod && isKey(e, 'x')) { s.copy(true); return; }
-      if (mod && isKey(e, 'd')) { e.preventDefault(); s.duplicate(); return; }
-      if (mod && isKey(e, 'a')) { e.preventDefault(); const ids: string[] = []; walkSheet(s.sheet()!, (t) => void ids.push(t.id)); s.select(ids); return; }
+      if (mod && isKey(e, 'd')) { e.preventDefault(); if (!(s.focusId && s.selection.includes(s.focusId))) s.duplicate(); return; }
+      // в фокусе на ветке — только она (иначе Delete стёр бы всю карту, которой не видно)
+      if (mod && isKey(e, 'a')) { e.preventDefault(); const ids: string[] = []; walkSheet(focusSheet(s.sheet()!, s.focusId) ?? s.sheet()!, (t) => void ids.push(t.id)); s.select(ids); return; }
       if (mod && isKey(e, 'b') && s.selection.length) {
         e.preventDefault();
         const t = findInSheet(s.sheet()!, sel)?.topic;
@@ -518,8 +522,10 @@ export default function Editor() {
         case 'Insert': e.preventDefault(); s.addChild(sel); return;
         case 'Enter':
           e.preventDefault();
-          if (mod) s.addParent(sel);
-          else s.addSibling(sel, e.shiftKey);
+          if (mod) {
+            // родитель темы-фокуса оказался бы вне видимой ветки
+            if (sel !== s.focusId) s.addParent(sel);
+          } else s.addSibling(sel, e.shiftKey);
           return;
         case 'Delete':
         case 'Backspace': e.preventDefault(); removeTopics(); return;
@@ -655,9 +661,9 @@ export default function Editor() {
             }}
           />
           <span className="tiny muted">{hits.length ? (searchIdx >= 0 ? `${Math.min(searchIdx, hits.length - 1) + 1}/${hits.length}` : String(hits.length)) : search ? '0' : ''}</span>
-          <button className="icon-btn" onClick={() => stepHit(-1)}><CaretLeft size={18} /></button>
-          <button className="icon-btn" onClick={() => stepHit(1)}><CaretRight size={18} /></button>
-          <button className="icon-btn" onClick={() => setSearch(null)}><X size={18} /></button>
+          <button className="icon-btn" onClick={() => stepHit(-1)} aria-label="Предыдущее совпадение" title="Предыдущее"><CaretLeft size={18} /></button>
+          <button className="icon-btn" onClick={() => stepHit(1)} aria-label="Следующее совпадение" title="Следующее"><CaretRight size={18} /></button>
+          <button className="icon-btn" onClick={() => setSearch(null)} aria-label="Закрыть поиск" title="Закрыть"><X size={18} /></button>
         </div>
       )}
 
@@ -810,10 +816,10 @@ export default function Editor() {
 
           {pitch && (
             <div className="pitch-bar glass">
-              <button className="icon-btn" onClick={() => setPitch((p) => (p && p.i > 0 ? { ...p, i: p.i - 1 } : p))} disabled={pitch.i === 0}><CaretLeft /></button>
+              <button className="icon-btn" onClick={() => setPitch((p) => (p && p.i > 0 ? { ...p, i: p.i - 1 } : p))} disabled={pitch.i === 0} aria-label="Предыдущий слайд"><CaretLeft /></button>
               <span className="small bold">{pitch.i + 1} / {pitch.slides.length}</span>
-              <button className="icon-btn" onClick={() => setPitch((p) => (p && p.i < p.slides.length - 1 ? { ...p, i: p.i + 1 } : p))} disabled={pitch.i >= pitch.slides.length - 1}><CaretRight /></button>
-              <button className="icon-btn" onClick={endPitch}><X /></button>
+              <button className="icon-btn" onClick={() => setPitch((p) => (p && p.i < p.slides.length - 1 ? { ...p, i: p.i + 1 } : p))} disabled={pitch.i >= pitch.slides.length - 1} aria-label="Следующий слайд"><CaretRight /></button>
+              <button className="icon-btn" onClick={endPitch} aria-label="Закончить показ"><X /></button>
             </div>
           )}
           {pitch && (

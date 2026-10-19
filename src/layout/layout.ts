@@ -564,6 +564,19 @@ export function layoutSheet(sheet: Sheet): LayoutResult {
         for (let i = 0; i < ks.length; i += 2) {
           const pair = ks.slice(i, i + 2);
           let pairW = 0;
+          // широкая главная тема выступает вправо от своего ребра на w/2 − наклон: отодвинуть пару,
+          // иначе она налезает на предыдущую
+          if (i > 0) {
+            const over = Math.max(
+              0,
+              ...pair.map((m) => {
+                const ch = kids(m);
+                const chH = ch.reduce((s, c) => s + subH(c), 0) + vGap(m) * Math.max(0, ch.length - 1);
+                return m.w / 2 - Math.max(70 * sp, chH + 40 * sp) * 0.55;
+              }),
+            );
+            ax -= over;
+          }
           pair.forEach((m, j) => {
             const vdir: 1 | -1 = j === 0 ? -1 : 1;
             m.vdir = vdir;
@@ -641,7 +654,8 @@ export function layoutSheet(sheet: Sheet): LayoutResult {
       const main = n.depth === 1 ? n : null;
       n.toggle = indentPos(!!main && n.index % 2 === 1);
     } else if (structure === 'fishbone' && n.depth <= 1) {
-      if (n.depth === 0) continue;
+      // центральная — без кнопки, пока не свёрнута (свёрнутую иначе нечем развернуть)
+      if (n.depth === 0 && !n.topic.collapsed) continue;
       n.toggle = n.vdir < 0 ? { x: n.x + n.w / 2, y: n.y - 9 } : below;
     } else {
       const ul = n.style.shape === 'underline';

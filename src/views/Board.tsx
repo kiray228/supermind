@@ -1268,7 +1268,7 @@ function CardModal({
                 }
               }}
             />
-            <button className="btn btn-sm" onClick={addCheck} disabled={!checkText.trim()}>
+            <button className="btn btn-sm" onClick={addCheck} disabled={!checkText.trim()} aria-label="Добавить пункт">
               <Plus size={15} />
             </button>
           </div>

@@ -41,21 +41,23 @@ export function PinPad({ title, hint, error, errorN = 0, onDone, busy }: { title
       else if (e.key === 'Enter') submit();
       else return;
       e.preventDefault();
+      // цифры кода — только сюда: открытая под замком карта иначе приняла бы их как ввод в тему
+      e.stopPropagation();
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
   });
 
   return (
     <div className="pin">
       <div className="pin-title">{title}</div>
-      <div className={`pin-dots${shake ? ' shake' : ''}`} aria-label={`Введено цифр: ${pin.length}`} onAnimationEnd={() => setShake(false)}>
+      <div className={`pin-dots${shake ? ' shake' : ''}`} role="status" aria-label={`Введено цифр: ${pin.length}`} onAnimationEnd={() => setShake(false)}>
         {Array.from({ length: Math.max(4, pin.length) }, (_, i) => (
           <i key={i} className={i < pin.length ? 'on' : ''} />
         ))}
       </div>
       {/* пока ввод недоступен (пауза после ошибок) — подсказка важнее ошибки */}
-      <div className={`pin-hint${error && !(busy && hint) ? ' err' : ''}`}>{(busy && hint) || error || hint || ' '}</div>
+      <div className={`pin-hint${error && !(busy && hint) ? ' err' : ''}`} role="alert">{(busy && hint) || error || hint || ' '}</div>
       <div className="pin-keys">
         {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
           <button key={d} className="pin-key" onClick={() => press(d)} disabled={busy}>
@@ -101,6 +103,39 @@ export function LockScreen() {
   }, [locked]);
 
   if (!locked) return null;
+  return <LockScreenBody setBusy={setBusy} busy={busy} wait={wait} setWait={setWait} error={error} setError={setError} errorN={errorN} setErrorN={setErrorN} bio={bio} forgot={forgot} setForgot={setForgot} />;
+}
+
+/** Экран замка (отдельный компонент — эффекты работают, только пока приложение заблокировано) */
+function LockScreenBody(p: {
+  busy: boolean;
+  setBusy: (v: boolean) => void;
+  wait: number;
+  setWait: (v: number) => void;
+  error: string;
+  setError: (v: string) => void;
+  errorN: number;
+  setErrorN: (f: (n: number) => number) => void;
+  bio: boolean;
+  forgot: boolean;
+  setForgot: (v: boolean) => void;
+}) {
+  const { busy, setBusy, wait, setWait, error, setError, errorN, setErrorN, bio, forgot, setForgot } = p;
+  // под замком приложение недоступно: клавиши не доходят до разделов (сочетания карт, удаление тем),
+  // остальной экран — inert (не получает фокус и нажатия)
+  useEffect(() => {
+    const block = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') e.stopPropagation();
+    };
+    window.addEventListener('keydown', block, true);
+    const self = document.querySelector('.lock-screen');
+    const others = self?.parentElement ? [...self.parentElement.children].filter((x) => x !== self && !x.hasAttribute('inert')) : [];
+    for (const x of others) x.setAttribute('inert', '');
+    return () => {
+      window.removeEventListener('keydown', block, true);
+      for (const x of others) x.removeAttribute('inert');
+    };
+  }, []);
 
   const done = async (pin: string) => {
     setBusy(true);

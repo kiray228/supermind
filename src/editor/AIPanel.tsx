@@ -254,9 +254,9 @@ export function AIPanel({ onClose }: { onClose(): void }) {
                 }}
               />
               {chatBusy ? (
-                <button className="icon-btn" onClick={stop}><Stop /></button>
+                <button className="icon-btn" onClick={stop} aria-label="Остановить"><Stop /></button>
               ) : (
-                <button className="icon-btn active" onClick={sendChat}><PaperPlaneRight /></button>
+                <button className="icon-btn active" onClick={sendChat} aria-label="Отправить"><PaperPlaneRight /></button>
               )}
             </div>
           </div>
