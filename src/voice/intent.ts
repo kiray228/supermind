@@ -55,6 +55,8 @@ const SMALL: Record<string, number> = {
 };
 const CURRENCY = '(?:тенге|тг|₸|kzt|руб(?:лей|ля|ль)?|р\\.?|₽|доллар(?:ов|а)?|бакс(?:ов|а)?|\\$|usd|евро|€|сом(?:ов|а)?|сум(?:ов|а)?)';
 const THOUSAND = '(?:тысяч[иау]?|тыщ[иау]?|тыс\\.?|к)';
+/** то же словами (без «к»: после слов это предлог) */
+const THOUSAND_W = '(?:тысяч[иау]?|тыщ[иау]?|тыс\\.?)';
 const MILLION = '(?:миллион(?:ов|а)?|млн)';
 
 /** Код валюты по слову из фразы («долларов» → USD) */
@@ -72,9 +74,13 @@ function currencyCode(word: string): string | undefined {
 /** Словесные числа («две тысячи пятьсот») → цифры, чтобы дальше работать с одним видом */
 export function wordsToDigits(text: string): string {
   const words = Object.keys(SMALL).sort((a, b) => b.length - a.length).join('|');
-  const re = new RegExp(`(?<![\\p{L}\\d])((?:${words})(?:\\s+(?:${words}))*)(?:\\s+(${THOUSAND}|${MILLION}))?(?:\\s+((?:${words})(?:\\s+(?:${words}))*))?(?![\\p{L}])`, 'giu');
+  // после слов «к» — предлог («в пять к врачу»), а не «тысяч»: множитель — только словами
+  const re = new RegExp(`(?<![\\p{L}\\d])((?:${words})(?:\\s+(?:${words}))*)(?:\\s+(${THOUSAND_W}|${MILLION}))?(?:\\s+((?:${words})(?:\\s+(?:${words}))*))?(?![\\p{L}])`, 'giu');
+  // «тысячу двести» — множитель без числа перед ним: «одна тысяча двести»
+  const bare = new RegExp(`(?<!(?:${words})\\s+)(?<!\\d[\\s\\u00a0]*)(?<![\\p{L}\\d.,])(тысяч[уа]|тыщ[уа])(?=\\s+(?:${words})(?![\\p{L}]))`, 'giu');
   return (
     text
+      .replace(bare, 'один $1')
       .replace(re, (m, a: string, mult: string | undefined, b: string | undefined) => {
         const sum = (s: string) => s.toLowerCase().split(/\s+/).reduce((acc, w) => acc + (SMALL[w] ?? 0), 0);
         // одиночное «один/одну/две» без множителя — часть речи («одну задачу»), не трогаем
@@ -208,8 +214,10 @@ function parseMoney(raw: string, ctx: VoiceCtx, today: string): VoiceAction | nu
   if (!exp && !inc) return null;
   const amt = findAmount(t);
   if (!amt) return null;
-  // «купить молоко» — задача; «купил молоко за 500» — расход
-  const kind: 'expense' | 'income' = inc && !exp ? 'income' : 'expense';
+  // «купить молоко» — задача; «купил молоко за 500» — расход.
+  // «мне перевели / скинули / отправили» — деньги пришли (глаголы те же, что у «перевёл», но во множественном числе)
+  const toMe = /(?:^|\s)(?:мне\s+(?:перевели|скинули|отправили|прислали|вернули|дали|заплатили)|(?:перевели|скинули|отправили|прислали|вернули|заплатили)\s+мне)(?=$|[\s,.])/iu.test(t);
+  const kind: 'expense' | 'income' = toMe || (inc && !exp) ? 'income' : 'expense';
   const { date, rest } = moneyDate(t.slice(0, amt.start) + ' ' + t.slice(amt.end), today);
   const cat = pickCategory(rest, kind, ctx);
   const account = pickAccount(rest, ctx);
@@ -486,14 +494,22 @@ function parseAsk(raw: string, ctx: VoiceCtx, now: Date): VoiceAction | null {
   }
   if (/(какой|сколько|покажи).*(баланс|денег|на\s+сч[её]т|на\s+карте|остал\p{L}*\s+денег)|^баланс$/iu.test(t)) return { type: 'ask', what: 'balance' };
   if (
-    /^(?:а\s+)?(?:что|какие|какое)\s+(?:у\s+меня\s+)?(?:сегодня|завтра|послезавтра|на\s+сегодня|на\s+завтра|по\s+планам|запланирован\p{L}*|в\s+планах|дела|задачи|планы|расписание)/iu.test(t) ||
-    /^(?:мои\s+)?(?:задачи|дела|планы|расписание)\s+(?:на\s+)?(?:сегодня|завтра|послезавтра)$/iu.test(t) ||
+    /^(?:а\s+)?(?:что|какие|какое)\s+(?:у\s+меня\s+)?(?:сегодня|завтра|послезавтра|на\s+сегодня|на\s+завтра|на\s+послезавтра|по\s+планам|запланирован\p{L}*|в\s+планах|дела|задачи|планы|расписание|(?:в|во|на)\s+(?:понедельник|вторник|среду|четверг|пятницу|субботу|воскресенье)(?=$|[\s,.?]))/iu.test(t) ||
+    /^(?:мои\s+)?(?:задачи|дела|планы|расписание)\s+(?:на\s+)?(?:сегодня|завтра|послезавтра|(?:в|во)?\s*(?:понедельник|вторник|среду|четверг|пятницу|субботу|воскресенье))$/iu.test(t) ||
     /что\s+(?:мне\s+)?(?:надо|нужно)\s+(?:сделать|успеть)/iu.test(t)
   ) {
-    const date = /послезавтра/.test(t) ? addDaysYmd(today, 2) : /завтра/.test(t) ? addDaysYmd(today, 1) : today;
+    const wd = /(понедельник|вторник|сред|четверг|пятниц|суббот|воскресень)/iu.exec(t);
+    const date = /послезавтра/.test(t) ? addDaysYmd(today, 2) : /завтра/.test(t) ? addDaysYmd(today, 1) : wd ? nextWeekday(today, wd[1]) : today;
     return { type: 'ask', what: 'agenda', date };
   }
   return null;
+}
+
+/** Ближайший такой день недели (сегодня — если сегодня он и есть) */
+function nextWeekday(today: string, w: string): string {
+  const k = ['воскресень', 'понедельник', 'вторник', 'сред', 'четверг', 'пятниц', 'суббот'].findIndex((x) => w.toLowerCase().startsWith(x));
+  const d = new Date(today + 'T00:00:00');
+  return addDaysYmd(today, (k - d.getDay() + 7) % 7);
 }
 
 // ---------- «Выполнил…» ----------

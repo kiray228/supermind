@@ -1036,10 +1036,10 @@ function InlineEditor({ n, view, animating }: { n: LNode; view: View; animating?
   // iOS Safari не присылает blur, когда поле удаляется из DOM, — сохраняем при размонтировании
   useEffect(
     () => () => {
+      // ввод отменили «Отменить» — набранное не возвращать (отметку снимаем в любом случае, чтобы она не «залипла»)
+      const dropped = takeDroppedEdit(n.id);
       // текст не меняли — не трогаем (иначе «Отменить» во время ввода тут же возвращал бы отменённое)
-      if (done.current || textRef.current === startText.current) return;
-      // ввод отменили «Отменить» — набранное не возвращать
-      if (takeDroppedEdit(n.id)) return;
+      if (dropped || done.current || textRef.current === startText.current) return;
       const st = useDoc.getState();
       // тема могла остаться на другом листе (переключили лист, не закрыв поле)
       const has = st.doc?.sheets.some((sh) => {

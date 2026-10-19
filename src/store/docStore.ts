@@ -122,15 +122,35 @@ function scheduleSave() {
 /** Есть несохранённые изменения открытой карты */
 export const hasPendingSave = () => !!saveTimer;
 
-export async function flushSave() {
+/** Сохранение, которое идёт прямо сейчас (таймер уже снят, а запись в базу не закончилась) */
+let inflight: Promise<void> | null = null;
+/** Дождаться отложенного и уже идущего сохранения: после него на диске — правки этого устройства */
+export async function settleSave() {
+  await flushSave();
+  while (inflight) await inflight;
+}
+
+export function flushSave(): Promise<void> {
   // нечего сохранять — не трогаем базу (иначе синхронизация считала бы карту изменённой)
-  if (!saveTimer) return;
+  if (!saveTimer) return inflight ?? Promise.resolve();
   clearTimeout(saveTimer);
   saveTimer = null;
+  const p = (inflight ?? Promise.resolve()).then(writeOpen);
+  inflight = p;
+  void p.finally(() => {
+    if (inflight === p) inflight = null;
+  });
+  return p;
+}
+
+async function writeOpen() {
   const { doc, password } = useDoc.getState();
   if (!doc) return;
   useDoc.setState({ saving: true });
   try {
+    // на другом устройстве на карту поставили пароль, а здесь она открыта без него:
+    // не перезаписываем зашифрованную версию открытой (иначе пароль слетел бы везде)
+    if (!password && (await lockedElsewhere(doc))) return;
     if (!password) await keepRemoteVersion(doc);
     if (password) await saveLocked(await encryptDoc(doc, password), doc.title);
     else {
@@ -148,6 +168,23 @@ export async function flushSave() {
 let base: { id: ID; rev: number; updatedAt: number } | null = null;
 export function markOpened(doc: MindDoc) {
   base = { id: doc.id, rev: remoteRev(`doc:${doc.id}`), updatedAt: doc.updatedAt };
+}
+
+/** На диске — зашифрованная версия, а пароль здесь не снимали: правки — отдельной картой, открытая карта закрывается */
+async function lockedElsewhere(doc: MindDoc): Promise<boolean> {
+  const disk = await kvGet<MindDoc | LockedDoc>(`doc:${doc.id}`);
+  if (!disk || !('locked' in disk) || (doc.unlockedAt ?? 0) >= (disk.updatedAt ?? 0)) return false;
+  const copy: MindDoc = { ...doc, id: uid(), title: `${doc.title || 'Карта'} (правки без пароля)`, updatedAt: Date.now() };
+  delete copy.unlockedAt;
+  await saveDoc(copy);
+  const { useApp, toast } = await import('./appStore');
+  if (useDoc.getState().doc?.id === doc.id) {
+    useDoc.setState({ doc: null, password: null, selection: [], editingId: null, past: [], future: [], focusId: null });
+    if (useApp.getState().view === 'editor') useApp.getState().go('home');
+  }
+  useApp.setState({ docsVersion: Date.now() });
+  toast('На другом устройстве на карту поставили пароль — откройте её с паролем. Ваши правки сохранены отдельной картой');
+  return true;
 }
 
 /** Карту изменили на другом устройстве, пока она открыта здесь: та версия сохраняется отдельной картой */
@@ -274,6 +311,15 @@ export const useDoc = create<DocState>((set, get) => {
       scheduleSave();
     },
     setPassword(p) {
+      // свежая отметка: эта версия (с паролем или явно без него) — новее правок, сделанных раньше на других устройствах
+      const now = Date.now();
+      const cur = get().doc;
+      if (cur) {
+        const next: MindDoc = { ...cur, updatedAt: now };
+        if (p) delete next.unlockedAt;
+        else if (get().password) next.unlockedAt = now;
+        set({ doc: next });
+      }
       set({ password: p });
       // с паролем история не ведётся — старые снимки без шифрования удаляем
       const d = get().doc;
@@ -297,6 +343,8 @@ export const useDoc = create<DocState>((set, get) => {
     setEditing(id) {
       // ввод в новой теме закончился — следующая правка её текста уже отдельный шаг
       if (id !== freshId) freshId = null;
+      // начали новый ввод — старая отметка «ввод отменён» к нему не относится
+      if (id) droppedEdit = null;
       set({ editingId: id });
     },
     selectRel(id) {

@@ -43,8 +43,13 @@ function normTopic(v: unknown, ids: Set<string>): Topic {
   // переносим все известные поля, неизвестные отбрасываем
   const t: Topic = { ...(o as Partial<Topic>), id, text: str(o.text) ?? '', children: [] };
   t.children = Array.isArray(o.children) ? o.children.map((c) => normTopic(c, ids)) : [];
-  if (t.markers && !Array.isArray(t.markers)) delete t.markers;
-  if (t.labels && !Array.isArray(t.labels)) delete t.labels;
+  // массивы строк: число или объект внутри уронили бы отрисовку карты (.trim() у не-строки)
+  if (t.markers) t.markers = Array.isArray(t.markers) ? t.markers.filter((m): m is string => typeof m === 'string') : undefined;
+  if (t.labels) t.labels = Array.isArray(t.labels) ? t.labels.filter((m): m is string => typeof m === 'string') : undefined;
+  if (!t.markers?.length) delete t.markers;
+  if (!t.labels?.length) delete t.labels;
+  if (t.side !== undefined && t.side !== 'left' && t.side !== 'right') delete t.side;
+  if (t.collapsed !== undefined && typeof t.collapsed !== 'boolean') delete t.collapsed;
   if (t.note != null && typeof t.note !== 'string') delete t.note;
   // ссылки — только безопасные (файл карты мог прийти откуда угодно)
   if (t.link != null && (typeof t.link !== 'string' || !safeUrl(t.link))) delete t.link;
@@ -79,12 +84,18 @@ function normSheet(v: unknown, i: number): Sheet {
       })
     : [];
   const okId = (x: unknown) => typeof x === 'string' && ids.has(x);
+  /** подписи и цвета — только строки */
+  const strFields = <T extends Obj>(x: T, keys: string[]): T => {
+    const out: Obj = { ...x };
+    for (const k of keys) if (out[k] !== undefined && typeof out[k] !== 'string') delete out[k];
+    return out as T;
+  };
   sheet.relationships = (Array.isArray(o.relationships) ? o.relationships : [])
     .filter((r): r is Obj => isObj(r) && okId(r.from) && okId(r.to))
-    .map((r) => ({ ...(r as Partial<Relationship>), id: str(r.id) || uid() }) as Relationship);
+    .map((r) => ({ ...(strFields(r, ['label', 'color']) as Partial<Relationship>), id: str(r.id) || uid() }) as Relationship);
   sheet.boundaries = (Array.isArray(o.boundaries) ? o.boundaries : [])
     .filter((b): b is Obj => isObj(b) && okId(b.topicId))
-    .map((b) => ({ ...(b as Partial<Boundary>), id: str(b.id) || uid() }) as Boundary);
+    .map((b) => ({ ...(strFields(b, ['label', 'color']) as Partial<Boundary>), id: str(b.id) || uid() }) as Boundary);
   sheet.summaries = (Array.isArray(o.summaries) ? o.summaries : [])
     .filter((b): b is Obj => isObj(b) && okId(b.topicId))
     .map((b) => ({ ...(b as Partial<Summary>), id: str(b.id) || uid(), text: str(b.text) ?? 'Итог' }) as Summary);

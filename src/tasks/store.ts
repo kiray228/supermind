@@ -3,15 +3,16 @@ import { get, set } from '../store/kv';
 import { blobSync } from '../store/blobSync';
 import type { ID, PlannerData } from '../types';
 import { uid } from '../utils/tree';
-import { todayYmd, updateMapTask } from '../utils/mapTasks';
+import { todayYmd, toYmd, updateMapTask } from '../utils/mapTasks';
 import { toast } from '../store/appStore';
 import { focusQuickInput } from '../ui/keyboard';
 import {
-  advanceRepeat,
+  advanceRepeatSteps,
   pinRule,
   pruneSkip,
   snapToRule,
   type ChecklistItem,
+  type CompletionLog,
   DEFAULT_PREFS,
   dayLabel,
   emptyTasksData,
@@ -259,15 +260,17 @@ export function toggleDone(id: ID) {
     return;
   }
   const snap = snapshotOf(t, true);
-  const next = t.repeat ? advanceRepeat(t, todayYmd()) : null;
+  const adv = t.repeat ? advanceRepeatSteps(t, todayYmd()) : null;
+  const next = adv?.next ?? null;
   mutateTasks((d) => {
     const x = d.tasks.find((y) => y.id === id)!;
-    d.log.push({ taskId: x.id, title: x.title, listId: x.listId, at: Date.now(), date: x.date });
-    if (d.log.length > 5000) d.log.splice(0, d.log.length - 5000);
+    // повтор: чек-лист сейчас сбросится — отмеченные пункты остаются в журнале (их опыт не пропадёт)
+    const ck = next ? x.checklist.filter((c) => c.done).length : 0;
+    pushLog(d, { taskId: x.id, title: x.title, listId: x.listId, at: Date.now(), date: x.date, ...(ck ? { ck } : {}) });
     if (next) {
       x.date = next;
-      x.repeatDone = (x.repeatDone ?? 0) + 1;
-      x.checklist = x.checklist.map((c) => ({ ...c, done: false }));
+      x.repeatDone = (x.repeatDone ?? 0) + (adv?.steps ?? 1);
+      x.checklist = x.checklist.map(({ doneAt: _d, ...c }) => ({ ...c, done: false }));
       if (x.repeat) x.repeat = pruneSkip(x.repeat, next);
     } else {
       x.done = true;
@@ -299,8 +302,7 @@ export function completeOccurrence(id: ID, date?: string): boolean {
     const snap = snapshotOf(t, true);
     mutateTasks((d) => {
       const x = d.tasks.find((y) => y.id === id)!;
-      d.log.push({ taskId: x.id, title: x.title, listId: x.listId, at: Date.now(), date });
-      if (d.log.length > 5000) d.log.splice(0, d.log.length - 5000);
+      pushLog(d, { taskId: x.id, title: x.title, listId: x.listId, at: Date.now(), date });
       x.repeat = { ...x.repeat!, skip: [...new Set([...(x.repeat!.skip ?? []), date])].sort() };
       x.updatedAt = Date.now();
     });
@@ -330,14 +332,15 @@ export function skipOccurrence(id: ID, date: string): boolean {
     return true;
   }
   // текущий повтор: дальше, к следующему (после него — без ожидания сегодняшнего дня)
-  const next = advanceRepeat(t, t.date < todayYmd() ? todayYmd() : t.date);
+  const adv = advanceRepeatSteps(t, t.date < todayYmd() ? todayYmd() : t.date);
+  const next = adv?.next ?? null;
   mutateTasks((d) => {
     const x = d.tasks.find((y) => y.id === id);
     if (!x) return;
     if (next) {
       x.date = next;
-      x.repeatDone = (x.repeatDone ?? 0) + 1;
-      x.checklist = x.checklist.map((c) => ({ ...c, done: false }));
+      x.repeatDone = (x.repeatDone ?? 0) + (adv?.steps ?? 1);
+      x.checklist = x.checklist.map(({ doneAt: _d, ...c }) => ({ ...c, done: false }));
       if (x.repeat) x.repeat = pruneSkip(x.repeat, next);
     } else x.deleted = Date.now();
     x.updatedAt = Date.now();
@@ -388,14 +391,15 @@ export function setWontDo(id: ID) {
   const t = getTask(id);
   if (!t) return;
   const snap = snapshotOf(t, false);
-  const next = t.repeat ? advanceRepeat(t, todayYmd()) : null;
+  const adv = t.repeat ? advanceRepeatSteps(t, todayYmd()) : null;
+  const next = adv?.next ?? null;
   mutateTasks((d) => {
     const x = d.tasks.find((y) => y.id === id);
     if (!x) return;
     if (next) {
       x.date = next;
-      x.repeatDone = (x.repeatDone ?? 0) + 1;
-      x.checklist = x.checklist.map((c) => ({ ...c, done: false }));
+      x.repeatDone = (x.repeatDone ?? 0) + (adv?.steps ?? 1);
+      x.checklist = x.checklist.map(({ doneAt: _d, ...c }) => ({ ...c, done: false }));
     } else {
       x.wontDo = true;
       x.completedAt = Date.now();
@@ -410,9 +414,46 @@ export function updateChecklist(id: ID, fn: (c: ChecklistItem[]) => ChecklistIte
   mutateTasks((d) => {
     const x = d.tasks.find((y) => y.id === id);
     if (!x) return;
-    x.checklist = fn(x.checklist);
-    x.updatedAt = Date.now();
+    const now = Date.now();
+    const was = new Map(x.checklist.map((c) => [c.id, c.done]));
+    // время отметки пункта — опыт засчитывается в день отметки, а не в день последней правки задачи
+    x.checklist = fn(x.checklist).map((c) => {
+      if (c.done && !c.doneAt && !was.get(c.id)) return { ...c, doneAt: now };
+      if (!c.done && c.doneAt) {
+        const { doneAt: _d, ...rest } = c;
+        return rest;
+      }
+      return c;
+    });
+    x.updatedAt = now;
   });
+}
+
+const LOG_CAP = 5000;
+/**
+ * Запись в журнал выполнений. Журнал хранит последние 5000 записей; вытесненные складываются в итоги по дням
+ * (logArchive), чтобы опыт и счётчики не уменьшались. Записи выполненных (не повторяющихся) задач не нужны:
+ * их и так засчитывает completedAt.
+ */
+export function pushLog(d: TasksData, entry: CompletionLog) {
+  d.log.push(entry);
+  if (d.log.length <= LOG_CAP) return;
+  const cut = d.log.splice(0, d.log.length - LOG_CAP);
+  const byId = new Map(d.tasks.map((t) => [t.id, t]));
+  const arch = (d.logArchive ??= {});
+  for (const l of cut) {
+    const t = byId.get(l.taskId);
+    if (t?.done && t.completedAt) continue;
+    const at = new Date(l.at);
+    const a = (arch[toYmd(at)] ??= { n: 0, hi: 0, med: 0, early: 0, late: 0 });
+    a.n++;
+    if (t?.priority === 1) a.hi++;
+    else if (t?.priority === 2) a.med++;
+    const h = at.getHours();
+    if (h >= 4 && h < 9) a.early++;
+    else if (h >= 23 || h < 4) a.late++;
+    if (l.ck) a.ck = (a.ck ?? 0) + l.ck;
+  }
 }
 
 export function trashTask(id: ID) {
@@ -567,8 +608,11 @@ export function deleteTag(tag: string) {
 // ---------- Фокус, отсчёты, настройки ----------
 
 export function addFocusSession(s: Omit<FocusSession, 'id'>) {
+  // id по началу сессии: та же сессия, записанная второй вкладкой или устройством, при слиянии не удвоится
+  const id = `focus:${s.kind ?? 'pomo'}:${s.start}`;
+  if (useTasks.getState().data?.focus.some((f) => f.id === id)) return;
   mutateTasks((d) => {
-    d.focus.push({ ...s, id: uid() });
+    d.focus.push({ ...s, id });
     if (d.focus.length > 5000) d.focus.splice(0, d.focus.length - 5000);
     if (s.taskId) {
       const t = d.tasks.find((x) => x.id === s.taskId);

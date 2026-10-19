@@ -98,7 +98,11 @@ export async function saveLocked(locked: LockedDoc, title: string) {
   await set(docKey(locked.id), locked);
   const list = await listDocs();
   const i = list.findIndex((m) => m.id === locked.id);
-  if (i >= 0) list[i] = { ...list[i], title, locked: true, updatedAt: locked.updatedAt ?? Date.now() };
+  if (i >= 0) {
+    // превью (центральная тема и ветки) и число тем выдали бы содержимое — список карт синхронизируется открытым
+    const { preview: _p, topicCount: _n, accent: _a, ...rest } = list[i];
+    list[i] = { ...rest, title, locked: true, updatedAt: locked.updatedAt ?? Date.now() };
+  }
   await saveIndex(list);
 }
 

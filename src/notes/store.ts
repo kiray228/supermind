@@ -29,9 +29,14 @@ interface NotesState {
   openId: ID | null;
   openBody: NoteBody | null;
   canUndo: boolean;
+  /** текст открытой заметки ещё не пришёл на это устройство (или не прочитался) — редактор не показывается */
+  openMissing?: boolean;
 }
 
 export const useNotes = create<NotesState>(() => ({ data: null, openId: null, openBody: null, canUndo: false }));
+
+/** В карточке заметки есть содержимое — значит, пустое тело на диске не «новая пустая заметка», а не дошедший текст */
+const metaHasContent = (m: NoteMeta | undefined) => !!m && !!(m.title?.trim() || m.preview?.trim() || m.wordCount || m.hasImage || m.hasAudio || m.hasTodo);
 
 let loading: Promise<NotesData> | null = null;
 
@@ -193,6 +198,8 @@ export async function reloadNotes(): Promise<void> {
     return;
   }
   if (pending.has(openId)) return;
+  // текст заметки, которого ждали, мог прийти с этой синхронизацией
+  if (useNotes.getState().openMissing) return void openNote(openId, true);
   const disk = normalizeBody(await get<NoteBody>(noteBodyKey(openId)));
   const s = useNotes.getState();
   if (s.openId !== openId || pending.has(openId) || !s.openBody) return;
@@ -222,15 +229,22 @@ export async function openNote(id: ID | null, keepTrail = false) {
   if (!keepTrail) trail = [];
   const s = useNotes.getState();
   if (s.openId && s.openId !== id) closeCurrent();
+  if (!id || id !== s.openId) useNotes.setState({ openMissing: false });
   undo = [];
   lastTypeAt = 0;
   if (!id) {
     useNotes.setState({ openId: null, openBody: null, canUndo: false });
     return;
   }
-  useNotes.setState({ openId: id, openBody: null, canUndo: false });
-  const body = await loadNoteBody(id).catch(() => emptyBody());
-  if (useNotes.getState().openId === id) useNotes.setState({ openBody: body });
+  useNotes.setState({ openId: id, openBody: null, canUndo: false, openMissing: false });
+  let failed = false;
+  const body = await loadNoteBody(id).catch(() => ((failed = true), emptyBody()));
+  if (useNotes.getState().openId !== id) return;
+  // текста нет, а карточка говорит, что он есть: не открываем пустой редактор —
+  // иначе закрытие удалило бы заметку на всех устройствах, а набранное затёрло бы настоящий текст
+  const meta = useNotes.getState().data?.notes.find((n) => n.id === id);
+  if (failed || (isBodyEmpty(body) && metaHasContent(meta))) useNotes.setState({ openMissing: true });
+  else useNotes.setState({ openBody: body });
 }
 
 /** Открыть связанную заметку: текущая запоминается, «назад» вернёт к ней */

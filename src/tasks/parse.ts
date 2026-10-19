@@ -181,7 +181,7 @@ export function parseTask(input: string, now = new Date()): ParsedTask {
   if (!out.time) {
     take(new RegExp(`${B}(утром|с утра|днём|днем|в обед|вечером|ночью|в полдень|в полночь)${E}`, 'i'), (m) => {
       const w = m[1].toLowerCase();
-      out.time = w.includes('утр') ? '09:00' : w.includes('полдень') || w.includes('обед') ? '13:00' : w.startsWith('дн') ? '14:00' : w.startsWith('веч') ? '19:00' : w.includes('полночь') ? '00:00' : '22:00';
+      out.time = w.includes('утр') ? '09:00' : w.includes('полдень') ? '12:00' : w.includes('обед') ? '13:00' : w.startsWith('дн') ? '14:00' : w.startsWith('веч') ? '19:00' : w.includes('полночь') ? '00:00' : '22:00';
     });
   }
 

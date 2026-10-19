@@ -9,6 +9,13 @@ export type Obj = Record<string, unknown>;
 export const isObj = (v: unknown): v is Obj => !!v && typeof v === 'object' && !Array.isArray(v);
 
 export function mergeValues(key: string, local: unknown, remote: unknown): unknown {
+  if (key.startsWith('doc:') && isObj(local) && isObj(remote) && 'locked' in local !== 'locked' in remote) {
+    // одна версия с паролем, другая без: пароль снимается только явно (unlockedAt не раньше шифрования),
+    // иначе правка без пароля, сделанная на другом устройстве, молча открыла бы карту (она сохранится копией)
+    const locked = 'locked' in local ? local : remote;
+    const plain = 'locked' in local ? remote : local;
+    return (Number(plain.unlockedAt) || 0) >= (Number(locked.updatedAt) || 0) ? plain : locked;
+  }
   if (key.startsWith('doc:') || key.startsWith('note:')) {
     // документ целиком: побеждает более свежий
     const lu = isObj(local) ? Number(local.updatedAt) || 0 : 0;

@@ -30,6 +30,20 @@ function Row({ t, depth }: { t: Topic; depth: number }) {
   const selected = useDoc((s) => s.selection.includes(t.id));
   const focusId = useDoc((s) => s.editingId);
   const ref = useRef<HTMLInputElement>(null);
+  /** набранное, ещё не записанное в карту (записывается при уходе с поля) */
+  const typed = useRef<string | null>(null);
+  // поле убрали без blur (iPhone: переключили вид, «Назад») — набранное не теряем
+  useEffect(
+    () => () => {
+      const v = typed.current;
+      if (v === null) return;
+      const s = useDoc.getState();
+      const sh = s.sheet();
+      const cur = sh ? findInSheet(sh, t.id)?.topic : undefined;
+      if (cur && cur.text !== v) s.setText(t.id, v);
+    },
+    [t.id],
+  );
 
   useEffect(() => {
     if (focusId === t.id && document.activeElement !== ref.current) {
@@ -104,8 +118,12 @@ function Row({ t, depth }: { t: Topic; depth: number }) {
           key={t.text}
           placeholder={depth === 0 ? 'Центральная тема' : 'Тема'}
           onFocus={() => useDoc.setState({ selection: [t.id], editingId: t.id })}
+          onChange={(e) => void (typed.current = e.target.value)}
           onBlur={(e) => {
+            typed.current = null;
             if (e.target.value !== t.text && findInSheet(st.sheet()!, t.id)) st.setText(t.id, e.target.value);
+            // ушли из поля (не на другую строку) — тема больше не «редактируется»
+            if (useDoc.getState().editingId === t.id) useDoc.setState({ editingId: null });
           }}
           onKeyDown={onKey}
         />

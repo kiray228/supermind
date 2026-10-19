@@ -36,6 +36,8 @@ export interface ChecklistItem {
   id: ID;
   text: string;
   done: boolean;
+  /** когда отметили (опыт засчитывается в этот день) */
+  doneAt?: number;
 }
 
 export interface TaskItem {
@@ -107,6 +109,20 @@ export interface CompletionLog {
   at: number;
   /** дата повторения, которое выполнили */
   date?: string;
+  /** отмеченных пунктов чек-листа в этом повторе (чек-лист повторяющейся задачи после выполнения сбрасывается) */
+  ck?: number;
+}
+
+/** Итог дня по записям, ушедшим из журнала (журнал хранит последние 5000): опыт и счётчики не пропадают */
+export interface LogDay {
+  n: number;
+  /** высокий / средний приоритет */
+  hi: number;
+  med: number;
+  /** до 9 утра / после 23:00 */
+  early: number;
+  late: number;
+  ck?: number;
 }
 
 export interface FocusSession {
@@ -179,6 +195,8 @@ export interface TasksData {
   filters: TaskFilter[];
   tagColors: Record<string, string>;
   log: CompletionLog[];
+  /** итоги по дням для записей, вытесненных из журнала */
+  logArchive?: Record<string, LogDay>;
   focus: FocusSession[];
   countdowns: Countdown[];
   prefs: TaskPrefs;
@@ -392,6 +410,14 @@ function afterCompletion(rule: RepeatRule, done: string): string {
 
 /** Следующая дата после выполнения повторяющейся задачи; null — повторы закончились */
 export function advanceRepeat(task: TaskItem, completedOn = todayYmd()): string | null {
+  return advanceRepeatSteps(task, completedOn)?.next ?? null;
+}
+
+/**
+ * То же, и сколько повторов серии пройдено (steps — прибавить к repeatDone): выполненный плюс те, что отмечены
+ * в skip (пропущенные или выполненные заранее). Так «повторить N раз» не даёт лишнего повтора.
+ */
+export function advanceRepeatSteps(task: TaskItem, completedOn = todayYmd()): { next: string; steps: number } | null {
   if (!task.repeat || !task.date) return null;
   const rule = task.repeat;
   let next = rule.fromCompletion ? afterCompletion(rule, completedOn) : nextOccurrence(rule, task.date, task.date);
@@ -399,11 +425,16 @@ export function advanceRepeat(task: TaskItem, completedOn = todayYmd()): string 
   if (!rule.fromCompletion) {
     for (let i = 0; i < 5000 && next <= completedOn; i++) next = nextOccurrence(rule, next, task.date);
   }
-  // пропущенные повторы — мимо
+  // пропущенные и заранее выполненные повторы — мимо, но в счёт серии
   const skip = new Set(rule.skip ?? []);
-  for (let i = 0; i < 400 && skip.has(next); i++) next = nextOccurrence(rule, next, task.date);
-  if (!withinRule(rule, next, (task.repeatDone ?? 0) + 1)) return null;
-  return next;
+  let steps = 1;
+  for (let i = 0; i < 400 && skip.has(next); i++) {
+    if (!withinRule(rule, next, (task.repeatDone ?? 0) + steps)) return null;
+    next = nextOccurrence(rule, next, task.date);
+    steps++;
+  }
+  if (!withinRule(rule, next, (task.repeatDone ?? 0) + steps)) return null;
+  return { next, steps };
 }
 
 /** Правило без пропусков, которые уже позади (раньше from) */

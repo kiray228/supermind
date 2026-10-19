@@ -585,12 +585,13 @@ function exportTopic(t: Topic, sheet: Sheet, ctx: ExportCtx, isRootLike: boolean
     for (const b of sheet.boundaries) {
       if (b.topicId === t.id) boundaries.push(compact({ id: b.id, range: 'master', title: b.label || undefined }));
     }
-    // итог для корня — по всем его детям
+    // итог для корня — по всем его детям; при одном ребёнке (или без детей) — 'master':
+    // «(0,0)» при импорте означало бы итог на ребёнке
     const n = t.children.length;
     for (const s of sheet.summaries) {
-      if (s.topicId !== t.id || !n) continue;
+      if (s.topicId !== t.id) continue;
       const sid = uid();
-      summaries.push({ id: s.id, range: `(0,${n - 1})`, topicId: sid });
+      summaries.push({ id: s.id, range: n > 1 ? `(0,${n - 1})` : 'master', topicId: sid });
       summaryTopics.push({ id: sid, class: 'topic', title: s.text || 'Итог' });
     }
   }

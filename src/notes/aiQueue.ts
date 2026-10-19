@@ -16,6 +16,8 @@ const KEY = 'sm-ai-queue';
 /** не больше стольких попыток и не дольше недели */
 const MAX_TRIES = 6;
 const MAX_AGE = 7 * 86400000;
+/** не больше стольких записей (старые уходят первыми) */
+const MAX_ITEMS = 50;
 
 export const useAiQueue = create<{ items: QueueItem[] }>(() => ({ items: read() }));
 
@@ -47,7 +49,7 @@ export function queueArticle(noteId: ID, url: string, body: string, now = Date.n
 }
 
 export function queueDictation(text: string, journal?: { noteId: ID; blockIds: string[] }, now = Date.now()) {
-  write([...useAiQueue.getState().items, { id: newId(), kind: 'dictation', text, ...(journal ? { journal } : {}), savedAt: now, tries: 0, next: now }]);
+  write([...useAiQueue.getState().items.slice(-(MAX_ITEMS - 1)), { id: newId(), kind: 'dictation', text, ...(journal ? { journal } : {}), savedAt: now, tries: 0, next: now }]);
 }
 
 /** Убрать из очереди (отменили то, что ждало ИИ) */
@@ -81,7 +83,11 @@ export function processQueue(now = Date.now()): Promise<QueueResult> {
 
 async function run(now: number): Promise<QueueResult> {
   const res: QueueResult = { done: 0, messages: [] };
-  const due = useAiQueue.getState().items.filter((x) => x.next <= now);
+  // неделя прошла — уже не ждём (даже если ИИ так и не стал доступен: нет ни ключа, ни аккаунта)
+  const all = useAiQueue.getState().items;
+  const fresh = all.filter((x) => now - x.savedAt < MAX_AGE);
+  if (fresh.length !== all.length) write(fresh);
+  const due = fresh.filter((x) => x.next <= now);
   if (!due.length || !(await aiReady())) return res;
   for (const it of due) {
     let outcome: 'done' | 'drop' | 'retry';
@@ -134,19 +140,29 @@ async function doDictation(it: Extract<QueueItem, { kind: 'dictation' }>): Promi
   if (!acts.length) return null;
   const { execute } = await import('../voice/run');
   const parts: string[] = [];
+  /** что-то уже создано: при ошибке дальше не повторяем весь разбор — иначе заметки и задачи появятся дважды */
+  let ran = false;
+  let failed = 0;
   for (const a of acts) {
-    if (a.type === 'add_journal') {
-      // слова уже в дневнике — заменить сырую расшифровку аккуратной записью
-      if (it.journal) await replaceJournal(it.journal, a.text);
-      continue;
+    try {
+      if (a.type === 'add_journal') {
+        // слова уже в дневнике — заменить сырую расшифровку аккуратной записью
+        if (it.journal) await replaceJournal(it.journal, a.text);
+        continue;
+      }
+      const d = await execute(a);
+      ran = true;
+      if (d.ok) parts.push(a.type === 'add_note' ? `заметка «${a.title}»` : a.type === 'add_task' ? 'задача' : '');
+    } catch (e) {
+      if (!ran) throw e;
+      failed++;
     }
-    const d = await execute(a);
-    if (d.ok) parts.push(a.type === 'add_note' ? `заметка «${a.title}»` : a.type === 'add_task' ? 'задача' : '');
   }
   const tasks = parts.filter((p) => p === 'задача').length;
   const note = parts.find((p) => p.startsWith('заметка'));
   const what = [note, tasks ? `задач: ${tasks}` : ''].filter(Boolean).join(', ');
-  return what ? `Голосовая запись разобрана: ${what}` : 'Голосовая запись разобрана';
+  const tail = failed ? ` (не получилось: ${failed})` : '';
+  return (what ? `Голосовая запись разобрана: ${what}` : 'Голосовая запись разобрана') + tail;
 }
 
 async function replaceJournal(j: { noteId: ID; blockIds: string[] }, text: string) {

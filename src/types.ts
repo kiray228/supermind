@@ -136,6 +136,8 @@ export interface MindDoc {
   activeSheet: ID;
   createdAt: number;
   updatedAt: number;
+  /** когда пароль сняли (явно, на этом или другом устройстве): только тогда открытая версия заменяет зашифрованную */
+  unlockedAt?: number;
 }
 
 /** Мета-информация для списка документов (хранится отдельно) */

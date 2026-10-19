@@ -657,3 +657,9 @@
   .nt-ask, .nt-dups { width: 100%; }
   .nt-ask { height: calc(var(--vvh, 100vh) - 24px); }
 }
+
+/* текст заметки ещё не пришёл на это устройство */
+.nt-missing { max-width: 520px; margin: 48px auto; padding: 0 20px; display: flex; flex-direction: column; gap: 10px; }
+.nt-missing h3 { margin: 0; font-size: 20px; }
+.nt-missing p { margin: 0; line-height: 1.5; }
+.nt-missing-acts { gap: 8px; margin-top: 6px; }

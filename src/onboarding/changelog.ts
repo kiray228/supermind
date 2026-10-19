@@ -1,5 +1,5 @@
 /** «Что нового»: главное в каждой версии. Новые версии — сверху. */
-import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge, MessageCircleQuestion, CloudOff, LayoutTemplate, SquareArrowOutUpRight, BellRing, Target, Timer, Lock, Crosshair, Move, GitMerge, EyeOff, CalendarRange, Fingerprint, ArrowUpDown, Banknote, MonitorSmartphone, Coins, ListChecks, FileInput, Split, CornerDownRight } from 'lucide-react';
+import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge, MessageCircleQuestion, CloudOff, LayoutTemplate, SquareArrowOutUpRight, BellRing, Target, Timer, Lock, Crosshair, Move, GitMerge, EyeOff, CalendarRange, Fingerprint, ArrowUpDown, Banknote, MonitorSmartphone, Coins, ListChecks, FileInput, Split, CornerDownRight, KeyRound, Keyboard, LifeBuoy } from 'lucide-react';
 
 export interface ChangeItem {
   icon: typeof Sparkles;
@@ -15,6 +15,18 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.41',
+    title: 'Надёжность: глубокая проверка всего приложения',
+    items: [
+      { icon: ShieldCheck, title: 'Заметки не пропадают', text: 'Если текст заметки ещё не пришёл на устройство, она больше не открывается пустой — и не удаляется при закрытии. Появится сама после синхронизации.' },
+      { icon: KeyRound, title: 'Пароль карты не слетает', text: 'Устройство, где карта открыта без пароля, больше не может молча снять пароль, поставленный на другом. В списке карт у защищённой карты не видно её веток.' },
+      { icon: Keyboard, title: 'Сочетания клавиш на русской раскладке', text: 'Ctrl+Z, Ctrl+Y, Ctrl+F, Ctrl+B и другие в картах работают и при русской раскладке.' },
+      { icon: Mic, title: 'Голос понимает точнее', text: '«Мне перевели 10 000» — доход, «тысячу двести» — 1200, «в полдень» — 12:00, «что у меня в пятницу» — ответ, а не новая задача.' },
+      { icon: Repeat, title: 'Повторы, опыт и календарь', text: '«Повторить N раз» без лишнего повтора, пропущенные повторы убираются и из календаря телефона, опыт за пункты чек-листа — в день отметки и больше не уменьшается со временем.' },
+      { icon: LifeBuoy, title: 'Без белого экрана', text: 'Если раздел не может открыться (например, повреждённая карта из файла), появится понятное сообщение и кнопка «На главную».' },
+    ],
+  },
   {
     version: '1.40',
     title: 'Разделение покупок, шаблоны задач и подзадачи со своей датой',

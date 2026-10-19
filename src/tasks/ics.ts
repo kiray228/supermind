@@ -34,7 +34,7 @@ export function toRRule(r: RepeatRule, date: string, opts: { allDay?: boolean; d
 
 const esc = (s: string) => s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
 
-function utcStamp(ms: number): string {
+export function utcStamp(ms: number): string {
   return new Date(ms).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
 }
 

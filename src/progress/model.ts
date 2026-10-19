@@ -244,16 +244,31 @@ export function computeProgress(src: ProgressInput, today: string): ProgressStat
     for (const l of t.log) {
       logged.add(l.taskId);
       doneAt(l.at, byId.get(l.taskId)?.priority);
+      // пункты чек-листа выполненного повтора
+      if (l.ck) {
+        c.checkItems += l.ck;
+        add('tasks', dayOf(l.at), l.ck * XP.checkItem);
+      }
+    }
+    // записи, вытесненные из журнала, — итогами по дням
+    for (const [day, a] of Object.entries(t.logArchive ?? {})) {
+      add('tasks', day, a.n * XP.task + a.hi * XP.taskHigh + a.med * XP.taskMedium + (a.ck ?? 0) * XP.checkItem);
+      c.tasksDone += a.n;
+      c.highTasks += a.hi;
+      c.earlyTasks += a.early;
+      c.lateTasks += a.late;
+      c.checkItems += a.ck ?? 0;
+      perDay.set(day, (perDay.get(day) ?? 0) + a.n);
     }
     for (const x of t.tasks) {
       // выполненные без записи в журнале (старые задачи ежедневника, обрезанный журнал)
       if (x.done && x.completedAt && !logged.has(x.id)) doneAt(x.completedAt, x.priority);
       if (x.deleted) continue;
-      let n = 0;
-      for (const ci of x.checklist ?? []) if (ci.done) n++;
-      if (n) {
-        c.checkItems += n;
-        add('tasks', dayOf(x.completedAt ?? x.updatedAt), n * XP.checkItem);
+      // каждый пункт — в день отметки (старые пункты без отметки — как раньше, по дню выполнения или правки)
+      for (const ci of x.checklist ?? []) {
+        if (!ci.done) continue;
+        c.checkItems++;
+        add('tasks', dayOf(ci.doneAt ?? x.completedAt ?? x.updatedAt), XP.checkItem);
       }
     }
     for (const n of perDay.values()) if (n > c.bestTaskDay) c.bestTaskDay = n;
@@ -326,6 +341,8 @@ export function computeProgress(src: ProgressInput, today: string): ProgressStat
   // ---------- Цели ----------
   const g = src.goals;
   if (g) {
+    // шаг, выполненный через свою задачу (отмечена в «Задачах»), — тоже выполненный шаг, как и в прогрессе цели
+    const taskById = new Map((src.tasks?.tasks ?? []).map((x) => [x.id, x]));
     for (const goal of g.goals) {
       c.goalsCreated++;
       add('goals', dayOf(goal.createdAt), XP.goalCreated);
@@ -337,10 +354,12 @@ export function computeProgress(src: ProgressInput, today: string): ProgressStat
         let last = 0;
         let doneSteps = 0;
         for (const sp of st.steps ?? []) {
-          if (!sp.done) continue;
+          const viaTask = !sp.done && sp.taskId ? taskById.get(sp.taskId) : undefined;
+          const closed = !!viaTask && !viaTask.deleted && (viaTask.done || !!viaTask.wontDo);
+          if (!sp.done && !closed) continue;
           doneSteps++;
           c.stepsDone++;
-          const at = sp.doneAt ?? goal.updatedAt;
+          const at = sp.doneAt ?? (closed ? viaTask!.completedAt : undefined) ?? goal.updatedAt;
           if (at > last) last = at;
           add('goals', dayOf(at), XP.step);
         }

@@ -66,6 +66,9 @@ const MODES: { id: Mode; label: string; icon: Icon }[] = [
 
 const isMobile = () => window.matchMedia('(max-width: 760px)').matches;
 
+/** Буква сочетания клавиш — и на русской раскладке (Ctrl+Z приходит как «я»): по физической клавише */
+const isKey = (e: KeyboardEvent, letter: string) => e.key.toLowerCase() === letter || e.code === 'Key' + letter.toUpperCase();
+
 export default function Editor() {
   const doc = useDoc((s) => s.doc);
   const sheet = useDoc((s) => s.sheet());
@@ -453,15 +456,15 @@ export default function Editor() {
         e.preventDefault();
         return;
       }
-      if (mod && k.toLowerCase() === 'z') {
+      if (mod && isKey(e, 'z')) {
         e.preventDefault();
         if (e.shiftKey) s.redo();
         else s.undo();
         return;
       }
-      if (mod && k.toLowerCase() === 'y') { e.preventDefault(); s.redo(); return; }
-      if (mod && k.toLowerCase() === 'f') { e.preventDefault(); setSearch(''); return; }
-      if (mod && k.toLowerCase() === 'e') { e.preventDefault(); setZen((z) => !z); return; }
+      if (mod && isKey(e, 'y')) { e.preventDefault(); s.redo(); return; }
+      if (mod && isKey(e, 'f')) { e.preventDefault(); setSearch(''); return; }
+      if (mod && isKey(e, 'e')) { e.preventDefault(); setZen((z) => !z); return; }
       if (mod && k === '0') { e.preventDefault(); canvas.current?.fit(); return; }
       if (mod && (k === '=' || k === '+')) { e.preventDefault(); canvas.current?.zoomBy(1.2); return; }
       if (mod && k === '-') { e.preventDefault(); canvas.current?.zoomBy(1 / 1.2); return; }
@@ -490,17 +493,17 @@ export default function Editor() {
       }
       if (mode !== 'map') return;
       const sel = s.selection[s.selection.length - 1];
-      if (mod && k.toLowerCase() === 'c') { s.copy(); return; }
-      if (mod && k.toLowerCase() === 'x') { s.copy(true); return; }
-      if (mod && k.toLowerCase() === 'd') { e.preventDefault(); s.duplicate(); return; }
-      if (mod && k.toLowerCase() === 'a') { e.preventDefault(); const ids: string[] = []; walkSheet(s.sheet()!, (t) => void ids.push(t.id)); s.select(ids); return; }
-      if (mod && k.toLowerCase() === 'b' && s.selection.length) {
+      if (mod && isKey(e, 'c')) { s.copy(); return; }
+      if (mod && isKey(e, 'x')) { s.copy(true); return; }
+      if (mod && isKey(e, 'd')) { e.preventDefault(); s.duplicate(); return; }
+      if (mod && isKey(e, 'a')) { e.preventDefault(); const ids: string[] = []; walkSheet(s.sheet()!, (t) => void ids.push(t.id)); s.select(ids); return; }
+      if (mod && isKey(e, 'b') && s.selection.length) {
         e.preventDefault();
         const t = findInSheet(s.sheet()!, sel)?.topic;
         s.updateStyle(s.selection, { bold: t?.style?.bold ? undefined : true });
         return;
       }
-      if (mod && k.toLowerCase() === 'i' && s.selection.length) {
+      if (mod && isKey(e, 'i') && s.selection.length) {
         e.preventDefault();
         const t = findInSheet(s.sheet()!, sel)?.topic;
         s.updateStyle(s.selection, { italic: t?.style?.italic ? undefined : true });

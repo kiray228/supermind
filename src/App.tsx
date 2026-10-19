@@ -22,6 +22,7 @@ import './app.css';
 import { mark, whenIdle } from './perf';
 import { initLock } from './ui/lock';
 import { LockScreen } from './ui/LockScreen';
+import { ViewBoundary } from './ui/ViewBoundary';
 
 // код-пароль — до первой отрисовки: содержимое не мелькнёт перед экраном блокировки
 initLock();
@@ -231,6 +232,7 @@ export default function App() {
       )}
       {view !== 'editor' && <VoiceFab />}
       <main className="app-main">
+        <ViewBoundary key={view}>
         <Suspense fallback={<div className="loading"><div className="spinner" /></div>}>
           {view === 'home' && <Home />}
           {view === 'editor' && <Editor />}
@@ -247,6 +249,7 @@ export default function App() {
           {view === 'assistant' && <Assistant />}
           {view === 'progress' && <Progress />}
         </Suspense>
+        </ViewBoundary>
       </main>
       {more && (
         <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && setMore(false)}>

@@ -166,9 +166,12 @@ export default function Board() {
       setBoard(n);
     });
     reloadMaps();
-    // доска изменилась на другом устройстве — перечитать
+    // доска изменилась на другом устройстве — перечитать. Своя правка ещё не записана — записать
+    // (saveBoard сливает её с пришедшим и возвращает итог), иначе перечитывание её потеряло бы
     const onRemote = () =>
-      void loadBoard().then((b) => {
+      saveTimer.current
+        ? flushBoard()
+        : void loadBoard().then((b) => {
         if (!alive) return;
         const n = normalize(b);
         boardRef.current = n;
@@ -179,7 +182,7 @@ export default function Board() {
       alive = false;
       window.removeEventListener('sm-board-changed', onRemote);
     };
-  }, [reloadMaps]);
+  }, [reloadMaps, flushBoard]);
 
   // ----- фильтрация -----
 

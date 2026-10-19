@@ -12,7 +12,8 @@ import type { GoalsData } from '../goals/model';
 import { ensureFinance, upcomingPayments, useFinance } from '../finance/store';
 import { fmtMoney, type FinanceData, type UpcomingPayment } from '../finance/model';
 import { addDaysYmd, fromYmd, todayYmd, toYmd } from '../utils/mapTasks';
-import type { PlannerData } from '../types';
+import type { Habit, PlannerData } from '../types';
+import { activeHabits, compareByTime, countOn, doneOn, dueOn, targetOf } from '../habits/model';
 
 type Obj = Record<string, unknown>;
 const isObj = (x: unknown): x is Obj => !!x && typeof x === 'object' && !Array.isArray(x);
@@ -79,54 +80,31 @@ export function byPriorityThenTime(a: TaskItem, b: TaskItem): number {
   return prioRank(a.priority) - prioRank(b.priority) || (a.time ?? '99:99').localeCompare(b.time ?? '99:99') || a.order - b.order;
 }
 
-// ---------- Привычки (поля могут добавляться — читаем осторожно) ----------
+// ---------- Привычки ----------
 
-function numArray(x: unknown): number[] | null {
-  return Array.isArray(x) && x.length > 0 && x.every((v) => typeof v === 'number') ? (x as number[]) : null;
-}
-
-/** Запланирована ли привычка на этот день (если у неё есть дни недели) */
-export function habitScheduledOn(h: Obj, date: Date): boolean {
-  if (h.archived || h.paused || h.deleted) return false;
-  const freq = isObj(h.frequency) ? h.frequency : isObj(h.schedule) ? h.schedule : null;
-  const days = numArray(h.days) ?? numArray(h.weekdays) ?? (freq ? numArray(freq.days) ?? numArray(freq.weekdays) : null);
-  if (days) return days.includes(date.getDay());
-  return true;
-}
-
-function habitTarget(h: Obj): number {
-  const freq = isObj(h.frequency) ? h.frequency : null;
-  const t = Number(h.target ?? h.perDay ?? h.times ?? (freq ? freq.perDay ?? freq.times : undefined));
-  return Number.isFinite(t) && t > 1 ? Math.min(99, Math.round(t)) : 1;
-}
-
+/**
+ * Привычки на день — по тем же правилам, что и раздел «Привычки» (habits/model): дни недели, «раз в N дней»,
+ * «N раз в неделю» (пока недельная цель не набрана), пропуски и паузы.
+ */
 export function habitsForDay(planner: PlannerData | null, ymd: string): BriefHabit[] {
   if (!planner || !Array.isArray(planner.habits)) return [];
-  const day = (isObj(planner.days) ? (planner.days as Obj)[ymd] : undefined) as Obj | undefined;
-  const doneIds = Array.isArray(day?.habits) ? (day!.habits as unknown[]) : [];
-  const counts = isObj(day?.habitCounts) ? (day!.habitCounts as Obj) : {};
-  const skipped = Array.isArray(day?.skipped) ? (day!.skipped as unknown[]) : [];
-  const date = fromYmd(ymd);
-  const out: BriefHabit[] = [];
-  for (const raw of planner.habits as unknown[]) {
-    if (!isObj(raw) || typeof raw.id !== 'string' || typeof raw.name !== 'string') continue;
-    if (!habitScheduledOn(raw, date)) continue;
-    // пропуск дня и пауза (больничный, отпуск) — не на сегодня, если не выполнена
-    const paused = Array.isArray(raw.pauses) && raw.pauses.some((p) => isObj(p) && typeof p.from === 'string' && typeof p.to === 'string' && p.from <= ymd && ymd <= p.to);
-    if ((paused || skipped.includes(raw.id)) && !doneIds.includes(raw.id)) continue;
-    const target = habitTarget(raw);
-    const cnt = Number(counts[raw.id]);
-    const count = Number.isFinite(cnt) ? cnt : doneIds.includes(raw.id) ? target : 0;
-    out.push({
-      id: raw.id,
-      name: raw.name,
-      color: typeof raw.color === 'string' ? raw.color : '#22c55e',
-      icon: typeof raw.icon === 'string' ? raw.icon : undefined,
-      done: doneIds.includes(raw.id) || count >= target,
-      ...(target > 1 ? { count, target } : {}),
+  const days = (isObj(planner.days) ? planner.days : {}) as Parameters<typeof dueOn>[0];
+  const list = activeHabits((planner.habits as unknown[]).filter((h): h is Habit => isObj(h) && typeof h.id === 'string' && typeof h.name === 'string'));
+  return list
+    .filter((h) => dueOn(days, h, ymd))
+    .sort(compareByTime)
+    .map((h) => {
+      const target = targetOf(h);
+      const count = countOn(days[ymd], h);
+      return {
+        id: h.id,
+        name: h.name,
+        color: typeof h.color === 'string' ? h.color : '#22c55e',
+        icon: typeof h.icon === 'string' ? h.icon : undefined,
+        done: doneOn(days, h, ymd),
+        ...(target > 1 ? { count, target } : {}),
+      };
     });
-  }
-  return out;
 }
 
 export function recentMoods(planner: PlannerData | null, today: string, days = 7): { date: string; mood: string }[] {

@@ -8,7 +8,7 @@ import { useApp, toast } from '../store/appStore';
 import { todayYmd, toYmd, addDaysYmd, fromYmd } from '../utils/mapTasks';
 import { isIOS, downloadText } from '../io/download';
 import { dayLabel, isActive, minutesOf, reminderFires, startAt, timeOf, whenLabel, type TaskItem } from './model';
-import { buildIcs, taskDescription, toRRule } from './ics';
+import { buildIcs, taskDescription, toRRule, utcStamp } from './ics';
 import { completeOccurrence, getTask, openTask, tasksData, useTasks } from './store';
 import * as hm from '../habits/model';
 
@@ -39,7 +39,7 @@ interface SmCalendarPlugin {
   checkAccess(): Promise<{ granted: boolean }>;
   requestAccess(): Promise<{ granted: boolean }>;
   listCalendars(): Promise<{ calendars: PhoneCalendar[] }>;
-  upsertEvent(o: { id?: string; calendarId?: string; title: string; description: string; start: number; end: number; allDay: boolean; rrule?: string }): Promise<{ id: string }>;
+  upsertEvent(o: { id?: string; calendarId?: string; title: string; description: string; start: number; end: number; allDay: boolean; rrule?: string; exdate?: string }): Promise<{ id: string }>;
   deleteEvents(o: { ids: string[] }): Promise<{ deleted: number }>;
   listEvents(o: { from: number; to: number }): Promise<{ events: PhoneEvent[] }>;
   insertWithPrompt(o: { title: string; description: string; start: number; end: number; allDay: boolean; rrule?: string }): Promise<void>;
@@ -461,7 +461,7 @@ async function handleAction(action: string, ex: Record<string, string>, input?: 
   if (action === 'done') {
     if (!completeOccurrence(t.id, ex.date || undefined)) toast('Эта задача уже выполнена');
   } else if (action === 'snooze10' || action === 'snooze60' || action === 'snooze') {
-    await snoozeOne(t, action === 'snooze60' ? 60 : 10);
+    await snoozeOne(t, action === 'snooze60' ? 60 : 10, ex.date || undefined);
   } else {
     useApp.getState().go('tasks');
     openTask(t.id);
@@ -498,23 +498,25 @@ function snoozeNag(taskId: string, date: string) {
   }
 }
 
-async function snoozeOne(t: TaskItem, minutes: number) {
-  if (t.date) snoozeNag(t.id, t.date);
+/** forDate — день повтора, о котором было уведомление (у просроченной повторяющейся задачи t.date — другой день) */
+async function snoozeOne(t: TaskItem, minutes: number, forDate?: string) {
+  const date = forDate || t.date;
+  if (date) snoozeNag(t.id, date);
   const at = Date.now() + minutes * 60000;
   if (isNative()) {
     const { LocalNotifications: LN } = await notifications();
-    if (t.date) await LN.cancel({ notifications: [1, 2, 3].map((k) => ({ id: hash(`${t.id}|${t.date}|nag${k}`) })) }).catch(() => {});
+    if (date) await LN.cancel({ notifications: [1, 2, 3].map((k) => ({ id: hash(`${t.id}|${date}|nag${k}`) })) }).catch(() => {});
     await LN.schedule({
       notifications: [
         {
           // 1..700000: не пересекается с напоминаниями (от 1 000 000) и таймером фокуса (777001)
           id: Math.floor(Math.random() * 700_000) + 1,
           title: t.title || 'Задача',
-          body: 'Отложено · ' + reminderBody(t, t.date ?? todayYmd()),
+          body: 'Отложено · ' + reminderBody(t, date ?? todayYmd()),
           schedule: { at: new Date(at), allowWhileIdle: true },
           channelId: 'sm-reminders',
           actionTypeId: 'sm-task',
-          extra: { taskId: t.id, date: t.date ?? '', sm: 1, snooze: 1 },
+          extra: { taskId: t.id, date: date ?? '', sm: 1, snooze: 1 },
         },
       ],
     });
@@ -682,7 +684,10 @@ function eventFor(t: TaskItem) {
   const start = allDay ? Date.UTC(fromYmd(date).getFullYear(), fromYmd(date).getMonth(), fromYmd(date).getDate()) : startAt(t, date).getTime();
   const end = allDay ? start + 86400000 : start + (t.duration || 30) * 60000;
   const rrule = t.repeat && !t.done ? toRRule(t.repeat, date, { allDay, done: t.repeatDone }) ?? undefined : undefined;
-  return { title: (t.done ? '✓ ' : '') + (t.title || 'Задача'), description: taskDescription(t), start, end, allDay, rrule };
+  // пропущенные и перенесённые повторы — исключения серии (иначе в календаре телефона они остаются, а перенесённый — дважды)
+  const skip = rrule ? (t.repeat?.skip ?? []).filter((d) => d >= date) : [];
+  const exdate = skip.length ? skip.map((d) => (allDay ? d.replace(/-/g, '') + 'T000000Z' : utcStamp(startAt(t, d).getTime()))).join(',') : undefined;
+  return { title: (t.done ? '✓ ' : '') + (t.title || 'Задача'), description: taskDescription(t), start, end, allDay, rrule, ...(exdate ? { exdate } : {}) };
 }
 
 let calRunning = false;
@@ -928,7 +933,7 @@ export function reminderAction(r: InAppReminder, action: 'done' | 'snooze' | 'op
   if (action === 'done') {
     if (!completeOccurrence(t.id, r.date)) toast('Эта задача уже выполнена');
   }
-  else if (action === 'snooze') void snoozeOne(t, 10);
+  else if (action === 'snooze') void snoozeOne(t, 10, r.date);
   else {
     useApp.getState().go('tasks');
     openTask(t.id);

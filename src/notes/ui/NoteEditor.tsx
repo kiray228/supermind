@@ -124,6 +124,7 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
   const openId = useNotes((s) => s.openId);
   const body = useNotes((s) => s.openBody);
   const canUndo = useNotes((s) => s.canUndo);
+  const missing = useNotes((s) => !!s.openMissing);
   const meta = useNotes((s) => s.data?.notes.find((n) => n.id === s.openId));
   const data = useNotes((s) => s.data);
   const folder = data?.folders.find((f) => f.id === meta?.folderId);
@@ -861,6 +862,27 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
   );
 
   if (!openId) return null;
+  if (missing && meta) {
+    return (
+      <div className="nt-editor">
+        <div className="nt-missing">
+          <h3>{meta.title || 'Заметка'}</h3>
+          <p className="muted">
+            Текст этой заметки ещё не пришёл на это устройство. Он появится после синхронизации — проверьте связь. Очень большие заметки (с крупными фото) хранятся только на устройстве, где их
+            создали.
+          </p>
+          <div className="row nt-missing-acts">
+            <button className="btn" onClick={onClose}>
+              Закрыть
+            </button>
+            <button className="btn btn-primary" onClick={() => void openNote(openId, true)}>
+              Проверить снова
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
   if (!body || !meta) {
     return (
       <div className="nt-editor">

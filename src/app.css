@@ -192,3 +192,10 @@
 }
 .set-card { padding: var(--pad-card); }
 .set-card h3 { display: flex; align-items: center; gap: 12px; margin: 0 0 12px; font-size: var(--fs-section); font-weight: 700; letter-spacing: -0.02em; }
+
+/* раздел не отрисовался (ui/ViewBoundary.tsx) */
+.view-crash { max-width: 520px; margin: 64px auto; padding: 0 20px; display: flex; flex-direction: column; gap: 10px; }
+.view-crash h2 { margin: 0; font-size: 22px; }
+.view-crash p { margin: 0; line-height: 1.5; }
+.view-crash-msg { word-break: break-word; }
+.view-crash-acts { gap: 8px; margin-top: 8px; }

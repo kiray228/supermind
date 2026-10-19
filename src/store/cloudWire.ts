@@ -9,7 +9,7 @@ let done = false;
 
 /** Открытую карту изменили на другом устройстве: показать новую версию (когда пользователь не печатает) */
 async function refreshOpenDoc(keys: string[], attempt = 0): Promise<void> {
-  const { useDoc, hasPendingSave, flushSave } = await import('./docStore');
+  const { useDoc, settleSave } = await import('./docStore');
   const st = useDoc.getState();
   if (!st.doc || !keys.includes(`doc:${st.doc.id}`)) return;
   if (st.editingId) {
@@ -17,8 +17,8 @@ async function refreshOpenDoc(keys: string[], attempt = 0): Promise<void> {
     if (attempt < 60) setTimeout(() => void refreshOpenDoc(keys, attempt + 1), 2000);
     return;
   }
-  // свои несохранённые правки — сначала записать (другая версия при этом сохранится отдельной картой)
-  if (hasPendingSave()) await flushSave();
+  // свои несохранённые и уже записываемые правки — сначала до конца записать (другая версия при этом сохранится отдельной картой)
+  await settleSave();
   const raw = await get<MindDoc | LockedDoc>(`doc:${st.doc.id}`);
   const cur = useDoc.getState();
   if (!raw || !cur.doc || cur.doc.id !== st.doc.id) return;

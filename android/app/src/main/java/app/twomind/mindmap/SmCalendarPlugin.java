@@ -175,10 +175,15 @@ public class SmCalendarPlugin extends Plugin {
             v.put(CalendarContract.Events.RRULE, rrule);
             v.put(CalendarContract.Events.DURATION, allDay ? "P" + Math.max(1, mins / 1440) + "D" : "PT" + mins + "M");
             v.putNull(CalendarContract.Events.DTEND);
+            // пропущенные повторы (через запятую, UTC: 20261020T040000Z)
+            String exdate = call.getString("exdate");
+            if (exdate != null && !exdate.isEmpty()) v.put(CalendarContract.Events.EXDATE, exdate);
+            else v.putNull(CalendarContract.Events.EXDATE);
         } else {
             v.put(CalendarContract.Events.DTEND, end);
             v.putNull(CalendarContract.Events.RRULE);
             v.putNull(CalendarContract.Events.DURATION);
+            v.putNull(CalendarContract.Events.EXDATE);
         }
 
         try {

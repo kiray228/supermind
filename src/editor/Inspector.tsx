@@ -164,6 +164,16 @@ function TopicPanel({ t, ids }: { t: Topic; ids: string[] }) {
   const [note, setNote] = useState(t.note ?? '');
   const [link, setLink] = useState(t.link ?? '');
   const [label, setLabel] = useState('');
+  // заметку и ссылку поменяли не здесь («Отменить», версия с другого устройства) — показать новые,
+  // если в поле нет своих несохранённых правок (иначе следующая буква вернула бы старый текст)
+  const [noteDirty, setNoteDirty] = useState(false);
+  const [linkFocus, setLinkFocus] = useState(false);
+  const [seen, setSeen] = useState({ note: t.note ?? '', link: t.link ?? '' });
+  if ((t.note ?? '') !== seen.note || (t.link ?? '') !== seen.link) {
+    setSeen({ note: t.note ?? '', link: t.link ?? '' });
+    if ((t.note ?? '') !== seen.note && !noteDirty) setNote(t.note ?? '');
+    if ((t.link ?? '') !== seen.link && !linkFocus) setLink(t.link ?? '');
+  }
   const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const pendingNote = useRef<string | null>(null);
@@ -183,11 +193,13 @@ function TopicPanel({ t, ids }: { t: Topic; ids: string[] }) {
 
   const saveNote = (v: string) => {
     setNote(v);
+    setNoteDirty(true);
     pendingNote.current = v;
     if (noteTimer.current) clearTimeout(noteTimer.current);
     noteTimer.current = setTimeout(() => {
       pendingNote.current = null;
       st.updateTopic(t.id, { note: v || undefined });
+      setNoteDirty(false);
     }, 400);
   };
   /** Записать набранное сразу (уход из поля, выход из карты, сворачивание приложения) */
@@ -197,6 +209,7 @@ function TopicPanel({ t, ids }: { t: Topic; ids: string[] }) {
     const v = pendingNote.current;
     if (v === null) return;
     pendingNote.current = null;
+    setNoteDirty(false);
     const sh = useDoc.getState().sheet();
     if (sh && findInSheet(sh, t.id)) useDoc.getState().updateTopic(t.id, { note: v || undefined });
   };
@@ -331,7 +344,9 @@ function TopicPanel({ t, ids }: { t: Topic; ids: string[] }) {
           placeholder="https://…"
           value={link}
           onChange={(e) => setLink(e.target.value)}
+          onFocus={() => setLinkFocus(true)}
           onBlur={() => {
+            setLinkFocus(false);
             const v = link.trim() ? (safeUrl(link) ?? undefined) : undefined;
             if (link.trim() && !v) {
               toast('Такую ссылку открыть нельзя — нужен адрес сайта, почта или телефон');
