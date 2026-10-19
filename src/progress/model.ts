@@ -386,11 +386,18 @@ export function computeProgress(src: ProgressInput, today: string): ProgressStat
     const accs = accountMap(f);
     const spent = new Map<string, number>();
     const expenseMonths = new Set<string>();
+    // начало дня операции — один раз на дату (дат намного меньше, чем операций)
+    const dayStart = new Map<string, number>();
+    const startOf = (ymd: string) => {
+      let v = dayStart.get(ymd);
+      if (v === undefined) dayStart.set(ymd, (v = fromYmd(ymd).getTime()));
+      return v;
+    };
     for (const tx of f.transactions) {
       if (tx.date > today) continue;
       // активность дня — только если операция записана в тот же день (±1): импорт задним числом опыт за прошлое не даёт
-      const made = tx.createdAt ? dayOf(tx.createdAt) : '';
-      if (!made || (made >= addDaysYmd(tx.date, -1) && made <= addDaysYmd(tx.date, 1))) txPerDay.set(tx.date, (txPerDay.get(tx.date) ?? 0) + 1);
+      const s0 = tx.createdAt ? startOf(tx.date) : 0;
+      if (!tx.createdAt || (tx.createdAt >= s0 - 86400000 && tx.createdAt < s0 + 2 * 86400000)) txPerDay.set(tx.date, (txPerDay.get(tx.date) ?? 0) + 1);
       if (tx.type === 'expense') {
         const m = tx.date.slice(0, 7);
         const v = txMain(f, tx, accs);

@@ -469,7 +469,7 @@ export interface GoalDue {
 }
 
 /** Сроки целей и их этапов в диапазоне [fromYmd, toYmd] (только активные цели) */
-export function goalsDueBetween(data: GoalsData | null | undefined, fromYmd: string, toYmd: string): GoalDue[] {
+export function goalsDueBetween(data: GoalsData | null | undefined, fromYmd: string, toYmd: string, look?: TaskLookup): GoalDue[] {
   const out: GoalDue[] = [];
   if (!data) return out;
   for (const g of data.goals) {
@@ -478,8 +478,8 @@ export function goalsDueBetween(data: GoalsData | null | undefined, fromYmd: str
       out.push({ id: g.id, goalId: g.id, title: g.title, date: g.deadline, emoji: g.emoji, kind: 'goal' });
     for (const st of g.stages) {
       if (!st.deadline || st.deadline < fromYmd || st.deadline > toYmd) continue;
-      // этап считаем выполненным, только если отмечены все его шаги (задачи здесь не учитываются)
-      if (st.steps.length ? st.steps.every((s) => s.done) : st.done) continue;
+      // выполненный этап — без напоминаний (шаги могли быть выполнены через свои задачи)
+      if (look ? stageDone(st, look) : st.steps.length ? st.steps.every((s) => s.done) : st.done) continue;
       out.push({ id: `${g.id}:${st.id}`, goalId: g.id, title: `${g.title}: ${st.title}`, date: st.deadline, emoji: g.emoji, kind: 'stage' });
     }
   }

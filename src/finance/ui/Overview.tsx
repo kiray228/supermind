@@ -37,7 +37,20 @@ export function Overview({ data }: { data: FinanceData }) {
   const month = useMemo(() => summarize(data, { from: monthStart(today), to: monthEnd(today) }), [data, today]);
   const accs = useMemo(() => accountMap(data), [data]);
   const cats = useMemo(() => categoryMap(data), [data]);
-  const recent = useMemo(() => [...data.transactions].sort(sortTx).slice(0, 6), [data.transactions]);
+  // последние 6 — одним проходом (сортировать десятки тысяч ради шести незачем)
+  const recent = useMemo(() => {
+    const top: typeof data.transactions = [];
+    for (const t of data.transactions) {
+      if (top.length < 6) {
+        top.push(t);
+        top.sort(sortTx);
+      } else if (sortTx(t, top[5]) < 0) {
+        top[5] = t;
+        top.sort(sortTx);
+      }
+    }
+    return top;
+  }, [data.transactions]);
   // блок «Долги» — только когда есть открытые долги (записать новый можно на вкладке «Долги»)
   const hasDebts = data.debts.some((d) => !d.closed);
   const upcoming = useMemo(() => upcomingPayments(data, '0000-01-01', addDaysYmd(today, 14)).slice(0, 8), [data, today]);

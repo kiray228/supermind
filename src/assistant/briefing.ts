@@ -7,8 +7,8 @@ import { get } from '../store/kv';
 import { useCloud } from '../store/cloud';
 import { ensureTasks, useTasks } from '../tasks/store';
 import { isActive, longDate, type TaskItem, type TasksData } from '../tasks/model';
-import { ensureGoals, goalsDueBetween, useGoals, type GoalDue } from '../goals/store';
-import type { GoalsData } from '../goals/model';
+import { ensureGoals, useGoals } from '../goals/store';
+import { goalsDueBetween, makeTaskLookup, type GoalDue, type GoalsData } from '../goals/model';
 import { ensureFinance, upcomingPayments, useFinance } from '../finance/store';
 import { fmtMoney, type FinanceData, type UpcomingPayment } from '../finance/model';
 import { addDaysYmd, fromYmd, todayYmd, toYmd } from '../utils/mapTasks';
@@ -152,7 +152,7 @@ export function computeBriefing({ tasks, goals, finance, planner, name, now = ne
     scheduled,
     doneToday,
     habits: habitsForDay(planner, today),
-    goals: goals ? goalsDueBetween(goals, today, addDaysYmd(today, 7)) : [],
+    goals: goals ? goalsDueBetween(goals, today, addDaysYmd(today, 7), makeTaskLookup(tasks?.tasks)) : [],
     payments,
     yesterday: { count: yLog.length, titles: yLog.slice(-5).map((l) => l.title) },
     moods: recentMoods(planner, today),

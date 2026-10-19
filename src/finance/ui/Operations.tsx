@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useDeferredValue } from 'react';
 import { DownloadSimple, FunnelSimple, MagnifyingGlass, X } from '@phosphor-icons/react';
 import { todayYmd } from '../../utils/mapTasks';
 import { downloadText } from '../../io/download';
@@ -68,7 +68,9 @@ export function Operations({ data }: { data: FinanceData }) {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const accs = useMemo(() => accountMap(data), [data]);
   const cats = useMemo(() => categoryMap(data), [data]);
-  const list = useMemo(() => applyFilter(data, f), [data, f]);
+  // поиск по десяткам тысяч операций — с отложенным текстом: ввод не подтормаживает
+  const deferredF = useDeferredValue(f);
+  const list = useMemo(() => applyFilter(data, deferredF), [data, deferredF]);
   const main = data.prefs.mainCurrency;
 
   const totals = useMemo(() => {

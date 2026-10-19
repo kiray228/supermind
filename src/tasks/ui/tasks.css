@@ -486,3 +486,4 @@
 .td-child-when.overdue { color: var(--danger, #ef4444); }
 .td-parent { display: inline-flex; align-items: center; gap: 5px; margin-top: 10px; border: none; background: var(--surface-2); color: var(--text-2); border-radius: 10px; padding: 6px 10px; font-size: 13px; max-width: 100%; }
 .tk-parent { max-width: 45%; min-width: 0; }
+.tk-more-rows { display: block; width: 100%; padding: 12px; border: none; background: none; color: var(--accent); font-weight: 600; font-size: 14px; }

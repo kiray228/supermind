@@ -14,6 +14,8 @@ const sql = new PgliteSql();
 const counted = { query: (q: string, p?: unknown[]) => (dbCalls++, sql.query(q, p)) };
 const app = createApp({
   sql: counted,
+  // владелец для «Входящих поддержки» (локально — тестовый адрес)
+  adminEmails: (process.env.ADMIN_EMAILS ?? 'admin@local.test').split(','),
   // письма — в журнал (код восстановления виден в консоли сервера)
   mail: async (m) => void console.log('MAIL →', m.to, '|', m.subject),
   nextDue: { get: async () => next, set: async (v, at) => ((next = v === undefined ? undefined : { next: v, at }), true) },

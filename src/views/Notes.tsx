@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { ArrowDown, ArrowUp, Brain, Check, ChevronDown, Compass, Copy, CopyCheck, Download, Equal, GraduationCap, Newspaper, NotebookPen, FolderInput, FolderPlus, LayoutGrid, LayoutTemplate, MoreHorizontal, Pencil, Pin, PinOff, Plus, RotateCcw, Search, StickyNote, Trash2, Upload, Waypoints, X } from 'lucide-react';
 import type { ID } from '../types';
 import { confirmDialog } from '../ui/dialogs';
@@ -271,6 +271,7 @@ export default function Notes() {
       void searchNotes(
         q,
         data.notes.filter((n) => !n.trashed),
+        () => alive,
       ).then((r) => alive && setFound(r));
     }, 250);
     return () => {
@@ -403,13 +404,13 @@ export default function Notes() {
   );
 
   const cards = (ns: NoteMeta[]) => (
-    <div className="nt-grid">
-      {ns.map((n) => (
+    <GrowList key={JSON.stringify(sel) + '|' + (q ?? '') + '|' + sort} items={ns} className="nt-grid">
+      {(n) => (
         <div key={n.id} data-note={n.id} className="nt-cell">
           <NoteCard n={n} folder={folderOf(n)} onOpen={open} onMenu={onCardMenu} />
         </div>
-      ))}
-    </div>
+      )}
+    </GrowList>
   );
 
   const menuNote = menu && (menu.kind === 'note' || menu.kind === 'move') ? data.notes.find((n) => n.id === menu.id) : undefined;
@@ -652,5 +653,35 @@ export default function Notes() {
         </NtMenu>
       )}
     </div>
+  );
+}
+
+/**
+ * Длинный список по частям: сначала 120 элементов, следующие — когда до конца списка докрутили
+ * (тысячи карточек сразу — секунды на слабом телефоне).
+ */
+const STEP = 120;
+function GrowList<T>({ items, className, children }: { items: T[]; className: string; children: (x: T) => ReactNode }) {
+  const [cap, setCap] = useState(STEP);
+  const end = useRef<HTMLDivElement>(null);
+  const more = items.length > cap;
+  useEffect(() => {
+    const el = end.current;
+    if (!el || !more || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver((es) => es.some((e) => e.isIntersecting) && setCap((c) => c + STEP), { rootMargin: '600px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [more, cap]);
+  return (
+    <>
+      <div className={className}>{items.slice(0, cap).map(children)}</div>
+      {more && (
+        <div ref={end} className="nt-grow">
+          <button className="btn btn-sm" onClick={() => setCap((c) => c + STEP)}>
+            Показать ещё
+          </button>
+        </div>
+      )}
+    </>
   );
 }

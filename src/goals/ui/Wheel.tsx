@@ -232,7 +232,8 @@ export function WheelTab({ data, onNewGoal }: { data: GoalsData; onNewGoal: (are
 
 function RateModal({ areas, initial, onClose, onSaved }: { areas: LifeArea[]; initial?: WheelSnapshot; onClose: () => void; onSaved: () => void }) {
   const [scores, setScores] = useState<Record<string, number>>(() => Object.fromEntries(areas.map((a) => [a.id, initial?.scores[a.id] ?? 5])));
-  const [note, setNote] = useState('');
+  // сегодня уже оценивали — заметка той оценки (новая оценка в тот же день заменяет прежнюю)
+  const [note, setNote] = useState(() => (initial && initial.date === todayYmd() ? (initial.note ?? '') : ''));
   const save = () => {
     if (saveWheel(scores, note.trim())) toast('Оценка сохранена');
     onSaved();

@@ -417,13 +417,14 @@ async function push(): Promise<boolean> {
   const dirty = Object.entries(await dirtyKeys());
   if (!dirty.length) return false;
   let conflict = false;
-  type Item = { key: string; value: unknown; updatedAt: number; deleted: boolean; baseSeq: number; at: number; bytes: number };
+  type Item = { key: string; json: string; updatedAt: number; deleted: boolean; baseSeq: number; at: number; bytes: number };
   let batch: Item[] = [];
   let size = 0;
   const post = async (items: Item[]) => {
     const r = await api<{ results: { key: string; ok: boolean; seq?: number }[] }>('/sync', {
       method: 'POST',
-      body: JSON.stringify({ items: items.map(({ key, value, updatedAt, deleted, baseSeq }) => ({ key, value, updatedAt, deleted, baseSeq })) }),
+      // значения уже в JSON — собираем тело из готовых строк (не переводим большие блоки в JSON второй раз)
+      body: `{"items":[${items.map(({ key, json, updatedAt, deleted, baseSeq }) => `{"key":${JSON.stringify(key)},"value":${json || 'null'},"updatedAt":${updatedAt},"deleted":${deleted},"baseSeq":${baseSeq}}`).join(',')}]}`,
     });
     for (const res of r.results) {
       const sent = items.find((b) => b.key === res.key)!;
@@ -467,7 +468,7 @@ async function push(): Promise<boolean> {
       continue;
     }
     if (size + bytes > 3 * 1024 * 1024 || batch.length >= 40) await send();
-    batch.push({ key, value: deleted ? null : value, updatedAt: Math.max(at, 1), deleted, baseSeq: meta.seqs[key] ?? 0, at, bytes });
+    batch.push({ key, json: deleted ? '' : json, updatedAt: Math.max(at, 1), deleted, baseSeq: meta.seqs[key] ?? 0, at, bytes });
     size += bytes;
   }
   await send();

@@ -4,7 +4,11 @@
  * не больше 3 МБ и 10 секунд, не больше 4 перенаправлений.
  */
 import { lookup } from 'node:dns/promises';
+import { lookup as lookupCb, type LookupAddress } from 'node:dns';
 import { isIP } from 'node:net';
+import { request as httpRequest, type IncomingMessage } from 'node:http';
+import { request as httpsRequest } from 'node:https';
+import { Readable } from 'node:stream';
 
 export interface WebPage {
   url: string;
@@ -41,15 +45,43 @@ export function isPublicIp(ip: string): boolean {
     return true;
   }
   if (v === 6) {
-    const s = ip.toLowerCase();
-    if (s === '::' || s === '::1') return false;
-    // IPv4 внутри IPv6
-    const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(s);
-    if (mapped) return isPublicIp(mapped[1]);
-    if (/^f[cd]/.test(s) || /^fe[89ab]/.test(s) || s.startsWith('ff') || s.startsWith('64:ff9b') || s.startsWith('2001:db8')) return false;
+    const w = v6Words(ip);
+    if (!w) return false;
+    const zero = (from: number, to: number) => w.slice(from, to).every((x) => x === 0);
+    const v4 = (hi: number, lo: number) => `${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`;
+    // :: и ::1
+    if (zero(0, 7) && (w[7] === 0 || w[7] === 1)) return false;
+    // IPv4 внутри IPv6 в любой записи: ::ffff:a.b.c.d, ::ffff:7f00:1 (так URL переписывает адрес), ::a.b.c.d, ::ffff:0:a.b.c.d
+    if (zero(0, 5) && (w[5] === 0xffff || w[5] === 0)) return isPublicIp(v4(w[6], w[7]));
+    if (zero(0, 4) && w[4] === 0xffff && w[5] === 0) return isPublicIp(v4(w[6], w[7]));
+    // NAT64 (64:ff9b::/96 и 64:ff9b:1::/48), 6to4 (2002::/16 — IPv4 внутри), Teredo (2001::/32), документация
+    if (w[0] === 0x64 && w[1] === 0xff9b) return false;
+    if (w[0] === 0x2002) return isPublicIp(v4(w[1], w[2]));
+    if (w[0] === 0x2001 && (w[1] === 0 || w[1] === 0xdb8)) return false;
+    // уникальные локальные (fc00::/7), link-local (fe80::/10), site-local (fec0::/10), multicast (ff00::/8)
+    if ((w[0] & 0xfe00) === 0xfc00 || (w[0] & 0xffc0) === 0xfe80 || (w[0] & 0xffc0) === 0xfec0 || (w[0] & 0xff00) === 0xff00) return false;
     return true;
   }
   return false;
+}
+
+/** IPv6 → 8 слов по 16 бит (с поддержкой «::» и IPv4 в конце); null — не разобрать */
+function v6Words(ip: string): number[] | null {
+  let s = ip.toLowerCase().replace(/%.*$/, '');
+  const tail = /(\d+\.\d+\.\d+\.\d+)$/.exec(s);
+  if (tail) {
+    const p = tail[1].split('.').map(Number);
+    if (p.some((x) => x > 255)) return null;
+    s = s.slice(0, -tail[1].length) + ((p[0] << 8) | p[1]).toString(16) + ':' + ((p[2] << 8) | p[3]).toString(16);
+  }
+  const [a, b] = s.split('::');
+  if (s.split('::').length > 2) return null;
+  const head = a ? a.split(':') : [];
+  const rest = b !== undefined ? (b ? b.split(':') : []) : null;
+  const words = rest ? [...head, ...Array(8 - head.length - rest.length).fill('0'), ...rest] : head;
+  if (words.length !== 8) return null;
+  const out = words.map((x) => parseInt(x || '0', 16));
+  return out.some((x) => !(x >= 0 && x <= 0xffff)) ? null : out;
 }
 
 /** Ссылку можно открыть: http(s), стандартный порт, хост — публичный */
@@ -75,9 +107,42 @@ async function defaultResolve(host: string): Promise<string[]> {
   return (await lookup(host, { all: true })).map((a) => a.address);
 }
 
+/**
+ * Запрос с проверкой адреса в момент подключения: сайт с «нулевым» временем жизни DNS мог бы ответить проверке
+ * публичным адресом, а самому запросу — внутренним (DNS rebinding). Здесь сокет открывается только к публичному адресу.
+ */
+const pinnedFetch = ((input: string, init?: RequestInit): Promise<Response> =>
+  new Promise((resolve, reject) => {
+    const u = new URL(input);
+    const lookupSafe = (host: string, opts: unknown, cb: (err: Error | null, address: string | LookupAddress[], family?: number) => void) => {
+      lookupCb(host, { all: true }, (err, addrs) => {
+        if (err) return cb(err, '', 0);
+        const list = addrs as LookupAddress[];
+        if (!list.length || !list.every((a) => isPublicIp(a.address))) return cb(new Error('blocked address'), '', 0);
+        const all = !!(opts && typeof opts === 'object' && (opts as { all?: boolean }).all);
+        if (all) cb(null, list);
+        else cb(null, list[0].address, list[0].family);
+      });
+    };
+    const req = (u.protocol === 'https:' ? httpsRequest : httpRequest)(
+      u,
+      { method: 'GET', headers: (init?.headers ?? {}) as Record<string, string>, lookup: lookupSafe as never, signal: init?.signal ?? undefined },
+      (res: IncomingMessage) => {
+        const headers = new Headers();
+        for (const [k, v] of Object.entries(res.headers)) if (v !== undefined) headers.set(k, Array.isArray(v) ? v.join(', ') : String(v));
+        const status = res.statusCode ?? 502;
+        const nullBody = status === 204 || status === 304 || (status >= 300 && status < 400);
+        if (nullBody) res.resume();
+        resolve(new Response(nullBody ? null : (Readable.toWeb(res) as ReadableStream), { status, headers }));
+      },
+    );
+    req.on('error', reject);
+    req.end();
+  })) as unknown as typeof fetch;
+
 /** Скачать страницу (с проверкой каждого перенаправления) */
 export async function fetchPublicPage(raw: string, deps: { fetch?: typeof fetch; resolve?: (host: string) => Promise<string[]> } = {}): Promise<WebPage> {
-  const f = deps.fetch ?? fetch;
+  const f = deps.fetch ?? pinnedFetch;
   let url = await checkUrl(raw, deps.resolve);
   const signal = AbortSignal.timeout(TIMEOUT);
   for (let hop = 0; ; hop++) {

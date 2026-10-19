@@ -197,7 +197,9 @@ async function plan(fromMs: number, toMs: number): Promise<Planned[]> {
       }
   }
   // платежи по подпискам (раздел «Финансы»): напоминание в 09:00 за указанное число дней
-  const fin = await get<import('../finance/model').FinanceData>('finance').catch(() => undefined);
+  // финансы в памяти (если раздел уже загружен) — без чтения всего блока из базы на каждое изменение задач
+  const finMem = (await import('../finance/store').catch(() => null))?.useFinance.getState().data;
+  const fin = finMem ?? (await get<import('../finance/model').FinanceData>('finance').catch(() => undefined));
   if (fin?.subscriptions?.length) {
     const { upcomingPayments } = await import('../finance/model');
     const fromDay = toYmd(new Date(fromMs));
@@ -237,6 +239,8 @@ async function plan(fromMs: number, toMs: number): Promise<Planned[]> {
   try {
     const [{ ensureGoals }, { goalReminders }, { makeTaskLookup }] = await Promise.all([import('../goals/store'), import('../goals/reminders'), import('../goals/model')]);
     const goals = await ensureGoals();
+    // накопительные цели считаются по счёту: без загруженных финансов их прогресс был бы 0%
+    if (goals.goals.some((g) => g.mode === 'savings' && g.status === 'active')) await (await import('../finance/store')).ensureFinance().catch(() => undefined);
     for (const r of goalReminders(goals, makeTaskLookup(d.tasks), toYmd(new Date(fromMs)), toYmd(new Date(toMs)))) {
       const at = fromYmd(r.day).getTime() + 9 * 3600000;
       if (at < fromMs || at > toMs) continue;
@@ -351,7 +355,8 @@ async function planStreakSaver(pref: string | undefined, p: PlannerData | undefi
 export function briefingFor(tasks: TaskItem[], p: PlannerData | undefined, day: string, brain: { part?: string; tail?: string } = {}): { title: string; body: string } {
   const active = tasks.filter((t) => isActive(t) && t.date);
   const today = active.filter((t) => t.date === day).sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0) || (a.time ?? '99').localeCompare(b.time ?? '99'));
-  const overdue = active.filter((t) => t.date! < day && day <= addDaysYmd(toYmd(new Date()), 1)).length;
+  // «завтра» — один раз, а не для каждой задачи
+  const overdue = day <= addDaysYmd(toYmd(new Date()), 1) ? active.filter((t) => t.date! < day).length : 0;
   const due = p ? hm.activeHabits(p.habits ?? []).filter((h) => hm.dueOn(p.days ?? {}, h, day)) : [];
   const habits = due.filter((h) => !hm.doneOn(p?.days ?? {}, h, day)).length;
   const parts: string[] = [];

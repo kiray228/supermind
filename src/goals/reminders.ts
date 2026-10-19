@@ -25,7 +25,7 @@ export function goalReminders(d: GoalsData | null | undefined, look: TaskLookup,
   const out: GoalReminder[] = [];
   if (!d) return out;
   const goals = new Map(d.goals.map((g) => [g.id, g]));
-  for (const due of goalsDueBetween(d, from, addDaysYmd(to, 7))) {
+  for (const due of goalsDueBetween(d, from, addDaysYmd(to, 7), look)) {
     const g = goals.get(due.goalId);
     if (!g) continue;
     const pct = goalProgress(g, look);

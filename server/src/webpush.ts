@@ -100,6 +100,10 @@ export async function sendPush(
   const body = new Uint8Array(encryptPayload(sub, Buffer.from(JSON.stringify(payload))));
   const res = await fetchImpl(sub.endpoint, {
     method: 'POST',
+    // push-сервис не перенаправляет; перенаправление могло бы увести запрос во внутреннюю сеть
+    redirect: 'manual',
+    // зависший адрес не должен задерживать остальные напоминания
+    signal: AbortSignal.timeout(10_000),
     headers: {
       Authorization: vapidAuthorization(sub.endpoint, keys, subject),
       'Content-Encoding': 'aes128gcm',

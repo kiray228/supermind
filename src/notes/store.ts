@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { del, get, set } from '../store/kv';
+import { getMany } from 'idb-keyval';
 import { blobSync } from '../store/blobSync';
 import type { ID } from '../types';
 import { uid } from '../utils/tree';
@@ -404,20 +405,32 @@ export async function duplicateNote(id: ID): Promise<NoteMeta | null> {
   return meta;
 }
 
-/** Найти заметки по тексту (заголовок + содержимое). Тела читаются лениво и кэшируются */
-export async function searchNotes(query: string, notes: NoteMeta[]): Promise<Set<ID>> {
+/**
+ * Найти заметки по тексту (заголовок + содержимое). Тела читаются лениво (пачками, одной транзакцией базы)
+ * и кэшируются. alive() — false: запрос уже устарел (набрали дальше), чтение прекращается.
+ */
+export async function searchNotes(query: string, notes: NoteMeta[], alive: () => boolean = () => true): Promise<Set<ID>> {
   const q = searchNorm(query.trim());
   const res = new Set<ID>();
   if (!q) return res;
   const words = q.split(/\s+/);
-  for (const n of notes) {
-    let c = textCache.get(n.id);
-    if (!c || c.at !== n.updatedAt) {
-      const body = await loadNoteBody(n.id).catch(() => null);
-      c = { at: n.updatedAt, text: searchNorm((body?.title ?? n.title) + '\n' + (body ? bodyPlainText(body) : n.preview)) };
-      textCache.set(n.id, c);
+  const stale = notes.filter((n) => textCache.get(n.id)?.at !== n.updatedAt);
+  for (let i = 0; i < stale.length; i += 200) {
+    if (!alive()) return res;
+    const part = stale.slice(i, i + 200);
+    // несохранённые и записываемые тела — из памяти, остальные — одним чтением
+    const fromDisk = part.filter((n) => !pending.has(n.id) && !writing.has(n.id));
+    const disk = fromDisk.length ? await getMany<NoteBody>(fromDisk.map((n) => noteBodyKey(n.id))).catch(() => fromDisk.map(() => undefined)) : [];
+    const byId = new Map(fromDisk.map((n, j) => [n.id, disk[j]]));
+    for (const n of part) {
+      const raw = byId.has(n.id) ? byId.get(n.id) : await loadNoteBody(n.id).catch(() => undefined);
+      const body = raw ? normalizeBody(raw) : null;
+      textCache.set(n.id, { at: n.updatedAt, text: searchNorm((body?.title || n.title) + '\n' + (body ? bodyPlainText(body) : n.preview)) });
     }
-    if (words.every((w) => c.text.includes(w))) res.add(n.id);
+  }
+  for (const n of notes) {
+    const c = textCache.get(n.id);
+    if (c && words.every((w) => c.text.includes(w))) res.add(n.id);
   }
   return res;
 }

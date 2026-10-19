@@ -171,12 +171,18 @@ export function addTransaction(p: TxDraft, opts: { silent?: boolean; id?: string
   return t;
 }
 
-/** Массовое добавление (импорт). Возвращает число добавленных */
-export function addTransactions(list: TxDraft[]): number {
+/** Массовое добавление (импорт). Возвращает id добавленных */
+export function addTransactions(list: TxDraft[]): string[] {
   const now = Date.now();
   const items = list.map((p, i) => normalizeTx({ ...p, tags: p.tags ?? [], id: uid(), createdAt: now + i, updatedAt: now }));
   if (items.length) mutateFinance((x) => void x.transactions.push(...items));
-  return items.length;
+  return items.map((t) => t.id);
+}
+
+/** Удалить несколько операций (отмена импорта) */
+export function removeTransactions(ids: string[]) {
+  const set = new Set(ids);
+  mutateFinance((d) => removeWhere(d, 'transactions', (t) => set.has(t.id)));
 }
 
 export function updateTransaction(id: string, patch: Partial<Transaction>) {

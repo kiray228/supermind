@@ -36,9 +36,13 @@ export function refreshProgressSources(): Promise<void> {
     try {
       const [planner, docs] = await Promise.all([get<PlannerData>('planner').catch(() => undefined), listDocs().catch(() => [])]);
       const s = useProgressExtra.getState();
+      const p = planner && typeof planner === 'object' ? planner : (s.planner ?? { days: {}, habits: [] });
+      const d = Array.isArray(docs) ? docs : (s.docs ?? []);
+      // то же самое — прежние объекты: подсчёт опыта (сотни мс на телефоне) не повторяется зря
+      const same = (a: unknown, b: unknown) => a === b || (!!a && !!b && JSON.stringify(a) === JSON.stringify(b));
       useProgressExtra.setState({
-        planner: planner && typeof planner === 'object' ? planner : (s.planner ?? { days: {}, habits: [] }),
-        docs: Array.isArray(docs) ? docs : (s.docs ?? []),
+        planner: same(p, s.planner) ? s.planner : p,
+        docs: same(d, s.docs) ? s.docs : d,
         day: todayYmd(),
       });
     } finally {
@@ -72,7 +76,9 @@ export function ensureProgressSources() {
     }
   }
   void refreshProgressSources();
-  onDirty(scheduleRefresh);
+  // перечитывать нужно только ежедневник и список карт (остальное — в памяти разделов)
+  onDirty((k) => (!k || k === 'planner' || k === 'docs:index') && scheduleRefresh());
+  window.addEventListener('sm-planner-changed', scheduleRefresh);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') scheduleRefresh();
   });

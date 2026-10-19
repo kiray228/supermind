@@ -205,18 +205,31 @@ export function parseMoneyInput(s: string): number {
     const base = parseMoneyInput(k[1]);
     return Number.isFinite(base) ? r2(base * (/^[кkт]/.test(k[2]) ? 1e3 : 1e6)) : NaN;
   }
-  let t = s.replace(/[\s ]/g, '').replace(/[−–]/g, '-');
-  // «1.200,50» / «1,200.50»: дробный разделитель — тот, что правее, другой разделяет тысячи
-  if (t.includes(',') && t.includes('.') && !/\d[+-]/.test(t)) t = t.lastIndexOf(',') > t.lastIndexOf('.') ? t.replace(/\./g, '') : t.replace(/,/g, '');
-  // запятая — дробная часть в каждом слагаемом («1200,5+300,5»)
-  t = t.replace(/,/g, '.').replace(/[^\d.+-]/g, '');
-  // простая арифметика «1200+350» — удобно на телефоне
-  if (/^[\d.]+([+-][\d.]+)+$/.test(t)) {
-    const parts = t.match(/[+-]?[\d.]+/g) ?? [];
-    return r2(parts.reduce((a, p) => a + (Number(p) || 0), 0));
+  const t = s.replace(/[\s ]/g, '').replace(/[−–]/g, '-').replace(/[^\d.,+-]/g, '');
+  // простая арифметика «1200+350», «1.200,50+300» — каждое слагаемое разбирается отдельно; ошибка в любом — ошибка
+  if (/^[\d.,]+([+-][\d.,]+)+$/.test(t)) {
+    const parts = t.match(/[+-]?[\d.,]+/g) ?? [];
+    let sum = 0;
+    for (const p of parts) {
+      const v = moneyTerm(p.replace(/^[+-]/, ''));
+      if (!Number.isFinite(v)) return NaN;
+      sum += p.startsWith('-') ? -v : v;
+    }
+    return r2(sum);
   }
+  const neg = t.startsWith('-');
+  const v = moneyTerm(t.replace(/^[+-]/, ''));
+  return Number.isFinite(v) ? r2(neg ? -v : v) : NaN;
+}
+
+/** Одно число: «1.200,50» / «1,200.50» — дробный разделитель тот, что правее; «1200,5» — запятая дробная */
+function moneyTerm(t: string): number {
+  if (!t || !/\d/.test(t)) return NaN;
+  if (t.includes(',') && t.includes('.')) t = t.lastIndexOf(',') > t.lastIndexOf('.') ? t.replace(/\./g, '').replace(',', '.') : t.replace(/,/g, '');
+  else if (t.includes(',')) t = (t.match(/,/g) ?? []).length > 1 ? t.replace(/,/g, '') : t.replace(',', '.');
+  else if ((t.match(/\./g) ?? []).length > 1) t = t.replace(/\./g, '');
   const n = Number(t);
-  return Number.isFinite(n) ? r2(n) : NaN;
+  return Number.isFinite(n) ? n : NaN;
 }
 
 // ---------- Категории по умолчанию ----------

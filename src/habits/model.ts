@@ -377,11 +377,38 @@ const createdYmd = (h: Habit) => (h.createdAt ? toYmd(new Date(h.createdAt)) : u
 
 /** Первый день с отметкой этой привычки */
 export function firstMark(days: Days, h: Habit): string | undefined {
-  let min: string | undefined;
-  for (const [k, d] of Object.entries(days)) {
-    if (d.habits?.includes(h.id) || (d.habitCounts?.[h.id] ?? 0) > 0) if (!min || k < min) min = k;
+  return memo(days, h, 'first', () => {
+    let min: string | undefined;
+    for (const [k, d] of Object.entries(days)) {
+      if (d.habits?.includes(h.id) || (d.habitCounts?.[h.id] ?? 0) > 0) if (!min || k < min) min = k;
+    }
+    return min;
+  });
+}
+
+/**
+ * Память расчётов по истории привычки: история (days) и привычка при каждом изменении — новые объекты,
+ * значит, пока они те же, результат тот же. Серии за 3 года — десятки мс на каждую строку при каждой отрисовке.
+ */
+const memoStore = new WeakMap<object, WeakMap<object, Map<string, unknown>>>();
+function memo<T>(days: Days, h: Habit, key: string, calc: () => T): T {
+  let byHabit = memoStore.get(days);
+  if (!byHabit) memoStore.set(days, (byHabit = new WeakMap()));
+  let m = byHabit.get(h);
+  if (!m) byHabit.set(h, (m = new Map()));
+  if (m.has(key)) return m.get(key) as T;
+  const v = calc();
+  m.set(key, v);
+  return v;
+}
+
+/** Шаги по дням без разбора строки даты на каждом шаге */
+function* dayWalk(from: string, step: 1 | -1): Generator<string> {
+  const d = fromYmd(from);
+  for (;;) {
+    yield toYmd(d);
+    d.setDate(d.getDate() + step);
   }
-  return min;
 }
 
 // ---------- Серии ----------
@@ -401,6 +428,10 @@ export const streakText = (s: Streak) =>
  * с выполненной целью (текущая неделя, пока цель не набрана, серию не рвёт; неделя целиком на паузе — тоже).
  */
 export function currentStreak(days: Days, h: Habit, ymd: string): Streak {
+  return memo(days, h, 'cur|' + ymd, () => calcCurrentStreak(days, h, ymd));
+}
+
+function calcCurrentStreak(days: Days, h: Habit, ymd: string): Streak {
   const stop = firstMark(days, h);
   if (freqOf(h) === 'weekly') {
     if (!stop) return { n: 0, unit: 'week' };
@@ -419,17 +450,23 @@ export function currentStreak(days: Days, h: Habit, ymd: string): Streak {
     return { n, unit: 'week' };
   }
   let n = 0;
-  let d = ymd;
-  for (let i = 0; i < 3700 && stop && d >= stop; i++) {
+  if (!stop) return { n, unit: 'day' };
+  let i = 0;
+  for (const d of dayWalk(ymd, -1)) {
+    if (i >= 3700 || d < stop) break;
     if (doneOn(days, h, d)) n++;
     else if (i > 0 && scheduledOn(h, d) && !frozenOn(days, h, d)) break;
-    d = addDaysYmd(d, -1);
+    i++;
   }
   return { n, unit: 'day' };
 }
 
 /** Лучшая серия за всю историю (до `today` включительно) */
 export function bestStreak(days: Days, h: Habit, today: string): Streak {
+  return memo(days, h, 'best|' + today, () => calcBestStreak(days, h, today));
+}
+
+function calcBestStreak(days: Days, h: Habit, today: string): Streak {
   const first = firstMark(days, h);
   if (!first) return { n: 0, unit: freqOf(h) === 'weekly' ? 'week' : 'day' };
   if (freqOf(h) === 'weekly') {
@@ -446,7 +483,9 @@ export function bestStreak(days: Days, h: Habit, today: string): Streak {
   }
   let best = 0;
   let run = 0;
-  for (let d = first, i = 0; d <= today && i < 5000; d = addDaysYmd(d, 1), i++) {
+  let i = 0;
+  for (const d of dayWalk(first, 1)) {
+    if (d > today || i++ >= 5000) break;
     if (doneOn(days, h, d)) best = Math.max(best, ++run);
     else if (scheduledOn(h, d) && d !== today && !frozenOn(days, h, d)) run = 0;
   }

@@ -663,3 +663,4 @@
 .nt-missing h3 { margin: 0; font-size: 20px; }
 .nt-missing p { margin: 0; line-height: 1.5; }
 .nt-missing-acts { gap: 8px; margin-top: 6px; }
+.nt-grow { display: flex; justify-content: center; padding: 16px 0 24px; }

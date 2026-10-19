@@ -1,5 +1,5 @@
 /** «Что нового»: главное в каждой версии. Новые версии — сверху. */
-import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge, MessageCircleQuestion, CloudOff, LayoutTemplate, SquareArrowOutUpRight, BellRing, Target, Timer, Lock, Crosshair, Move, GitMerge, EyeOff, CalendarRange, Fingerprint, ArrowUpDown, Banknote, MonitorSmartphone, Coins, ListChecks, FileInput, Split, CornerDownRight, KeyRound, Keyboard, LifeBuoy } from 'lucide-react';
+import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge, MessageCircleQuestion, CloudOff, LayoutTemplate, SquareArrowOutUpRight, BellRing, Target, Timer, Lock, Crosshair, Move, GitMerge, EyeOff, CalendarRange, Fingerprint, ArrowUpDown, Banknote, MonitorSmartphone, Coins, ListChecks, FileInput, Split, CornerDownRight, KeyRound, Keyboard, LifeBuoy, Zap, FileSpreadsheet } from 'lucide-react';
 
 export interface ChangeItem {
   icon: typeof Sparkles;
@@ -15,6 +15,16 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.42',
+    title: 'Защита сервера, точный импорт выписок и скорость',
+    items: [
+      { icon: ShieldCheck, title: 'Сервер защищён надёжнее', text: 'Закрыты лазейки к внутренним адресам, push-уведомления — только для вошедших и только через сервисы браузеров, ограничения от перебора паролей и злоупотреблений, место в облаке у каждого своё.' },
+      { icon: FileSpreadsheet, title: 'Импорт выписок без сюрпризов', text: 'Строка «Выписка по карте…» над таблицей больше не ломает импорт. У Kaspi описанием берётся продавец, дубли ищутся на своём счёте, а импорт можно отменить одной кнопкой.' },
+      { icon: Zap, title: 'Быстрее на больших данных', text: 'Опыт и уровень считаются в 4 раза быстрее, серии привычек — мгновенно, длинные списки задач и заметок показываются по частям, поиск по заметкам и операциям не тормозит ввод.' },
+      { icon: Target, title: 'Цели и мелочи', text: 'Этап, выполненный через задачи, не напоминает о сроке; «1.200,50+300» в сумме считается верно; Enter в поиске открывает то, что вы ввели.' },
+    ],
+  },
   {
     version: '1.41',
     title: 'Надёжность: глубокая проверка всего приложения',

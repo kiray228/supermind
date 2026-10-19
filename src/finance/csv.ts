@@ -4,9 +4,13 @@
 import { accountMap, categoryMap, r2, sortTx, type FinanceData, type Transaction } from './model';
 import type { TxDraft } from './store';
 
+/**
+ * Разделитель — по первым 20 строкам: тот, что делит больше всего строк на одинаковое число столбцов.
+ * (Первая строка выписки часто — заголовок вроде «Выписка по карте Kaspi Gold» без разделителей.)
+ */
 export function detectDelimiter(text: string): string {
-  const line = text.split(/\r?\n/).find((l) => l.trim()) ?? '';
-  const count = (ch: string) => {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim()).slice(0, 20);
+  const count = (line: string, ch: string) => {
     let n = 0;
     let q = false;
     for (const c of line) {
@@ -15,8 +19,27 @@ export function detectDelimiter(text: string): string {
     }
     return n;
   };
-  const cands = [';', ',', '\t'].map((ch) => [ch, count(ch)] as const).sort((a, b) => b[1] - a[1]);
-  return cands[0][1] > 0 ? cands[0][0] : ',';
+  let best: { ch: string; rows: number; cols: number } = { ch: ',', rows: 0, cols: 0 };
+  for (const ch of [';', '\t', ',']) {
+    // самое частое ненулевое число разделителей в строке и сколько строк с ним
+    const freq = new Map<number, number>();
+    for (const l of lines) {
+      const n = count(l, ch);
+      if (n > 0) freq.set(n, (freq.get(n) ?? 0) + 1);
+    }
+    for (const [cols, rows] of freq) if (rows > best.rows || (rows === best.rows && cols > best.cols)) best = { ch, rows, cols };
+  }
+  return best.rows > 0 ? best.ch : ',';
+}
+
+/** Убрать строки-шапку выписки над таблицей: в них меньше двух заполненных ячеек */
+export function dropPreamble(rows: string[][]): string[][] {
+  const filled = (r: string[]) => r.filter((c) => c.trim()).length;
+  const width = Math.max(0, ...rows.slice(0, 30).map(filled));
+  if (width < 2) return rows;
+  let i = 0;
+  while (i < rows.length - 1 && filled(rows[i]) < Math.min(2, width)) i++;
+  return rows.slice(i);
 }
 
 /** Разбор CSV с кавычками («"a;b"», «""»). Пустые строки пропускаются */
@@ -57,6 +80,11 @@ const pad = (n: number) => String(n).padStart(2, '0');
 /** Дата из строки: DD.MM.YYYY, DD.MM.YY, YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY (время после даты допускается) */
 export function parseDate(s: string): { date: string; time?: string } | null {
   const t = s.trim();
+  // время с часовым поясом (2024-10-31T22:00:00Z, …+03:00): переводим в местные сутки
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})$/i.test(t)) {
+    const d = new Date(t);
+    if (!Number.isNaN(d.getTime())) return { date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, time: `${pad(d.getHours())}:${pad(d.getMinutes())}` };
+  }
   let y = 0, m = 0, d = 0;
   let mm = t.match(/^(\d{4})[-./](\d{1,2})[-./](\d{1,2})/);
   if (mm) [y, m, d] = [Number(mm[1]), Number(mm[2]), Number(mm[3])];
@@ -77,6 +105,10 @@ export function parseDate(s: string): { date: string; time?: string } | null {
 export function parseAmount(s: string): number | null {
   let t = s.trim().replace(/[−–]/g, '-');
   if (!t) return null;
+  // дата или время — не сумма («01.10.24» иначе превращалось в 11024)
+  if (/\d{1,4}[./-]\d{1,2}[./-]\d{2,4}|\d{1,2}:\d{2}/.test(t)) return null;
+  // буквы, кроме валюты, — тоже не сумма
+  if (/[a-zа-яё]/i.test(t.replace(/тенге|тг|kzt|руб\.?|rub|usd|eur|сом|сум/gi, ''))) return null;
   let neg = false;
   if (/^\(.*\)$/.test(t)) {
     neg = true;
@@ -112,14 +144,21 @@ export interface ColumnMap {
 export function guessColumns(header: string[]): ColumnMap {
   const find = (re: RegExp) => header.findIndex((h) => re.test(h.toLowerCase()));
   const date = find(/дата|date|время/);
-  const amount = find(/сумм|amount|sum|приход|расход|value/);
-  let description = find(/описан|назначен|коммент|детал|операц|description|details|memo|payee|получател|merchant|наимен/);
+  // «Сумма в валюте счёта» точнее, чем «Сумма операции» (та бывает в валюте покупки)
+  let amount = find(/сумм.*(счет|счёт|карт)|amount.*account/);
+  if (amount < 0) amount = find(/сумм|amount|sum|приход|расход|value/);
+  // сначала точные слова (продавец, назначение), потом общие («Операция» у Kaspi — лишь «Покупки»/«Пополнения»)
+  let description = find(/описан|назначен|детал|description|details|memo|payee|получател|merchant|наимен|контрагент/);
+  if (description < 0 || description === amount || description === date) description = find(/коммент|операц/);
   const category = find(/категор|category/);
   if (description === amount || description === date) description = -1;
+  const d = date >= 0 ? date : 0;
+  // сумма по умолчанию — не столбец даты
+  const a = amount >= 0 ? amount : d === 1 ? Math.min(2, header.length - 1) : Math.min(1, header.length - 1);
   return {
-    date: date >= 0 ? date : 0,
-    amount: amount >= 0 ? amount : Math.min(1, header.length - 1),
-    description: description >= 0 ? description : Math.min(2, header.length - 1),
+    date: d,
+    amount: a,
+    description: description >= 0 ? description : [2, 1, 0].find((i) => i < header.length && i !== d && i !== a) ?? -1,
     category,
   };
 }
@@ -132,13 +171,13 @@ export function looksLikeHeader(row: string[]): boolean {
 // ---------- Автокатегории ----------
 
 const RULES: [RegExp, string][] = [
+  [/zara|h&m|lc\s*waikiki|bershka|adidas|nike|reebok|одежд|обув|wildberries|ozon|lamoda|kaspi\s*магазин/i, 'c-clothes'],
   [/magnum|small|галмарт|galmart|anvar|анвар|арзан|продукт|супермаркет|grocery|пятёрочк|пятерочк|перекр[её]сток|магнит|ашан|auchan|лента|вкусвилл|metro|market|маркет|магазин/i, 'c-food'],
   [/yandex\s*go|яндекс\s*go|такси|taxi|uber|indriver|indrive|bolt|onay|онай|автобус|метро|бензин|азс|helios|гелиос|sinooil|qazaq\s*oil|лукойл|parking|парков|авиабилет|ктж|ktz/i, 'c-transport'],
   [/кафе|cafe|coffee|кофе|starbucks|ресторан|restaurant|pub\b|burger|kfc|mcdonald|макдон|dodo|додо|пицц|pizza|суши|sushi|wolt|glovo|chocofood|delivery|доставк|столов/i, 'c-cafe'],
   [/коммунал|жкх|kegoc|алсеко|alseco|электроэнерг|водоканал|газоснаб|qazaqgaz|аренд|квартплат|ипотек|ikea|леруа|leroy/i, 'c-home'],
   [/kcell|beeline|билайн|tele2|теле2|activ|altel|kazakhtelecom|казахтелеком|мтс|mts|мегафон|megafon|интернет|internet|мобильн|связь/i, 'c-mobile'],
   [/аптек|apteka|pharm|клиник|clinic|больниц|стомат|dental|medic|медиц|анализ|invitro|инвитро|olymp|олимп/i, 'c-health'],
-  [/zara|h&m|lc\s*waikiki|bershka|adidas|nike|reebok|одежд|обув|wildberries|ozon|lamoda|kaspi\s*магазин/i, 'c-clothes'],
   [/кино|cinema|kinopark|кинопарк|театр|концерт|steam|playstation|xbox|games?\b|ticketon|боулинг/i, 'c-fun'],
   [/netflix|spotify|youtube|apple\.com|icloud|google\s*(one|storage|play)|яндекс\s*плюс|yandex\s*plus|кинопоиск|ivi|okko|подписк|subscription|chatgpt|openai|anthropic|claude/i, 'c-subs'],
   [/курсы|школ|универ|обучен|udemy|coursera|skillbox|книг|books?\b|education|учеб/i, 'c-edu'],
@@ -178,7 +217,7 @@ export function autoCategory(d: FinanceData, desc: string, type: 'expense' | 'in
 
 // ---------- Импорт ----------
 
-export const dupKey = (date: string, type: string, amount: number, note?: string) => `${date}|${type}|${r2(amount).toFixed(2)}|${(note ?? '').trim().toLowerCase()}`;
+export const dupKey = (date: string, type: string, amount: number, note?: string, accountId = '') => `${accountId}|${date}|${type}|${r2(amount).toFixed(2)}|${(note ?? '').trim().toLowerCase()}`;
 
 export interface ImportPreview {
   items: TxDraft[];
@@ -191,9 +230,21 @@ export function buildImport(d: FinanceData, rows: string[][], map: ColumnMap, ac
   // сколько таких операций уже есть: две одинаковые покупки за день в выписке — не дубликаты,
   // а при повторном импорте того же файла пропускаются обе
   const seen = new Map<string, number>();
+  const groups = new Map<string, Transaction[]>();
   for (const t of d.transactions) {
-    if (t.type === 'transfer') continue;
-    const k = dupKey(t.date, t.type, t.amount, t.note);
+    // другой счёт — не дубликат (та же покупка в выписке карты и наличными — разные операции)
+    if (t.type === 'transfer' || t.accountId !== accountId) continue;
+    if (t.splitId) {
+      groups.set(t.splitId, [...(groups.get(t.splitId) ?? []), t]);
+      continue;
+    }
+    const k = dupKey(t.date, t.type, t.amount, t.note, accountId);
+    seen.set(k, (seen.get(k) ?? 0) + 1);
+  }
+  // разделённая покупка — в выписке одной строкой на всю сумму
+  for (const parts of groups.values()) {
+    const t = parts[0];
+    const k = dupKey(t.date, t.type, parts.reduce((a, x) => a + x.amount, 0), t.note, accountId);
     seen.set(k, (seen.get(k) ?? 0) + 1);
   }
   const items: TxDraft[] = [];
@@ -209,7 +260,7 @@ export function buildImport(d: FinanceData, rows: string[][], map: ColumnMap, ac
     if (opts.invert) amt = -amt;
     const type = amt < 0 ? 'expense' : 'income';
     const note = (map.description >= 0 ? r[map.description] ?? '' : '').replace(/\s+/g, ' ').trim();
-    const key = dupKey(dt.date, type, Math.abs(amt), note);
+    const key = dupKey(dt.date, type, Math.abs(amt), note, accountId);
     const left = seen.get(key) ?? 0;
     if (left > 0) {
       seen.set(key, left - 1);

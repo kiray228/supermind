@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import {
   CalendarDays,
   CalendarPlus,
@@ -212,6 +212,8 @@ export default function Tasks() {
   const [listDlg, setListDlg] = useState<{ id?: string } | null>(null);
   const [filterDlg, setFilterDlg] = useState<TaskFilter | null>(null);
   const [tplOpen, setTplOpen] = useState(false);
+  // в группе сначала столько задач (тысячи строк сразу — долго на телефоне)
+  const [rowCap, setRowCap] = useState(300);
   // приложение открыто через полночь — «Сегодня» и «Просрочено» сменяются сами
   const today = useToday();
 
@@ -240,6 +242,7 @@ export default function Tasks() {
 
   const setSel = (s: Sel) => {
     endSelect();
+    setRowCap(300);
     setSelState(s);
     writeLS('sm-tasks-sel', s);
     setDrawer(false);
@@ -259,15 +262,35 @@ export default function Tasks() {
     const c: Record<string, number> = {};
     if (!data) return c;
     for (const s of SMART) c['smart:' + s.id] = data.tasks.filter((t) => isActive(t) && inSelection(data, { k: 'smart', id: s.id }, t, today)).length;
-    for (const l of data.lists) c['list:' + l.id] = data.tasks.filter((t) => isActive(t) && t.listId === l.id).length;
+    // списки и теги — одним проходом по задачам (а не проход на каждый список и тег)
+    for (const l of data.lists) c['list:' + l.id] = 0;
+    for (const g of allTags(data)) c['tag:' + g] = 0;
+    for (const t of data.tasks) {
+      if (!isActive(t)) continue;
+      if (c['list:' + t.listId] !== undefined) c['list:' + t.listId]++;
+      for (const g of t.tags) if (c['tag:' + g] !== undefined) c['tag:' + g]++;
+    }
     for (const f of data.filters) c['filter:' + f.id] = data.tasks.filter((t) => isActive(t) && applyFilter(t, f, today)).length;
-    for (const g of allTags(data)) c['tag:' + g] = data.tasks.filter((t) => isActive(t) && t.tags.includes(g)).length;
     const linkedIds = new Set(data.tasks.filter((t) => t.source && !t.deleted).map((t) => t.source!.topicId));
     c['smart:maps'] += mapTasks.filter((m) => m.task.status !== 'done' && !linkedIds.has(m.topicId)).length;
     return c;
   }, [data, today, mapTasks]);
 
-  if (!data) {
+  // поиск — с отложенным текстом: при тысячах задач ввод не подтормаживает
+  const deferredQuery = useDeferredValue(query);
+  const listView = useMemo(() => {
+    if (!data) return null;
+    const q = deferredQuery?.trim().toLowerCase();
+    const all = data.tasks.filter((t) => (q ? !t.deleted && (t.title + ' ' + (t.notes ?? '') + ' ' + t.tags.join(' ')).toLowerCase().includes(q) : inSelection(data, sel, t, today)));
+    const active = all.filter((t) => !t.done && !t.wontDo).sort((a, b) => compareTasks(a, b, data.prefs.sortBy));
+    const done = all.filter((t) => t.done || t.wontDo).sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0));
+    const effectiveGroup: GroupBy = sel.k === 'smart' && (sel.id === 'tomorrow' || sel.id === 'nodate') && groupBy === 'date' ? 'none' : groupBy;
+    const groups = groupTasks(active, effectiveGroup, data, today, sel.k === 'smart' && sel.id === 'week').filter((g) => g.tasks.length || (mode === 'kanban' && g.drop));
+    const listById = new Map(data.lists.map((l) => [l.id, l]));
+    return { q, all, active, done, effectiveGroup, groups, listById };
+  }, [data, sel, deferredQuery, today, groupBy, mode]);
+
+  if (!data || !listView) {
     return (
       <div className="page">
         <div className="page-header">
@@ -300,10 +323,7 @@ export default function Tasks() {
             ? '#' + sel.id
             : curFilter?.name ?? 'Фильтр';
 
-  const q = query?.trim().toLowerCase();
-  const all = data.tasks.filter((t) => (q ? !t.deleted && (t.title + ' ' + (t.notes ?? '') + ' ' + t.tags.join(' ')).toLowerCase().includes(q) : inSelection(data, sel, t, today)));
-  const active = all.filter((t) => !t.done && !t.wontDo).sort((a, b) => compareTasks(a, b, data.prefs.sortBy));
-  const done = all.filter((t) => t.done || t.wontDo).sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0));
+  const { q, all, active, done, effectiveGroup, groups, listById } = listView;
   const isTrash = sel.k === 'smart' && sel.id === 'trash';
   const isCompleted = sel.k === 'smart' && sel.id === 'completed';
 
@@ -320,8 +340,6 @@ export default function Tasks() {
               ? { date: today }
               : {};
 
-  const effectiveGroup: GroupBy = sel.k === 'smart' && (sel.id === 'tomorrow' || sel.id === 'nodate') && groupBy === 'date' ? 'none' : groupBy;
-  const groups = groupTasks(active, effectiveGroup, data, today, sel.k === 'smart' && sel.id === 'week').filter((g) => g.tasks.length || (mode === 'kanban' && g.drop));
   // темы карт, у которых уже есть задача с напоминанием, не дублируются в «Из карт»
   const linkedTopics = new Set(data.tasks.filter((t) => t.source && !t.deleted).map((t) => t.source!.topicId));
   const mapList =
@@ -383,8 +401,18 @@ export default function Tasks() {
     </div>
   );
 
-  const renderRows = (ts: TaskItem[]) =>
-    ts.map((t) => <TaskRow key={t.id} task={t} list={data.lists.find((l) => l.id === t.listId)} showList={sel.k !== 'list'} tagColors={data.tagColors} draggable selectable />);
+  const renderRows = (ts: TaskItem[]) => (
+    <>
+      {ts.slice(0, rowCap).map((t) => (
+        <TaskRow key={t.id} task={t} list={listById.get(t.listId)} showList={sel.k !== 'list'} tagColors={data.tagColors} draggable selectable />
+      ))}
+      {ts.length > rowCap && (
+        <button className="tk-more-rows" onClick={() => setRowCap((n) => n + 300)}>
+          Показать ещё {Math.min(300, ts.length - rowCap)} из {ts.length - rowCap}
+        </button>
+      )}
+    </>
+  );
 
   const content = () => {
     if (sel.k === 'matrix' && !q) return <Matrix data={data} />;
@@ -834,6 +862,8 @@ function Matrix({ data }: { data: TasksData }) {
 
 function CompletedView({ data }: { data: TasksData }) {
   const today = todayYmd();
+  const taskById = new Map(data.tasks.map((x) => [x.id, x]));
+  const listById = new Map(data.lists.map((l) => [l.id, l]));
   const entries = [...data.log].sort((a, b) => b.at - a.at).slice(0, 400);
   const byDay = new Map<string, typeof entries>();
   for (const e of entries) {
@@ -853,8 +883,8 @@ function CompletedView({ data }: { data: TasksData }) {
             <span className="tk-group-count">{es.length}</span>
           </div>
           {es.map((e, i) => {
-            const t = data.tasks.find((x) => x.id === e.taskId);
-            const list = data.lists.find((l) => l.id === e.listId);
+            const t = taskById.get(e.taskId);
+            const list = listById.get(e.listId);
             return (
               <div key={e.taskId + e.at + i} className="tk-row-wrap">
                 <div className="tk-row is-done" onClick={() => t && openTask(t.id)}>

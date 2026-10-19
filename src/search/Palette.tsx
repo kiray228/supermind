@@ -193,7 +193,7 @@ export default function Palette() {
       setExpanded((s) => new Set(s).add(row.g));
       return;
     }
-    rememberQuery(dq);
+    rememberQuery(q);
     closeSearch();
     // синхронно, в обработчике нажатия (на iPhone так открывается клавиатура в новом окне)
     try {
@@ -212,6 +212,17 @@ export default function Palette() {
       setActive((active + d + flat.length) % flat.length);
     } else if (e.key === 'Enter') {
       e.preventDefault();
+      // результаты ещё по прошлому тексту (ввод быстрее задержки) — лучший результат по набранному сейчас,
+      // иначе Enter открыл бы чужое (а при пустом прошлом запросе — «Новая карта»)
+      if (q !== dq && q.trim()) {
+        const raw = q.trim();
+        const cmd = raw.startsWith('>');
+        const toks = tokenize(cmd ? raw.slice(1) : raw);
+        const top = toks.length ? rank(cmd ? commands : [...commands, ...entries], toks, norm(cmd ? raw.slice(1).trim() : raw))[0] : undefined;
+        if (top) activate({ t: 'item', r: top });
+        else setDq(q);
+        return;
+      }
       activate(flat[active]);
     }
   };

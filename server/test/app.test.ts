@@ -7,7 +7,7 @@ import { parseNextDue, type NextDueMark, type NextDueStore } from '../src/object
 
 const sql = new PgliteSql();
 const mails: { to: string; subject: string; text: string }[] = [];
-const app = createApp({ mail: async (m) => void mails.push(m), supportEmail: 'owner@b.cd', sql, push: async () => ({ status: 201, gone: false }) });
+const app = createApp({ mail: async (m) => void mails.push(m), supportEmail: 'owner@b.cd', sql, push: async () => ({ status: 201, gone: false }), pushHostOk: () => true });
 
 async function call<T = Record<string, unknown>>(method: string, path: string, body?: unknown, token?: string) {
   const r = await app.fetch(
@@ -151,6 +151,63 @@ test('поддержка: обращение сохраняется, письм�
   assert.equal(list.data.items[0].text, 'Не открывается карта');
 });
 
+test('входящие поддержки: владелец видит все обращения, меняет статус и отвечает', async () => {
+  const adminApp = createApp({ mail: async (m) => void mails.push(m), supportEmail: 'owner@b.cd', adminEmails: ['Boss@b.cd'], sql, pushHostOk: () => true });
+  const req = async <T = Record<string, unknown>>(method: string, path: string, body?: unknown, token?: string) => {
+    const r = await adminApp.fetch(
+      new Request('http://x' + path, {
+        method,
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      }),
+    );
+    return { status: r.status, data: (await r.json()) as T };
+  };
+  const boss = (await req<{ token: string }>('POST', '/auth/register', { email: 'boss@b.cd', password: '12345678' })).data.token;
+  const user = (await req<{ token: string }>('POST', '/auth/register', { name: 'Аня', email: 'anya@b.cd', password: '12345678' })).data.token;
+  const id = (await req<{ id: string }>('POST', '/feedback', { kind: 'problem', text: 'Будильник без звука', image: 'aGVsbG8=' }, user)).data.id;
+
+  // не владельцу — нельзя
+  assert.equal((await req('GET', '/admin/feedback', undefined, user)).status, 403);
+  assert.equal((await req('PATCH', `/admin/feedback/${id}`, { status: 'done' }, user)).status, 403);
+  assert.equal((await req('GET', '/auth/me', undefined, user)).data.admin, undefined);
+  assert.equal((await req('GET', '/auth/me', undefined, boss)).data.admin, true);
+
+  type Inbox = { items: { id: string; text: string; name: string; hasImage: boolean; status: string; note: string; reply: string }[]; counts: Record<string, number> };
+  let inbox = await req<Inbox>('GET', '/admin/feedback', undefined, boss);
+  const it = inbox.data.items.find((x) => x.id === id)!;
+  assert.equal(it.text, 'Будильник без звука');
+  assert.equal(it.name, 'Аня');
+  assert.equal(it.hasImage, true);
+  assert.equal((await req<{ image: string }>('GET', `/admin/feedback/${id}/image`, undefined, boss)).data.image, 'aGVsbG8=');
+
+  assert.equal((await req('PATCH', `/admin/feedback/${id}`, { status: 'nope' }, boss)).status, 400);
+  assert.equal((await req('PATCH', `/admin/feedback/${id}`, { status: 'planned', note: 'iOS PWA: звук пуша не задать' }, boss)).status, 200);
+  inbox = await req<Inbox>('GET', '/admin/feedback', undefined, boss);
+  assert.equal(inbox.data.items.find((x) => x.id === id)!.note, 'iOS PWA: звук пуша не задать');
+
+  const before = mails.length;
+  const r = await req<{ mailed: boolean }>('POST', `/admin/feedback/${id}/reply`, { text: 'Спасибо! Сделаем звук в приложении.' }, boss);
+  assert.equal(r.data.mailed, true);
+  const m = mails[before] as { to: string; subject: string; text: string; replyTo?: string };
+  assert.equal(m.to, 'anya@b.cd');
+  assert.equal(m.replyTo, 'owner@b.cd');
+  assert.match(m.text, /Будильник без звука/);
+
+  // пользователь видит ответ у себя, заметку — нет
+  const mine = await req<{ items: { id: string; status: string; reply?: string; note?: string }[] }>('GET', '/feedback', undefined, user);
+  const own = mine.data.items.find((x) => x.id === id)!;
+  assert.equal(own.status, 'answered');
+  assert.equal(own.reply, 'Спасибо! Сделаем звук в приложении.');
+  assert.equal(own.note, undefined);
+
+  // решённые уходят из открытых, но видны во «всех»
+  await req('PATCH', `/admin/feedback/${id}`, { status: 'done' }, boss);
+  assert.equal((await req<Inbox>('GET', '/admin/feedback', undefined, boss)).data.items.some((x) => x.id === id), false);
+  assert.equal((await req<Inbox>('GET', '/admin/feedback?status=all', undefined, boss)).data.items.some((x) => x.id === id), true);
+  assert.equal((await req('PATCH', '/admin/feedback/999999', { status: 'done' }, boss)).status, 404);
+});
+
 test('голосовая команда: модель на сервере, лимит в день, без ключа — 503', async () => {
   const prompts: string[] = [];
   const aiApp = createApp({
@@ -180,7 +237,8 @@ test('голосовая команда: модель на сервере, ли�
 });
 
 test('напоминания: старые неотправленные (старше 6 часов) не мешают отправить наступившие', async () => {
-  const dev = await call<{ deviceId: string }>('POST', '/devices', { subscription: { endpoint: 'https://push.example/cron', keys: { p256dh: 'p', auth: 'a' } } });
+  const owner = await call<{ token: string }>('POST', '/auth/register', { email: 'cron@b.cd', password: '12345678' });
+  const dev = await call<{ deviceId: string }>('POST', '/devices', { subscription: { endpoint: 'https://push.example/cron', keys: { p256dh: 'p', auth: 'a' } } }, owner.data.token);
   const id = dev.data.deviceId;
   // 300+ «зависших» напоминаний (сервер не работал полдня) — раньше они занимали всю выборку
   await sql.query(
@@ -288,10 +346,12 @@ test('отметка ближайшего напоминания: расписа
     },
   };
   const sent: string[] = [];
-  const nApp = createApp({ sql, mail: null, nextDue: store, push: async (sub) => (sent.push(sub.endpoint), { status: 201, gone: false }) });
+  const nApp = createApp({ sql, mail: null, nextDue: store, push: async (sub) => (sent.push(sub.endpoint), { status: 201, gone: false }), pushHostOk: () => true });
   const fetchJson = async <T>(path: string, init: RequestInit) => (await (await nApp.fetch(new Request('http://x' + path, init))).json()) as T;
+  const owner = await call<{ token: string }>('POST', '/auth/register', { email: 'mark@b.cd', password: '12345678' });
   const dev = await fetchJson<{ deviceId: string; secret: string }>('/devices', {
     method: 'POST',
+    headers: { Authorization: `Bearer ${owner.data.token}` },
     body: JSON.stringify({ subscription: { endpoint: 'https://push.example/mark', keys: { p256dh: 'p', auth: 'a' } } }),
   });
   const schedule = (items: { id: string; at: number; title: string }[]) =>
@@ -334,4 +394,78 @@ test('отметка ближайшего напоминания: расписа
   assert.equal(mark?.next, t + 30 * 60_000);
   mark = { next: mark!.next, at: Date.now() - 5 * 60_000 };
   assert.equal((await cron()).skipped, true);
+});
+
+test('устройства: только с входом, только push-сервисы, не больше 10; тест не отдаёт код ответа', async () => {
+  const strict = createApp({ sql, mail: null, push: async () => ({ status: 403, gone: false }) });
+  const reqS = async (path: string, b: unknown, token?: string) => {
+    const r = await strict.fetch(new Request('http://x' + path, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(b) }));
+    return { status: r.status, data: (await r.json()) as Record<string, unknown> };
+  };
+  const sub = (endpoint: string) => ({ subscription: { endpoint, keys: { p256dh: 'p', auth: 'a' } } });
+  assert.equal((await reqS('/devices', sub('https://fcm.googleapis.com/fcm/send/x1'))).status, 401, 'без входа — нельзя');
+  const u = await call<{ token: string }>('POST', '/auth/register', { email: 'dev@b.cd', password: '12345678' });
+  const t = u.data.token;
+  for (const bad of ['https://169.254.169.254/x', 'https://evil.example/push', 'https://fcm.googleapis.com.evil.io/x', 'https://[::ffff:7f00:1]/x'])
+    assert.equal((await reqS('/devices', sub(bad), t)).status, 400, bad);
+  assert.equal((await reqS('/devices', { subscription: { endpoint: 'https://fcm.googleapis.com/' + 'x'.repeat(2000), keys: { p256dh: 'p', auth: 'a' } } }, t)).status, 400);
+  const ok = await reqS('/devices', sub('https://fcm.googleapis.com/fcm/send/abc'), t);
+  assert.equal(ok.status, 200);
+  assert.equal((await reqS('/devices', sub('https://web.push.apple.com/QWE'), t)).status, 200);
+  const test = await reqS(`/devices/${ok.data.deviceId}/test`, { secret: ok.data.secret }, t);
+  assert.deepEqual(test.data, { ok: false }, 'код ответа сервиса наружу не уходит');
+  for (let i = 0; i < 12; i++) await reqS('/devices', sub('https://fcm.googleapis.com/fcm/send/n' + i), t);
+  const n = await sql.query(`SELECT count(*) FROM devices d JOIN users u ON u.id = d.user_id WHERE u.email = 'dev@b.cd'`);
+  assert.equal(Number(n[0][0]), 10);
+});
+
+test('лимиты: место в облаке, ручные копии, обращения, общий ИИ', async () => {
+  const small = createApp({ sql, mail: null, quotaBytes: 2000 });
+  const r = async (method: string, path: string, b: unknown, token: string) => {
+    const x = await small.fetch(new Request('http://x' + path, { method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: b === undefined ? undefined : JSON.stringify(b) }));
+    return { status: x.status, data: (await x.json()) as Record<string, unknown> };
+  };
+  const u = await call<{ token: string }>('POST', '/auth/register', { email: 'quota@b.cd', password: '12345678' });
+  const t = u.data.token;
+  const okPush = await r('POST', '/sync', { items: [{ key: 'notes', value: { t: 'x'.repeat(1200) }, updatedAt: 1, baseSeq: 0 }] }, t);
+  assert.equal(okPush.status, 200);
+  const seq = (okPush.data.results as { seq: number }[])[0].seq;
+  // замена того же ключа — считается вместо старого значения
+  assert.equal((await r('POST', '/sync', { items: [{ key: 'notes', value: { t: 'y'.repeat(1500) }, updatedAt: 2, baseSeq: seq }] }, t)).status, 200);
+  assert.equal((await r('POST', '/sync', { items: [{ key: 'tasks', value: { t: 'z'.repeat(1500) }, updatedAt: 3, baseSeq: 0 }] }, t)).status, 413, 'сверх квоты');
+  for (let i = 0; i < 5; i++) assert.equal((await r('POST', '/snapshots', {}, t)).status, 200);
+  assert.equal((await r('POST', '/snapshots', {}, t)).status, 429, 'шестая ручная копия за сутки');
+  for (let i = 0; i < 5; i++) assert.equal((await r('POST', '/feedback', { kind: 'idea', text: 'Идея номер ' + i }, t)).status, 201);
+  assert.equal((await r('POST', '/feedback', { kind: 'idea', text: 'Ещё одна идея' }, t)).status, 429);
+
+  const aiApp = createApp({ sql, mail: null, ai: async () => '[]', aiGlobalLimit: 2, aiDailyLimit: 100 });
+  const ask = async (token: string) =>
+    (await aiApp.fetch(new Request('http://x/ai/chat', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ messages: [{ role: 'user', content: 'привет' }] }) }))).status;
+  await sql.query(`DELETE FROM ai_usage`);
+  assert.equal(await ask(t), 200);
+  assert.equal(await ask(t), 200);
+  assert.equal(await ask(t), 429, 'общий дневной лимит');
+});
+
+test('вход и регистрация: ограничение по IP; восстановление — не больше 5 кодов в сутки, без имени в письме', async () => {
+  const ipReq = (path: string, b: unknown, ip: string) =>
+    app.fetch(new Request('http://x' + path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '198.51.100.9, ' + ip }, body: JSON.stringify(b) }));
+  let last = 0;
+  for (let i = 0; i < 42; i++) last = (await ipReq('/auth/login', { email: `spray${i}@b.cd`, password: 'wrongpass' }, '203.0.113.7')).status;
+  assert.equal(last, 429, 'перебор по многим адресам с одного IP');
+  assert.equal((await ipReq('/auth/login', { email: 'spray@b.cd', password: 'wrongpass' }, '203.0.113.8')).status, 401, 'другой IP — как обычно');
+
+  await call('POST', '/auth/register', { name: 'Забери приз на evil.example', email: 'victim@b.cd', password: '12345678' });
+  mails.length = 0;
+  await call('POST', '/auth/forgot', { email: 'victim@b.cd' });
+  assert.equal(mails.length, 1);
+  assert.doesNotMatch(mails[0].text, /evil/, 'имя из регистрации в письмо не попадает');
+  await sql.query(`UPDATE password_resets SET created_at = now() - interval '1 hour' WHERE email = 'victim@b.cd'`);
+  await call('POST', '/auth/forgot', { email: 'victim@b.cd' });
+  await call('POST', '/auth/forgot', { email: 'victim@b.cd' });
+  await sql.query(`UPDATE password_resets SET created_at = now() - interval '2 hours' WHERE email = 'victim@b.cd'`);
+  await call('POST', '/auth/forgot', { email: 'victim@b.cd' });
+  await call('POST', '/auth/forgot', { email: 'victim@b.cd' });
+  await sql.query(`UPDATE password_resets SET created_at = now() - interval '3 hours' WHERE email = 'victim@b.cd'`);
+  assert.equal((await call('POST', '/auth/forgot', { email: 'victim@b.cd' })).status, 429, 'шестой код за сутки');
 });

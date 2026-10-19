@@ -13,6 +13,7 @@ import {
   fmtNum,
   goalProgressRaw,
   makeTaskLookup,
+  goalsDueBetween as goalsDueBetweenModel,
   normalizeGoal,
   normalizeGoalsData,
   sortedAreas,
@@ -28,7 +29,8 @@ import {
   type WheelSnapshot,
 } from './model';
 
-export { goalsDueBetween } from './model';
+/** Сроки целей и этапов; выполненность этапов — с учётом задач шагов */
+export const goalsDueBetween = (data: GoalsData | null | undefined, from: string, to: string) => goalsDueBetweenModel(data, from, to, lookup());
 export type { GoalDue } from './model';
 
 const KEY = 'goals';

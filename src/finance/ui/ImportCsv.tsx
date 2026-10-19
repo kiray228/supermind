@@ -3,8 +3,8 @@ import { FileArrowUp } from '@phosphor-icons/react';
 import { pickFile } from '../../io/download';
 import { toast } from '../../store/appStore';
 import { categoryMap, curSymbol, dateShort, fmtMoney, sortedAccounts, type FinanceData } from '../model';
-import { buildImport, detectDelimiter, guessColumns, looksLikeHeader, parseCsv, type ColumnMap } from '../csv';
-import { addTransactions } from '../store';
+import { buildImport, detectDelimiter, dropPreamble, guessColumns, looksLikeHeader, parseCsv, type ColumnMap } from '../csv';
+import { addTransactions, removeTransactions } from '../store';
 import { Sheet } from './common';
 
 interface Loaded {
@@ -41,7 +41,7 @@ export function ImportCsvSheet({ data, onClose }: { data: FinanceData; onClose: 
     try {
       const text = await readText(f);
       const delim = detectDelimiter(text);
-      const rows = parseCsv(text, delim);
+      const rows = dropPreamble(parseCsv(text, delim));
       if (!rows.length) return toast('Файл пустой');
       const header = looksLikeHeader(rows[0]);
       setHasHeader(header);
@@ -59,8 +59,11 @@ export function ImportCsvSheet({ data, onClose }: { data: FinanceData; onClose: 
 
   const run = () => {
     if (!preview || !preview.items.length) return toast('Нечего импортировать');
-    const n = addTransactions(preview.items);
-    toast(`Импортировано операций: ${n}` + (preview.duplicates ? `, пропущено дубликатов: ${preview.duplicates}` : ''));
+    const ids = addTransactions(preview.items);
+    toast(`Импортировано операций: ${ids.length}` + (preview.duplicates ? `, пропущено дубликатов: ${preview.duplicates}` : ''), {
+      label: 'Отменить',
+      run: () => removeTransactions(ids),
+    });
     onClose();
   };
 

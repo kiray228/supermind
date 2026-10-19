@@ -3,7 +3,9 @@
  *
  *   POST /auth/register, /auth/login, /auth/logout, /auth/password · GET /auth/me · DELETE /account
  *   POST /auth/forgot (код на почту) · POST /auth/reset (код + новый пароль → вход)
- *   POST /feedback (проблема или идея → база и письмо владельцу) · GET /feedback (мои обращения)
+ *   POST /feedback (проблема или идея → база и письмо владельцу) · GET /feedback (мои обращения и ответы)
+ *   GET /admin/feedback · GET /admin/feedback/:id/image · PATCH /admin/feedback/:id · POST /admin/feedback/:id/reply
+ *     — входящие поддержки для владельца (ADMIN_EMAILS)
  *   POST /ai/command — голосовая команда → действия · POST /ai/chat — текстовый ответ без своего ключа Claude
  *     (бесплатная модель Gemini/Groq, общий лимит запросов в день на пользователя)
  *   GET /sync?since=N · POST /sync
@@ -15,9 +17,9 @@ import { hashPassword, newToken, tokenHash, verifyPassword } from './crypto.ts';
 import { ensureSchema, type Row, type Sql } from './sql.ts';
 import { generateVapidKeys, sendPush, type PushResult, type PushSubscription, type VapidKeys } from './webpush.ts';
 import type { NextDueMark, NextDueStore } from './objectStore.ts';
-import { envMailer, feedbackMail, resetMail, type Mailer } from './mail.ts';
+import { envMailer, feedbackMail, replyMail, resetMail, type Mailer } from './mail.ts';
 import { commandPrompt, envAi, parseAiJson, type Ai } from './ai.ts';
-import { fetchPublicPage, WebError, type FetchPage } from './web.ts';
+import { fetchPublicPage, isPublicIp, WebError, type FetchPage } from './web.ts';
 import { randomInt } from 'node:crypto';
 
 export interface Deps {
@@ -31,15 +33,32 @@ export interface Deps {
   mail?: Mailer | null;
   /** адрес поддержки (по умолчанию SUPPORT_EMAIL или MAIL_FROM) */
   supportEmail?: string;
+  /** владельцы: видят все обращения и отвечают на них (по умолчанию ADMIN_EMAILS через запятую) */
+  adminEmails?: string[];
   /** бесплатная модель для голосовых команд; null — не настроена */
   ai?: Ai | null;
   /** страница по ссылке («Сохранить статью»); в тестах — заглушка */
   fetchPage?: FetchPage;
   /** запросов к модели в день на пользователя (AI_DAILY_LIMIT, по умолчанию 100) */
   aiDailyLimit?: number;
+  /** запросов к модели в день на всех (AI_GLOBAL_DAILY, по умолчанию 3000) — бесплатная квота общая */
+  aiGlobalLimit?: number;
+  /** хост push-сервиса допустим (в тестах — любой) */
+  pushHostOk?: (host: string) => boolean;
+  /** место в облаке на пользователя, байт */
+  quotaBytes?: number;
 }
 
 const VAPID_SUBJECT = 'https://kiray228.github.io/2mind/';
+/** Push-сервисы браузеров: подписка на другой адрес — не подписка (иначе сервер слал бы запросы куда угодно) */
+const PUSH_HOSTS = [/^fcm\.googleapis\.com$/, /^android\.googleapis\.com$/, /^updates\.push\.services\.mozilla\.com$/, /^([a-z0-9-]+\.)*push\.apple\.com$/, /^([a-z0-9-]+\.)*notify\.windows\.com$/];
+const pushHostDefault = (host: string) => PUSH_HOSTS.some((re) => re.test(host));
+const MAX_DEVICES = 10;
+/** место в облаке на пользователя */
+const QUOTA_BYTES = 300 * 1024 * 1024;
+/** писем в сутки на весь сервис (бесплатный тариф почты — 300); часть — только для восстановления пароля */
+const MAIL_DAILY = 280;
+const MAIL_DAILY_OTHER = 150;
 const MAX_ITEM_BYTES = 8 * 1024 * 1024;
 const MAX_SCHEDULE = 500;
 const PULL_LIMIT = 300;
@@ -58,7 +77,7 @@ const NEXT_DUE_MAX_AGE = 3 * 3600_000;
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Access-Control-Max-Age': '86400',
 };
@@ -94,9 +113,41 @@ export function createApp(deps: Deps) {
   const mail = deps.mail === undefined ? envMailer() : deps.mail;
   /** куда приходят обращения в поддержку */
   const supportTo = deps.supportEmail ?? process.env.SUPPORT_EMAIL ?? process.env.MAIL_FROM ?? '';
+  const admins = new Set((deps.adminEmails ?? (process.env.ADMIN_EMAILS ?? '').split(',')).map((x) => x.trim().toLowerCase()).filter(Boolean));
   const ai = deps.ai === undefined ? envAi() : deps.ai;
   const aiDailyLimit = deps.aiDailyLimit ?? (Number(process.env.AI_DAILY_LIMIT) || 100);
   const fetchPage = deps.fetchPage ?? ((url: string) => fetchPublicPage(url));
+  const aiGlobalLimit = deps.aiGlobalLimit ?? (Number(process.env.AI_GLOBAL_DAILY) || 3000);
+  const pushHostOk = deps.pushHostOk ?? pushHostDefault;
+  const quotaBytes = deps.quotaBytes ?? QUOTA_BYTES;
+
+  /** Отметить событие и вернуть, сколько их за окно (запись до подсчёта — параллельные запросы не проскочат) */
+  async function hit(bucket: string, key: string, windowSec: number): Promise<number> {
+    await sql.query(`INSERT INTO rate_hits (bucket, key) VALUES ($1, $2)`, [bucket, key]);
+    const r = await sql.query(`SELECT count(*) FROM rate_hits WHERE bucket = $1 AND key = $2 AND at > now() - make_interval(secs => $3::float8)`, [bucket, key, windowSec]);
+    return Number(r[0]?.[0] ?? 0);
+  }
+  /**
+   * Адрес клиента (за прокси Neon); пусто — ограничение по IP не применяется.
+   * Внутренний адрес — это адрес прокси, а не клиента: по нему не ограничиваем (иначе лимит стал бы общим на всех).
+   */
+  const ipOf = (request: Request) => {
+    // последний адрес дописал прокси (первые клиент может подставить сам)
+    const list = (request.headers.get('x-forwarded-for') ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+    const ip = list[list.length - 1] || request.headers.get('x-real-ip') || '';
+    return ip && isPublicIp(ip) ? ip : '';
+  };
+  /** Ограничение по IP: limit событий за окно */
+  async function limitIp(request: Request, bucket: string, limit: number, windowSec: number, message: string) {
+    const ip = ipOf(request);
+    if (ip && (await hit(bucket, ip, windowSec)) > limit) throw new HttpError(429, message);
+  }
+  /** Письмо в пределах суточного бюджета; reset — восстановление пароля (ему оставлен запас) */
+  async function mailBudget(kind: 'reset' | 'other'): Promise<boolean> {
+    return (await hit('mail', 'all', 86400)) <= (kind === 'reset' ? MAIL_DAILY : MAIL_DAILY_OTHER);
+  }
+  /** Хэш для отсутствующего пользователя: вход занимает столько же времени (нельзя узнать, есть ли аккаунт) */
+  let dummyHash: Promise<string> | null = null;
 
   /** Запись отметки не удалась — проверка идёт в базу, пока не запишется */
   let nextDueBroken = false;
@@ -189,6 +240,7 @@ export function createApp(deps: Deps) {
     if (!EMAIL.test(email) || email.length > 200) throw new HttpError(400, 'Проверьте email');
     if (password.length < 8) throw new HttpError(400, 'Пароль — минимум 8 символов');
     if (password.length > 200) throw new HttpError(400, 'Слишком длинный пароль');
+    await limitIp(request, 'register', 10, 3600, 'Слишком много регистраций — попробуйте через час');
     let rows: Row[];
     try {
       rows = await sql.query(`INSERT INTO users (email, name, pass_hash) VALUES ($1, $2, $3) RETURNING id`, [
@@ -208,6 +260,8 @@ export function createApp(deps: Deps) {
   async function login(request: Request) {
     const b = await body<{ email?: string; password?: string }>(request);
     const email = str(b.email).trim().toLowerCase();
+    // перебор паролей по многим адресам с одного адреса — тоже ограничен
+    await limitIp(request, 'login', 40, 900, 'Слишком много попыток входа — подождите 15 минут');
     // сначала записываем попытку, потом считаем: параллельные запросы не проскочат лимит
     const mine = await sql.query(`INSERT INTO auth_failures (email) VALUES ($1) RETURNING ctid`, [email]);
     const fails = await sql.query(
@@ -221,8 +275,12 @@ export function createApp(deps: Deps) {
     }
     const rows = await sql.query(`SELECT id, name, pass_hash FROM users WHERE email = $1`, [email]);
     const user = rows[0] as string[] | undefined;
-    // неудачная попытка уже записана
-    if (!user || !(await verifyPassword(str(b.password), user[2]))) throw new HttpError(401, 'Неверный email или пароль');
+    // неудачная попытка уже записана; без аккаунта — та же проверка «вхолостую» (время ответа одинаковое)
+    if (!user) {
+      await verifyPassword(str(b.password), await (dummyHash ??= hashPassword('нет такого пользователя')));
+      throw new HttpError(401, 'Неверный email или пароль');
+    }
+    if (!(await verifyPassword(str(b.password), user[2]))) throw new HttpError(401, 'Неверный email или пароль');
     await sql.query(`DELETE FROM auth_failures WHERE email = $1`, [email]);
     return json({ token: await createSession(user[0], request), user: { id: user[0], email, name: user[1] } });
   }
@@ -239,14 +297,18 @@ export function createApp(deps: Deps) {
     // снимок экрана: base64 JPEG/PNG до ~1.5 МБ
     let image = typeof b.image === 'string' ? b.image.replace(/^data:image\/[a-z]+;base64,/, '') : '';
     if (image && (image.length > 2_000_000 || !/^[A-Za-z0-9+/=]+$/.test(image))) image = '';
-    const recent = await sql.query(`SELECT count(*) FROM feedback WHERE user_id = $1 AND created_at > now() - interval '1 hour'`, [user.id]);
-    if (Number(recent[0]?.[0] ?? 0) >= 10) throw new HttpError(429, 'Слишком много обращений за час — попробуйте позже');
+    const recent = await sql.query(
+      `SELECT count(*) FILTER (WHERE created_at > now() - interval '1 hour'), count(*) FROM feedback WHERE user_id = $1 AND created_at > now() - interval '1 day'`,
+      [user.id],
+    );
+    if (Number(recent[0]?.[0] ?? 0) >= 5) throw new HttpError(429, 'Слишком много обращений за час — попробуйте позже');
+    if (Number(recent[0]?.[1] ?? 0) >= 20) throw new HttpError(429, 'Слишком много обращений за сегодня — попробуйте завтра');
     const rows = await sql.query(
       `INSERT INTO feedback (user_id, email, kind, text, meta, image) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
       [user.id, user.email, kind, text, meta, image || null],
     );
     const id = String(rows[0][0]);
-    if (mail && supportTo) {
+    if (mail && supportTo && (await mailBudget('other'))) {
       try {
         await mail(feedbackMail(supportTo, { id, kind, text, email: user.email, name: user.name, meta, image: image || undefined }));
       } catch (e) {
@@ -266,6 +328,9 @@ export function createApp(deps: Deps) {
       [userId],
     );
     if (Number(used[0]?.[0] ?? 0) > aiDailyLimit) throw new HttpError(429, 'Лимит ИИ на сегодня исчерпан');
+    // общий лимит: бесплатная квота модели одна на всех
+    const all = await sql.query(`SELECT coalesce(sum(count), 0) FROM ai_usage WHERE day = current_date`);
+    if (Number(all[0]?.[0] ?? 0) > aiGlobalLimit) throw new HttpError(429, 'Бесплатный ИИ на сегодня занят — попробуйте завтра или подключите свой ключ Claude');
   }
 
   /** Страница по ссылке для «Сохранить статью» (только публичные сайты; считается в дневной лимит ИИ) */
@@ -334,10 +399,106 @@ export function createApp(deps: Deps) {
   async function myFeedback(request: Request) {
     const user = await userOf(request);
     const rows = await sql.query(
-      `SELECT id, kind, text, status, (extract(epoch FROM created_at) * 1000)::bigint FROM feedback WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`,
+      `SELECT id, kind, text, status, (extract(epoch FROM created_at) * 1000)::bigint, reply, (extract(epoch FROM replied_at) * 1000)::bigint
+       FROM feedback WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`,
       [user.id],
     );
-    return json({ items: rows.map(([id, kind, text, status, at]) => ({ id, kind, text, status, at: Number(at) })) });
+    return json({
+      items: rows.map(([id, kind, text, status, at, reply, repliedAt]) => ({
+        id,
+        kind,
+        text,
+        status,
+        at: Number(at),
+        ...(reply ? { reply, repliedAt: Number(repliedAt) } : {}),
+      })),
+    });
+  }
+
+  // ---------- Входящие поддержки (владелец) ----------
+
+  const FEEDBACK_STATUSES = ['new', 'seen', 'planned', 'answered', 'done', 'rejected'];
+
+  async function adminOf(request: Request) {
+    const user = await userOf(request);
+    if (!admins.has(user.email.toLowerCase())) throw new HttpError(403, 'Только для владельца');
+    return user;
+  }
+
+  /** Все обращения: открытые (не решены и не отклонены) или все; снимки — отдельным запросом */
+  async function adminFeedback(request: Request, url: URL) {
+    await adminOf(request);
+    const all = url.searchParams.get('status') === 'all';
+    const rows = await sql.query(
+      `SELECT f.id, f.kind, f.text, f.status, (extract(epoch FROM f.created_at) * 1000)::bigint, f.email, coalesce(u.name, ''), f.meta,
+              f.image IS NOT NULL, f.reply, (extract(epoch FROM f.replied_at) * 1000)::bigint, f.note
+       FROM feedback f LEFT JOIN users u ON u.id = f.user_id
+       ${all ? '' : `WHERE f.status NOT IN ('done', 'rejected')`}
+       ORDER BY f.created_at DESC LIMIT 300`,
+    );
+    const counts = await sql.query(`SELECT status, count(*) FROM feedback GROUP BY status`);
+    return json({
+      items: rows.map(([id, kind, text, status, at, email, name, meta, hasImage, reply, repliedAt, note]) => ({
+        id,
+        kind,
+        text,
+        status,
+        at: Number(at),
+        email,
+        name,
+        meta,
+        hasImage: hasImage === 't' || hasImage === 'true',
+        reply: reply ?? '',
+        repliedAt: repliedAt == null ? null : Number(repliedAt),
+        note: note ?? '',
+      })),
+      counts: Object.fromEntries(counts.map(([st, n]) => [st, Number(n)])),
+    });
+  }
+
+  async function adminFeedbackImage(request: Request, id: string) {
+    await adminOf(request);
+    const rows = await sql.query(`SELECT image FROM feedback WHERE id = $1`, [id]);
+    if (!rows[0]?.[0]) throw new HttpError(404, 'Снимка нет');
+    return json({ image: rows[0][0] });
+  }
+
+  /** Статус и заметка-разбор (заметку видит только владелец) */
+  async function adminFeedbackPatch(request: Request, id: string) {
+    await adminOf(request);
+    const b = await body<{ status?: string; note?: string }>(request);
+    if (b.status !== undefined && !FEEDBACK_STATUSES.includes(String(b.status))) throw new HttpError(400, 'Неизвестный статус');
+    const rows = await sql.query(
+      `UPDATE feedback SET status = coalesce($2, status), note = coalesce($3, note), updated_at = now() WHERE id = $1 RETURNING id`,
+      [id, b.status ?? null, typeof b.note === 'string' ? b.note.slice(0, 20_000) : null],
+    );
+    if (!rows[0]) throw new HttpError(404, 'Обращение не найдено');
+    return json({ ok: true });
+  }
+
+  /** Ответ пользователю: виден в «Мои обращения» и уходит письмом (ответ на письмо придёт в поддержку) */
+  async function adminFeedbackReply(request: Request, id: string) {
+    await adminOf(request);
+    const b = await body<{ text?: string; status?: string }>(request);
+    const text = str(b.text).trim().slice(0, 5000);
+    if (text.length < 2) throw new HttpError(400, 'Напишите ответ');
+    const status = b.status && FEEDBACK_STATUSES.includes(b.status) ? b.status : 'answered';
+    const rows = await sql.query(
+      `UPDATE feedback SET reply = $2, replied_at = now(), status = $3, updated_at = now() WHERE id = $1 RETURNING email, kind, text`,
+      [id, text, status],
+    );
+    if (!rows[0]) throw new HttpError(404, 'Обращение не найдено');
+    const [email, kind, original] = rows[0] as string[];
+    let mailed = false;
+    if (mail && email && (await mailBudget('other'))) {
+      try {
+        await mail(replyMail(email, { id, kind, text: original, reply: text, replyTo: supportTo || undefined }));
+        mailed = true;
+      } catch (e) {
+        console.error('reply mail', e); // ответ сохранён и виден в приложении
+      }
+    }
+    return json({ ok: true, mailed });
   }
 
   // ---------- Восстановление пароля: 6-значный код на почту ----------
@@ -347,23 +508,31 @@ export function createApp(deps: Deps) {
     const email = str(b.email).trim().toLowerCase();
     if (!EMAIL.test(email)) throw new HttpError(400, 'Проверьте email');
     if (!mail) throw new HttpError(503, 'Восстановление по почте пока не настроено — напишите в поддержку');
-    // не чаще 3 писем за 15 минут на адрес
-    const recent = await sql.query(`SELECT count(*) FROM password_resets WHERE email = $1 AND created_at > now() - interval '15 minutes'`, [email]);
+    await limitIp(request, 'forgot', 10, 3600, 'Слишком много запросов кода — попробуйте через час');
+    // не чаще 3 писем за 15 минут и 5 в сутки на адрес (иначе код можно было бы подбирать)
+    const recent = await sql.query(
+      `SELECT count(*) FILTER (WHERE created_at > now() - interval '15 minutes'), count(*) FROM password_resets WHERE email = $1 AND created_at > now() - interval '1 day'`,
+      [email],
+    );
     if (Number(recent[0]?.[0] ?? 0) >= 3) throw new HttpError(429, 'Код уже отправлен — проверьте почту (и «Спам») или подождите 15 минут');
+    if (Number(recent[0]?.[1] ?? 0) >= 5) throw new HttpError(429, 'Сегодня кодов уже достаточно — попробуйте завтра или напишите в поддержку');
     const rows = await sql.query(`SELECT name FROM users WHERE email = $1`, [email]);
     // ответ одинаковый, есть аккаунт или нет — чтобы нельзя было перебирать адреса
     if (rows[0]) {
+      if (!(await mailBudget('reset'))) throw new HttpError(503, 'Сегодня письма временно не отправляются — попробуйте завтра или напишите в поддержку');
       const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
-      await sql.query(`INSERT INTO password_resets (email, code_hash, expires_at) VALUES ($1, $2, now() + interval '15 minutes')`, [
-        email,
-        tokenHash(`${email}|${code}`),
-      ]);
+      // в письме — без имени: его задаёт кто угодно при регистрации, а письмо уходит от имени SuperMind
       try {
-        await mail(resetMail(email, rows[0][0] ?? '', code));
+        await mail(resetMail(email, '', code));
       } catch (e) {
         console.error('mail', e);
         throw new HttpError(502, 'Не удалось отправить письмо — попробуйте позже');
       }
+      // код — только после отправки: неотправленный код подбирать бессмысленно
+      await sql.query(`INSERT INTO password_resets (email, code_hash, expires_at) VALUES ($1, $2, now() + interval '15 minutes')`, [
+        email,
+        tokenHash(`${email}|${code}`),
+      ]);
     } else {
       await sql.query(`INSERT INTO password_resets (email, code_hash, expires_at, used) VALUES ($1, '', now(), true)`, [email]);
     }
@@ -377,6 +546,7 @@ export function createApp(deps: Deps) {
     const password = str(b.password);
     if (password.length < 8) throw new HttpError(400, 'Пароль — минимум 8 символов');
     if (password.length > 200) throw new HttpError(400, 'Слишком длинный пароль');
+    await limitIp(request, 'reset', 30, 3600, 'Слишком много попыток — попробуйте через час');
     // попытка засчитывается и проверяется одним запросом: параллельные запросы не превысят 5 попыток
     const rows = await sql.query(
       `UPDATE password_resets SET attempts = attempts + 1
@@ -437,20 +607,25 @@ export function createApp(deps: Deps) {
   async function pull(request: Request, url: URL) {
     const user = await userOf(request);
     const since = Math.max(0, Number(url.searchParams.get('since') ?? 0) || 0);
-    const rows = await sql.query(
-      `SELECT key, value, updated_at, deleted, seq FROM kv WHERE user_id = $1 AND seq > $2 ORDER BY seq LIMIT $3`,
+    // сначала размеры, потом значения только выбранных: страница ограничена и числом, и размером
+    // (иначе несколько больших карт с фото подряд делали ответ базы неподъёмным, и загрузка застревала навсегда)
+    const sizes = await sql.query(
+      `SELECT seq, coalesce(octet_length(value::text), 0) FROM kv WHERE user_id = $1 AND seq > $2 ORDER BY seq LIMIT $3`,
       [user.id, since, PULL_LIMIT + 1],
     );
-    // страница ограничена и числом, и размером (большие карты с фото)
     let take = 0;
     let bytes = 0;
-    for (const r of rows.slice(0, PULL_LIMIT)) {
-      bytes += (r[1]?.length ?? 0) * 2;
+    for (const r of sizes.slice(0, PULL_LIMIT)) {
+      bytes += Number(r[1] ?? 0);
       if (take > 0 && bytes > PULL_BYTES) break;
       take++;
     }
-    const more = rows.length > take;
-    const items = rows.slice(0, take).map(([key, value, updatedAt, deleted, seq]) => ({
+    const more = sizes.length > take;
+    const lastSeq = take ? Number(sizes[take - 1][0]) : since;
+    const rows = take
+      ? await sql.query(`SELECT key, value, updated_at, deleted, seq FROM kv WHERE user_id = $1 AND seq > $2 AND seq <= $3 ORDER BY seq`, [user.id, since, lastSeq])
+      : [];
+    const items = rows.map(([key, value, updatedAt, deleted, seq]) => ({
       key,
       value: value == null ? null : JSON.parse(value),
       updatedAt: Number(updatedAt),
@@ -479,6 +654,17 @@ export function createApp(deps: Deps) {
     // размер проверяем до записи: иначе часть пачки уже записана, а клиент повторит её как конфликт
     const big = list.find((x) => x.value && x.value.length > MAX_ITEM_BYTES);
     if (big) throw new HttpError(413, `Слишком большой объект: ${big.item.key}`);
+    // место в облаке: сколько будет после записи (заменяемые ключи — вместо старых значений)
+    const incoming = list.reduce((n, x) => n + Buffer.byteLength(x.value ?? ''), 0);
+    if (incoming > 0) {
+      const keys = list.map((x) => x.item.key);
+      const used = await sql.query(
+        `SELECT coalesce(sum(octet_length(value::text)), 0), coalesce(sum(octet_length(value::text)) FILTER (WHERE key = ANY($2::text[])), 0) FROM kv WHERE user_id = $1`,
+        [user.id, keys],
+      );
+      const after = Number(used[0]?.[0] ?? 0) - Number(used[0]?.[1] ?? 0) + incoming;
+      if (after > quotaBytes) throw new HttpError(413, 'Место в облаке закончилось — удалите большие карты или фото из заметок');
+    }
     if (list.some((x) => Number(x.item.baseSeq) > 0)) await autoSnapshot(user.id);
     const results: { key: string; ok: boolean; seq?: number }[] = [];
     for (const { item, value } of list) {
@@ -559,6 +745,8 @@ export function createApp(deps: Deps) {
 
   async function manualSnapshot(request: Request) {
     const user = await userOf(request);
+    const today = await sql.query(`SELECT count(*) FROM snapshots WHERE user_id = $1 AND reason = 'manual' AND created_at > now() - interval '1 day'`, [user.id]);
+    if (Number(today[0]?.[0] ?? 0) >= 5) throw new HttpError(429, 'Сегодня копий уже 5 — автоматические копии делаются и так');
     const id = await snapshot(user.id, 'manual');
     if (!id) throw new HttpError(400, 'В облаке пока нет данных — дождитесь синхронизации');
     return json({ id });
@@ -573,8 +761,17 @@ export function createApp(deps: Deps) {
     const s = b.subscription;
     if (!s?.endpoint?.startsWith('https://') || !s.keys?.p256dh || !s.keys.auth)
       throw new HttpError(400, 'Нет подписки на уведомления');
-    let userId: string | null = null;
-    if (request.headers.get('authorization')) userId = (await userOf(request)).id;
+    if (typeof s.endpoint !== 'string' || s.endpoint.length > 1000 || typeof s.keys.p256dh !== 'string' || s.keys.p256dh.length > 200 || typeof s.keys.auth !== 'string' || s.keys.auth.length > 100)
+      throw new HttpError(400, 'Нет подписки на уведомления');
+    let host = '';
+    try {
+      host = new URL(s.endpoint).hostname.toLowerCase();
+    } catch {
+      /* не адрес */
+    }
+    if (!pushHostOk(host)) throw new HttpError(400, 'Неизвестный сервис уведомлений');
+    // только с входом: иначе кто угодно мог бы завалить очередь напоминаний
+    const userId = (await userOf(request)).id;
     const secret = newToken();
     const rows = await sql.query(
       `INSERT INTO devices (secret_hash, user_id, endpoint, p256dh, auth, platform)
@@ -582,7 +779,12 @@ export function createApp(deps: Deps) {
        ON CONFLICT (endpoint) DO UPDATE SET secret_hash = EXCLUDED.secret_hash, user_id = EXCLUDED.user_id,
          p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth, platform = EXCLUDED.platform, last_seen = now()
        RETURNING id`,
-      [tokenHash(secret), userId, s.endpoint, s.keys.p256dh, s.keys.auth, (b.platform ?? '').slice(0, 40)],
+      [tokenHash(secret), userId, s.endpoint, s.keys.p256dh, s.keys.auth, String(b.platform ?? '').slice(0, 40)],
+    );
+    // не больше 10 устройств на аккаунт: самые давние уходят
+    await sql.query(
+      `DELETE FROM devices WHERE user_id = $1 AND id NOT IN (SELECT id FROM devices WHERE user_id = $1 ORDER BY last_seen DESC LIMIT $2)`,
+      [userId, MAX_DEVICES],
     );
     return json({ deviceId: rows[0][0], secret });
   }
@@ -643,7 +845,8 @@ export function createApp(deps: Deps) {
       await vapidKeys(),
     );
     if (result.gone) await sql.query(`DELETE FROM devices WHERE id = $1`, [id]);
-    return json({ ok: result.status < 300, status: result.status });
+    // код ответа push-сервиса наружу не отдаём
+    return json({ ok: result.status < 300 });
   }
 
   async function removeDevice(request: Request, id: string) {
@@ -675,8 +878,11 @@ export function createApp(deps: Deps) {
        FROM devices d
        WHERE q.device_id = d.id AND q.sent_at IS NULL AND q.fire_at <= now() AND q.fire_at > now() - interval '6 hours'
          AND (q.device_id, q.item_id) IN (
-           SELECT device_id, item_id FROM push_queue
-           WHERE sent_at IS NULL AND fire_at <= now() AND fire_at > now() - interval '6 hours' ORDER BY fire_at LIMIT 300)
+           -- не больше 10 за раз с одного устройства: одно устройство с сотнями напоминаний не задержит остальных
+           SELECT device_id, item_id FROM (
+             SELECT device_id, item_id, fire_at, row_number() OVER (PARTITION BY device_id ORDER BY fire_at) AS rn
+             FROM push_queue WHERE sent_at IS NULL AND fire_at <= now() AND fire_at > now() - interval '6 hours') x
+           WHERE rn <= 10 ORDER BY fire_at LIMIT 300)
        RETURNING d.id, d.endpoint, d.p256dh, d.auth, q.payload`,
     );
     let sent = 0;
@@ -698,6 +904,7 @@ export function createApp(deps: Deps) {
     await sql.query(`DELETE FROM push_queue WHERE fire_at < now() - interval '2 days'`);
     await sql.query(`DELETE FROM auth_failures WHERE at < now() - interval '1 day'`);
     await sql.query(`DELETE FROM password_resets WHERE created_at < now() - interval '1 day'`);
+    await sql.query(`DELETE FROM rate_hits WHERE at < now() - interval '2 days'`);
     await refreshNextDue({ mark });
     console.log(`cron: наступило ${due.length}, отправлено ${sent}`);
     return json({ due: due.length, sent, removedDevices: gone.size });
@@ -730,7 +937,15 @@ export function createApp(deps: Deps) {
     if (m === 'POST' && path === '/web/page') return webPage(request);
     if (m === 'POST' && path === '/auth/reset') return reset(request);
     if (m === 'POST' && path === '/auth/password') return changePassword(request);
-    if (m === 'GET' && path === '/auth/me') return json({ user: await userOf(request) });
+    if (m === 'GET' && path === '/auth/me') {
+      const user = await userOf(request);
+      return json({ user, ...(admins.has(user.email.toLowerCase()) ? { admin: true } : {}) });
+    }
+    if (m === 'GET' && path === '/admin/feedback') return adminFeedback(request, url);
+    const fb = path.match(/^\/admin\/feedback\/(\d{1,18})(\/image|\/reply)?$/);
+    if (fb && m === 'GET' && fb[2] === '/image') return adminFeedbackImage(request, fb[1]);
+    if (fb && m === 'PATCH' && !fb[2]) return adminFeedbackPatch(request, fb[1]);
+    if (fb && m === 'POST' && fb[2] === '/reply') return adminFeedbackReply(request, fb[1]);
     if (m === 'DELETE' && path === '/account') return deleteAccount(request);
     if (m === 'GET' && path === '/sync') return pull(request, url);
     if (m === 'POST' && path === '/sync') return pushItems(request);

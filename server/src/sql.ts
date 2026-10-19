@@ -126,12 +126,25 @@ export const SCHEMA = [
     created_at timestamptz NOT NULL DEFAULT now()
   )`,
   `CREATE INDEX IF NOT EXISTS feedback_user ON feedback (user_id, created_at DESC)`,
+  // ответ владельца (виден пользователю в «Мои обращения») и разбор обращения (виден только владельцу)
+  `ALTER TABLE feedback ADD COLUMN IF NOT EXISTS reply text`,
+  `ALTER TABLE feedback ADD COLUMN IF NOT EXISTS replied_at timestamptz`,
+  `ALTER TABLE feedback ADD COLUMN IF NOT EXISTS note text NOT NULL DEFAULT ''`,
+  `ALTER TABLE feedback ADD COLUMN IF NOT EXISTS updated_at timestamptz`,
   `CREATE TABLE IF NOT EXISTS ai_usage (
     user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     day date NOT NULL,
     count integer NOT NULL DEFAULT 0,
     PRIMARY KEY (user_id, day)
   )`,
+  // счётчики для ограничений частоты (по IP, общий бюджет писем)
+  `CREATE TABLE IF NOT EXISTS rate_hits (
+    bucket text NOT NULL,
+    key text NOT NULL,
+    at timestamptz NOT NULL DEFAULT now()
+  )`,
+  `CREATE INDEX IF NOT EXISTS rate_hits_key ON rate_hits (bucket, key, at)`,
+  `CREATE INDEX IF NOT EXISTS devices_user ON devices (user_id, last_seen DESC)`,
   `CREATE TABLE IF NOT EXISTS meta (
     key text PRIMARY KEY,
     value jsonb NOT NULL

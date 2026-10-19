@@ -19,7 +19,7 @@ export function isSynced(key: string): boolean {
 type Dirty = Record<string, number>;
 /** Последние известные отметки этой вкладки (для быстрых проверок без ожидания) */
 let dirty: Dirty = {};
-const listeners = new Set<() => void>();
+const listeners = new Set<(key?: string) => void>();
 
 /** То же хранилище, что у idb-keyval по умолчанию, — для записи в одной транзакции */
 const raw = createStore('keyval-store', 'keyval');
@@ -54,7 +54,7 @@ const bump = (d: Dirty, key: string, at: number) => {
 export async function markDirty(key: string, at = Date.now()) {
   if (!isSynced(key)) return;
   await writeTx(() => {}, (d) => bump(d, key, at));
-  for (const l of listeners) l();
+  for (const l of listeners) l(key);
 }
 
 export async function dirtyKeys(): Promise<Dirty> {
@@ -77,7 +77,8 @@ export async function clearDirty(key: string, sentAt: number) {
   );
 }
 
-export function onDirty(fn: () => void): () => void {
+/** Изменён ключ (key) — или неизвестно какой (без аргумента) */
+export function onDirty(fn: (key?: string) => void): () => void {
   listeners.add(fn);
   return () => listeners.delete(fn);
 }
@@ -92,7 +93,7 @@ export async function set(key: string, value: unknown) {
     (s) => s.put(value, key),
     (d) => bump(d, key, at),
   );
-  for (const l of listeners) l();
+  for (const l of listeners) l(key);
 }
 
 export async function del(key: string) {
@@ -102,7 +103,7 @@ export async function del(key: string) {
     (s) => s.delete(key),
     (d) => bump(d, key, at),
   );
-  for (const l of listeners) l();
+  for (const l of listeners) l(key);
 }
 
 // ---------- Данные с сервера ----------
