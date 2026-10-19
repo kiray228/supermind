@@ -26,6 +26,7 @@ import {
   CalendarX2,
   Layers,
   SquareCheck as CheckSquare,
+  LayoutTemplate,
 } from 'lucide-react';
 import { useApp, toast } from '../store/appStore';
 import { loadAllDocs } from '../store/db';
@@ -69,6 +70,7 @@ import {
 import { exportTasksIcs } from '../tasks/sync';
 import { TaskCheck, TaskRow } from '../tasks/ui/TaskRow';
 import { BulkBar } from '../tasks/ui/BulkBar';
+import { TaskTemplatesSheet } from '../tasks/ui/TaskTemplatesSheet';
 import { endSelect, startSelect, useBulk } from '../tasks/bulk';
 import { registerDropZone } from '../tasks/ui/touchDrag';
 import { SmartInput } from '../tasks/ui/QuickAdd';
@@ -209,6 +211,7 @@ export default function Tasks() {
   const [mapTasks, setMapTasks] = useState<MapTask[]>([]);
   const [listDlg, setListDlg] = useState<{ id?: string } | null>(null);
   const [filterDlg, setFilterDlg] = useState<TaskFilter | null>(null);
+  const [tplOpen, setTplOpen] = useState(false);
   // приложение открыто через полночь — «Сегодня» и «Просрочено» сменяются сами
   const today = useToday();
 
@@ -549,6 +552,9 @@ export default function Tasks() {
                   </button>
                 ))}
                 <div className="sep" />
+                <button onClick={() => setTplOpen(true)}>
+                  <LayoutTemplate size={16} /> Из шаблона…
+                </button>
                 {canBulk && (
                   <button onClick={() => startSelect()}>
                     <CheckSquare size={16} /> Выбрать задачи
@@ -646,6 +652,7 @@ export default function Tasks() {
         <div className="page-body tk-main">{content()}</div>
       </div>
 
+      {tplOpen && <TaskTemplatesSheet preset={sel.k === 'matrix' || isTrash || isCompleted ? {} : preset} onClose={() => setTplOpen(false)} />}
       {bulkOn && canBulk ? (
         <BulkBar visible={shownIds} />
       ) : (

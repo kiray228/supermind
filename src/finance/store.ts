@@ -194,6 +194,66 @@ export function deleteTransaction(id: string, undo = true) {
   if (undo) toast('Операция удалена', { label: 'Отменить', run: () => mutateFinance((d) => upsertIn(d, 'transactions', t)) });
 }
 
+// ---------- Разделённые покупки ----------
+
+export interface SplitPart {
+  categoryId?: string;
+  amount: number;
+}
+
+/** Все части покупки (вместе с исходной операцией) */
+export const splitParts = (d: FinanceData, splitId: string) => d.transactions.filter((t) => t.splitId === splitId);
+
+/**
+ * Разделить операцию по категориям: каждая часть — отдельная операция той же покупки (тот же счёт, дата,
+ * комментарий; общий splitId), у исходной остаётся остаток. Так бюджеты, аналитика и баланс считаются как обычно.
+ * null — если частей нет или их сумма не меньше всей операции.
+ */
+export function splitTransaction(id: string, parts: SplitPart[]): Transaction[] | null {
+  const t = useFinance.getState().data?.transactions.find((x) => x.id === id);
+  if (!t || t.type === 'transfer') return null;
+  const valid = parts.filter((p) => p.amount > 0).map((p) => ({ ...p, amount: r2(p.amount) }));
+  const sum = r2(valid.reduce((a, p) => a + p.amount, 0));
+  if (!valid.length || sum >= t.amount - 0.005) return null;
+  const group = t.splitId ?? t.id;
+  const now = Date.now();
+  const made = valid.map((p, i) => {
+    const x: Transaction = { ...t, id: uid(), amount: p.amount, categoryId: p.categoryId, splitId: group, createdAt: now + i + 1, updatedAt: now };
+    delete x.subscriptionId;
+    return normalizeTx(x);
+  });
+  mutateFinance((d) => {
+    const m = d.transactions.find((x) => x.id === id);
+    if (!m) return;
+    m.amount = r2(m.amount - sum);
+    m.splitId = group;
+    m.updatedAt = now;
+    d.transactions.push(...made);
+  });
+  return made;
+}
+
+/** Собрать части покупки обратно в эту операцию (сумма — всех частей). Возвращает число убранных частей */
+export function mergeSplit(id: string): number {
+  const d0 = useFinance.getState().data;
+  const t = d0?.transactions.find((x) => x.id === id);
+  if (!d0 || !t?.splitId) return 0;
+  const others = splitParts(d0, t.splitId).filter((x) => x.id !== id && x.accountId === t.accountId);
+  const total = r2(others.reduce((a, x) => a + x.amount, t.amount));
+  const ids = new Set(others.map((x) => x.id));
+  const left = splitParts(d0, t.splitId).length - others.length - 1;
+  mutateFinance((d) => {
+    const m = d.transactions.find((x) => x.id === id);
+    if (!m) return;
+    m.amount = total;
+    // остались части на другом счёте (их перенесли) — группа остаётся
+    if (!left) delete m.splitId;
+    m.updatedAt = Date.now();
+    removeWhere(d, 'transactions', (x) => ids.has(x.id));
+  });
+  return others.length;
+}
+
 /** Сообщение о превышении бюджета, если новая трата выводит категорию или общий бюджет за лимит */
 function budgetAlert(d: FinanceData, t: Transaction): string | null {
   if (!d.budgets.length) return null;

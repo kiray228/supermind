@@ -1,5 +1,5 @@
 /** «Что нового»: главное в каждой версии. Новые версии — сверху. */
-import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge, MessageCircleQuestion, CloudOff, LayoutTemplate, SquareArrowOutUpRight, BellRing, Target, Timer, Lock, Crosshair, Move, GitMerge, EyeOff, CalendarRange, Fingerprint, ArrowUpDown, Banknote, MonitorSmartphone, Coins, ListChecks, FileInput } from 'lucide-react';
+import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge, MessageCircleQuestion, CloudOff, LayoutTemplate, SquareArrowOutUpRight, BellRing, Target, Timer, Lock, Crosshair, Move, GitMerge, EyeOff, CalendarRange, Fingerprint, ArrowUpDown, Banknote, MonitorSmartphone, Coins, ListChecks, FileInput, Split, CornerDownRight } from 'lucide-react';
 
 export interface ChangeItem {
   icon: typeof Sparkles;
@@ -15,6 +15,15 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.40',
+    title: 'Разделение покупок, шаблоны задач и подзадачи со своей датой',
+    items: [
+      { icon: Split, title: 'Одна покупка — несколько категорий', text: 'В окне операции — «Разделить по категориям»: из чека на 12 000 ₸ — 8 000 на продукты и 4 000 на дом. Бюджеты и аналитика считают каждую часть, «Собрать в одну» вернёт как было.' },
+      { icon: LayoutTemplate, title: 'Шаблоны задач', text: 'В окне задачи «⋯» → «Сохранить как шаблон»: название, описание, чек-лист, теги и время. Новая задача по шаблону — «Задачи» → «⋯» → «Из шаблона…».' },
+      { icon: CornerDownRight, title: 'Подзадача со своей датой', text: 'Любой пункт чек-листа можно сделать отдельной задачей (стрелка рядом с пунктом): со своей датой и напоминанием. Она остаётся связана с основной задачей.' },
+    ],
+  },
   {
     version: '1.39',
     title: 'Несколько задач сразу, курсы валют и одинаковые настройки',

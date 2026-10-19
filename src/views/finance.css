@@ -334,6 +334,16 @@
 .fn-rate { gap: 8px; }
 .fn-rate .input { flex: 1; min-width: 0; }
 .fn-rate-label { font-weight: 600; white-space: nowrap; }
+/* разделение покупки по категориям */
+.fn-split-add { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; margin: 8px 0 2px; }
+.fn-split { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; padding: 10px; border-radius: 14px; background: var(--surface-2); }
+.fn-split-h { font-size: 12.5px; font-weight: 600; color: var(--text-2); }
+.fn-split-row { gap: 6px; }
+.fn-split-row .select { flex: 1.3; min-width: 0; }
+.fn-split-row .input { flex: 1; min-width: 0; }
+.fn-split-foot { gap: 10px; align-items: center; }
+.fn-split-foot .grow { text-align: right; }
+.fn-split-info { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); font-size: 13px; }
 .fn-rate-auto { min-width: 0; font-variant-numeric: tabular-nums; font-size: 16px; padding: 8px 0; }
 
 .fn-import { width: min(640px, 100%); }

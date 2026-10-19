@@ -168,7 +168,7 @@ function TxRowBody(props: TxRowProps & { className?: string; style?: CSSProperti
       </button>
     );
   }
-  const sub = [cat && tx.note ? cat.name : '', acc?.name, showDate ? dayTitle(tx.date) : '', tx.time, ...tx.tags.map((g) => '#' + g)].filter(Boolean).join(' · ');
+  const sub = [cat && tx.note ? cat.name : '', tx.splitId ? 'часть покупки' : '', acc?.name, showDate ? dayTitle(tx.date) : '', tx.time, ...tx.tags.map((g) => '#' + g)].filter(Boolean).join(' · ');
   return (
     <button {...btn}>
       <CatIcon emoji={cat?.emoji ?? (tx.type === 'income' ? '💰' : '📦')} color={cat?.color ?? '#64748b'} />

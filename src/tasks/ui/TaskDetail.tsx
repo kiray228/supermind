@@ -4,6 +4,9 @@ import {
   CalendarDays,
   CalendarPlus,
   Copy,
+  LayoutTemplate,
+  CornerLeftUp,
+  SquareArrowOutUpRight,
   Flag,
   GripVertical,
   MoreHorizontal,
@@ -24,8 +27,10 @@ import { uid } from '../../utils/tree';
 import { toast, useApp } from '../../store/appStore';
 import { openDoc } from '../../actions';
 import { isOverdue, repeatLabel, reminderLabel, whenLabel, type ChecklistItem, type Priority, type TaskItem } from '../model';
-import { allTags, updateChecklist, duplicateTask, openTask, purgeTask, restoreTask, setWontDo, toggleDone, trashTask, updateTask, useTasks } from '../store';
+import { allTags, childTasks, promoteChecklistItem, updateChecklist, duplicateTask, openTask, purgeTask, restoreTask, setWontDo, toggleDone, trashTask, updateTask, useTasks } from '../store';
 import { addTaskToCalendar, askNotifyIfNeeded } from '../sync';
+import { saveTaskTemplate } from '../templates';
+import { askText } from '../../ui/dialogs';
 import { DatePicker } from './DatePicker';
 import { TaskCheck } from './TaskRow';
 import { Popover } from './Popover';
@@ -78,6 +83,8 @@ function TaskDetail({ task, onClose }: { task: TaskItem; onClose: () => void }) 
   const commitNotes = () => notes !== (task.notes ?? '') && save({ notes: notes || undefined });
 
   const setChecklist = (fn: (c: ChecklistItem[]) => ChecklistItem[]) => updateChecklist(task.id, fn);
+  const children = childTasks(data, task.id);
+  const parent = task.parentId ? data.tasks.find((t) => t.id === task.parentId && !t.deleted) : undefined;
   const list = data.lists.find((l) => l.id === task.listId);
   const pc = task.priority ? PRIORITY_META[task.priority] : undefined;
   const overdue = isOverdue(task);
@@ -189,6 +196,15 @@ function TaskDetail({ task, onClose }: { task: TaskItem; onClose: () => void }) 
                 >
                   <Copy size={16} /> Дублировать
                 </button>
+                <button
+                  onClick={async () => {
+                    setMenu(null);
+                    const name = await askText('Сохранить как шаблон', { value: task.title, message: 'Название, описание, чек-лист, теги и время — для похожих задач. Новая задача по шаблону: «Задачи» → «⋯» → «Из шаблона…».' });
+                    if (name?.trim() && saveTaskTemplate(task.id, name)) toast(`Шаблон «${name.trim()}» сохранён`);
+                  }}
+                >
+                  <LayoutTemplate size={16} /> Сохранить как шаблон
+                </button>
                 {!task.done && !task.wontDo && (
                   <button onClick={() => (setMenu(null), setWontDo(task.id))}>
                     <Ban size={16} /> Не буду делать
@@ -261,6 +277,10 @@ function TaskDetail({ task, onClose }: { task: TaskItem; onClose: () => void }) 
               item={c}
               onChange={(p) => setChecklist((all) => all.map((x) => (x.id === c.id ? { ...x, ...p } : x)))}
               onDelete={() => setChecklist((all) => all.filter((x) => x.id !== c.id))}
+              onPromote={() => {
+                const n = promoteChecklistItem(task.id, c.id);
+                if (n) toast(`«${n.title}» — теперь отдельная задача`, { label: 'Открыть', run: () => openTask(n.id) });
+              }}
               onEnter={() => {
                 const n = { id: uid(), text: '', done: false };
                 setChecklist((all) => [...all.slice(0, i + 1), n, ...all.slice(i + 1)]);
@@ -281,6 +301,25 @@ function TaskDetail({ task, onClose }: { task: TaskItem; onClose: () => void }) 
             placeholder="Добавить подзадачу"
             onAdd={(text) => setChecklist((all) => [...all, { id: uid(), text, done: false }])}
           />
+          {children.length > 0 && (
+            <div className="td-children">
+              <div className="td-children-h">Отдельные задачи</div>
+              {children.map((c) => (
+                <div key={c.id} className={`td-child${c.done ? ' done' : ''}`}>
+                  <TaskCheck task={c} onToggle={() => toggleDone(c.id)} />
+                  <button className="td-child-title ellipsis" onClick={() => openTask(c.id)}>
+                    {c.title || 'Без названия'}
+                  </button>
+                  {c.date && <span className={`td-child-when${isOverdue(c) ? ' overdue' : ''}`}>{whenLabel(c, todayYmd())}</span>}
+                </div>
+              ))}
+            </div>
+          )}
+          {parent && (
+            <button className="td-parent" onClick={() => openTask(parent.id)}>
+              <CornerLeftUp size={14} /> Из задачи «{parent.title || 'Без названия'}»
+            </button>
+          )}
         </div>
 
         {/* параметры */}
@@ -394,10 +433,12 @@ function ChecklistRow({
   onDelete,
   onEnter,
   onMove,
+  onPromote,
 }: {
   item: ChecklistItem;
   onChange: (p: Partial<ChecklistItem>) => void;
   onDelete: () => void;
+  onPromote: () => void;
   onEnter: () => void;
   onMove: (dir: -1 | 1) => void;
 }) {
@@ -430,6 +471,9 @@ function ChecklistRow({
           else if (e.altKey && e.key === 'ArrowDown') onMove(1);
         }}
       />
+      <button className="td-ck-del" onClick={onPromote} aria-label="Сделать отдельной задачей" title="Сделать отдельной задачей — со своей датой и напоминанием">
+        <SquareArrowOutUpRight size={14} />
+      </button>
       <button className="td-ck-del" onClick={onDelete} aria-label="Удалить подзадачу">
         <X size={14} />
       </button>

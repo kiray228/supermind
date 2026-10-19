@@ -73,6 +73,8 @@ export interface TaskItem {
   cal?: { id: string; sig: string };
   /** минуты фокуса (помодоро) по задаче */
   focusMinutes?: number;
+  /** задача сделана из пункта чек-листа этой задачи (подзадача со своей датой) */
+  parentId?: ID;
 }
 
 export interface TaskList {
@@ -151,9 +153,28 @@ export interface TaskPrefs {
   updatedAt?: number;
 }
 
+/** Шаблон задачи (tasks/templates.ts) */
+export interface TaskTemplate {
+  id: ID;
+  /** имя в списке шаблонов */
+  name: string;
+  title: string;
+  notes?: string;
+  priority: Priority;
+  tags: string[];
+  listId: ID;
+  /** пункты чек-листа */
+  checklist: string[];
+  time?: string;
+  duration?: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface TasksData {
   version: 1;
   tasks: TaskItem[];
+  templates?: TaskTemplate[];
   lists: TaskList[];
   filters: TaskFilter[];
   tagColors: Record<string, string>;

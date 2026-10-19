@@ -462,6 +462,31 @@ export async function reloadTasksFromSync(): Promise<boolean> {
   return true;
 }
 
+/**
+ * Пункт чек-листа → отдельная задача (своя дата, напоминания, повтор), связанная с родительской (parentId).
+ * Пункт из чек-листа убирается. Выполненный пункт становится выполненной задачей.
+ */
+export function promoteChecklistItem(taskId: ID, itemId: ID): TaskItem | null {
+  const t = getTask(taskId);
+  const item = t?.checklist.find((c) => c.id === itemId);
+  if (!t || !item || !item.text.trim()) return null;
+  const child = addTask({ title: item.text.trim(), listId: t.listId, tags: [...t.tags], priority: t.priority, parentId: t.id });
+  if (!child) return null;
+  mutateTasks((d) => {
+    const p = d.tasks.find((x) => x.id === taskId);
+    if (p) {
+      p.checklist = p.checklist.filter((c) => c.id !== itemId);
+      p.updatedAt = Date.now();
+    }
+    const c = d.tasks.find((x) => x.id === child.id);
+    if (c && item.done) Object.assign(c, { done: true, completedAt: Date.now() });
+  });
+  return getTask(child.id) ?? child;
+}
+
+/** Задачи, сделанные из пунктов этой задачи (без удалённых) */
+export const childTasks = (d: TasksData, id: ID) => d.tasks.filter((t) => t.parentId === id && !t.deleted);
+
 export function duplicateTask(id: ID): TaskItem | null {
   const t = getTask(id);
   if (!t) return null;

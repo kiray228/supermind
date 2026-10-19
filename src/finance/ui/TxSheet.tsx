@@ -1,9 +1,9 @@
 import { useMemo, useState, type CSSProperties } from 'react';
-import { Trash } from '@phosphor-icons/react';
+import { Plus, Trash, X } from '@phosphor-icons/react';
 import { addDaysYmd, todayYmd } from '../../utils/mapTasks';
 import { toast } from '../../store/appStore';
-import { curSymbol, dateShort, parseMoneyInput, sortedAccounts, sortedCategories, type CatKind, type FinanceData, type TxType } from '../model';
-import { addTransaction, deleteTransaction, updateTransaction } from '../store';
+import { curSymbol, dateShort, fmtMoney, parseMoneyInput, r2, sortedAccounts, sortedCategories, type CatKind, type FinanceData, type TxType } from '../model';
+import { addTransaction, deleteTransaction, mergeSplit, splitParts, splitTransaction, updateTransaction } from '../store';
 import { AmountInput, Sheet } from './common';
 import { closeTxSheet, openMore, useFinUi } from './state';
 
@@ -36,6 +36,9 @@ function TxForm({ data }: { data: FinanceData }) {
   const [time, setTime] = useState(init.time ?? '');
   const [note, setNote] = useState(init.note ?? '');
   const [tags, setTags] = useState((init.tags ?? []).join(', '));
+  /** разделение по категориям: части сверх основной категории (её сумма — остаток) */
+  const [parts, setParts] = useState<{ cat: string; amount: string }[]>([]);
+  const group = edit?.splitId ? splitParts(data, edit.splitId) : [];
 
   const kind: CatKind = type === 'income' ? 'income' : 'expense';
   const cats = useMemo(() => sortedCategories(data, kind), [data, kind]);
@@ -64,10 +67,15 @@ function TxForm({ data }: { data: FinanceData }) {
     );
   }
 
+  const partSum = r2(parts.reduce((a, p) => a + (parseMoneyInput(p.amount) || 0), 0));
+  const rest = r2((parseMoneyInput(amount) || 0) - partSum);
+
   const save = () => {
     const v = parseMoneyInput(amount);
     if (!(v > 0)) return toast('Введите сумму');
     if (!acc) return toast('Выберите счёт');
+    const split = type === 'transfer' ? [] : parts.map((p) => ({ categoryId: p.cat || undefined, amount: parseMoneyInput(p.amount) || 0 })).filter((p) => p.amount > 0);
+    if (split.length && r2(v - partSum) <= 0) return toast('Части больше всей суммы — уменьшите их');
     const tagList = [...new Set(tags.split(/[,#]/).map((g) => g.trim()).filter(Boolean))];
     const base = { type, amount: v, accountId, date, time: time || undefined, note: note.trim() || undefined, tags: tagList };
     let patch;
@@ -79,8 +87,10 @@ function TxForm({ data }: { data: FinanceData }) {
     } else {
       patch = { ...base, categoryId: catByKind[kind] || undefined, toAccountId: undefined, toAmount: undefined };
     }
+    let id = edit?.id;
     if (edit) updateTransaction(edit.id, patch);
-    else addTransaction({ ...patch, subscriptionId: sheet.preset?.subscriptionId });
+    else id = addTransaction({ ...patch, subscriptionId: sheet.preset?.subscriptionId })?.id;
+    if (id && split.length && splitTransaction(id, split)) toast(`Покупка разделена на ${split.length + 1} части`);
     closeTxSheet();
   };
 
@@ -161,6 +171,56 @@ function TxForm({ data }: { data: FinanceData }) {
               </button>
             ))}
           </div>
+          {group.length > 1 ? (
+            <div className="fn-split-info">
+              <span className="grow">
+                Часть покупки: {group.length} {group.length < 5 ? 'части' : 'частей'} на {fmtMoney(r2(group.reduce((a, x) => a + x.amount, 0)), acc?.currency ?? '')}
+              </span>
+              <button
+                type="button"
+                className="fn-link"
+                onClick={() => {
+                  const n = mergeSplit(edit!.id);
+                  closeTxSheet();
+                  if (n) toast('Части собраны в одну операцию');
+                }}
+              >
+                Собрать в одну
+              </button>
+            </div>
+          ) : parts.length === 0 ? (
+            <button type="button" className="fn-link fn-split-add" onClick={() => setParts([{ cat: '', amount: '' }])}>
+              <Plus size={14} /> Разделить по категориям
+            </button>
+          ) : (
+            <div className="fn-split">
+              <div className="fn-split-h">Ещё категории в этой покупке</div>
+              {parts.map((p, i) => (
+                <div key={i} className="row fn-split-row">
+                  <select className="select" value={p.cat} onChange={(e) => setParts(parts.map((x, j) => (j === i ? { ...x, cat: e.target.value } : x)))} aria-label="Категория части">
+                    <option value="">Без категории</option>
+                    {cats.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.emoji} {c.name}
+                      </option>
+                    ))}
+                  </select>
+                  <AmountInput value={p.amount} onChange={(v) => setParts(parts.map((x, j) => (j === i ? { ...x, amount: v } : x)))} placeholder="сумма" />
+                  <button type="button" className="icon-btn" onClick={() => setParts(parts.filter((_, j) => j !== i))} aria-label="Убрать часть">
+                    <X size={16} />
+                  </button>
+                </div>
+              ))}
+              <div className="row fn-split-foot">
+                <button type="button" className="fn-link" onClick={() => setParts([...parts, { cat: '', amount: '' }])}>
+                  <Plus size={14} /> Ещё часть
+                </button>
+                <span className={'grow tiny ' + (rest > 0 ? 'faint' : 'fn-danger')}>
+                  {(catByKind[kind] && cats.find((c) => c.id === catByKind[kind])?.name) || 'Без категории'}: {fmtMoney(Math.max(0, rest), acc?.currency ?? '')}
+                </span>
+              </div>
+            </div>
+          )}
           <label className="label">Счёт</label>
           {accChips(accountId, setAccountId)}
         </>

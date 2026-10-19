@@ -1,10 +1,10 @@
 import { useRef, useState, type CSSProperties, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
-import { Bell, Check, ListChecks, Network, Pin, Repeat, Timer, AlignLeft, Undo2 } from 'lucide-react';
+import { Bell, Check, CornerDownRight, ListChecks, Network, Pin, Repeat, Timer, AlignLeft, Undo2 } from 'lucide-react';
 import { PRIORITY_META, addDaysYmd, todayYmd } from '../../utils/mapTasks';
 import { dayLabel, isOverdue, whenLabel, type TaskItem, type TaskList } from '../model';
 import { toast } from '../../store/appStore';
-import { moveOccurrence, openTask, purgeTask, restoreTask, skipOccurrence, toggleDone, trashTask, updateTask } from '../store';
+import { moveOccurrence, openTask, purgeTask, restoreTask, skipOccurrence, toggleDone, trashTask, updateTask, useTasks } from '../store';
 import { mergeHandlers, useLongPressDrag, useSwipeActions } from '../../ui/gestures';
 import { startTouchDrag } from './touchDrag';
 import { startSelect, toggleSelect, useBulk } from '../bulk';
@@ -246,6 +246,8 @@ export function TaskRow({
         ? whenLabel(task, today).replace(/^Сегодня, /, '')
         : whenLabel(task, today);
   const checklistDone = task.checklist.filter((c) => c.done).length;
+  // подзадача: название родительской задачи
+  const parentTitle = useTasks((s) => (task.parentId ? s.data?.tasks.find((t) => t.id === task.parentId && !t.deleted)?.title : undefined));
   const rowRef = useRef<HTMLDivElement>(null);
   const { swipe, handlers, bg, overlays, done, completing, future } = useTaskActions(task, occurrence, draggable && !finePointer ? rowRef : undefined, selectable);
   // режим выбора нескольких задач (tasks/bulk.ts): нажатие — выбрать, жесты и перетаскивание выключены
@@ -288,8 +290,13 @@ export function TaskRow({
             {task.pinned && <Pin size={12} className="tk-pin" />}
             {task.title || <span className="faint">Без названия</span>}
           </div>
-          {(when || task.repeat || task.reminders.length > 0 || task.checklist.length > 0 || task.tags.length > 0 || task.source || task.notes) && (
+          {(when || task.repeat || task.reminders.length > 0 || task.checklist.length > 0 || task.tags.length > 0 || task.source || task.notes || parentTitle) && (
             <div className="tk-meta">
+              {parentTitle !== undefined && (
+                <span className="tk-mi-text tk-parent">
+                  <CornerDownRight size={12} /> <span className="ellipsis">{parentTitle || 'Без названия'}</span>
+                </span>
+              )}
               {showDate && when && <span className={`tk-when${overdue ? ' overdue' : task.date === today ? ' today' : ''}`}>{when}</span>}
               {task.repeat && <Repeat size={12} className="tk-mi" />}
               {task.date && task.reminders.length > 0 && !task.done && <Bell size={12} className="tk-mi" />}

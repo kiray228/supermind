@@ -35,6 +35,8 @@ export interface Transaction {
   note?: string;
   tags: string[];
   subscriptionId?: string;
+  /** часть разделённой покупки: у всех частей один splitId (id исходной операции) */
+  splitId?: string;
   createdAt: number;
   updatedAt: number;
 }
