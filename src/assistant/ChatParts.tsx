@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Check, CheckCircle2, Copy, Flag, ListPlus, NotebookPen, RotateCcw, Sparkles, Target, Wallet, CalendarArrowUp, X } from 'lucide-react';
+import { Check, CheckCircle2, Copy, Flag, MessageSquareWarning, ListPlus, NotebookPen, RotateCcw, Sparkles, Target, Wallet, CalendarArrowUp, X } from 'lucide-react';
 import { toast } from '../store/appStore';
 import { describeAction, executeAction, type ActionItem, type ActionView } from './actions';
 import { patchMessage, useChat, type ChatMessage } from './history';
 import { Markdown } from './Markdown';
+import { reportAI } from '../ui/ReportAI';
 
 const KIND_ICON: Record<ActionView['kind'], typeof Check> = {
   task: ListPlus,
@@ -128,6 +129,11 @@ export function MessageView({ msg, onRetry }: { msg: ChatMessage; onRetry?: () =
           {!msg.error && msg.text && (
             <button className="as-tool" onClick={() => void copyText(msg.text)} aria-label="Копировать">
               <Copy size={14} /> Копировать
+            </button>
+          )}
+          {!msg.error && msg.text && (
+            <button className="as-tool" onClick={() => reportAI(msg.text, 'Ассистент')} aria-label="Пожаловаться на ответ ИИ">
+              <MessageSquareWarning size={14} /> Пожаловаться
             </button>
           )}
           {onRetry && (

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Loader2, MessageCircleQuestion, RefreshCw, X } from 'lucide-react';
+import { Flag, Loader2, MessageCircleQuestion, RefreshCw, X } from 'lucide-react';
+import { reportAI } from '../../ui/ReportAI';
 import { toast } from '../../store/appStore';
 import { todayYmd } from '../../utils/mapTasks';
 import { answerQuestion, dismissQuestion, ensureQuestion, nextQuestion, useQuestion } from '../question';
@@ -44,6 +45,9 @@ export function QuestionCard() {
         </span>
         <button className="icon-btn" onClick={() => void nextQuestion()} disabled={busy} aria-label="Другой вопрос" title="Другой вопрос">
           {busy ? <Loader2 size={15} className="spin" /> : <RefreshCw size={15} />}
+        </button>
+        <button className="icon-btn" onClick={() => reportAI(q.question, 'Вопрос дня')} aria-label="Пожаловаться на вопрос ИИ" title="Пожаловаться на вопрос ИИ">
+          <Flag size={15} />
         </button>
         <button className="icon-btn" onClick={dismissQuestion} aria-label="Не сегодня" title="Не сегодня">
           <X size={16} />

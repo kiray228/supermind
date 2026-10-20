@@ -7,6 +7,7 @@ import { openItem } from '../brain';
 import { brainItems } from '../related';
 import { parseItemId } from '../brainDocs';
 import { KIND_ICON } from './kindIcons';
+import { ReportAI } from '../../ui/ReportAI';
 
 /** Открыть источник ответа: шторка закрывается, запись открывается в своём разделе */
 function openSource(id: string) {
@@ -51,6 +52,7 @@ function Entry({ entry }: { entry: AskEntry }) {
         </div>
       )}
       {entry.a && <Answer entry={entry} />}
+      {entry.state === 'done' && entry.sources.length > 0 && <ReportAI text={entry.a} where="Спросить мозг" />}
       {entry.state === 'answer' && !entry.a && (
         <div className="nt-ask-status">
           <Loader2 size={15} className="spin" /> Думаю…

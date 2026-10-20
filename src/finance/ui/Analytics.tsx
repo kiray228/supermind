@@ -26,6 +26,7 @@ import {
 } from '../model';
 import { runFinanceAi } from '../ai';
 import { IconTile } from '../../ui/icons';
+import { ReportAI } from '../../ui/ReportAI';
 import { dayTitle, Money, Sheet, Stepper, TxRow, useToday } from './common';
 import { openTxSheet, showOps } from './state';
 import { RateWarning } from './RateWarning';
@@ -409,6 +410,7 @@ function AiSheet({ data, month, onClose }: { data: FinanceData; month: string; o
     >
       {!text && busy && <p className="muted">Claude анализирует ваши траты…</p>}
       <div className="fn-ai-text">{renderMd(text)}</div>
+      {!busy && text && <ReportAI text={text} where="Финансы · ИИ-разбор" />}
     </Sheet>
   );
 }

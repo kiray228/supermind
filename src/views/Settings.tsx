@@ -30,9 +30,10 @@ import {
 import { useApp, toast } from '../store/appStore';
 import { AI_MODELS, streamText, AIError } from '../ai/claude';
 import { openWhatsNew } from '../onboarding/state';
-import { openSupport, SupportHost } from '../ui/Support';
+import { openSupport } from '../ui/Support';
+import { reportAI } from '../ui/ReportAI';
 import { InboxHost, openInbox, useSupportAdmin } from '../ui/SupportInbox';
-import { Bug, Lightbulb, Question, Tray, Warning } from '@phosphor-icons/react';
+import { Bug, Flag, Lightbulb, Question, Tray, Warning } from '@phosphor-icons/react';
 import { errorReportsOn, setErrorReports } from '../ui/errorReport';
 import { APP_VERSION } from '../store/safety';
 import { IconTile } from '../ui/icons';
@@ -278,6 +279,13 @@ export default function Settings() {
             <ListRow icon={<IconTile icon={Bug} tone="red" size="list" />} title="Сообщить о проблеме" chevron onClick={() => openSupport('problem')} />
             <ListRow icon={<IconTile icon={Lightbulb} tone="yellow" size="list" />} title="Предложить идею" chevron onClick={() => openSupport('idea')} />
             <ListRow icon={<IconTile icon={Question} tone="blue" size="list" />} title="Задать вопрос" subtitle="На частые вопросы ИИ ответит сразу" chevron onClick={() => openSupport('question')} />
+            <ListRow
+              icon={<IconTile icon={Flag} tone="orange" size="list" />}
+              title="Пожаловаться на ответ ИИ"
+              subtitle="Оскорбительный, опасный или неверный ответ — пришлите, разберёмся"
+              chevron
+              onClick={() => reportAI('', '')}
+            />
             <SwitchRow
               icon={<IconTile icon={Warning} tone="orange" size="list" />}
               title="Отправлять отчёты об ошибках"
@@ -298,7 +306,6 @@ export default function Settings() {
               />
             )}
           </ListSection>
-          <SupportHost />
           <InboxHost />
 
           <ListSection

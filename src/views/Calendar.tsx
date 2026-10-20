@@ -272,8 +272,13 @@ function rangeOf(view: CalView, cursor: string): string[] {
   return Array.from({ length: n }, (_, i) => addDaysYmd(from, i));
 }
 
-function periodTitle(view: CalView, days: string[], cursor: string): string {
-  if (view === 'day') return longDate(cursor);
+function periodTitle(view: CalView, days: string[], cursor: string, narrow = false): string {
+  if (view === 'day') {
+    // на телефоне «Понедельник, 19 октября» не влезает между стрелками и «Сегодня» — день недели коротко
+    if (!narrow) return longDate(cursor);
+    const d = fromYmd(cursor);
+    return `${WD_SHORT[d.getDay()]}, ${longDate(cursor).split(', ')[1]}`;
+  }
   if (view === 'month') {
     const d = fromYmd(cursor);
     return `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
@@ -486,7 +491,9 @@ export default function Calendar() {
           <button className="icon-btn" onClick={() => shift(-1)} aria-label="Назад">
             <ChevronLeft />
           </button>
-          <div className="cv-period ellipsis">{periodTitle(view, days, cursor)}</div>
+          <div className="cv-period ellipsis" title={view === 'day' ? longDate(cursor) : undefined}>
+            {periodTitle(view, days, cursor, narrow)}
+          </div>
           <button className="icon-btn" onClick={() => shift(1)} aria-label="Вперёд">
             <ChevronRight />
           </button>
@@ -983,8 +990,11 @@ function TimeGrid({
   const block = (it: Item, start: number, dur: number, col: number, cols: number, ghost = false) => {
     // блок не вылезает за полночь (ниже сетки времени)
     const h = Math.max(22, (Math.min(dur, 1440 - start) / 60) * HOUR - 2);
+    const tall = h >= 36;
     const style = {
       '--c': it.color,
+      // название переносится на столько строк, сколько вмещает блок (строка до 16px, под временем — ещё одна)
+      '--lines': Math.max(1, Math.floor((h - 4 - (tall ? 14 : 0)) / 16)),
       top: (start / 60) * HOUR + 1,
       height: h,
       left: `calc(${(col / cols) * 100}% + 1px)`,
@@ -993,7 +1003,6 @@ function TimeGrid({
     const cls = `cv-block cv-${it.kind}${it.done ? ' done' : ''}${it.overdue ? ' overdue' : ''}${it.movable ? ' movable' : ''}${
       ghost ? ' ghost' : drag?.it.key === it.key ? ' src' : ''
     }`;
-    const tall = h >= 36;
     return (
       <div
         key={ghost ? 'ghost' : it.key}
@@ -1004,7 +1013,7 @@ function TimeGrid({
         onClick={() => !suppress.current && activate(it)}
         onContextMenu={(e) => e.preventDefault()}
       >
-        <div className="cv-block-title ellipsis">
+        <div className="cv-block-title">
           {it.habit && it.done ? <Check size={11} strokeWidth={3} /> : kindIcon(it)}
           {!tall && <span className="cv-block-time">{timeOf(start)}</span>}
           {it.title}

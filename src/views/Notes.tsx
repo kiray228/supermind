@@ -403,8 +403,9 @@ export default function Notes() {
     </div>
   );
 
-  const cards = (ns: NoteMeta[]) => (
-    <GrowList key={JSON.stringify(sel) + '|' + (q ?? '') + '|' + sort} items={ns} className="nt-grid">
+  // group — свой ключ у «Закреплённых» и остальных: оба списка стоят рядом, а ключ ещё и сбрасывает подгрузку при смене папки, поиска, сортировки
+  const cards = (ns: NoteMeta[], group: 'pinned' | 'rest') => (
+    <GrowList key={group + '|' + JSON.stringify(sel) + '|' + (q ?? '') + '|' + sort} items={ns} className="nt-grid">
       {(n) => (
         <div key={n.id} data-note={n.id} className="nt-cell">
           <NoteCard n={n} folder={folderOf(n)} onOpen={open} onMenu={onCardMenu} />
@@ -486,12 +487,12 @@ export default function Notes() {
             ) : pinned.length ? (
               <>
                 <div className="nt-sec-title">Закреплённые</div>
-                {cards(pinned)}
+                {cards(pinned, 'pinned')}
                 {rest.length > 0 && <div className="nt-sec-title">Заметки</div>}
-                {cards(rest)}
+                {cards(rest, 'rest')}
               </>
             ) : (
-              cards(rest)
+              cards(rest, 'rest')
             )}
           </div>
           {openId && <NoteEditor key={openId} onClose={() => void openNote(null)} />}

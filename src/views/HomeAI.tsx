@@ -6,6 +6,7 @@ import { createAndOpen } from '../actions';
 import { docFromMarkdown } from '../templates';
 import { PROMPTS, streamText, AIError } from '../ai/claude';
 import { STRUCTURES } from '../editor/Inspector';
+import { ReportAI } from '../ui/ReportAI';
 
 export default function AICreate({ onClose }: { onClose(): void }) {
   const [idea, setIdea] = useState('');
@@ -59,6 +60,7 @@ export default function AICreate({ onClose }: { onClose(): void }) {
               </select>
             </div>
             {(busy || out) && <pre className="ai-preview">{out || 'Думаю…'}</pre>}
+            {!busy && out && <ReportAI text={out} where="Создать карту с ИИ" />}
             {err && <div className="ai-err">{err}</div>}
             <div className="modal-actions">
               {busy ? (

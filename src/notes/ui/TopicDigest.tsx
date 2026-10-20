@@ -8,6 +8,7 @@ import { openItem } from '../brain';
 import { parseItemId } from '../brainDocs';
 import { CitedText } from './CitedText';
 import { KIND_ICON } from './kindIcons';
+import { ReportAI } from '../../ui/ReportAI';
 
 function openSource(id: string) {
   closeDigest();
@@ -106,6 +107,7 @@ export function TopicDigest() {
             </div>
           )}
           {st.text && <CitedText text={st.text} sources={st.sources} onOpen={openSource} />}
+          {st.state === 'done' && st.text && <ReportAI text={st.text} where={`Конспект темы «${st.topic}»`} />}
           {st.state === 'error' && <div className="nt-ask-error">{st.error}</div>}
         </div>
         <div className="nt-digest-actions">

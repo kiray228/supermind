@@ -49,6 +49,7 @@ const ProgressWatcher = lazy(() => import('./progress/ProgressWatcher'));
 // окна задач и напоминаний — отдельными модулями: при запуске не нужны
 const TaskDetailHost = lazy(() => import('./tasks/ui/TaskDetail').then((m) => ({ default: m.TaskDetailHost })));
 const QuickAddHost = lazy(() => import('./tasks/ui/QuickAdd').then((m) => ({ default: m.QuickAddHost })));
+const SupportHost = lazy(() => import('./ui/Support').then((m) => ({ default: m.SupportHost })));
 const ReminderStack = lazy(() => import('./tasks/ui/Reminders').then((m) => ({ default: m.ReminderStack })));
 
 /** Широкий экран (боковая панель видна целиком) */
@@ -297,6 +298,11 @@ export default function App() {
       {deferred && (
         <Suspense fallback={null}>
           <ReminderStack />
+        </Suspense>
+      )}
+      {deferred && (
+        <Suspense fallback={null}>
+          <SupportHost />
         </Suspense>
       )}
       <SearchHost />
