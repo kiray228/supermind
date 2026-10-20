@@ -3,7 +3,7 @@
  * владелец получает письмо и push и отвечает из «Входящих» (SupportInbox). На вопрос ИИ отвечает сразу по справке.
  * В «Мои обращения» — переписка: ответы поддержки и ИИ, а пользователь может дописать («не помогло», уточнение).
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { create } from 'zustand';
 import { Bug, Lightbulb, Question, Image as ImageIcon, X, PaperPlaneTilt, CheckCircle, Sparkle } from '@phosphor-icons/react';
 import { api, useCloud } from '../store/cloud';
@@ -40,9 +40,10 @@ export const STATUS_LABEL: Record<string, string> = {
 
 export const KIND_ICON = { problem: Bug, idea: Lightbulb, question: Question } as const;
 
-const useSupport = create<{ open: Kind | null }>(() => ({ open: null }));
-export const openSupport = (kind: Kind = 'problem') => useSupport.setState({ open: kind });
-const close = () => useSupport.setState({ open: null });
+const useSupport = create<{ open: Kind | null; text: string }>(() => ({ open: null, text: '' }));
+/** Открыть окно поддержки; text — заготовка обращения (например, жалоба на ответ ИИ) */
+export const openSupport = (kind: Kind = 'problem', text = '') => useSupport.setState({ open: kind, text });
+const close = () => useSupport.setState({ open: null, text: '' });
 
 /** Снимок экрана → JPEG до ~1200px (base64 без префикса) */
 async function shrink(file: File): Promise<{ data: string; preview: string }> {
@@ -108,8 +109,9 @@ export function Thread({ messages, mine, names = AUTHOR }: { messages: Msg[]; mi
 
 export function SupportHost() {
   const open = useSupport((s) => s.open);
+  const text = useSupport((s) => s.text);
   if (!open) return null;
-  return <SupportSheet initial={open} />;
+  return <SupportSheet initial={open} initialText={text} />;
 }
 
 const PLACEHOLDER: Record<Kind, string> = {
@@ -118,10 +120,19 @@ const PLACEHOLDER: Record<Kind, string> = {
   question: 'Что хотите узнать? Например: как поставить напоминание на каждый день',
 };
 
-function SupportSheet({ initial }: { initial: Kind }) {
+function SupportSheet({ initial, initialText }: { initial: Kind; initialText: string }) {
   const email = useCloud((s) => s.account?.user.email);
   const [kind, setKind] = useState<Kind>(initial);
-  const [text, setText] = useState('');
+  const [text, setText] = useState(initialText);
+  const textRef = useRef<HTMLTextAreaElement>(null);
+  // заготовка уже в поле — курсор в конец, чтобы сразу дописать, что не так
+  useEffect(() => {
+    const el = textRef.current;
+    if (el && initialText) {
+      el.setSelectionRange(el.value.length, el.value.length);
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [initialText]);
   const [image, setImage] = useState<{ data: string; preview: string } | null>(null);
   const [withInfo, setWithInfo] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -217,7 +228,7 @@ function SupportSheet({ initial }: { initial: Kind }) {
               })}
             </div>
 
-            <textarea className="sp-text" autoFocus rows={6} maxLength={5000} value={text} onChange={(e) => setText(e.target.value)} placeholder={PLACEHOLDER[kind]} />
+            <textarea ref={textRef} className="sp-text" autoFocus rows={6} maxLength={5000} value={text} onChange={(e) => setText(e.target.value)} placeholder={PLACEHOLDER[kind]} />
 
             {image ? (
               <div className="sp-shot">

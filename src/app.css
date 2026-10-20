@@ -199,3 +199,10 @@
 .view-crash p { margin: 0; line-height: 1.5; }
 .view-crash-msg { word-break: break-word; }
 .view-crash-acts { gap: 8px; margin-top: 8px; }
+
+/* «Пожаловаться» рядом с ответом ИИ — тихая ссылка, не спорит с основными кнопками */
+.ai-report {
+  display: inline-flex; align-items: center; gap: 4px; min-height: 28px; padding: 0 6px; margin-left: -6px; border: none; border-radius: 8px;
+  background: none; font-size: 12px; color: var(--text-3); cursor: pointer;
+}
+.ai-report:hover { background: var(--surface-2); color: var(--text-2); }

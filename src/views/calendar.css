@@ -159,8 +159,13 @@
 }
 .cv-block:hover { background: color-mix(in srgb, var(--c) 28%, var(--surface)); }
 .cv-block.movable { cursor: grab; }
-.cv-block-title { display: flex; align-items: center; gap: 4px; font-weight: 600; }
-.cv-block-title svg { flex-shrink: 0; color: var(--c); }
+.cv-block-title {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: var(--lines, 1); overflow: hidden;
+  font-weight: 600; overflow-wrap: break-word; hyphens: auto;
+}
+.cv-block-title svg { color: var(--c); vertical-align: -1px; margin-right: 3px; }
+.cv-block-title .cv-block-time { margin-right: 4px; }
+.cv-block > .cv-block-time { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cv-block-time { flex-shrink: 0; font-size: 11px; font-weight: 500; color: var(--text-2); font-variant-numeric: tabular-nums; }
 .cv-block.done { opacity: .5; }
 .cv-block.done .cv-block-title { text-decoration: line-through; }
@@ -217,6 +222,8 @@
   .cv-block { padding: 1px 3px; font-size: 11px; border-left-width: 2px; }
   .cv-tg-7 .cv-block-time { display: none; }
   .cv-tg-7 .cv-block-title svg, .cv-tg-7 .cv-chip svg, .cv-tg-7 .cv-chip-time { display: none; }
+  /* 3 дня на телефоне: колонка ~100px — время и так видно по сетке, место отдаём названию */
+  .cv-tg-3 .cv-block-title .cv-block-time, .cv-tg-3 .cv-block-title svg { display: none; }
   .cv-tg .cv-chip { font-size: 11px; padding: 0 3px; border-left-width: 2px; }
 }
 
@@ -279,4 +286,10 @@
   .cv-header .cv-nav .icon-btn { width: 36px; height: 36px; }
   .cv-period { font-size: 19px; padding: 0 2px; }
   .cv-header { padding-left: 12px; padding-right: 12px; column-gap: 6px; }
+}
+/* узкий телефон (360–420): название периода целиком — чуть меньше шрифт и компактная «Сегодня» */
+@media (max-width: 420px) {
+  .cv-period { font-size: 17px; }
+  .cv-header .cv-today { padding: 0 10px; font-size: 14px; }
+  .cv-header .cv-nav { gap: 0; }
 }

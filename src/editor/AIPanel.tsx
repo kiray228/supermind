@@ -9,6 +9,7 @@ import { markdownToTopic, textToTopics } from '../io/markdown';
 import { findInSheet, pathTo, walk } from '../utils/tree';
 import type { Topic } from '../types';
 import { newSheet } from '../store/docStore';
+import { ReportAI } from '../ui/ReportAI';
 
 type Mode = 'menu' | 'run' | 'chat';
 
@@ -193,6 +194,7 @@ export function AIPanel({ onClose }: { onClose(): void }) {
             ) : (
               <pre className="ai-output">{run.text || (run.busy ? 'Думаю…' : '')}</pre>
             )}
+            {!run.busy && !run.error && run.kind !== 'info' && run.text && <ReportAI text={run.text} where={`Карта · ${run.title}`} />}
             {run.busy ? (
               <button className="btn" onClick={stop}><Stop size={14} /> Остановить</button>
             ) : !run.error && run.kind !== 'info' ? (
@@ -234,6 +236,9 @@ export function AIPanel({ onClose }: { onClose(): void }) {
                     >
                       <Plus size={14} /> Вставить пункты в «{(sel.text || '').slice(0, 20)}»
                     </button>
+                  )}
+                  {m.role === 'assistant' && m.content && !m.content.startsWith('⚠️') && !(chatBusy && i === chat.length - 1) && (
+                    <ReportAI text={m.content} where="Карта · Чат с картой" />
                   )}
                 </div>
               ))}

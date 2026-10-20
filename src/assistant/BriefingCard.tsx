@@ -12,6 +12,7 @@ import type { PlannerData } from '../types';
 import { AIError } from '../ai/claude';
 import { aiBrief, cachedAiBrief, computeBriefing, plural } from './briefing';
 import { Markdown } from './Markdown';
+import { ReportAI } from '../ui/ReportAI';
 import type { BrainBrief } from '../notes/brainBrief';
 
 const COLLAPSE_KEY = 'sm-assistant-brief-collapsed';
@@ -350,6 +351,7 @@ export function BriefingCard({ hasKey, onCollapse }: { hasKey: boolean; onCollap
                     </button>
                   </div>
                   <Markdown text={ai} />
+                  {!aiBusy && <ReportAI text={ai} where="ИИ-план на день" />}
                 </>
               ) : (
                 <button className="as-ai-btn" onClick={() => void runAi()} disabled={aiBusy}>

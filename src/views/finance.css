@@ -481,8 +481,10 @@
 }
 @media (max-width: 420px) {
   .fn-grid2 { grid-template-columns: 1fr; }
-  .fn-kpi { padding: 0 8px 0 16px; }
-  .fn-kpi .fn-money { font-size: 17px; }
+  /* три суммы в ряд на 360px: «+481 тыс. ₸» целиком — у второй и третьей колонки поля поуже, шрифт на пиксель меньше */
+  .fn-kpi { padding: 0 6px 0 12px; }
+  .fn-kpi:first-child { padding-left: 16px; }
+  .fn-kpi .fn-money { font-size: 16px; letter-spacing: -0.03em; }
   .fn-budget-stats { grid-template-columns: 1fr 1fr; row-gap: 12px; }
   .fn-budget-stats > div:nth-child(3) { box-shadow: none; }
   .fn-pay-row { grid-template-columns: 1fr 1fr; }
