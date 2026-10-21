@@ -47,6 +47,8 @@ interface DocState {
   /** текст, отправленный в системный буфер при копировании тем */
   clipboardText: string | null;
   saving: boolean;
+  /** последняя запись карты не удалась — на диске старая версия */
+  saveError: string | null;
   /** счётчик для "сфокусировать камеру на теме" */
   focusReq: { id: ID; n: number } | null;
   /** фокус на ветке: на холсте только эта тема с потомками (вид, в карту не сохраняется) */
@@ -121,7 +123,7 @@ function scheduleSave() {
 }
 
 /** Есть несохранённые изменения открытой карты */
-export const hasPendingSave = () => !!saveTimer;
+export const hasPendingSave = () => !!saveTimer || !!useDoc.getState().saveError;
 
 /** Сохранение, которое идёт прямо сейчас (таймер уже снят, а запись в базу не закончилась) */
 let inflight: Promise<void> | null = null;
@@ -131,12 +133,17 @@ export async function settleSave() {
   while (inflight) await inflight;
 }
 
-export function flushSave(): Promise<void> {
+/** force — записать, даже если автосохранение ничего не ждёт (кнопка «Сохранить», прошлая запись не удалась) */
+export function flushSave(force = false): Promise<void> {
   // нечего сохранять — не трогаем базу (иначе синхронизация считала бы карту изменённой)
-  if (!saveTimer) return inflight ?? Promise.resolve();
-  clearTimeout(saveTimer);
+  if (!saveTimer && !force && !useDoc.getState().saveError) return inflight ?? Promise.resolve();
+  if (saveTimer) clearTimeout(saveTimer);
   saveTimer = null;
-  const p = (inflight ?? Promise.resolve()).then(writeOpen);
+  // карта — на момент вызова: close() сразу после flushSave() не должен оставить запись без карты
+  const { doc, password } = useDoc.getState();
+  if (!doc) return inflight ?? Promise.resolve();
+  // writeOpen ошибок не бросает, но и чужая ошибка в цепочке не должна отменять следующую запись
+  const p = (inflight ?? Promise.resolve()).catch(() => {}).then(() => writeOpen(doc, password));
   inflight = p;
   void p.finally(() => {
     if (inflight === p) inflight = null;
@@ -144,9 +151,36 @@ export function flushSave(): Promise<void> {
   return p;
 }
 
-async function writeOpen() {
-  const { doc, password } = useDoc.getState();
-  if (!doc) return;
+/** Кнопка «Сохранить»: забрать набранное в открытых полях, записать карту и проверить, что она на диске */
+export async function saveNow(): Promise<{ ok: boolean; doc: MindDoc | null }> {
+  if (!useDoc.getState().doc) return { ok: false, doc: null };
+  // поле ввода (тема, название, панель формата) записывает текст при закрытии
+  const el = typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null;
+  if (el?.matches('input, textarea, [contenteditable=true]')) el.blur();
+  if (useDoc.getState().editingId) useDoc.getState().setEditing(null);
+  // поле темы записывает текст при размонтировании — после отрисовки
+  await new Promise((r) => setTimeout(r, 30));
+  const doc = useDoc.getState().doc;
+  if (!doc) return { ok: false, doc: null };
+  await flushSave(true);
+  while (inflight) await inflight;
+  if (useDoc.getState().saveError) return { ok: false, doc };
+  // карту закрыли при сохранении (пароль поставили на другом устройстве) — правки сохранены отдельной картой
+  if (useDoc.getState().doc?.id !== doc.id) return { ok: true, doc };
+  try {
+    const disk = await kvGet<MindDoc | LockedDoc>(`doc:${doc.id}`);
+    const ok = !!disk && ('locked' in disk ? !!useDoc.getState().password : disk.updatedAt >= doc.updatedAt);
+    if (!ok) useDoc.setState({ saveError: 'Карта не нашлась на диске после записи' });
+    return { ok, doc };
+  } catch (e) {
+    useDoc.setState({ saveError: errText(e) });
+    return { ok: false, doc };
+  }
+}
+
+const errText = (e: unknown) => (e instanceof Error ? e.message : String(e)) || 'Ошибка записи';
+
+async function writeOpen(doc: MindDoc, password: string | null) {
   useDoc.setState({ saving: true });
   try {
     // на другом устройстве на карту поставили пароль, а здесь она открыта без него:
@@ -159,7 +193,17 @@ async function writeOpen() {
       // пока сохраняли, могли поставить пароль — тогда без снимка
       if (!useDoc.getState().password) maybeSnapshot(doc);
     }
-    base = { id: doc.id, rev: remoteRev(`doc:${doc.id}`), updatedAt: doc.updatedAt };
+    if (useDoc.getState().doc?.id === doc.id) base = { id: doc.id, rev: remoteRev(`doc:${doc.id}`), updatedAt: doc.updatedAt };
+    if (useDoc.getState().saveError) useDoc.setState({ saveError: null });
+  } catch (e) {
+    // раньше ошибка терялась, а значок показывал «сохранено»: теперь видно, и следующая правка или кнопка повторят запись
+    console.error('Карта не сохранилась', e);
+    const first = !useDoc.getState().saveError;
+    useDoc.setState({ saveError: errText(e) });
+    if (first) {
+      const { toast } = await import('./appStore');
+      toast('Карта не сохранилась', { label: 'Сохранить', run: () => void flushSave(true) });
+    }
   } finally {
     useDoc.setState({ saving: false });
   }
@@ -254,6 +298,7 @@ export const useDoc = create<DocState>((set, get) => {
     clipboard: null,
     clipboardText: null,
     saving: false,
+    saveError: null,
     focusReq: null,
     focusId: null,
 
@@ -269,7 +314,7 @@ export const useDoc = create<DocState>((set, get) => {
       markOpened(doc);
       // версия «до правок» — в историю (для карт с паролем история не ведётся)
       if (!password) void snapshot(doc).catch(() => {});
-      set({ doc, password, selection: touch ? [] : [activeSheet(doc).root.id], editingId: null, pendingText: null, past: [], future: [], selectedRel: null, focusId: null });
+      set({ doc, password, selection: touch ? [] : [activeSheet(doc).root.id], editingId: null, pendingText: null, past: [], future: [], selectedRel: null, focusId: null, saveError: null });
     },
     close() {
       flushSave();

@@ -8,7 +8,17 @@
   padding: 6px 8px; border-radius: 8px; text-overflow: ellipsis;
 }
 .ed-title:hover, .ed-title:focus { background: var(--surface-2); }
-.ed-save { display: inline-flex; gap: 3px; align-items: center; color: var(--text-3); }
+.ed-save {
+  display: inline-flex; gap: 5px; align-items: center; flex-shrink: 0; height: var(--h-icon-btn); padding: 0 12px 0 10px;
+  border: none; border-radius: 999px; background: transparent; color: var(--text-2); font: inherit; font-size: 13.5px; font-weight: 550; cursor: pointer;
+  transition: background .15s, transform .18s cubic-bezier(.3, 1.4, .5, 1);
+}
+.ed-save svg { width: 18px; height: 18px; }
+.ed-save .ed-save-lock { width: 13px; height: 13px; color: var(--text-3); }
+.ed-save:active { transform: scale(.94); }
+@media (hover: hover) { .ed-save:hover { background: var(--fill-3); color: var(--text); } }
+/* запись не удалась — заметно, нажатие повторит */
+.ed-save.err { color: var(--danger, #e5484d); background: color-mix(in srgb, var(--danger, #e5484d) 12%, transparent); }
 .ed-modes button { display: inline-flex; align-items: center; gap: 5px; }
 .ai-btn { color: var(--accent); }
 .ai-btn svg { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 40%, transparent)); }
@@ -207,7 +217,9 @@
   .hide-mobile { display: none !important; }
   .show-mobile { display: inline-flex !important; }
   .show-mobile-inline { display: inline !important; }
-  .ed-save { display: none; }
+  /* на телефоне — круглая кнопка без подписи */
+  .ed-save { width: var(--h-icon-btn); padding: 0; justify-content: center; gap: 0; }
+  .ed-save-label, .ed-save .ed-save-lock { display: none; }
   .ed-panel {
     position: fixed; left: 0; right: 0; bottom: 0; width: auto; height: 62vh; z-index: 40; border-left: none; border-top: var(--hairline) solid var(--separator);
     border-radius: 20px 20px 0 0; box-shadow: var(--shadow-lg); padding-bottom: var(--safe-bottom); animation: sheet .22s ease;
@@ -462,6 +474,8 @@
 @media (max-width: 480px) {
   .ed-top .icon-btn { width: 42px; height: 42px; }
   .ed-top .icon-btn svg { width: 22px; height: 22px; }
+  .ed-top .ed-save { width: 42px; height: 42px; }
+  .ed-top .ed-save svg { width: 22px; height: 22px; }
   .ed-top .ed-title { flex: 1; min-width: 0; max-width: none; padding: 6px 6px; }
   .ed-top > .grow { display: none; }
   .ed-toolbar .tb-btn { min-width: 58px; }

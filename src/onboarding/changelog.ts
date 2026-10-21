@@ -1,5 +1,5 @@
 /** «Что нового»: главное в каждой версии. Новые версии — сверху. */
-import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge, MessageCircleQuestion, CloudOff, LayoutTemplate, SquareArrowOutUpRight, BellRing, Target, Timer, Lock, Crosshair, Move, GitMerge, EyeOff, CalendarRange, Fingerprint, ArrowUpDown, Banknote, MonitorSmartphone, Coins, ListChecks, FileInput, Split, CornerDownRight, KeyRound, Keyboard, LifeBuoy, Zap, FileSpreadsheet, Gauge as GaugeIcon, MessagesSquare, Accessibility, Focus } from 'lucide-react';
+import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge, MessageCircleQuestion, CloudOff, LayoutTemplate, SquareArrowOutUpRight, BellRing, Target, Timer, Lock, Crosshair, Move, GitMerge, EyeOff, CalendarRange, Fingerprint, ArrowUpDown, Banknote, MonitorSmartphone, Coins, ListChecks, FileInput, Split, CornerDownRight, KeyRound, Keyboard, LifeBuoy, Zap, FileSpreadsheet, Gauge as GaugeIcon, MessagesSquare, Accessibility, Focus, Save, Flag } from 'lucide-react';
 
 export interface ChangeItem {
   icon: typeof Sparkles;
@@ -15,6 +15,15 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.47',
+    title: 'Кнопка «Сохранить» в картах',
+    items: [
+      { icon: Save, title: 'Сохранить карту сейчас', text: 'В шапке карты появилась кнопка «Сохранить» (и Ctrl+S): она забирает набранный текст, записывает карту, проверяет, что она на устройстве, и отправляет в облако.' },
+      { icon: ShieldCheck, title: 'Автосохранение надёжнее', text: 'Если запись не удалась, кнопка становится красной и подсказывает сохранить ещё раз, а одна неудачная запись больше не мешает следующим.' },
+      { icon: Flag, title: 'Пожаловаться на ответ ИИ', text: 'У каждого ответа ИИ есть кнопка «Пожаловаться», а перед первым запросом к ИИ приложение спрашивает согласие на отправку данных.' },
+    ],
+  },
   {
     version: '1.46',
     title: 'Заметки бережнее, будильники надёжнее',

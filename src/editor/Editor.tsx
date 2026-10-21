@@ -3,10 +3,10 @@ import {
   CaretLeft, ArrowCounterClockwise, ArrowClockwise, Sparkle, SlidersHorizontal, MagnifyingGlass, DotsThree, Plus, ArrowElbowDownRight, Trash, BezierCurve, Selection,
   BracketsCurly, Minus, CornersOut, PresentationChart, ArrowsOutSimple, DownloadSimple, Lock, LockOpen, Graph, TreeView, ChartBarHorizontal, X, CaretRight,
   Keyboard, Copy, Scissors, ClipboardText, FilePlus, PencilSimple, ArrowsInLineVertical, ArrowLineUp, CopySimple, NotePencil, CloudArrowUp, Check, Palette, ArrowsLeftRight,
-  Export, CaretDown, Stack, ClockCounterClockwise, Crosshair, type Icon,
+  Export, CaretDown, Stack, ClockCounterClockwise, Crosshair, FloppyDisk, WarningCircle, type Icon,
 } from '@phosphor-icons/react';
 import { focusPath, focusSheet } from './focus';
-import { useDoc, topicSide } from '../store/docStore';
+import { useDoc, topicSide, saveNow } from '../store/docStore';
 import { toast } from '../store/appStore';
 import { leaveEditor } from '../actions';
 import { MapCanvas, type MapCanvasHandle } from './MapCanvas';
@@ -86,6 +86,7 @@ export default function Editor() {
   const canRedo = useDoc((s) => s.future.length > 0);
   const saving = useDoc((s) => s.saving);
   const password = useDoc((s) => s.password);
+  const saveError = useDoc((s) => s.saveError);
   const editing = useDoc((s) => s.editingId !== null);
   const canvas = useRef<MapCanvasHandle>(null);
 
@@ -333,6 +334,30 @@ export default function Editor() {
     setMenu({ x, y, title: branchId ? 'Сколько уровней показать в ветви' : 'Сколько уровней показать', single: true, items });
   };
 
+  // «Сохранить»: запись на устройство с проверкой, затем — в облако, если вошли в аккаунт
+  const savingNow = useRef(false);
+  const saveMap = async () => {
+    if (savingNow.current) return;
+    savingNow.current = true;
+    try {
+      const { ok } = await saveNow();
+      if (!ok) {
+        toast('Не удалось сохранить: ' + (useDoc.getState().saveError ?? 'ошибка записи'), { label: 'Ещё раз', run: () => void saveMap() });
+        return;
+      }
+      haptic();
+      const { useCloud, syncNow } = await import('../store/cloud');
+      if (!useCloud.getState().account) return void toast('Карта сохранена');
+      if (!navigator.onLine) return void toast('Карта сохранена на устройстве. В облако отправится, когда появится интернет');
+      toast('Карта сохранена, отправляю в облако…');
+      await syncNow();
+      const c = useCloud.getState();
+      toast(c.status === 'idle' ? 'Карта сохранена на устройстве и в облаке' : 'Карта сохранена на устройстве. В облако отправится позже' + (c.error ? ` (${c.error})` : ''));
+    } finally {
+      savingNow.current = false;
+    }
+  };
+
   const openMoreMenu = (e: React.MouseEvent) => {
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const x = Math.max(8, Math.min(r.right - 240, window.innerWidth - 256));
@@ -350,6 +375,7 @@ export default function Editor() {
               'sep' as const,
             ]
           : []),
+        { icon: <FloppyDisk size={16} />, label: 'Сохранить', kbd: touchUI ? undefined : 'Ctrl+S', onClick: () => void saveMap() },
         { icon: <PresentationChart size={16} />, label: 'Презентация', onClick: startPitch },
         { icon: <ArrowsOutSimple size={16} />, label: 'Режим Zen', kbd: 'Ctrl+E', onClick: () => setZen(true) },
         { icon: <Stack size={16} />, label: 'Уровни…', onClick: () => openLevelsMenu(x, y) },
@@ -444,8 +470,16 @@ export default function Editor() {
   );
 
   // ---------- горячие клавиши ----------
+  const saveMapRef = useRef(saveMap);
+  saveMapRef.current = saveMap;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Ctrl+S — и во время ввода текста
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && isKey(e, 's')) {
+        e.preventDefault();
+        void saveMapRef.current();
+        return;
+      }
       const tgt = e.target as HTMLElement;
       if (tgt.closest('input, textarea, select, [contenteditable=true]')) return;
       if (hasOverlay()) return;
@@ -608,10 +642,16 @@ export default function Editor() {
             onBlur={(e) => e.target.value.trim() && e.target.value !== doc.title && st.setTitle(e.target.value.trim())}
             onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
           />
-          <span className="ed-save" title={saving ? 'Сохранение…' : 'Сохранено на устройстве'}>
-            {password && <Lock size={13} />}
-            {saving ? <CloudArrowUp size={15} className="faint" /> : <Check size={15} className="faint" />}
-          </span>
+          <button
+            className={`ed-save ${saveError ? 'err' : ''}`}
+            onClick={() => void saveMap()}
+            title={saveError ? 'Карта не сохранилась — нажмите, чтобы сохранить' : saving ? 'Сохранение…' : 'Сохранить (Ctrl+S)'}
+            aria-label="Сохранить карту"
+          >
+            {password && <Lock size={13} className="ed-save-lock" />}
+            {saveError ? <WarningCircle weight="fill" /> : saving ? <CloudArrowUp /> : <FloppyDisk />}
+            <span className="ed-save-label">Сохранить</span>
+          </button>
           <div className="grow" />
           {touchUI ? (
             <>
@@ -977,6 +1017,7 @@ const KEYS: [string, string][] = [
   ['Ctrl+B / Ctrl+I', 'Жирный / курсив'],
   ['Ctrl+F', 'Поиск'],
   ['Ctrl+0 / Ctrl+= / Ctrl+-', 'Вписать / увеличить / уменьшить'],
+  ['Ctrl+S', 'Сохранить карту'],
   ['Ctrl+E', 'Режим Zen'],
   ['Двойной клик по фону', 'Плавающая тема'],
   ['Перетаскивание темы', 'Переместить (на тему — вложить, на пустое место — открепить)'],
