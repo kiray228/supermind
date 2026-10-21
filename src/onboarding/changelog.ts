@@ -16,6 +16,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.48',
+    title: 'Ctrl+S сохраняет и во время ввода',
+    items: [
+      { icon: Keyboard, title: 'Ctrl+S прямо из темы', text: 'Сочетание Ctrl+S сохраняет карту, даже пока вы печатаете текст темы, — не нужно сначала закрывать поле.' },
+    ],
+  },
+  {
     version: '1.47',
     title: 'Кнопка «Сохранить» в картах',
     items: [
