@@ -426,6 +426,8 @@ function scheduleNative() {
     const { LocalNotifications: L } = await LN();
     await L.cancel({ notifications: [{ id: NID }] }).catch(() => {});
     const work = s.phase === 'work';
+    // без разрешения на точные будильники плагин открыл бы системные настройки — тогда «почти точно»
+    const exact = await L.checkExactNotificationSetting().then((r) => r.exact_alarm === 'granted').catch(() => false);
     await L.schedule({
       notifications: [
         {
@@ -433,6 +435,7 @@ function scheduleNative() {
           title: work ? 'Помодоро завершён' : 'Перерыв окончен',
           body: work ? 'Время отдохнуть' : 'Пора вернуться к фокусу',
           schedule: { at: new Date(s.endAt), allowWhileIdle: true },
+          isExactNotification: exact,
           channelId: 'sm-reminders',
         },
       ],

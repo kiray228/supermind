@@ -123,6 +123,13 @@ export async function exactAlarmState(): Promise<'granted' | 'denied' | 'n/a'> {
     return 'n/a';
   }
 }
+/**
+ * Точные ли уведомления: только если разрешение уже есть. Иначе плагин при каждом schedule()
+ * сам открывал бы системный экран «Будильники и напоминания» (на Android 14+ после установки
+ * оно выключено) — спрашиваем только по нажатию: «Как будильник» и Настройки.
+ */
+export const exactAllowed = async () => (await exactAlarmState()) === 'granted';
+
 export async function openExactAlarmSettings() {
   const { LocalNotifications: LN } = await notifications();
   await LN.changeExactNotificationSetting().catch(() => {});
@@ -523,6 +530,7 @@ async function snoozeOne(t: TaskItem, minutes: number, forDate?: string) {
   const at = Date.now() + minutes * 60000;
   if (isNative()) {
     const { LocalNotifications: LN } = await notifications();
+    const exact = await exactAllowed();
     if (date) await LN.cancel({ notifications: [1, 2, 3].map((k) => ({ id: hash(`${t.id}|${date}|nag${k}`) })) }).catch(() => {});
     await LN.schedule({
       notifications: [
@@ -532,6 +540,7 @@ async function snoozeOne(t: TaskItem, minutes: number, forDate?: string) {
           title: t.title || 'Задача',
           body: 'Отложено · ' + reminderBody(t, date ?? todayYmd()),
           schedule: { at: new Date(at), allowWhileIdle: true },
+          isExactNotification: exact,
           channelId: 'sm-reminders',
           actionTypeId: 'sm-task',
           extra: { taskId: t.id, date: date ?? '', sm: 1, snooze: 1 },
@@ -586,6 +595,7 @@ async function syncNative() {
   }
   if (cancel.length) await LN.cancel({ notifications: cancel });
   const add = want.filter((w) => !have.has(w.id));
+  const exact = add.length ? await exactAllowed() : false;
   for (let i = 0; i < add.length; i += 60) {
     await LN.schedule({
       notifications: add.slice(i, i + 60).map((w) => ({
@@ -594,6 +604,7 @@ async function syncNative() {
         body: w.body,
         largeBody: w.body,
         schedule: { at: new Date(w.at), allowWhileIdle: true },
+        isExactNotification: exact,
         channelId: 'sm-reminders',
         actionTypeId: w.extra.brain === 'question' ? 'sm-question' : w.extra.brain === 'cards' ? 'sm-card' : w.extra.habitId ? 'sm-habit' : w.extra.payId || w.extra.briefing || w.extra.saver || w.extra.goalId ? undefined : 'sm-task',
         autoCancel: true,
