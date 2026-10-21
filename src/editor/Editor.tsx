@@ -472,14 +472,19 @@ export default function Editor() {
   // ---------- горячие клавиши ----------
   const saveMapRef = useRef(saveMap);
   saveMapRef.current = saveMap;
+  // Ctrl+S — и во время ввода: поле темы останавливает всплытие клавиш, поэтому слушаем на погружении
+  useEffect(() => {
+    const onSave = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || !isKey(e, 's')) return;
+      e.preventDefault();
+      e.stopPropagation();
+      void saveMapRef.current();
+    };
+    window.addEventListener('keydown', onSave, true);
+    return () => window.removeEventListener('keydown', onSave, true);
+  }, []);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      // Ctrl+S — и во время ввода текста
-      if ((e.ctrlKey || e.metaKey) && !e.altKey && isKey(e, 's')) {
-        e.preventDefault();
-        void saveMapRef.current();
-        return;
-      }
       const tgt = e.target as HTMLElement;
       if (tgt.closest('input, textarea, select, [contenteditable=true]')) return;
       if (hasOverlay()) return;
