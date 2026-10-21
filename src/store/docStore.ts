@@ -198,6 +198,8 @@ async function writeOpen(doc: MindDoc, password: string | null) {
   } catch (e) {
     // раньше ошибка терялась, а значок показывал «сохранено»: теперь видно, и следующая правка или кнопка повторят запись
     console.error('Карта не сохранилась', e);
+    // в отчёты об ошибках (раньше она попадала туда сама, как необработанная)
+    void import('../ui/errorReport').then((m) => m.recordError(e, 'error')).catch(() => {});
     const first = !useDoc.getState().saveError;
     useDoc.setState({ saveError: errText(e) });
     if (first) {
