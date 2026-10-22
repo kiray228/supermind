@@ -226,7 +226,7 @@ function HabitsRow({ habits, planner, today }: { habits: BriefHabit[]; planner: 
               <span className="td-ring" style={{ ['--c' as string]: h.color }}>
                 <svg viewBox="0 0 44 44" aria-hidden="true">
                   <circle cx="22" cy="22" r="19" className="td-ring-track" />
-                  <circle cx="22" cy="22" r="19" className="td-ring-bar" strokeDasharray={`${(pct * 119.4).toFixed(1)} 200`} />
+                  <circle cx="22" cy="22" r="19" className="td-ring-bar" strokeDasharray={`${(pct * 119.4).toFixed(1)} 200`} opacity={pct > 0 ? 1 : 0} />
                 </svg>
                 <span className="td-ring-ico">{h.done ? '✓' : h.icon || h.name.slice(0, 1).toUpperCase()}</span>
               </span>
