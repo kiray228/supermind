@@ -30,6 +30,9 @@ android/local.properties
 release/
 .claude/
 
+# Подпись обновлений программы для Windows — не публиковать
+desktop/updater.key
+
 # Сборка приложения для Windows
 desktop/out/
 desktop/src-tauri/target/

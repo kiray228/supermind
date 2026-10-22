@@ -15,11 +15,18 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
+    "targets": [
+      "nsis"
+    ],
     "publisher": "SuperMind",
     "copyright": "SuperMind",
     "shortDescription": "SuperMind — интеллект-карты, задачи, ежедневник",
-    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.ico"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ],
     "windows": {
       "webviewInstallMode": {
         "type": "downloadBootstrapper",
@@ -27,10 +34,24 @@
       },
       "nsis": {
         "installMode": "currentUser",
-        "languages": ["Russian"],
+        "languages": [
+          "Russian"
+        ],
         "displayLanguageSelector": false,
         "installerIcon": "icons/icon.ico",
         "installerHooks": "./installer-hooks.nsh"
+      }
+    },
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDRGMEIxNkIwRjgzOTI5NzIKUldSeUtUbjRzQllMVHdFZzJwbHFSTVFIOERIaFJjdElUSmNGUk9iaDBVVUd2eml0V3lBRmJQMGkK",
+      "endpoints": [
+        "https://github.com/kiray228/supermind/releases/download/windows/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
       }
     }
   }

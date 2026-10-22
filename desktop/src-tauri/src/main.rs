@@ -1,11 +1,14 @@
 // SuperMind для Windows: окно с веб-версией на встроенном в Windows движке (WebView2).
 // Сайт кэшируется service worker'ом — после первого запуска работает офлайн,
-// а обновления приходят сами вместе с сайтом.
+// а обновления приходят сами вместе с сайтом. Саму программу обновляет tauri-plugin-updater:
+// при запуске сверяется с latest.json в релизе `windows` и ставит подписанный установщик.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::io::Write;
 use tauri::webview::{NewWindowResponse, PageLoadEvent, PermissionKind, PermissionResponse};
 use tauri::{AppHandle, Manager, Runtime, Url, WebviewUrl, WebviewWindowBuilder};
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
+use tauri_plugin_updater::UpdaterExt;
 
 const APP_URL: &str = "https://kiray228.github.io/supermind/";
 // прежний адрес (до переименования) переадресует на новый
@@ -39,6 +42,54 @@ fn log<R: Runtime>(app: &AppHandle<R>, msg: &str) {
     }
 }
 
+/// Новая версия программы: спросить и поставить (установщик закроет окно, обновит и откроет программу снова).
+/// Без сети или при ошибке — тихо, до следующего запуска.
+async fn check_update(app: AppHandle) {
+    let update = match app.updater() {
+        Ok(u) => u.check().await,
+        Err(e) => return log(&app, &format!("updater: {e}")),
+    };
+    let update = match update {
+        Ok(Some(u)) => u,
+        Ok(None) => return,
+        Err(e) => return log(&app, &format!("update check: {e}")),
+    };
+    log(&app, &format!("update available {}", update.version));
+    let ok = app
+        .dialog()
+        .message(format!(
+            "Вышла новая версия SuperMind {} (у вас {}).
+
+Обновить сейчас? Это займёт несколько секунд, карты и задачи останутся на месте.",
+            update.version, update.current_version
+        ))
+        .title("Обновление SuperMind")
+        .kind(MessageDialogKind::Info)
+        .buttons(MessageDialogButtons::OkCancelCustom("Обновить".into(), "Позже".into()))
+        .blocking_show();
+    if !ok {
+        return log(&app, "update postponed");
+    }
+    // окно с сайтом — успеть записать несохранённое (pagehide → сохранение карт и задач)
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.eval("window.dispatchEvent(new Event('pagehide'))");
+    }
+    match update.download_and_install(|_, _| {}, || {}).await {
+        // на Windows сюда обычно не доходит: установщик сам закрывает программу и запускает новую
+        Ok(()) => app.restart(),
+        Err(e) => {
+            log(&app, &format!("update install: {e}"));
+            app.dialog()
+                .message(format!("Не удалось обновить SuperMind: {e}
+
+Попробуйте позже или скачайте установщик с сайта."))
+                .title("Обновление SuperMind")
+                .kind(MessageDialogKind::Error)
+                .blocking_show();
+        }
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         // второй запуск только показывает уже открытое окно
@@ -52,6 +103,8 @@ fn main() {
         // размер и место окна между запусками (за край экрана не восстанавливает)
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let handle = app.handle().clone();
             log(&handle, &format!("start {}", app.package_info().version));
@@ -91,6 +144,13 @@ fn main() {
                     }
                 })
                 .build()?;
+            // проверка обновления — после того как окно открылось
+            // (отдельный поток: окно-вопрос ждёт ответа, не задерживая программу)
+            let upd = handle.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_secs(5));
+                tauri::async_runtime::block_on(check_update(upd));
+            });
             Ok(())
         })
         .run(tauri::generate_context!())

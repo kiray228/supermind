@@ -2,7 +2,10 @@ name: Build Windows app
 
 # Установщик SuperMind-Setup.exe (Tauri, WebView2) прикрепляется к каждому релизу и к постоянному релизу «windows».
 # Ссылка в приложении ведёт на releases/download/windows/SuperMind-Setup.exe —
-# она работает и в первые минуты после нового релиза, пока установщик ещё собирается
+# она работает и в первые минуты после нового релиза, пока установщик ещё собирается.
+# Обновление программы: установщик подписан ключом TAURI_SIGNING_PRIVATE_KEY (секрет репозитория,
+# копия — desktop/updater.key на компьютере владельца), а windows/latest.json говорит установленным
+# программам, какая версия последняя и где её установщик
 on:
   release:
     types: [published]
@@ -10,6 +13,9 @@ on:
     inputs:
       tag:
         description: 'Релиз, к которому прикрепить установщик (например v1.20). Пусто — только собрать для проверки'
+        required: false
+      version:
+        description: 'Только для проверки обновления: собрать с этой версией (например 1.0.0) — такая программа сразу предложит обновиться'
         required: false
 
 permissions:
@@ -22,6 +28,7 @@ jobs:
     runs-on: windows-latest
     env:
       TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      VERSION_OVERRIDE: ${{ inputs.version }}
       GH_TOKEN: ${{ github.token }}
     defaults:
       run:
@@ -43,14 +50,25 @@ jobs:
       - run: |
           v="${TAG#v}"
           [ -z "$v" ] && v=$(node -p "require('../package.json').version")
+          [ -n "$VERSION_OVERRIDE" ] && [ -z "$TAG" ] && v="$VERSION_OVERRIDE"
           [[ "$v" =~ ^[0-9]+\.[0-9]+$ ]] && v="$v.0"
+          echo "APP_VERSION=$v" >> "$GITHUB_ENV"
           node -e "const f='src-tauri/tauri.conf.json',c=require('./'+f);c.version='$v';require('fs').writeFileSync(f,JSON.stringify(c,null,2))"
+      # подпись для обновления (рядом с установщиком появляется .sig)
       - run: npm run dist
-      - run: cp src-tauri/target/release/bundle/nsis/*-setup.exe SuperMind-Setup.exe && ls -la SuperMind-Setup.exe
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+      - run: |
+          cp src-tauri/target/release/bundle/nsis/*-setup.exe SuperMind-Setup.exe
+          cp src-tauri/target/release/bundle/nsis/*-setup.exe.sig SuperMind-Setup.exe.sig
+          ls -la SuperMind-Setup.exe SuperMind-Setup.exe.sig
       - uses: actions/upload-artifact@v4
         with:
           name: SuperMind-Setup
-          path: desktop/SuperMind-Setup.exe
+          path: |
+            desktop/SuperMind-Setup.exe
+            desktop/SuperMind-Setup.exe.sig
       - if: env.TAG != ''
         run: gh release upload "$TAG" SuperMind-Setup.exe --clobber
       # постоянная ссылка: сначала загрузить под временным именем, потом подменить — файл доступен всё время
@@ -61,3 +79,15 @@ jobs:
           gh release delete-asset windows SuperMind-Setup.exe -y || true
           id=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/windows" --jq '.assets[] | select(.name == "SuperMind-Setup-next.exe") | .id')
           gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/assets/$id" -f name=SuperMind-Setup.exe > /dev/null
+      # обновление программы: latest.json — после того как установщик уже лежит в релизе версии
+      - if: env.TAG != ''
+        run: |
+          node -e "
+            const fs = require('fs');
+            const p = { signature: fs.readFileSync('SuperMind-Setup.exe.sig', 'utf8').trim(), url: 'https://github.com/' + process.env.GITHUB_REPOSITORY + '/releases/download/' + process.env.TAG + '/SuperMind-Setup.exe' };
+            const j = { version: process.env.APP_VERSION, notes: 'SuperMind ' + process.env.TAG, pub_date: new Date().toISOString(), platforms: { 'windows-x86_64': p, 'windows-x86_64-nsis': p } };
+            fs.writeFileSync('latest.json', JSON.stringify(j, null, 2));
+          "
+          cat latest.json
+          gh release upload "$TAG" latest.json --clobber
+          gh release upload windows latest.json --clobber
