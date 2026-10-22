@@ -42,6 +42,11 @@ fn log<R: Runtime>(app: &AppHandle<R>, msg: &str) {
     }
 }
 
+/// «1.50.0» → «1.50», как в названиях релизов
+fn short(v: &str) -> &str {
+    v.strip_suffix(".0").unwrap_or(v)
+}
+
 /// Новая версия программы: спросить и поставить (установщик закроет окно, обновит и откроет программу снова).
 /// Без сети или при ошибке — тихо, до следующего запуска.
 async fn check_update(app: AppHandle) {
@@ -61,7 +66,8 @@ async fn check_update(app: AppHandle) {
             "Вышла новая версия SuperMind {} (у вас {}).
 
 Обновить сейчас? Это займёт несколько секунд, карты и задачи останутся на месте.",
-            update.version, update.current_version
+            short(&update.version),
+            short(&update.current_version)
         ))
         .title("Обновление SuperMind")
         .kind(MessageDialogKind::Info)
