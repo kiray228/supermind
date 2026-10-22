@@ -12,7 +12,8 @@ import { useSearchUi } from './state';
 import { entry, nav, whenShown, type Entry } from './sources';
 
 const GO: { view: Exclude<View, 'editor'>; label: string; emoji: string; alias: string }[] = [
-  { view: 'home', label: 'Карты', emoji: '🧠', alias: 'интеллект карты главная mind map' },
+  { view: 'today', label: 'Сегодня', emoji: '☀️', alias: 'день главная план привычки деньги' },
+  { view: 'home', label: 'Карты', emoji: '🧠', alias: 'интеллект карты mind map' },
   { view: 'tasks', label: 'Задачи', emoji: '✅', alias: 'дела todo список' },
   { view: 'calendar', label: 'Календарь', emoji: '📅', alias: 'расписание неделя месяц' },
   { view: 'habits', label: 'Привычки', emoji: '🔥', alias: 'привычки дневник день журнал настроение ежедневник' },

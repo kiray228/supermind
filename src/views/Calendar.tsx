@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, MouseEvent as RMouseEvent, PointerEvent as RPointerEvent, RefObject, TouchEvent as RTouchEvent } from 'react';
-import { CalendarDays, Check, ChevronLeft, ChevronRight, Download, MoreHorizontal, Network, NotebookPen, Plus, Repeat } from 'lucide-react';
+import { CalendarDays, Check, ChevronLeft, ChevronRight, Download, ListTodo, MoreHorizontal, Network, NotebookPen, Plus, Repeat } from 'lucide-react';
 import { ensureTasks, openQuickAdd, openTask, updateTask, useTasks } from '../tasks/store';
 import { dayLabel, isActive, isOverdue, longDate, minutesOf, mondayOf, MONTHS, occurrences, pad2, timeOf, WD_SHORT } from '../tasks/model';
 import type { TasksData, TaskItem } from '../tasks/model';
@@ -520,6 +520,9 @@ export default function Calendar() {
             </button>
           ))}
         </div>
+        <button className="icon-btn phone-only cv-list-btn" onClick={() => useApp.getState().go('tasks')} aria-label="Список задач" title="Список задач">
+          <ListTodo />
+        </button>
         <button className="icon-btn cv-more-btn" onClick={(e) => setMenu(e.currentTarget.getBoundingClientRect())} aria-label="Ещё">
           <MoreHorizontal />
         </button>

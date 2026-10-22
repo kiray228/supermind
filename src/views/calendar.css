@@ -208,6 +208,9 @@
   .cv-period { flex: 1; min-width: 0; font-size: 17px; }
   .cv-today { order: 2; }
   .cv-more-btn { order: 3; }
+  .cv-list-btn { order: 3; }
+  /* «‹ Сегодня» сверху слева: шапке календаря (стрелки слева) — своя строка под неё */
+  .app:has(> .phone-back) .cv-header { padding-top: calc(54px + var(--safe-top)); }
   .cv-views { order: 4; display: flex; width: 100%; }
   .cv-views button { flex: 1; min-width: 0; padding: 0 2px; font-size: 12.5px; }
   .cv-fab { right: 16px; bottom: calc(96px + var(--safe-bottom)); }

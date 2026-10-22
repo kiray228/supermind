@@ -523,6 +523,10 @@ export default function Tasks() {
           <ChevronDown size={18} className="tk-mobile-only" />
         </button>
         <div className="grow" />
+        {/* телефон: календарь — соседний вид задач (вкладка «Сегодня») */}
+        <button className="icon-btn phone-only" onClick={() => useApp.getState().go('calendar')} aria-label="Календарь" title="Календарь">
+          <CalendarDays />
+        </button>
         {query !== null ? (
           <div className="tk-search">
             <Search size={16} />

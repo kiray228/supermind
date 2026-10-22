@@ -80,7 +80,8 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
       /* привычки можно добавить и позже */
     }
     onDone();
-    useApp.getState().go(to);
+    // «Начать» — на экран дня (привычки, задачи, деньги); настройки — как просили
+    useApp.getState().go(to === 'home' ? 'today' : to);
   };
 
   useEffect(() => {

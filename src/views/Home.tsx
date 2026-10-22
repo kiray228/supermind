@@ -226,7 +226,7 @@ export default function Home() {
       </div>
       <div className="page-body">
         {/* ----- создать: компактная строка вместо большой ленты шаблонов ----- */}
-        <div className="home-create">
+        <div className={`home-create${active.length === 0 && tab === 'recent' && !q ? ' is-first' : ''}`}>
           <button className="home-chip home-chip-accent" onClick={() => createAndOpen(docFromTemplate(TEMPLATES[0]))}>
             <Plus size={16} /> Пустая карта
           </button>
@@ -240,6 +240,30 @@ export default function Home() {
             <Upload size={16} /> Импорт
           </button>
         </div>
+
+        {/* телефон: одна строка — вкладки списка и действия (вместо двух рядов кнопок и переключателя) */}
+        {!(active.length === 0 && tab === 'recent' && !q) && (
+          <div className="home-phone-chips" role="toolbar" aria-label="Карты">
+            <button className={`home-chip${tab === 'recent' ? ' is-on' : ''}`} onClick={() => setTab('recent')} aria-pressed={tab === 'recent'}>
+              Все
+            </button>
+            <button className={`home-chip${tab === 'starred' ? ' is-on' : ''}`} onClick={() => setTab('starred')} aria-pressed={tab === 'starred'}>
+              <Star size={14} /> Избранные
+            </button>
+            <button className="home-chip home-chip-ai" onClick={() => setAiOpen(true)}>
+              <Sparkles size={15} /> С ИИ
+            </button>
+            <button className="home-chip" onClick={() => setTplOpen(true)}>
+              <LayoutTemplate size={15} /> Шаблоны
+            </button>
+            <button className="home-chip" onClick={doImport}>
+              <Upload size={15} /> Импорт
+            </button>
+            <button className={`home-chip${tab === 'trash' ? ' is-on' : ''}`} onClick={() => setTab('trash')} aria-pressed={tab === 'trash'}>
+              <Trash2 size={14} /> Корзина{trashCount > 0 ? ` · ${trashCount}` : ''}
+            </button>
+          </div>
+        )}
 
         {active.length === 0 && tab === 'recent' && !q ? (
           <FirstMap onTemplate={(i) => createAndOpen(docFromTemplate(TEMPLATES[i]))} onAi={() => setAiOpen(true)} />

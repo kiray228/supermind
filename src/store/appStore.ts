@@ -5,16 +5,8 @@ import { shareSettings } from './sharedPrefs';
 
 export type View = 'today' | 'more' | 'home' | 'editor' | 'board' | 'planner' | 'settings' | 'tasks' | 'calendar' | 'focus' | 'notes' | 'goals' | 'finance' | 'assistant' | 'progress' | 'habits';
 
-/** Вкладки нижней панели телефона: Сегодня · Карты · (микрофон) · Мозг · Ещё */
-export type PhoneTab = 'today' | 'home' | 'notes' | 'more';
-/** К какой вкладке телефона относится раздел (подсветка панели и «назад») */
-export function phoneTab(v: View): PhoneTab {
-  if (v === 'today' || v === 'tasks' || v === 'calendar' || v === 'habits' || v === 'focus' || v === 'planner') return 'today';
-  if (v === 'home' || v === 'editor') return 'home';
-  if (v === 'notes' || v === 'goals') return 'notes';
-  return 'more';
-}
-export const isPhoneTab = (v: View): v is PhoneTab => v === 'today' || v === 'home' || v === 'notes' || v === 'more';
+export { phoneTab, isPhoneTab, type PhoneTab } from './phoneNav';
+import { nextBackTab, type PhoneTab } from './phoneNav';
 
 interface AppState {
   view: View;
@@ -67,8 +59,7 @@ export const useApp = create<AppState>((set, get) => ({
     // Ежедневник заменён разделом «Привычки» (дневник и настроение — там же)
     if (view === 'planner') view = 'habits';
     const cur = get().view;
-    // раздел внутри вкладки помнит, откуда пришли; переход между разделами внутри — тоже
-    const backTab = isPhoneTab(view) ? null : isPhoneTab(cur) ? cur : cur === 'editor' ? (get().backTab ?? 'home') : get().backTab;
+    const backTab = nextBackTab(cur, view, get().backTab);
     set({ view, backTab });
     try {
       if (RESTORABLE.includes(view)) localStorage.setItem('sm-view', view);

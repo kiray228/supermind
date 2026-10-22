@@ -27,7 +27,7 @@
 .spinner { width: 26px; height: 26px; border-radius: 50%; border: 2.5px solid var(--fill-2); border-top-color: var(--text-2); animation: spin .8s linear infinite; }
 
 /* ================= Панель вкладок (телефон): Сегодня · Карты · (микрофон) · Мозг · Ещё ================= */
-.tabbar, .phone-back { display: none; }
+.tabbar, .phone-back, .phone-only { display: none; }
 @media (max-width: 760px) {
   .app { flex-direction: column-reverse; }
   .sidebar { display: none; }
@@ -58,10 +58,14 @@
     background: var(--lg-bg); -webkit-backdrop-filter: var(--lg-blur); backdrop-filter: var(--lg-blur);
     box-shadow: var(--lg-highlight), 0 0 0 0.5px var(--lg-edge), 0 4px 14px rgba(0, 0, 0, 0.1);
   }
+  .icon-btn.phone-only { display: inline-flex; }
   .phone-back:active { transform: scale(.96); }
   /* прокрутили — в верхней строке компактный заголовок или сегменты: кнопка уходит, пока не вернёмся наверх */
   .app:has(.page.is-scrolled) .phone-back { opacity: 0; pointer-events: none; transform: translateY(-6px); }
   .phone-back { transition: opacity .2s, transform .2s; }
+  /* верхняя строка шапки не ниже кнопки «назад» — заголовок не подъезжает под неё (и без кнопок справа) */
+  .app:has(> .phone-back) .page-header:not(.cv-header) { padding-top: calc(8px + var(--safe-top)) !important; }
+  .app:has(> .phone-back) .page-header:not(.cv-header)::before { content: ''; flex: 0 0 0; height: 44px; }
 }
 
 /* значок с числом задач на сегодня */

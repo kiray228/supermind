@@ -32,6 +32,7 @@ import { CardsLayer } from '../notes/ui/CardsLayer';
 import { TemplatesLayer } from '../notes/ui/TemplatesSheet';
 import { isTemplateNote, listTemplates, openTemplates, templateFolderIds } from '../notes/templates';
 import { QuestionCard } from '../notes/ui/QuestionCard';
+import { BrainHome } from '../notes/ui/BrainHome';
 import { BrainHub } from '../notes/ui/BrainHub';
 import { hubSeen, markHubSeen } from '../notes/hub';
 import { openCardsReview, todaysCards } from '../notes/cards';
@@ -422,18 +423,28 @@ export default function Notes() {
       <div className="page-header nt-header">
         <IconTile section="notes" size="sm" className="ph-tile" />
         <button className="nt-title-btn" onClick={() => setDrawer(true)}>
-          <h1 className="ellipsis">{title}</h1>
+          <h1 className="ellipsis">
+            {/* на телефоне вкладка «Мозг»: все заметки — это «Второй мозг» */}
+            {title === 'Заметки' ? (
+              <>
+                <span className="nt-desk-only">Заметки</span>
+                <span className="nt-phone-only">Второй мозг</span>
+              </>
+            ) : (
+              title
+            )}
+          </h1>
           <ChevronDown size={18} className="nt-mobile-only" />
         </button>
         <div className="grow" />
-        <button className="icon-btn" onClick={() => void openDaily()} aria-label="Заметка дня" title="Заметка дня">
+        <button className="icon-btn nt-desk-only" onClick={() => void openDaily()} aria-label="Заметка дня" title="Заметка дня">
           <NotebookPen />
         </button>
-        <button className="icon-btn" onClick={() => openAsk()} aria-label="Спросить у мозга" title="Спросить у мозга">
+        <button className="icon-btn nt-desk-only" onClick={() => openAsk()} aria-label="Спросить у мозга" title="Спросить у мозга">
           <Brain />
         </button>
         {sel.k !== 'trash' && (
-          <button className={`icon-btn${mode === 'graph' ? ' active' : ''}`} onClick={() => setMode(mode === 'graph' ? 'list' : 'graph')} aria-label={mode === 'graph' ? 'Показать списком' : 'Граф заметок'} title={mode === 'graph' ? 'Списком' : 'Граф связей'}>
+          <button className={`icon-btn${mode === 'graph' ? ' active' : ' nt-desk-only'}`} onClick={() => setMode(mode === 'graph' ? 'list' : 'graph')} aria-label={mode === 'graph' ? 'Показать списком' : 'Граф заметок'} title={mode === 'graph' ? 'Списком' : 'Граф связей'}>
             {mode === 'graph' ? <LayoutGrid /> : <Waypoints />}
           </button>
         )}
@@ -469,10 +480,20 @@ export default function Notes() {
             />
           )}
           <div className="page-body nt-list" hidden={graphMode}>
-            {sel.k === 'all' && !q && <HubNudge count={data.notes.filter((n) => !n.trashed).length} onOpen={() => setHub(true)} />}
+            {/* телефон: верх «Второго мозга» вместо подсказок и значков в шапке */}
+            {sel.k === 'all' && !q && <BrainHome onGraph={() => setMode('graph')} onReview={() => setReviewSheet(true)} onDaily={() => void openDaily()} />}
+            {sel.k === 'all' && !q && (
+              <div className="nt-desk-only">
+                <HubNudge count={data.notes.filter((n) => !n.trashed).length} onOpen={() => setHub(true)} />
+              </div>
+            )}
             {sel.k === 'all' && !q && <QuestionCard />}
-            {sel.k === 'all' && !q && <CardsNudge />}
-            {sel.k === 'all' && !q && <ReviewNudge onOpen={() => setReviewSheet(true)} />}
+            {sel.k === 'all' && !q && (
+              <div className="nt-desk-only">
+                <CardsNudge />
+                <ReviewNudge onOpen={() => setReviewSheet(true)} />
+              </div>
+            )}
             {isTrash && list.length > 0 && <div className="nt-trash-hint small faint">Заметки в корзине удаляются навсегда через {TRASH_DAYS} дней.</div>}
             {list.length === 0 ? (
               <div className="empty">
@@ -505,7 +526,7 @@ export default function Notes() {
         </button>
       )}
       {!openId && !(graphMode && graphSel) && !isTrash && hasTemplates && (
-        <button className="nt-fab nt-fab-mini" onClick={fromTemplate} aria-label="Новая заметка по шаблону" title="Новая заметка по шаблону">
+        <button className="nt-fab nt-fab-mini nt-desk-only" onClick={fromTemplate} aria-label="Новая заметка по шаблону" title="Новая заметка по шаблону">
           <LayoutTemplate size={20} />
         </button>
       )}

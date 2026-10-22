@@ -134,3 +134,14 @@
   .home-continue-go { position: absolute; right: 12px; bottom: 16px; }
   .home-first .tpl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* ================= Телефон: одна строка «Все · Избранные · С ИИ · Шаблоны · Импорт · Корзина» ================= */
+.home-phone-chips { display: none; }
+@media (max-width: 760px) {
+  .home-create:not(.is-first), .home-tabs { display: none; }
+  .home-phone-chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 0 -16px 12px; padding: 2px 16px; }
+  .home-phone-chips::-webkit-scrollbar { display: none; }
+  .home-phone-chips .home-chip { flex-shrink: 0; }
+  .home-phone-chips .home-chip.is-on { background: var(--text); color: var(--bg); }
+  .home-phone-chips .home-chip.is-on svg { color: var(--bg); }
+}

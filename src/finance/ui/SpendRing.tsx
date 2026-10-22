@@ -128,14 +128,16 @@ function Ring({ slices, total, sel, onPick, children }: { slices: Slice[]; total
   const r = (size - width) / 2 - 6;
   const C = 2 * Math.PI * r;
   const gap = slices.length > 1 ? 2.5 : 0;
-  let off = 0;
+  // начало каждой части по кругу — накопленная длина предыдущих
+  const lens = slices.map((s) => (s.value / total) * C);
+  const starts = lens.map((_, i) => lens.slice(0, i).reduce((a, x) => a + x, 0));
   return (
     <div className="fn-ring" style={{ width: size, height: size }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
-        {slices.map((s) => {
-          const len = (s.value / total) * C;
+        {slices.map((s, i) => {
+          const len = lens[i];
           const w = sel === s.id ? width + 8 : width;
-          const el = (
+          return (
             <circle
               key={s.id}
               cx={size / 2}
@@ -145,14 +147,12 @@ function Ring({ slices, total, sel, onPick, children }: { slices: Slice[]; total
               stroke={s.color}
               strokeWidth={w}
               strokeDasharray={`${Math.max(len - gap, 0.6)} ${C}`}
-              strokeDashoffset={-off}
+              strokeDashoffset={-starts[i]}
               opacity={sel && sel !== s.id ? 0.3 : 1}
               className="fn-ring-seg"
               onClick={() => onPick(s.id)}
             />
           );
-          off += len;
-          return el;
         })}
       </svg>
       <div className="fn-ring-ctr">{children}</div>
