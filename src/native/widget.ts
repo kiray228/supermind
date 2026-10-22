@@ -42,6 +42,8 @@ interface WidgetBridgePlugin {
   biometricAvailable(): Promise<{ available: boolean }>;
   biometricVerify(o: { title: string; subtitle?: string; negative?: string }): Promise<{ ok: boolean; error?: string }>;
   consumePending(): Promise<{ actions: PendingAction[] }>;
+  installSource(): Promise<{ installer: string }>;
+  openUrl(o: { url: string }): Promise<void>;
   addListener(event: 'pending', fn: () => void): Promise<PluginListenerHandle>;
 }
 
@@ -61,6 +63,15 @@ export const nativeBiometricVerify = (o: { title: string; subtitle?: string; neg
   WidgetBridge.biometricVerify(o)
     .then((r) => r.ok)
     .catch(() => false);
+
+/** Android: кто установил приложение ('com.android.vending' — Google Play; '' — APK с сайта) */
+export const nativeInstallSource = () =>
+  WidgetBridge.installSource()
+    .then((r) => r.installer)
+    .catch(() => '');
+
+/** Android: открыть https-ссылку в браузере телефона */
+export const nativeOpenUrl = (url: string) => WidgetBridge.openUrl({ url });
 
 const DAYS_AHEAD = 7;
 const MAX_TASKS = 80;

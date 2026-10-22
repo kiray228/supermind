@@ -124,6 +124,44 @@ public class WidgetBridgePlugin extends Plugin {
         });
     }
 
+    /**
+     * Откуда установлено приложение: com.android.vending — Google Play (обновляет сам магазин),
+     * пусто или другое — APK с сайта (обновление предлагает само приложение)
+     */
+    @PluginMethod
+    public void installSource(PluginCall call) {
+        String src = null;
+        try {
+            android.content.pm.PackageManager pm = getContext().getPackageManager();
+            String pkg = getContext().getPackageName();
+            if (android.os.Build.VERSION.SDK_INT >= 30) src = pm.getInstallSourceInfo(pkg).getInstallingPackageName();
+            else src = pm.getInstallerPackageName(pkg);
+        } catch (Exception ignored) {
+            // неизвестно — как APK с сайта
+        }
+        JSObject r = new JSObject();
+        r.put("installer", src == null ? "" : src);
+        call.resolve(r);
+    }
+
+    /** Открыть ссылку в браузере телефона (скачать новую версию APK) — только https */
+    @PluginMethod
+    public void openUrl(PluginCall call) {
+        String url = call.getString("url");
+        if (url == null || !url.startsWith("https://")) {
+            call.reject("bad url");
+            return;
+        }
+        try {
+            android.content.Intent i = new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(i);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject(e.getMessage());
+        }
+    }
+
     /** Новые действия в очереди — приложение заберёт их сразу, если запущено */
     static void notifyPending() {
         WidgetBridgePlugin p = instance.get();

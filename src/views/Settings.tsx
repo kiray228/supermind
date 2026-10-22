@@ -33,7 +33,8 @@ import { openWhatsNew } from '../onboarding/state';
 import { openSupport } from '../ui/Support';
 import { reportAI } from '../ui/ReportAI';
 import { InboxHost, openInbox, useSupportAdmin } from '../ui/SupportInbox';
-import { Bug, Flag, Lightbulb, Question, Tray, Warning } from '@phosphor-icons/react';
+import { ArrowClockwise, Bug, Flag, Lightbulb, Question, Tray, Warning } from '@phosphor-icons/react';
+import { applyUpdate, checkForUpdate, updatesSupported, useAppUpdate } from '../ui/appUpdate';
 import { errorReportsOn, setErrorReports } from '../ui/errorReport';
 import { APP_VERSION } from '../store/safety';
 import { IconTile } from '../ui/icons';
@@ -68,6 +69,17 @@ export default function Settings() {
   const settings = useApp((s) => s.settings);
   const setSettings = useApp((s) => s.setSettings);
   const support = useSupportAdmin();
+  const [canUpdate, setCanUpdate] = useState(false);
+  const checking = useAppUpdate((s) => s.checking);
+  const found = useAppUpdate((s) => s.update);
+  useEffect(() => {
+    void updatesSupported().then(setCanUpdate);
+  }, []);
+  const checkUpdates = async () => {
+    const u = await checkForUpdate(true);
+    if (u) toast(u.version ? `Доступна версия ${u.version}` : 'Доступно обновление', { label: u.kind === 'apk' ? 'Скачать' : 'Обновить', run: () => void applyUpdate() });
+    else toast(`У вас последняя версия — ${APP_VERSION}`);
+  };
   const [errorReports, setErrorReportsState] = useState(errorReportsOn);
   const [key, setKey] = useState(settings.apiKey);
   // настройки читаются из базы после запуска: раздел, открытый сразу, сначала видит пустой ключ —
@@ -313,6 +325,27 @@ export default function Settings() {
             footer="SuperMind — бесплатные интеллект-карты, задачи с напоминаниями, календарь, привычки, ИИ-ассистент, заметки, цели, финансы, прогресс, фокус, и доска задач. Все функции открыты, без подписок."
           >
             <ListRow icon={<IconTile icon={InfoIcon} tone="gray" size="list" />} title="Версия" value={APP_VERSION} />
+            {canUpdate && (
+              <ListRow
+                icon={<IconTile icon={ArrowClockwise} tone="blue" size="list" />}
+                title={found ? (found.kind === 'apk' ? `Скачать версию ${found.version}` : 'Обновить до новой версии') : 'Проверить обновления'}
+                subtitle={
+                  found
+                    ? found.kind === 'apk'
+                      ? 'Ставится поверх — карты и задачи останутся'
+                      : 'Несохранённое сохранится само'
+                    : isDesktopApp()
+                      ? 'Программа для Windows обновляется сама при запуске'
+                      : isNative()
+                        ? 'Новые версии приходят с GitHub'
+                        : 'Сайт обновляется сам; открытое окно — по кнопке'
+                }
+                value={checking ? 'Проверяю…' : undefined}
+                disabled={checking}
+                chevron
+                onClick={() => void (found ? applyUpdate() : checkUpdates())}
+              />
+            )}
             <ListRow icon={<IconTile icon={Sparkle} tone="accent" size="list" />} title="Что нового" chevron onClick={openWhatsNew} />
           </ListSection>
         </div>

@@ -2,6 +2,9 @@ import react from '@vitejs/plugin-react'
 import { defineConfig, type Plugin } from 'vite'
 import pkg from './package.json' with { type: 'json' }
 
+/** Метка сборки: по ней открытое приложение замечает, что на сайте уже новая версия (version.json) */
+const BUILD_ID = Date.now().toString(36)
+
 /** Генерирует sw.js со списком всех файлов сборки — приложение работает офлайн */
 function serviceWorker(): Plugin {
   return {
@@ -13,7 +16,7 @@ function serviceWorker(): Plugin {
       const optional = /(^|\/)(jspdf\.|html2canvas[.-]|purify\.es-|index\.es-|sdk-)/
       const files = Object.keys(bundle).filter((f) => !f.endsWith('.map') && !optional.test(f))
       const assets = ['./', './index.html', ...files.map((f) => './' + f), './icon.svg', './icon-192.png', './icon-512.png', './manifest.webmanifest', './apple-touch-icon.png']
-      const version = Date.now().toString(36)
+      const version = BUILD_ID
       const code = `const CACHE = 'supermind-${version}';
 const ASSETS = ${JSON.stringify([...new Set(assets)])};
 // сначала файлы текущей версии, потом прошлых (их догружает ещё открытая вкладка старой версии)
@@ -36,6 +39,8 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== location.origin) return;
+  // проверка новой версии — всегда у сервера, мимо кэша
+  if (url.pathname.endsWith('/version.json')) return;
   if (req.mode === 'navigate') {
     e.respondWith(fetch(req).then((r) => { const cp = r.clone(); caches.open(CACHE).then((c) => c.put('./index.html', cp)); return r; }).catch(() => match('./index.html')));
     return;
@@ -79,6 +84,8 @@ self.addEventListener('notificationclick', (e) => {
 });
 `
       this.emitFile({ type: 'asset', fileName: 'sw.js', source: code })
+      // не в списке офлайн-файлов: его всегда спрашивают у сервера
+      this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify({ version: pkg.version, build: BUILD_ID }) })
     },
   }
 }
@@ -89,7 +96,7 @@ export default defineConfig({
   // IPv4: эмулятор Android подключается через adb reverse к 127.0.0.1
   server: { host: '127.0.0.1' },
   plugins: [react(), serviceWorker()],
-  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
+  define: { __APP_VERSION__: JSON.stringify(pkg.version), __BUILD_ID__: JSON.stringify(BUILD_ID) },
   build: {
     chunkSizeWarningLimit: 1500,
   },

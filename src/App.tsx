@@ -9,6 +9,8 @@ import { AuthGate } from './ui/AuthGate';
 import Home from './views/Home';
 import { flushSave } from './store/docStore';
 import { ensureTasks, flushTasks, useTasks } from './tasks/store';
+import { UpdateBanner } from './ui/UpdateBanner';
+import { initAppUpdates } from './ui/appUpdate';
 import { isActive } from './tasks/model';
 import { todayYmd } from './utils/mapTasks';
 import { SearchHost, SearchNavButton, SearchSheetButton } from './search/SearchHost';
@@ -156,6 +158,8 @@ export default function App() {
       import('./views/Calendar');
       import('./views/Habits');
     }, 2500);
+    // новая версия: сайт — «Обновить», Android с APK — «Скачать» (Play и iPhone обновляет магазин)
+    initAppUpdates();
     // Escape закрывает верхнее окно или меню
     const onEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && closeTopOverlay()) {
@@ -328,6 +332,8 @@ export default function App() {
       <div className="sr-only" role="status" aria-live="polite">
         {toastMsg ?? ''}
       </div>
+      {/* в редакторе не мешает: появится, когда выйдете к списку */}
+      {view !== 'editor' && <UpdateBanner />}
       {toastMsg && (
         <div className={`toast${toastAction ? ' has-action' : ''}`} onMouseEnter={() => holdToast(true)} onMouseLeave={() => holdToast(false)} onFocus={() => holdToast(true)} onBlur={() => holdToast(false)}>
           <span aria-hidden="true">{toastMsg}</span>
