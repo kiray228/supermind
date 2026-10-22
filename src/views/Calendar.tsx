@@ -22,7 +22,7 @@ import { ensureNotes, useNotes } from '../notes/store';
 
 // ---------- Константы ----------
 
-type CalView = 'month' | 'week' | '3day' | 'day' | 'agenda';
+export type CalView = 'month' | 'week' | '3day' | 'day' | 'agenda';
 
 const VIEWS: { id: CalView; label: string }[] = [
   { id: 'month', label: 'Месяц' },
@@ -362,10 +362,21 @@ const noHabits = (list: Item[] | undefined) => (list ?? []).filter((it) => it.ki
 
 // ---------- Календарь ----------
 
+/** Открыть календарь на дне (с экрана «Сегодня»): вид и дата подхватываются при монтировании */
+let pendingOpen: { date: string; view: CalView } | null = null;
+export function openCalendarAt(date: string, view: CalView = 'day') {
+  pendingOpen = { date, view };
+  useApp.getState().go('calendar');
+}
+
 export default function Calendar() {
   const data = useTasks((s) => s.data);
-  const [view, setViewState] = useState<CalView>(loadView);
-  const [cursor, setCursor] = useState(todayYmd);
+  const [view, setViewState] = useState<CalView>(() => pendingOpen?.view ?? loadView());
+  const [cursor, setCursor] = useState(() => {
+    const d = pendingOpen?.date ?? todayYmd();
+    pendingOpen = null;
+    return d;
+  });
   const [maps, setMaps] = useState<MapTask[]>([]);
   const [events, setEvents] = useState<PhoneEvent[]>([]);
   const [planner, setPlanner] = useState<PlannerData | null>(null);

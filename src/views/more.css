@@ -1,0 +1,15 @@
+/* ================= «Ещё» (телефон): профиль, разделы, настройки, помощь ================= */
+.mr-wrap { max-width: 680px; margin: 0 auto; padding: 0 16px; display: flex; flex-direction: column; gap: 4px; }
+.mr-profile {
+  display: flex; align-items: center; gap: 12px; padding: 12px 12px 12px 14px; margin-bottom: 8px; border: none; text-align: left;
+  border-radius: var(--radius-card); background: var(--surface); box-shadow: var(--shadow); color: var(--text);
+}
+.mr-ava {
+  width: 52px; height: 52px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; color: #fff;
+  font-size: 22px; font-weight: 700; background: linear-gradient(135deg, var(--accent), var(--accent-2));
+}
+.mr-profile-x { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.mr-profile-x b { font-size: 17px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mr-profile-x small { font-size: 13px; color: var(--text-2); }
+.mr-profile-x small.is-err { color: var(--danger); }
+.mr-profile:active { transform: scale(.985); }

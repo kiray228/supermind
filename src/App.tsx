@@ -1,5 +1,5 @@
-import { lazy, Suspense, useEffect, useState, useSyncExternalStore } from 'react';
-import { holdToast, useApp, type View } from './store/appStore';
+import { lazy, Suspense, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { holdToast, isPhoneTab, phoneTab, useApp, type PhoneTab, type View } from './store/appStore';
 import { listDocs, loadSettings, saveDoc } from './store/db';
 import { get as idbGet, set as idbSet } from './store/kv';
 import { welcomeDoc } from './templates';
@@ -13,13 +13,14 @@ import { UpdateBanner } from './ui/UpdateBanner';
 import { initAppUpdates } from './ui/appUpdate';
 import { isActive } from './tasks/model';
 import { todayYmd } from './utils/mapTasks';
-import { SearchHost, SearchNavButton, SearchSheetButton } from './search/SearchHost';
+import { SearchHost, SearchNavButton } from './search/SearchHost';
 import { applyAppearance } from './ui/appearance';
 import { initLargeTitles } from './ui/navbar';
 import { VoiceFab, VoiceNavButton } from './voice/VoiceButton';
-import { SyncDot, SyncNavButton, SyncSheetRow } from './ui/SyncBadge';
+import { SyncDot, SyncNavButton } from './ui/SyncBadge';
 import { useVoice } from './voice/state';
-import { IconTile, SectionIcon, type SectionId } from './ui/icons';
+import { SectionIcon, type SectionId } from './ui/icons';
+import { Brain, CaretLeft, DotsThreeCircle, Graph, SunHorizon, type Icon } from '@phosphor-icons/react';
 import './ui/appearance.css';
 import './app.css';
 import { mark, whenIdle } from './perf';
@@ -30,6 +31,8 @@ import { ViewBoundary } from './ui/ViewBoundary';
 // код-пароль — до первой отрисовки: содержимое не мелькнёт перед экраном блокировки
 initLock();
 
+const Today = lazy(() => import('./views/Today'));
+const More = lazy(() => import('./views/More'));
 const Editor = lazy(() => import('./editor/Editor'));
 const Board = lazy(() => import('./views/Board'));
 const Planner = lazy(() => import('./views/Planner'));
@@ -63,21 +66,31 @@ const subscribeWide = (cb: () => void) => {
 };
 const isWide = () => window.matchMedia(WIDE).matches;
 
-/** phone: false — на телефоне пункт в меню «Ещё» */
-const NAV: { id: Extract<View, SectionId>; label: string; phone: boolean }[] = [
-  { id: 'home', label: 'Карты', phone: true },
-  { id: 'tasks', label: 'Задачи', phone: true },
-  { id: 'calendar', label: 'Календарь', phone: true },
-  { id: 'habits', label: 'Привычки', phone: true },
-  { id: 'assistant', label: 'Ассистент', phone: false },
-  { id: 'notes', label: 'Заметки', phone: false },
-  { id: 'goals', label: 'Цели', phone: false },
-  { id: 'finance', label: 'Финансы', phone: false },
-  { id: 'progress', label: 'Прогресс', phone: false },
-  { id: 'focus', label: 'Фокус', phone: false },
-  { id: 'board', label: 'Доска', phone: false },
-  { id: 'settings', label: 'Настройки', phone: false },
+/** Боковая панель компьютера: все разделы */
+const NAV: { id: Extract<View, SectionId>; label: string }[] = [
+  { id: 'today', label: 'Сегодня' },
+  { id: 'home', label: 'Карты' },
+  { id: 'tasks', label: 'Задачи' },
+  { id: 'calendar', label: 'Календарь' },
+  { id: 'habits', label: 'Привычки' },
+  { id: 'assistant', label: 'Ассистент' },
+  { id: 'notes', label: 'Заметки' },
+  { id: 'goals', label: 'Цели' },
+  { id: 'finance', label: 'Финансы' },
+  { id: 'progress', label: 'Прогресс' },
+  { id: 'focus', label: 'Фокус' },
+  { id: 'board', label: 'Доска' },
+  { id: 'settings', label: 'Настройки' },
 ];
+
+/** Панель вкладок телефона: Сегодня · Карты · (микрофон) · Мозг · Ещё */
+const PHONE_TABS: { id: PhoneTab; label: string; icon: Icon }[] = [
+  { id: 'today', label: 'Сегодня', icon: SunHorizon },
+  { id: 'home', label: 'Карты', icon: Graph },
+  { id: 'notes', label: 'Мозг', icon: Brain },
+  { id: 'more', label: 'Ещё', icon: DotsThreeCircle },
+];
+const TAB_TITLE: Record<PhoneTab, string> = { today: 'Сегодня', home: 'Карты', notes: 'Второй мозг', more: 'Ещё' };
 
 let welcomeStarted = false;
 /** Второстепенное (напоминания, виджеты, push, таймер фокуса, окна задач) уже запущено — после первой отрисовки */
@@ -94,12 +107,12 @@ export default function App() {
   useEffect(() => applyAppearance({ accent, glass, backdrop }), [accent, glass, backdrop]);
   const toastMsg = useApp((s) => s.toast);
   const toastAction = useApp((s) => s.toastAction);
-  const [more, setMore] = useState(false);
   const [deferred, setDeferred] = useState(deferredStarted);
   const wide = useSyncExternalStore(subscribeWide, isWide);
   const taskOpen = useTasks((s) => !!s.openTaskId);
   const quickAdd = useTasks((s) => !!s.quickAdd);
-  const moreActive = NAV.some((n) => !n.phone && n.id === view);
+  const backTab = useApp((s) => s.backTab);
+  const tab = backTab ?? phoneTab(view);
   const todayCount = useTasks((s) => {
     const t = todayYmd();
     return s.data ? s.data.tasks.filter((x) => isActive(x) && !!x.date && x.date <= t).length : 0;
@@ -226,7 +239,7 @@ export default function App() {
           {/* неотправленные в облако изменения — только когда есть повод */}
           <SyncNavButton />
           {NAV.map((n) => (
-            <button key={n.id} className={`nav-item ${view === n.id ? 'active' : ''}${n.phone ? '' : ' nav-desk'}`} onClick={() => go(n.id)} aria-current={view === n.id ? 'page' : undefined}>
+            <button key={n.id} className={`nav-item ${view === n.id ? 'active' : ''}`} onClick={() => go(n.id)} aria-current={view === n.id ? 'page' : undefined}>
               <span className="nav-ico">
                 <SectionIcon section={n.id} size={24} weight={view === n.id ? 'fill' : 'regular'} />
                 {n.id === 'tasks' && todayCount > 0 && <i className="nav-badge">{todayCount > 99 ? '99+' : todayCount}</i>}
@@ -234,19 +247,27 @@ export default function App() {
               <span>{n.label}</span>
             </button>
           ))}
-          <button className={`nav-item nav-more ${moreActive ? 'active' : ''}`} onClick={() => setMore(true)}>
-            <span className="nav-ico">
-              <SectionIcon section="more" size={24} weight={moreActive ? 'fill' : 'regular'} />
-              <SyncDot />
-            </span>
-            <span>Ещё</span>
-          </button>
         </nav>
       )}
-      {view !== 'editor' && <VoiceFab />}
+      {view !== 'editor' && !wide && (
+        <nav className="tabbar" aria-label="Разделы">
+          {PHONE_TABS.map((t, i) => (
+            <PhoneTabButton key={t.id} t={t} active={tab === t.id} badge={t.id === 'today' ? todayCount : 0} sync={t.id === 'more'} onClick={() => go(t.id)} after={i === 1 ? <VoiceFab /> : null} />
+          ))}
+        </nav>
+      )}
+      {/* раздел внутри вкладки (задачи, финансы, цели…) — назад к вкладке */}
+      {view !== 'editor' && !wide && !isPhoneTab(view) && (
+        <button className="phone-back" onClick={() => go(tab)}>
+          <CaretLeft size={17} weight="bold" />
+          {TAB_TITLE[tab]}
+        </button>
+      )}
       <main className="app-main">
         <ViewBoundary key={view}>
         <Suspense fallback={<div className="loading"><div className="spinner" /></div>}>
+          {view === 'today' && <Today />}
+          {view === 'more' && <More />}
           {view === 'home' && <Home />}
           {view === 'editor' && <Editor />}
           {view === 'board' && <Board />}
@@ -264,30 +285,6 @@ export default function App() {
         </Suspense>
         </ViewBoundary>
       </main>
-      {more && (
-        <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && setMore(false)}>
-          <div className="modal nav-more-sheet" role="dialog" aria-label="Все разделы">
-            <SearchSheetButton onPick={() => setMore(false)} />
-            <SyncSheetRow onPick={() => setMore(false)} />
-            <Suspense fallback={null}>
-              <LevelBadge className="nav-sheet-level" onClick={() => (setMore(false), go('progress'))} />
-            </Suspense>
-            {NAV.filter((n) => !n.phone).map((n) => (
-              <button
-                key={n.id}
-                className={`nav-sheet-item${view === n.id ? ' active' : ''}`}
-                onClick={() => {
-                  setMore(false);
-                  go(n.id);
-                }}
-              >
-                <IconTile section={n.id} size="lg" />
-                <span>{n.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
       {taskOpen && (
         <Suspense fallback={null}>
           <TaskDetailHost />
@@ -351,5 +348,22 @@ export default function App() {
         </div>
       )}
     </div>
+  );
+}
+
+function PhoneTabButton({ t, active, badge, sync, onClick, after }: { t: (typeof PHONE_TABS)[number]; active: boolean; badge: number; sync: boolean; onClick: () => void; after: ReactNode }) {
+  const I = t.icon;
+  return (
+    <>
+      <button className={`tab-item${active ? ' active' : ''}`} onClick={onClick} aria-current={active ? 'page' : undefined}>
+        <span className="nav-ico">
+          <I size={26} weight={active ? 'fill' : 'regular'} />
+          {badge > 0 && <i className="nav-badge">{badge > 99 ? '99+' : badge}</i>}
+          {sync && <SyncDot />}
+        </span>
+        <span>{t.label}</span>
+      </button>
+      {after}
+    </>
   );
 }

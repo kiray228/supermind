@@ -14,10 +14,12 @@ import {
   Kanban,
   GearSix,
   MagnifyingGlass,
+  SunHorizon,
   type Icon,
 } from '@phosphor-icons/react';
 
 export type SectionId =
+  | 'today'
   | 'home'
   | 'tasks'
   | 'calendar'
@@ -35,6 +37,7 @@ export type SectionId =
 
 /** Иконка каждого раздела */
 export const SECTION_ICONS: Record<SectionId, Icon> = {
+  today: SunHorizon,
   home: Graph,
   tasks: CheckCircle,
   calendar: CalendarDots,
@@ -72,6 +75,7 @@ export const TONES = {
 export type Tone = keyof typeof TONES;
 
 export const SECTION_TONES: Record<SectionId, Tone> = {
+  today: 'orange',
   home: 'violet',
   tasks: 'blue',
   calendar: 'red',

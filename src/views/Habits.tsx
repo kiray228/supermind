@@ -27,6 +27,7 @@ import {
   Trophy,
 } from '@phosphor-icons/react';
 import type { Icon } from '@phosphor-icons/react';
+import { NEW_HABIT_EVENT } from '../ui/createActions';
 import type { Habit, HabitPart, PlannerData, PlannerDay } from '../types';
 import { loadPlanner, savePlanner } from '../store/db';
 import { toast } from '../store/appStore';
@@ -293,6 +294,12 @@ export default function Habits() {
   const [manager, setManager] = useState<false | 'mine' | 'library'>(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [editing, setEditing] = useState<Habit | 'new' | null>(null);
+  // «Создать → Привычка» из меню микрофона
+  useEffect(() => {
+    const onNew = () => setEditing('new');
+    window.addEventListener(NEW_HABIT_EVENT, onNew);
+    return () => window.removeEventListener(NEW_HABIT_EVENT, onNew);
+  }, []);
   const [burst, setBurst] = useState<string | null>(null);
   /** лист заморозки: меню привычки или сразу «Пауза…» */
   const [sheet, setSheet] = useState<{ id: string; stage: 'menu' | 'pause' } | null>(null);

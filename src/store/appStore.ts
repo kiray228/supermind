@@ -3,10 +3,23 @@ import type { Settings } from '../types';
 import { DEFAULT_SETTINGS, saveSettings } from './db';
 import { shareSettings } from './sharedPrefs';
 
-export type View = 'home' | 'editor' | 'board' | 'planner' | 'settings' | 'tasks' | 'calendar' | 'focus' | 'notes' | 'goals' | 'finance' | 'assistant' | 'progress' | 'habits';
+export type View = 'today' | 'more' | 'home' | 'editor' | 'board' | 'planner' | 'settings' | 'tasks' | 'calendar' | 'focus' | 'notes' | 'goals' | 'finance' | 'assistant' | 'progress' | 'habits';
+
+/** Вкладки нижней панели телефона: Сегодня · Карты · (микрофон) · Мозг · Ещё */
+export type PhoneTab = 'today' | 'home' | 'notes' | 'more';
+/** К какой вкладке телефона относится раздел (подсветка панели и «назад») */
+export function phoneTab(v: View): PhoneTab {
+  if (v === 'today' || v === 'tasks' || v === 'calendar' || v === 'habits' || v === 'focus' || v === 'planner') return 'today';
+  if (v === 'home' || v === 'editor') return 'home';
+  if (v === 'notes' || v === 'goals') return 'notes';
+  return 'more';
+}
+export const isPhoneTab = (v: View): v is PhoneTab => v === 'today' || v === 'home' || v === 'notes' || v === 'more';
 
 interface AppState {
   view: View;
+  /** телефон: вкладка, с которой открыли раздел (Финансы с «Сегодня» — назад на «Сегодня») */
+  backTab: PhoneTab | null;
   settings: Settings;
   toast: string | null;
   /** кнопка в уведомлении («Отменить») */
@@ -19,14 +32,15 @@ interface AppState {
 }
 
 /** последний открытый раздел — приложение открывается там, где закончили */
-const RESTORABLE: View[] = ['home', 'tasks', 'calendar', 'planner', 'board', 'focus', 'settings', 'notes', 'goals', 'finance', 'assistant', 'progress', 'habits'];
+const RESTORABLE: View[] = ['today', 'more', 'home', 'tasks', 'calendar', 'planner', 'board', 'focus', 'settings', 'notes', 'goals', 'finance', 'assistant', 'progress', 'habits'];
 function initialView(): View {
   try {
     const v = localStorage.getItem('sm-view') as View | null;
     if (v === 'planner') return 'habits';
-    return v && RESTORABLE.includes(v) ? v : 'home';
+    // первый запуск — с экрана дня
+    return v && RESTORABLE.includes(v) ? v : 'today';
   } catch {
-    return 'home';
+    return 'today';
   }
 }
 
@@ -43,6 +57,7 @@ function cachedTheme(): Settings['theme'] {
 
 export const useApp = create<AppState>((set, get) => ({
   view: initialView(),
+  backTab: null,
   // тема — сразу из прошлого запуска (настройки читаются из базы позже, иначе мелькнула бы другая тема)
   settings: { ...DEFAULT_SETTINGS, theme: cachedTheme() },
   toast: null,
@@ -51,7 +66,10 @@ export const useApp = create<AppState>((set, get) => ({
   go(view) {
     // Ежедневник заменён разделом «Привычки» (дневник и настроение — там же)
     if (view === 'planner') view = 'habits';
-    set({ view });
+    const cur = get().view;
+    // раздел внутри вкладки помнит, откуда пришли; переход между разделами внутри — тоже
+    const backTab = isPhoneTab(view) ? null : isPhoneTab(cur) ? cur : cur === 'editor' ? (get().backTab ?? 'home') : get().backTab;
+    set({ view, backTab });
     try {
       if (RESTORABLE.includes(view)) localStorage.setItem('sm-view', view);
     } catch {

@@ -1,5 +1,5 @@
 import { Capacitor } from '@capacitor/core';
-import { useApp } from './store/appStore';
+import { isPhoneTab, phoneTab, useApp } from './store/appStore';
 import { useDoc, flushSave } from './store/docStore';
 import { leaveEditor } from './actions';
 import { runBack } from './ui/dialogs';
@@ -106,7 +106,8 @@ export function setupPlatform() {
         if (app.view === 'editor') {
           if (doc.editingId) doc.setEditing(null);
           else await leaveEditor('home');
-        } else if (app.view !== 'home') app.go('home');
+        } else if (!isPhoneTab(app.view)) app.go(app.backTab ?? phoneTab(app.view));
+        else if (app.view !== 'today') app.go('today');
         else {
           await flushSave();
           App.exitApp();
