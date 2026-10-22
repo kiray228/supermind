@@ -25,6 +25,7 @@ import { ensureGoals, useGoals } from '../../goals/store';
 import { savingsByAccount } from '../../goals/savings';
 import { CurTotals, dayTitle, Money, Progress, TxRow, useToday } from './common';
 import { DebtSummary } from './Debts';
+import { SpendRing } from './SpendRing';
 import { openMore, openTxSheet, setFinTab, showOps } from './state';
 
 export function Overview({ data }: { data: FinanceData }) {
@@ -92,6 +93,8 @@ export function Overview({ data }: { data: FinanceData }) {
           </button>
         </div>
       </section>
+
+      <SpendRing data={data} />
 
       <section className="card fn-panel">
         <div className="fn-panel-head">

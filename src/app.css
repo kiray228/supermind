@@ -59,6 +59,9 @@
     box-shadow: var(--lg-highlight), 0 0 0 0.5px var(--lg-edge), 0 4px 14px rgba(0, 0, 0, 0.1);
   }
   .phone-back:active { transform: scale(.96); }
+  /* прокрутили — в верхней строке компактный заголовок или сегменты: кнопка уходит, пока не вернёмся наверх */
+  .app:has(.page.is-scrolled) .phone-back { opacity: 0; pointer-events: none; transform: translateY(-6px); }
+  .phone-back { transition: opacity .2s, transform .2s; }
 }
 
 /* значок с числом задач на сегодня */
