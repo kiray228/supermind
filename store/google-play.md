@@ -2,10 +2,11 @@
 
 Пакет: `app.twomind.mindmap` · Категория: **Продуктивность** · Бесплатно, без рекламы, без покупок в приложении.
 
-Ссылки (заработают после слияния ветки в main, GitHub Pages):
-- Политика конфиденциальности: https://kiray228.github.io/supermind/privacy.html
-- Удаление аккаунта: https://kiray228.github.io/supermind/delete-account.html
-- Сайт и поддержка: https://kiray228.github.io/supermind/support.html
+Ссылки (supermind.kz и jarvissoft.kz — на GitHub Pages, домены ТОО на hoster.kz):
+- Политика конфиденциальности: https://supermind.kz/privacy.html
+- Удаление аккаунта: https://supermind.kz/delete-account.html
+- Поддержка: https://supermind.kz/support.html
+- Сайт приложения: https://supermind.kz · сайт разработчика (ТОО): https://jarvissoft.kz
 
 ---
 

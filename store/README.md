@@ -20,7 +20,7 @@
 ## Что нужно сделать перед подачей (один раз)
 
 1. **Email поддержки** — jarvis.soft.kz@gmail.com (уже на страницах сайта). Его же укажите как контактный email разработчика в обеих консолях.
-2. **Слить ветку `store-release` в main.** После этого страницы появятся на https://kiray228.github.io/supermind/privacy.html (и delete-account.html, support.html). Магазины проверяют, что ссылки открываются.
+2. ~~Слить ветку `store-release` в main~~ — сделано. Страницы для магазинов: https://supermind.kz/privacy.html, https://supermind.kz/support.html, https://supermind.kz/delete-account.html; сайт компании — https://jarvissoft.kz. Старые адреса на kiray228.github.io/supermind тоже продолжают работать.
 3. **Демо-аккаунт для проверяющих.** Зарегистрируйте в приложении отдельный аккаунт (например, review.supermind@…) и добавьте в него пару карт и задач. Логин и пароль впишете в обе консоли.
 
 ---

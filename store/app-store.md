@@ -3,10 +3,11 @@
 Bundle ID: `app.twomind.mindmap` · SKU: `supermind` · Основной язык: **русский**
 Категория: **Продуктивность**, дополнительная — **Бизнес** · Цена: **бесплатно** · Устройства: iPhone и iPad
 
-Ссылки (заработают после слияния ветки в main, GitHub Pages):
-- Политика конфиденциальности (Privacy Policy URL): https://kiray228.github.io/supermind/privacy.html
-- Поддержка (Support URL): https://kiray228.github.io/supermind/support.html
-- Маркетинговый сайт (по желанию): https://kiray228.github.io/supermind/
+Ссылки (supermind.kz и jarvissoft.kz — на GitHub Pages, домены ТОО на hoster.kz):
+- Политика конфиденциальности (Privacy Policy URL): https://supermind.kz/privacy.html
+- Поддержка (Support URL): https://supermind.kz/support.html
+- Маркетинговый сайт: https://supermind.kz
+- Сайт компании (для регистрации ТОО в Apple Developer): https://jarvissoft.kz
 
 > Правило Apple 2.3.10: в текстах и на скриншотах для App Store не упоминайте Android, APK и Google Play. Тексты ниже уже без этого.
 
