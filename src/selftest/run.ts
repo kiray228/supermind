@@ -205,6 +205,14 @@ async function firstRun() {
     seed.txId = tx.id;
   });
 
+  // метка для второго запуска — сразу после данных: Android пишет localStorage на диск с задержкой,
+  // а до перезапуска ещё минута проверок
+  try {
+    localStorage.setItem(SEED_KEY, JSON.stringify(seed));
+  } catch {
+    /* без хранилища второй запуск ничего не проверит */
+  }
+
   // --- возможности телефона ---
   await check('уведомления: поставить и снять напоминание', async () => {
     const { LocalNotifications } = await import('@capacitor/local-notifications');
@@ -259,12 +267,6 @@ async function firstRun() {
   }
 
   await screens(seed.docId ?? '');
-
-  try {
-    localStorage.setItem(SEED_KEY, JSON.stringify(seed));
-  } catch {
-    /* без хранилища второй запуск ничего не проверит */
-  }
 }
 
 /** Второй запуск после перезапуска: данные первого должны быть на месте */

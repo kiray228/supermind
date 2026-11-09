@@ -44,6 +44,7 @@ run_phase() {
 }
 
 run_phase 1
+sleep 3
 adb shell am force-stop "$BUNDLE"
 sleep 2
 run_phase 2
