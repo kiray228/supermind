@@ -43,6 +43,8 @@ jobs:
             -project ios/App/App.xcodeproj -scheme App -configuration Debug \
             -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath build CODE_SIGNING_ALLOWED=NO | tail -n 30
+      - name: Выдача разрешений симулятору (applesimutils)
+        run: brew tap wix/brew && brew install applesimutils || echo "applesimutils не установился — уведомления спросят разрешение"
       - name: Самопроверка
         run: bash scripts/selftest-ios.sh build/Build/Products/Debug-iphonesimulator/App.app selftest-out
       - name: Отчёт

@@ -17,6 +17,10 @@ xcrun simctl bootstatus "$UDID" -b >/dev/null
 xcrun simctl install "$UDID" "$APP"
 # микрофон, распознавание речи, фото — заранее, иначе системные окна закроют экран
 xcrun simctl privacy "$UDID" grant all "$BUNDLE" 2>/dev/null || true
+# уведомления simctl не выдаёт — через applesimutils (иначе системный вопрос висит и блокирует напоминания)
+if command -v applesimutils >/dev/null; then
+  applesimutils --byId "$UDID" --bundle "$BUNDLE" --setPermissions notifications=YES,microphone=YES,speech=YES || true
+fi
 
 field() { sed -n "s/.*\"$1\":\"\([^\"]*\)\".*/\1/p" <<<"$2"; }
 
