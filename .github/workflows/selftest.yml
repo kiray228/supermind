@@ -44,7 +44,9 @@ jobs:
             -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath build CODE_SIGNING_ALLOWED=NO | tail -n 30
       - name: Выдача разрешений симулятору (applesimutils)
-        run: brew tap wix/brew && brew install applesimutils || echo "applesimutils не установился — уведомления спросят разрешение"
+        # applesimutils (Wix, инструмент Detox) — в стороннем «tap»: свежий Homebrew ставит его только после brew trust
+        run: |
+          brew tap wix/brew && { brew trust wix/brew 2>/dev/null || true; } && brew install applesimutils             || echo "::warning::applesimutils не установился — системные окна разрешений закроют экраны"
       - name: Самопроверка
         run: bash scripts/selftest-ios.sh build/Build/Products/Debug-iphonesimulator/App.app selftest-out
       - name: Отчёт
