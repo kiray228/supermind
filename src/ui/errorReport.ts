@@ -90,7 +90,8 @@ export function recordError(err: unknown, kind: Kind) {
 
 function enqueue(message: string, stack: string, view: string) {
   // в режиме разработки — только на локальный сервер
-  if (!errorReportsOn() || APP_VERSION === 'dev' || (import.meta.env.DEV && !localStorage.getItem('sm-api'))) return;
+  // тестовая сборка CI не шлёт отчёты владельцу: её ошибки видны в отчёте самопроверки
+  if (!errorReportsOn() || APP_VERSION === 'dev' || import.meta.env.VITE_SELFTEST === '1' || (import.meta.env.DEV && !localStorage.getItem('sm-api'))) return;
   const key = `${message}|${stack.split('\n').slice(0, 3).join('|')}`;
   const q = queue.get(key);
   if (q) q.count++;

@@ -1,0 +1,103 @@
+name: Self-test on iPhone and Android
+
+# Самопроверка всех разделов на симуляторе iPhone и эмуляторе Android при каждом изменении приложения.
+# Тестовая сборка (VITE_SELFTEST=1) сама создаёт карту, задачу, заметку, привычку и трату,
+# проверяет плагины телефона, открывает каждый экран (снимки — в артефактах), затем перезапускается
+# и проверяет, что данные сохранились. Отчёт — в сводке запуска. Скрипты: scripts/selftest-*.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['src/**', 'ios/**', 'android/**', 'package.json', 'package-lock.json', 'capacitor.config.ts', 'scripts/selftest-*', '.github/workflows/selftest.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: selftest-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ios:
+    name: iPhone (симулятор)
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - run: npm ci
+      - run: npm run build
+        env:
+          VITE_SELFTEST: '1'
+      - run: npx cap sync ios
+      - name: Сборка для симулятора
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project ios/App/App.xcodeproj -scheme App -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO | tail -n 30
+      - name: Самопроверка
+        run: bash scripts/selftest-ios.sh build/Build/Products/Debug-iphonesimulator/App.app selftest-out
+      - name: Отчёт
+        if: always()
+        run: node scripts/selftest-report.mjs ios selftest-out
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: selftest-ios
+          path: selftest-out
+          retention-days: 30
+
+  android:
+    name: Android (эмулятор)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npm run build
+        env:
+          VITE_SELFTEST: '1'
+      - run: npx cap sync android
+      - name: Сборка APK (отладочная)
+        working-directory: android
+        run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon -q
+      - name: Ускорение эмулятора (KVM)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Самопроверка
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_7
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: bash scripts/selftest-android.sh android/app/build/outputs/apk/debug/app-debug.apk selftest-out
+      - name: Отчёт
+        if: always()
+        run: node scripts/selftest-report.mjs android selftest-out
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: selftest-android
+          path: selftest-out
+          retention-days: 30

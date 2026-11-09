@@ -33,7 +33,8 @@ const digits = (s: string) => s.replace(/\D/g, '');
 const LOCAL_ONLY = 'sm-local-only';
 function localOnly(): boolean {
   try {
-    return isIOSApp() && localStorage.getItem(LOCAL_ONLY) === '1';
+    // тестовая сборка (самопроверка в CI) работает без аккаунта и на Android
+    return (isIOSApp() || import.meta.env.VITE_SELFTEST === '1') && localStorage.getItem(LOCAL_ONLY) === '1';
   } catch {
     return false;
   }
