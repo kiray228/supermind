@@ -69,12 +69,14 @@ jobs:
           # номер сборки растёт с каждым запуском — App Store Connect не принимает повторный
           BUILD=$((1000 + GITHUB_RUN_NUMBER))
 
+          # Архив без подписи: автоподпись при архивации требует профиль разработчика,
+          # а его нельзя создать без зарегистрированного iPhone. Подписывает экспорт ниже —
+          # облачным сертификатом Apple Distribution и профилем App Store.
           xcodebuild archive \
             -project ios/App/App.xcodeproj -scheme App -configuration Release \
             -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/App.xcarchive" \
-            DEVELOPMENT_TEAM="$TEAM_ID" CODE_SIGN_STYLE=Automatic \
-            MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD" \
-            "${AUTH[@]}" | tail -n 80
+            DEVELOPMENT_TEAM="$TEAM_ID" CODE_SIGN_STYLE=Automatic CODE_SIGNING_ALLOWED=NO \
+            MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD" | tail -n 80
 
           cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
