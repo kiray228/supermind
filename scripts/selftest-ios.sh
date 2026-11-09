@@ -26,8 +26,8 @@ run_phase() {
   xcrun simctl launch --console-pty --terminate-running-process "$UDID" "$BUNDLE" >"$log" 2>&1 &
   local pid=$!
   while ((SECONDS < deadline)); do
-    mapfile -t lines < <(grep -o 'SMTEST {.*}' "$log" | tail -n +$((seen + 1)))
-    for l in "${lines[@]}"; do
+    # без mapfile: на macOS старый bash 3.2
+    while IFS= read -r l; do
       seen=$((seen + 1))
       local json=${l#SMTEST } kind
       kind=$(field kind "$json")
@@ -37,7 +37,7 @@ run_phase() {
         kill "$pid" 2>/dev/null
         return 0
       fi
-    done
+    done < <(grep -o 'SMTEST {.*}' "$log" | tail -n +$((seen + 1)))
     sleep 0.5
   done
   echo "::error::Самопроверка iOS, запуск $n: не закончилась за 10 минут"

@@ -23,8 +23,8 @@ run_phase() {
   local logpid=$!
   adb shell monkey -p "$BUNDLE" -c android.intent.category.LAUNCHER 1 >/dev/null
   while ((SECONDS < deadline)); do
-    mapfile -t lines < <(grep -o 'SMTEST {.*}' "$log" | tail -n +$((seen + 1)))
-    for l in "${lines[@]}"; do
+    # без mapfile: на macOS старый bash 3.2
+    while IFS= read -r l; do
       seen=$((seen + 1))
       local json=${l#SMTEST } kind
       kind=$(field kind "$json")
@@ -34,7 +34,7 @@ run_phase() {
         kill "$logpid" 2>/dev/null
         return 0
       fi
-    done
+    done < <(grep -o 'SMTEST {.*}' "$log" | tail -n +$((seen + 1)))
     sleep 0.5
   done
   echo "::error::Самопроверка Android, запуск $n: не закончилась за 10 минут"

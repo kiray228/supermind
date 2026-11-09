@@ -1,7 +1,7 @@
 // Отчёт самопроверки (CI): разбирает строки «SMTEST {json}» из журналов обоих запусков,
 // пишет таблицу в сводку GitHub Actions и report.md, падает, если есть провалы или запуск не закончился.
 // Использование: node scripts/selftest-report.mjs ios|android папка-результатов
-import { readFileSync, writeFileSync, appendFileSync, existsSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, appendFileSync, existsSync, readdirSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const [platform, dir = 'selftest-out'] = process.argv.slice(2);
@@ -45,6 +45,7 @@ const shots = existsSync(join(dir, 'shots')) ? readdirSync(join(dir, 'shots')).f
 lines.push(`Снимков экрана: ${shots.length} — в артефакте «selftest-${platform}».`, '');
 
 const md = lines.join('\n');
+mkdirSync(dir, { recursive: true });
 writeFileSync(join(dir, `report-${platform}.md`), md);
 if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, md + '\n');
 console.log(md);

@@ -394,7 +394,8 @@ function setupNative(): Promise<void> {
   if (nativeReady) return nativeReady;
   nativeReady = (async () => {
     const { LocalNotifications: LN } = await notifications();
-    await LN.createChannel({
+    // каналы уведомлений есть только на Android (iPhone отвечает «not implemented»)
+    if (isAndroidApp()) await LN.createChannel({
       id: 'sm-reminders',
       name: 'Напоминания о задачах',
       description: 'Сроки задач, повторы и привычки',
