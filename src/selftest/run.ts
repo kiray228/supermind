@@ -57,7 +57,8 @@ function assert(cond: unknown, msg: string): asserts cond {
 async function shot(name: string) {
   await sleep(1200);
   out('shot', { name });
-  await sleep(2500);
+  // симулятор iPhone снимает экран 3–4 с (Android — меньше секунды): не уходить с экрана раньше
+  await sleep(Capacitor.getPlatform() === 'ios' ? 7000 : 2500);
 }
 
 /** Плагины, без которых функции не работают (у каждой платформы свои) */
