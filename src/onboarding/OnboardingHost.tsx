@@ -8,6 +8,7 @@
 import { useEffect, useState } from 'react';
 import { APP_VERSION } from '../store/safety';
 import { useCloud } from '../store/cloud';
+import { LOCAL_ONLY_EVENT, localOnly } from '../ui/AuthGate';
 import { get } from '../store/kv';
 import { useWhatsNew, lsGet, lsSet, touchLastOpen, AWAY_DAYS, ONBOARDED_KEY, WHATSNEW_KEY } from './state';
 import { entriesFor, isRealVersion } from './changelog';
@@ -52,10 +53,18 @@ export default function OnboardingHost() {
   const [welcome, setWelcome] = useState(false);
   const wn = useWhatsNew((s) => s.open);
   // сначала вход в аккаунт (обязателен), знакомство — после
-  const signedIn = useCloud((s) => !!s.account);
+  const account = useCloud((s) => !!s.account);
+  // без аккаунта (iPhone) знакомство тоже нужно — данных из облака там ждать не надо
+  const [local, setLocal] = useState(localOnly);
+  useEffect(() => {
+    const on = () => setLocal(localOnly());
+    window.addEventListener(LOCAL_ONLY_EVENT, on);
+    return () => window.removeEventListener(LOCAL_ONLY_EVENT, on);
+  }, []);
+  const signedIn = account || local;
   // данные аккаунта уже пришли (или сети нет): иначе на новом устройстве знакомство показалось бы
   // пользователю с данными, а стартовые привычки задвоились бы
-  const synced = useCloud((s) => !!s.lastSync || s.status === 'error' || s.status === 'offline');
+  const synced = useCloud((s) => !!s.lastSync || s.status === 'error' || s.status === 'offline') || (local && !account);
 
   useEffect(() => {
     if (decided || !signedIn || !synced) return;

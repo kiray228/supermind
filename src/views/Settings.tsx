@@ -33,7 +33,9 @@ import { openWhatsNew } from '../onboarding/state';
 import { openSupport } from '../ui/Support';
 import { reportAI } from '../ui/ReportAI';
 import { InboxHost, openInbox, useSupportAdmin } from '../ui/SupportInbox';
-import { ArrowClockwise, Bug, Flag, Lightbulb, Question, Tray, Warning } from '@phosphor-icons/react';
+import { ArrowClockwise, Bug, Flag, Lightbulb, Question, ShieldCheck, SlidersHorizontal, Tray, Warning } from '@phosphor-icons/react';
+import { TabsEditor } from '../ui/TabsEditor';
+import { openExternal, PRIVACY_URL } from '../ui/links';
 import { applyUpdate, checkForUpdate, updatesSupported, useAppUpdate } from '../ui/appUpdate';
 import { errorReportsOn, setErrorReports } from '../ui/errorReport';
 import { APP_VERSION } from '../store/safety';
@@ -69,6 +71,7 @@ export default function Settings() {
   const settings = useApp((s) => s.settings);
   const setSettings = useApp((s) => s.setSettings);
   const support = useSupportAdmin();
+  const [editTabs, setEditTabs] = useState(false);
   const [canUpdate, setCanUpdate] = useState(false);
   const checking = useAppUpdate((s) => s.checking);
   const found = useAppUpdate((s) => s.update);
@@ -182,6 +185,7 @@ export default function Settings() {
           <TaskSettings />
 
           <ListSection header="Оформление">
+            <ListRow icon={<IconTile icon={SlidersHorizontal} tone="accent" size="list" />} title="Нижняя панель" subtitle="Какие разделы стоят внизу на телефоне" chevron onClick={() => setEditTabs(true)} />
             <ListCell>
               <div className="segmented" role="tablist" aria-label="Тема">
                 <button className={settings.theme === 'system' ? 'active' : ''} onClick={() => setSettings({ theme: 'system' })}>
@@ -347,9 +351,11 @@ export default function Settings() {
               />
             )}
             <ListRow icon={<IconTile icon={Sparkle} tone="accent" size="list" />} title="Что нового" chevron onClick={openWhatsNew} />
+            <ListRow icon={<IconTile icon={ShieldCheck} tone="gray" size="list" />} title="Политика конфиденциальности" subtitle="Какие данные хранятся и куда передаются" chevron onClick={() => void openExternal(PRIVACY_URL)} />
           </ListSection>
         </div>
       </div>
+      {editTabs && <TabsEditor onClose={() => setEditTabs(false)} />}
     </div>
   );
 }

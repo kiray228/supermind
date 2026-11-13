@@ -3,7 +3,7 @@
  * поддержка и обновления. На компьютере те же разделы — в боковой панели.
  */
 import { useEffect, useState } from 'react';
-import { ArrowClockwise, Bell, ChatCircleDots, CloudArrowUp, Gift, Info, Lightbulb, Palette, Question, ShieldCheck, UserCircle } from '@phosphor-icons/react';
+import { ArrowClockwise, Bell, ChatCircleDots, CloudArrowUp, Gift, Info, Lightbulb, Palette, Question, ShieldCheck, SlidersHorizontal, UserCircle } from '@phosphor-icons/react';
 import { useApp, toast } from '../store/appStore';
 import { useCloud } from '../store/cloud';
 import { IconTile } from '../ui/icons';
@@ -16,6 +16,8 @@ import { applyUpdate, checkForUpdate, updatesSupported, useAppUpdate } from '../
 import { ensureFinance, useFinance } from '../finance/store';
 import { fmtMoney, summarize } from '../finance/model';
 import { todayYmd } from '../utils/mapTasks';
+import { moreBlocks, TAB_INFO } from '../store/phoneNav';
+import { TabsEditor } from '../ui/TabsEditor';
 import './more.css';
 
 /** Открыть «Настройки» на нужной группе (по заголовку группы) */
@@ -32,6 +34,8 @@ function openSettingsAt(header: string) {
 
 export default function More() {
   const go = useApp((s) => s.go);
+  const tabs = useApp((s) => s.tabs);
+  const [editTabs, setEditTabs] = useState(false);
   const account = useCloud((s) => s.account);
   const status = useCloud((s) => s.status);
   const fin = useFinance((s) => s.data);
@@ -73,11 +77,19 @@ export default function More() {
             </span>
           </button>
 
-          <ListSection>
-            <ListRow icon={<IconTile section="finance" size="list" />} title="Финансы" subtitle={fin && spent ? 'Потрачено за месяц: ' + fmtMoney(spent, fin.prefs.mainCurrency, { compact: true }) : 'Счета, бюджет, траты'} chevron onClick={() => go('finance')} />
-            <ListRow icon={<IconTile section="progress" size="list" />} title="Прогресс" subtitle="Уровень, серия, достижения" chevron onClick={() => go('progress')} />
-            <ListRow icon={<IconTile section="assistant" size="list" />} title="ИИ-ассистент" subtitle="Сводка дня и чат" chevron onClick={() => go('assistant')} />
-            <ListRow icon={<IconTile section="focus" size="list" />} title="Фокус" subtitle="Помодоро, секундомер, отсчёты" chevron onClick={() => go('focus')} />
+          {/* разделы, которых нет в нижней панели */}
+          <ListSection header="Разделы">
+            {moreBlocks(tabs).map((t) => (
+              <ListRow
+                key={t}
+                icon={<IconTile section={t} size="list" />}
+                title={TAB_INFO[t].title}
+                subtitle={t === 'finance' && fin && spent ? 'Потрачено за месяц: ' + fmtMoney(spent, fin.prefs.mainCurrency, { compact: true }) : TAB_INFO[t].hint}
+                chevron
+                onClick={() => go(t)}
+              />
+            ))}
+            <ListRow icon={<IconTile icon={SlidersHorizontal} tone="accent" size="list" />} title="Настроить нижнюю панель" subtitle="Какие разделы всегда под рукой" chevron onClick={() => setEditTabs(true)} />
           </ListSection>
 
           <ListSection header="Настройки">
@@ -111,6 +123,7 @@ export default function More() {
           </ListSection>
         </div>
       </div>
+      {editTabs && <TabsEditor onClose={() => setEditTabs(false)} />}
     </div>
   );
 }

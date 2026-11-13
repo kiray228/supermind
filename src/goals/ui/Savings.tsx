@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { ArrowsLeftRight, Check, CheckCircle, Plus, Warning } from '@phosphor-icons/react';
 import { toast } from '../../store/appStore';
 import { todayYmd } from '../../utils/mapTasks';
-import { CURRENCIES, curSymbol, dateShort, fmtMoney, fmtNum, parseMoneyInput, r2, sortedAccounts, sortTx, toMain } from '../../finance/model';
+import { CURRENCIES, curSymbol, dateShort, fmtMoney, fmtNum, groupDigits, parseMoneyInput, r2, sortedAccounts, sortTx, toMain } from '../../finance/model';
 import { ensureFinance, useFinance } from '../../finance/store';
 import {
   accountBalance,
@@ -228,7 +228,7 @@ function DepositSheet({ goal, onClose }: { goal: Goal; onClose: () => void }) {
           placeholder="4 500 или 4,5к"
           value={amount}
           autoFocus
-          onChange={(e) => setAmount(e.target.value)}
+          onChange={(e) => setAmount(groupDigits(e.target.value))}
           onKeyDown={(e) => e.key === 'Enter' && save()}
         />
         <button type="button" className="btn gl-sv-000" onClick={() => setAmount((a) => (a.trim() ? a.trim() + '000' : a))} aria-label="Добавить три нуля">
@@ -265,7 +265,7 @@ function DepositSheet({ goal, onClose }: { goal: Goal; onClose: () => void }) {
       {cross && (
         <>
           <label className="label">Зачислено в копилку, {curSymbol(target.currency)}</label>
-          <input className="input" inputMode="decimal" placeholder={est ? fmtNum(est) : '0'} value={toAmount} onChange={(e) => setToAmount(e.target.value)} />
+          <input className="input" inputMode="decimal" placeholder={est ? fmtNum(est) : '0'} value={toAmount} onChange={(e) => setToAmount(groupDigits(e.target.value))} />
         </>
       )}
 
@@ -342,7 +342,7 @@ export function SavingsFields({ draft, onChange, prev, deadline, title }: { draf
         </div>
       )}
       <label className="label">Сколько накопить, {curSymbol(cur)}</label>
-      <input className="input" inputMode="decimal" placeholder="Например, 200 000 или 200к" value={draft.amount} onChange={(e) => set({ amount: e.target.value })} />
+      <input className="input" inputMode="decimal" placeholder="Например, 200 000 или 200к" value={draft.amount} onChange={(e) => set({ amount: groupDigits(e.target.value) })} />
       {acc && bal > 0 && (
         <label className="row gl-sv-check-row">
           <input type="checkbox" checked={draft.countExisting} onChange={(e) => set({ countExisting: e.target.checked })} />

@@ -152,6 +152,9 @@ export type TxDraft = Omit<Transaction, 'id' | 'createdAt' | 'updatedAt' | 'tags
 
 function normalizeTx(t: Transaction): Transaction {
   t.amount = r2(Math.abs(t.amount));
+  // сумма в другой валюте: только у расхода и дохода, с валютой и суммой
+  if (t.orig && (t.type === 'transfer' || !(Number(t.orig.amount) > 0) || !t.orig.currency)) delete t.orig;
+  else if (t.orig) t.orig = { amount: r2(Math.abs(Number(t.orig.amount))), currency: t.orig.currency };
   if (t.type === 'transfer') {
     delete t.categoryId;
     if (t.toAmount !== undefined) t.toAmount = r2(Math.abs(t.toAmount));
@@ -239,6 +242,8 @@ export function splitTransaction(id: string, parts: SplitPart[]): Transaction[] 
   const made = valid.map((p, i) => {
     const x: Transaction = { ...t, id: uid(), amount: p.amount, categoryId: p.categoryId, splitId: group, createdAt: now + i + 1, updatedAt: now };
     delete x.subscriptionId;
+    // сумма «как ввели в другой валюте» относится ко всей покупке — у частей её нет
+    delete x.orig;
     return normalizeTx(x);
   });
   mutateFinance((d) => {
@@ -246,6 +251,7 @@ export function splitTransaction(id: string, parts: SplitPart[]): Transaction[] 
     if (!m) return;
     m.amount = r2(m.amount - sum);
     m.splitId = group;
+    delete m.orig;
     m.updatedAt = now;
     d.transactions.push(...made);
   });
@@ -265,6 +271,7 @@ export function mergeSplit(id: string): number {
     const m = d.transactions.find((x) => x.id === id);
     if (!m) return;
     m.amount = total;
+    delete m.orig;
     // остались части на другом счёте (их перенесли) — группа остаётся
     if (!left) delete m.splitId;
     m.updatedAt = Date.now();
@@ -503,7 +510,7 @@ let ratesBusy: Promise<boolean> | null = null;
  * Обновить курсы из сети (если автокурсы включены и пора; force — сейчас). true — курсы обновлены.
  * Без сети и при ошибке — false, прежние курсы остаются.
  */
-export function refreshRates(force = false, fetcher?: typeof fetch): Promise<boolean> {
+export function refreshRates(force = false, fetcher?: typeof fetch, extra: string[] = []): Promise<boolean> {
   const d = useFinance.getState().data;
   if (!d || !(force || ratesStale(d))) return Promise.resolve(false);
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return Promise.resolve(false);
@@ -512,7 +519,8 @@ export function refreshRates(force = false, fetcher?: typeof fetch): Promise<boo
       const { rates } = await fetchUsdRates(fetcher);
       const cur = useFinance.getState().data;
       if (!cur) return false;
-      const fresh = crossRates(rates, cur.prefs.mainCurrency, usedCurrencies(cur));
+      // extra — валюта, которую только что выбрали для операции (её курса ещё нет)
+      const fresh = crossRates(rates, cur.prefs.mainCurrency, [...new Set([...usedCurrencies(cur), ...extra])]);
       setFinancePrefs({ rates: { ...cur.prefs.rates, ...fresh }, ratesAt: Date.now(), autoRates: true });
       return Object.keys(fresh).length > 0;
     } catch {

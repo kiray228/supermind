@@ -1,5 +1,7 @@
 import { lazy, Suspense, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { holdToast, isPhoneTab, phoneTab, useApp, type PhoneTab, type View } from './store/appStore';
+import { TAB_INFO } from './store/phoneNav';
+import { tabIcon } from './ui/tabIcons';
 import { listDocs, loadSettings, saveDoc } from './store/db';
 import { get as idbGet, set as idbSet } from './store/kv';
 import { welcomeDoc } from './templates';
@@ -20,7 +22,7 @@ import { VoiceFab, VoiceNavButton } from './voice/VoiceButton';
 import { SyncDot, SyncNavButton } from './ui/SyncBadge';
 import { useVoice } from './voice/state';
 import { SectionIcon, type SectionId } from './ui/icons';
-import { Brain, CaretLeft, DotsThreeCircle, Graph, SunHorizon, type Icon } from '@phosphor-icons/react';
+import { CaretLeft, type Icon } from '@phosphor-icons/react';
 import './ui/appearance.css';
 import './app.css';
 import { mark, whenIdle } from './perf';
@@ -46,6 +48,7 @@ const Goals = lazy(() => import('./views/Goals'));
 const Finance = lazy(() => import('./views/Finance'));
 const Assistant = lazy(() => import('./views/Assistant'));
 const Progress = lazy(() => import('./views/Progress'));
+const Health = lazy(() => import('./views/Health'));
 const LevelBadge = lazy(() => import('./progress/LevelBadge').then((m) => ({ default: m.LevelBadge })));
 const VoiceHost = lazy(() => import('./voice/VoiceSheet'));
 const OnboardingHost = lazy(() => import('./onboarding/OnboardingHost'));
@@ -73,6 +76,7 @@ const NAV: { id: Extract<View, SectionId>; label: string }[] = [
   { id: 'tasks', label: 'Задачи' },
   { id: 'calendar', label: 'Календарь' },
   { id: 'habits', label: 'Привычки' },
+  { id: 'health', label: 'Здоровье' },
   { id: 'assistant', label: 'Ассистент' },
   { id: 'notes', label: 'Заметки' },
   { id: 'goals', label: 'Цели' },
@@ -83,14 +87,6 @@ const NAV: { id: Extract<View, SectionId>; label: string }[] = [
   { id: 'settings', label: 'Настройки' },
 ];
 
-/** Панель вкладок телефона: Сегодня · Карты · (микрофон) · Мозг · Ещё */
-const PHONE_TABS: { id: PhoneTab; label: string; icon: Icon }[] = [
-  { id: 'today', label: 'Сегодня', icon: SunHorizon },
-  { id: 'home', label: 'Карты', icon: Graph },
-  { id: 'notes', label: 'Мозг', icon: Brain },
-  { id: 'more', label: 'Ещё', icon: DotsThreeCircle },
-];
-const TAB_TITLE: Record<PhoneTab, string> = { today: 'Сегодня', home: 'Карты', notes: 'Второй мозг', more: 'Ещё' };
 
 let welcomeStarted = false;
 /** Второстепенное (напоминания, виджеты, push, таймер фокуса, окна задач) уже запущено — после первой отрисовки */
@@ -112,7 +108,10 @@ export default function App() {
   const taskOpen = useTasks((s) => !!s.openTaskId);
   const quickAdd = useTasks((s) => !!s.quickAdd);
   const backTab = useApp((s) => s.backTab);
-  const tab = backTab ?? phoneTab(view);
+  const tabs = useApp((s) => s.tabs);
+  const tab = backTab ?? phoneTab(view, tabs);
+  // панель телефона: три раздела на выбор · (микрофон после второго) · «Ещё»
+  const phoneTabs: PhoneTab[] = [...tabs, 'more'];
   const todayCount = useTasks((s) => {
     const t = todayYmd();
     return s.data ? s.data.tasks.filter((x) => isActive(x) && !!x.date && x.date <= t).length : 0;
@@ -251,16 +250,25 @@ export default function App() {
       )}
       {view !== 'editor' && !wide && (
         <nav className="tabbar" aria-label="Разделы">
-          {PHONE_TABS.map((t, i) => (
-            <PhoneTabButton key={t.id} t={t} active={tab === t.id} badge={t.id === 'today' ? todayCount : 0} sync={t.id === 'more'} onClick={() => go(t.id)} after={i === 1 ? <VoiceFab /> : null} />
+          {phoneTabs.map((id, i) => (
+            <PhoneTabButton
+              key={id}
+              label={TAB_INFO[id].label}
+              icon={tabIcon(id)}
+              active={tab === id}
+              badge={id === 'today' || (id === 'tasks' && !tabs.includes('today')) ? todayCount : 0}
+              sync={id === 'more'}
+              onClick={() => go(id)}
+              after={i === 1 ? <VoiceFab /> : null}
+            />
           ))}
         </nav>
       )}
       {/* раздел внутри вкладки (задачи, финансы, цели…) — назад к вкладке */}
-      {view !== 'editor' && !wide && !isPhoneTab(view) && (
+      {view !== 'editor' && !wide && !isPhoneTab(view, tabs) && (
         <button className="phone-back" onClick={() => go(tab)}>
           <CaretLeft size={17} weight="bold" />
-          {TAB_TITLE[tab]}
+          {TAB_INFO[tab].title}
         </button>
       )}
       <main className="app-main">
@@ -282,6 +290,7 @@ export default function App() {
           {view === 'finance' && <Finance />}
           {view === 'assistant' && <Assistant />}
           {view === 'progress' && <Progress />}
+          {view === 'health' && <Health />}
         </Suspense>
         </ViewBoundary>
       </main>
@@ -351,8 +360,7 @@ export default function App() {
   );
 }
 
-function PhoneTabButton({ t, active, badge, sync, onClick, after }: { t: (typeof PHONE_TABS)[number]; active: boolean; badge: number; sync: boolean; onClick: () => void; after: ReactNode }) {
-  const I = t.icon;
+function PhoneTabButton({ label, icon: I, active, badge, sync, onClick, after }: { label: string; icon: Icon; active: boolean; badge: number; sync: boolean; onClick: () => void; after: ReactNode }) {
   return (
     <>
       <button className={`tab-item${active ? ' active' : ''}`} onClick={onClick} aria-current={active ? 'page' : undefined}>
@@ -361,7 +369,7 @@ function PhoneTabButton({ t, active, badge, sync, onClick, after }: { t: (typeof
           {badge > 0 && <i className="nav-badge">{badge > 99 ? '99+' : badge}</i>}
           {sync && <SyncDot />}
         </span>
-        <span>{t.label}</span>
+        <span>{label}</span>
       </button>
       {after}
     </>

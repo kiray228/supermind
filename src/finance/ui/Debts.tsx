@@ -10,7 +10,7 @@ import { toast } from '../../store/appStore';
 import { confirmDialog } from '../../ui/dialogs';
 import { ListRow, ListSection, SwitchRow } from '../../ui/list';
 import { IconTile } from '../../ui/icons';
-import { curSymbol, dateLong, dateShort, debtLeft, debtPaid, debtTotals, fmtMoney, parseMoneyInput, sortedAccounts, type Debt, type FinanceData } from '../model';
+import { curSymbol, dateLong, dateShort, debtLeft, debtPaid, debtTotals, fmtMoney, parseMoneyInput, sortedAccounts, type Debt, type FinanceData, fmtInputNum } from '../model';
 import { addDebtPayment, addTransaction, deleteDebt, deleteTransaction, financeData, removeDebtPayment, saveDebt } from '../store';
 import { AmountInput, CurrencySelect, CurTotals, Sheet, useToday } from './common';
 import { closeDebt, openDebt, useFinUi } from './state';
@@ -176,7 +176,7 @@ export function DebtSheets({ data }: { data: FinanceData }) {
 function DebtEditSheet({ data, debt, kind: kind0 }: { data: FinanceData; debt?: Debt; kind: Kind }) {
   const [kind, setKind] = useState<Kind>(debt?.kind ?? kind0);
   const [person, setPerson] = useState(debt?.person ?? '');
-  const [amount, setAmount] = useState(debt ? String(debt.amount).replace('.', ',') : '');
+  const [amount, setAmount] = useState(debt ? fmtInputNum(debt.amount) : '');
   const [currency, setCurrency] = useState(debt?.currency ?? data.prefs.mainCurrency);
   const [date, setDate] = useState(debt?.date ?? todayYmd());
   const [dueDate, setDueDate] = useState(debt?.dueDate ?? '');

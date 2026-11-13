@@ -6,6 +6,7 @@
  * Забыли пароль — код на почту (POST /auth/forgot), затем код + новый пароль (POST /auth/reset).
  */
 import { useEffect, useState } from 'react';
+import { openExternal, PRIVACY_URL } from './links';
 import { Eye, EyeOff, Cloud, ShieldCheck, Smartphone } from 'lucide-react';
 import { InstallAppButton } from './InstallAppButton';
 import { login, register, requestReset, resetPassword, useCloud } from '../store/cloud';
@@ -31,7 +32,9 @@ const BUTTON: Record<Mode, string> = {
 const digits = (s: string) => s.replace(/\D/g, '');
 
 const LOCAL_ONLY = 'sm-local-only';
-function localOnly(): boolean {
+export const LOCAL_ONLY_EVENT = 'sm-local-only';
+/** Без аккаунта (iPhone: «Продолжить без аккаунта»): данные только на устройстве */
+export function localOnly(): boolean {
   try {
     // тестовая сборка (самопроверка в CI) работает без аккаунта и на Android
     return (isIOSApp() || import.meta.env.VITE_SELFTEST === '1') && localStorage.getItem(LOCAL_ONLY) === '1';
@@ -177,6 +180,22 @@ export function AuthGate() {
           <button className="btn btn-primary auth-submit" type="submit" disabled={busy || !email.trim() || (mode !== 'forgot' && !password)}>
             {busy ? 'Подождите…' : BUTTON[mode]}
           </button>
+          {(mode === 'register' || mode === 'login') && (
+            <p className="auth-consent">
+              Продолжая, вы соглашаетесь с{' '}
+              <a
+                href={PRIVACY_URL}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => {
+                  e.preventDefault();
+                  void openExternal(PRIVACY_URL);
+                }}
+              >
+                Политикой конфиденциальности
+              </a>
+            </p>
+          )}
         </form>
 
         {mode === 'login' && (
@@ -220,6 +239,8 @@ export function AuthGate() {
                 } catch {
                   /* не сохранится — спросим при следующем запуске */
                 }
+                // знакомство с приложением ждёт входа — без аккаунта показать сразу
+                window.dispatchEvent(new Event(LOCAL_ONLY_EVENT));
                 setSkipped(true);
               }}
             >

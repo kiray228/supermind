@@ -1,5 +1,5 @@
 /** «Что нового»: главное в каждой версии. Новые версии — сверху. */
-import { Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge, MessageCircleQuestion, CloudOff, LayoutTemplate, SquareArrowOutUpRight, BellRing, Target, Timer, Lock, Crosshair, Move, GitMerge, EyeOff, CalendarRange, Fingerprint, ArrowUpDown, Banknote, MonitorSmartphone, Coins, ListChecks, FileInput, Split, CornerDownRight, KeyRound, Keyboard, LifeBuoy, Zap, FileSpreadsheet, Gauge as GaugeIcon, MessagesSquare, Accessibility, Focus, Save, Flag, RefreshCw } from 'lucide-react';
+import { Heart, Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge, MessageCircleQuestion, CloudOff, LayoutTemplate, SquareArrowOutUpRight, BellRing, Target, Timer, Lock, Crosshair, Move, GitMerge, EyeOff, CalendarRange, Fingerprint, ArrowUpDown, Banknote, MonitorSmartphone, Coins, ListChecks, FileInput, Split, CornerDownRight, KeyRound, Keyboard, LifeBuoy, Zap, FileSpreadsheet, Gauge as GaugeIcon, MessagesSquare, Accessibility, Focus, Save, Flag, RefreshCw } from 'lucide-react';
 
 export interface ChangeItem {
   icon: typeof Sparkles;
@@ -15,6 +15,17 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.52',
+    title: 'Своя нижняя панель и валюты',
+    items: [
+      { icon: LayoutGrid, title: 'Нижняя панель — под вас', text: 'Поставьте вниз разделы, которыми пользуетесь чаще всего: например, Финансы вместо «Мозга». Ещё → «Настроить нижнюю панель» или Настройки → Оформление → «Нижняя панель». Остальные разделы — в «Ещё».' },
+      { icon: Heart, title: 'Здоровье и спорт', text: 'Новый раздел: вода, сон, шаги и тренировки на сегодня, неделя на одном графике, траты на здоровье и шаблоны в одно касание. Можно поставить в нижнюю панель.' },
+      { icon: Coins, title: 'Сумма в любой валюте', text: 'В новой операции нажмите на знак валюты рядом с суммой и выберите другую: например, расход в тенге со счёта в юанях. Со счёта спишется сумма по курсу, а в списке будет видно, сколько вводили.' },
+      { icon: Banknote, title: 'Разряды в суммах', text: 'Суммы в полях ввода сразу разбиваются по разрядам: 10 000, 1 250 000. Счета в другой валюте показывают, сколько это в основной.' },
+      { icon: ShieldCheck, title: 'Политика конфиденциальности', text: 'Ссылка — на экране входа и в Настройках → «О приложении».' },
+    ],
+  },
   {
     version: '1.51',
     title: 'Новый телефонный SuperMind',

@@ -17,6 +17,7 @@ import {
   summarize,
   totalBudget,
   type FinanceData,
+  fmtInputNum
 } from '../model';
 import { setBudget } from '../store';
 import { AmountInput, CatIcon, Money, Progress, Sheet, Stepper, useToday } from './common';
@@ -164,7 +165,7 @@ function BudgetSheet({ data, edit, spentByCat, onClose }: { data: FinanceData; e
   const isTotal = !edit.pick && !edit.categoryId;
   // в режиме выбора категории без выбранной категории — не общий бюджет (иначе «Убрать» удалит его)
   const existing = isTotal ? data.budgets.find((b) => !b.categoryId) : catId ? data.budgets.find((b) => b.categoryId === catId) : undefined;
-  const [val, setVal] = useState(existing ? String(existing.limit).replace('.', ',') : '');
+  const [val, setVal] = useState(existing ? fmtInputNum(existing.limit) : '');
   const main = data.prefs.mainCurrency;
   const free = sortedCategories(data, 'expense').filter((c) => c.id === catId || !data.budgets.some((b) => b.categoryId === c.id));
   const cat = data.categories.find((c) => c.id === catId);

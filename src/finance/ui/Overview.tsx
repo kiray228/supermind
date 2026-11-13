@@ -19,6 +19,7 @@ import {
   totalsByCurrency,
   upcomingPayments,
   type FinanceData,
+  toMain
 } from '../model';
 import { paySubscription } from '../store';
 import { ensureGoals, useGoals } from '../../goals/store';
@@ -85,6 +86,10 @@ export function Overview({ data }: { data: FinanceData }) {
                 {piggy.has(a.id) && <span className="fn-acc-goal" title={`Цель «${piggy.get(a.id)!.title}»`}>цель {piggy.get(a.id)!.pct}%</span>}
               </span>
               <Money v={bal.get(a.id) ?? 0} cur={a.currency} />
+              {/* счёт в другой валюте — сколько это в основной */}
+              {a.currency !== main && toMain(bal.get(a.id) ?? 0, a.currency, data.prefs) !== null && (
+                <span className="fn-acc-card-main">≈ {fmtMoney(toMain(bal.get(a.id) ?? 0, a.currency, data.prefs)!, main, { compact: true })}</span>
+              )}
             </button>
           ))}
           <button className="fn-acc-card fn-acc-add" onClick={() => openMore('accounts')}>

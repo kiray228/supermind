@@ -1,0 +1,135 @@
+.te-modal {
+  display: flex;
+  flex-direction: column;
+}
+.te-head {
+  align-items: center;
+  gap: 8px;
+}
+.te-text {
+  margin: 4px 0 14px;
+  color: var(--text-2);
+  font-size: 14px;
+}
+.te-bar {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  padding: 8px 6px;
+  margin-bottom: 14px;
+  border-radius: 18px;
+  background: var(--fill-3, rgba(120, 120, 128, 0.12));
+}
+.te-slot {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 2px;
+  border-radius: 12px;
+  color: var(--accent);
+  background: var(--surface);
+}
+.te-slot small {
+  font-size: 11px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.te-slot.empty {
+  color: var(--text-3);
+  background: transparent;
+  border: 1.5px dashed var(--separator);
+}
+.te-dash {
+  width: 22px;
+  height: 22px;
+}
+.te-mic {
+  flex: 0 0 44px;
+  color: #fff;
+  background: var(--accent);
+  border-radius: 50%;
+  align-self: center;
+  height: 44px;
+}
+.te-fixed {
+  color: var(--text-2);
+  background: transparent;
+}
+.te-move {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  color: var(--text-2);
+  background: var(--fill-2, rgba(120, 120, 128, 0.16));
+  cursor: pointer;
+}
+.te-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: auto;
+  min-height: 0;
+}
+.te-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.te-item.on {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.te-item-x {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.te-item-x b {
+  font-weight: 600;
+  font-size: 15px;
+}
+.te-item-x small {
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+.te-num {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  border: 1.5px solid var(--separator);
+}
+.te-item.on .te-num {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+.te-actions {
+  justify-content: space-between;
+}

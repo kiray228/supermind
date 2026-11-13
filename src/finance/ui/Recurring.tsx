@@ -20,6 +20,7 @@ import {
   type FinanceData,
   type SubPeriod,
   type Subscription,
+  fmtInputNum
 } from '../model';
 import { deleteSubscription, paySubscription, saveSubscription, skipSubscription } from '../store';
 import { AmountInput, CatIcon, CurTotals, Money, Sheet, useToday } from './common';
@@ -114,7 +115,7 @@ function SubSheet({ data, sub, onClose }: { data: FinanceData; sub: Subscription
   const accounts = sortedAccounts(data, true);
   const [name, setName] = useState(sub?.name ?? '');
   const [income, setIncome] = useState(!!sub?.income);
-  const [amount, setAmount] = useState(sub ? String(sub.amount).replace('.', ',') : '');
+  const [amount, setAmount] = useState(sub ? fmtInputNum(sub.amount) : '');
   const [accountId, setAccountId] = useState(sub?.accountId ?? data.prefs.lastAccountId ?? accounts[0]?.id ?? '');
   const [categoryId, setCategoryId] = useState(sub?.categoryId ?? (data.categories.some((c) => c.id === 'c-subs') ? 'c-subs' : ''));
   const [period, setPeriod] = useState<PeriodOpt>(sub ? (sub.period === 'month' && sub.every > 1 ? 'months' : sub.period) : 'month');

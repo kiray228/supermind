@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowsLeftRight, CaretLeft, CaretRight, X } from '@phosphor-icons/react';
 import { addDaysYmd, fromYmd, todayYmd } from '../../utils/mapTasks';
@@ -14,6 +14,7 @@ import {
   dateLong,
   EMOJIS,
   fmtMoney,
+  groupDigits,
   WD_SHORT,
   type Account,
   type Category,
@@ -178,6 +179,8 @@ function TxRowBody(props: TxRowProps & { className?: string; style?: CSSProperti
       </span>
       <span className={'fn-tx-amt' + (tx.type === 'income' ? ' is-income' : '')}>
         <span className="fn-money">{fmtMoney(tx.type === 'income' ? tx.amount : -tx.amount, cur, { sign: true })}</span>
+        {/* введено в другой валюте: как вводили */}
+        {tx.orig && tx.orig.currency !== cur && <span className="tiny faint">{fmtMoney(tx.orig.amount, tx.orig.currency)}</span>}
       </span>
     </button>
   );
@@ -222,17 +225,35 @@ export function ColorDots({ value, onChange }: { value: string; onChange: (v: st
   );
 }
 
-/** Поле суммы: десятичная клавиатура на телефоне */
+/** Поле суммы: десятичная клавиатура на телефоне; разряды пробелами по мере ввода (10 000) */
 export function AmountInput(props: { value: string; onChange: (v: string) => void; placeholder?: string; autoFocus?: boolean; className?: string; onEnter?: () => void; onBlur?: () => void }) {
+  const ref = useRef<HTMLInputElement>(null);
+  /** куда поставить курсор после форматирования: сколько цифр слева от него */
+  const caret = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    const want = caret.current;
+    caret.current = null;
+    if (!el || want === null || document.activeElement !== el) return;
+    let pos = 0;
+    for (let seen = 0; pos < el.value.length && seen < want; pos++) if (/[\d.,+\-]/.test(el.value[pos])) seen++;
+    el.setSelectionRange(pos, pos);
+  }, [props.value]);
   return (
     <input
+      ref={ref}
       className={'input fn-amount-input ' + (props.className ?? '')}
       inputMode="decimal"
       enterKeyHint="done"
       placeholder={props.placeholder ?? '0'}
       value={props.value}
       autoFocus={props.autoFocus}
-      onChange={(e) => props.onChange(e.target.value.replace(/[^\d.,+\-\s]/g, ''))}
+      onChange={(e) => {
+        const raw = e.target.value.replace(/[^\d.,+\-\s]/g, '');
+        const at = e.target.selectionStart ?? raw.length;
+        caret.current = (e.target.value.slice(0, at).match(/[\d.,+\-]/g) ?? []).length;
+        props.onChange(groupDigits(raw));
+      }}
       onKeyDown={(e) => e.key === 'Enter' && props.onEnter?.()}
       onBlur={props.onBlur}
     />

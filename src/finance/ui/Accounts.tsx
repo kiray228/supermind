@@ -3,7 +3,7 @@ import { ArrowDown, ArrowUp, Plus } from '@phosphor-icons/react';
 import { uid } from '../../utils/tree';
 import { toast } from '../../store/appStore';
 import { confirmDialog } from '../../ui/dialogs';
-import { balances, COLORS, fmtMoney, parseMoneyInput, r2, sortedAccounts, sortedCategories, type Account, type Category, type CatKind, type FinanceData } from '../model';
+import { balances, COLORS, fmtMoney, parseMoneyInput, r2, sortedAccounts, sortedCategories, type Account, type Category, type CatKind, type FinanceData, fmtInputNum } from '../model';
 import { deleteAccount, deleteCategory, moveAccount, moveCategory, saveAccount, saveCategory } from '../store';
 import { AmountInput, CatIcon, ColorDots, CurrencySelect, EmojiPicker, Money, Sheet } from './common';
 import { showOps } from './state';
@@ -63,7 +63,7 @@ function AccountSheet({ data, acc, balance, onClose }: { data: FinanceData; acc:
   const [color, setColor] = useState(acc?.color ?? COLORS[data.accounts.length % COLORS.length]);
   const [currency, setCurrency] = useState(acc?.currency ?? data.prefs.mainCurrency);
   // пользователь вводит текущий остаток, начальный пересчитывается
-  const [bal, setBal] = useState(String(acc ? balance : 0).replace('.', ','));
+  const [bal, setBal] = useState(fmtInputNum(acc ? balance : 0));
   const [archived, setArchived] = useState(!!acc?.archived);
   const count = acc ? data.transactions.filter((t) => t.accountId === acc.id || t.toAccountId === acc.id).length : 0;
 

@@ -37,6 +37,8 @@ export interface Transaction {
   subscriptionId?: string;
   /** часть разделённой покупки: у всех частей один splitId (id исходной операции) */
   splitId?: string;
+  /** введено в другой валюте (например, ₸ со счёта в юанях): сумма как ввели; amount — пересчёт по курсу в валюту счёта */
+  orig?: { amount: number; currency: string };
   createdAt: number;
   updatedAt: number;
 }
@@ -196,6 +198,21 @@ export function fmtMoney(x: number, cur: string, opts: { sign?: boolean; compact
   const plus = opts.sign && v > 0 ? '+' : '';
   return `${plus}${body} ${curSymbol(cur)}`;
 }
+
+/**
+ * Поле суммы: разряды пробелами по мере ввода («10000» → «10 000», «1234567,5» → «1 234 567,5»).
+ * Выражения («1200+350», «4,5к») и всё необычное — как ввели.
+ */
+export function groupDigits(s: string): string {
+  const m = s.match(/^\s*(-?)([\d\s  ]*)([.,]\d*)?\s*$/);
+  if (!m) return s;
+  const int = m[2].replace(/\D/g, '');
+  if (!int && !m[3]) return s.trim() === '-' ? '-' : s.replace(/\s+/g, '');
+  return m[1] + int.replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + (m[3] ?? '');
+}
+
+/** Число для поля ввода (правка): 12500.5 → «12 500,5» */
+export const fmtInputNum = (x: number | undefined) => (x === undefined || !Number.isFinite(x) ? '' : groupDigits(String(x).replace('.', ',')));
 
 /** Разбор суммы из поля ввода: «1 200,5» → 1200.5 */
 export function parseMoneyInput(s: string): number {
@@ -435,6 +452,26 @@ export function missingRates(d: FinanceData, r?: { from: string; to: string }): 
     if (toMain(1, cur, d.prefs) === null) out.add(cur);
   }
   return [...out].sort();
+}
+
+/**
+ * Пересчёт между любыми валютами через основную (курсы «1 X = N основной»). null — нет курса.
+ * 1000 ₸ на счёт в юанях: convertAmount(1000, 'KZT', 'CNY', prefs) ≈ 14 ¥
+ */
+export function convertAmount(amount: number, from: string, to: string, prefs: FinancePrefs): number | null {
+  if (from === to) return amount;
+  const m = toMain(amount, from, prefs);
+  if (m === null) return null;
+  if (to === prefs.mainCurrency) return m;
+  const r = prefs.rates[to];
+  return r && r > 0 ? m / r : null;
+}
+
+/** Курс словами — от более «дорогой» валюты: «1 ¥ = 70,15 ₸» (а не «1 ₸ = 0,01 ¥»). '' — курса нет */
+export function rateText(a: string, b: string, prefs: FinancePrefs): string {
+  const r = convertAmount(1, a, b, prefs);
+  if (r === null || !(r > 0)) return '';
+  return r >= 1 ? `1 ${curSymbol(a)} = ${fmtNum(r)} ${curSymbol(b)}` : `1 ${curSymbol(b)} = ${fmtNum(1 / r)} ${curSymbol(a)}`;
 }
 
 /** То же, но без курса сумма берётся как есть (для бюджетов и аналитики) */

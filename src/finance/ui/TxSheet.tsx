@@ -1,13 +1,14 @@
-import { useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { Plus, Trash, X } from '@phosphor-icons/react';
 import { addDaysYmd, todayYmd } from '../../utils/mapTasks';
 import { toast } from '../../store/appStore';
-import { curSymbol, dateShort, fmtMoney, parseMoneyInput, r2, sortedAccounts, sortedCategories, type CatKind, type FinanceData, type TxType } from '../model';
-import { addTransaction, deleteTransaction, mergeSplit, splitParts, splitTransaction, updateTransaction } from '../store';
+import { curSymbol, dateShort, fmtMoney, parseMoneyInput, r2, sortedAccounts, sortedCategories, type CatKind, type FinanceData, type TxType, fmtInputNum, convertAmount, CURRENCIES, rateText } from '../model';
+import { addTransaction, deleteTransaction, mergeSplit, refreshRates, splitParts, splitTransaction, updateTransaction } from '../store';
+import { autoRatesOn } from '../rates';
 import { AmountInput, Sheet } from './common';
 import { closeTxSheet, openMore, useFinUi } from './state';
 
-const numStr = (x: number | undefined) => (x === undefined ? '' : String(x).replace('.', ','));
+const numStr = fmtInputNum;
 
 /** Быстрое добавление / правка операции */
 export function TxSheet({ data }: { data: FinanceData }) {
@@ -24,7 +25,8 @@ function TxForm({ data }: { data: FinanceData }) {
   const lastAcc = data.prefs.lastAccountId && accounts.some((a) => a.id === data.prefs.lastAccountId) ? data.prefs.lastAccountId : accounts[0]?.id;
 
   const [type, setType] = useState<TxType>(init.type ?? 'expense');
-  const [amount, setAmount] = useState(numStr(init.amount));
+  // введено в другой валюте — правим как вводили
+  const [amount, setAmount] = useState(numStr(init.orig?.amount ?? init.amount));
   const [toAmount, setToAmount] = useState(numStr(init.toAmount));
   const [accountId, setAccountId] = useState(init.accountId ?? lastAcc ?? '');
   const [toAccountId, setToAccountId] = useState(init.toAccountId ?? accounts.find((a) => a.id !== (init.accountId ?? lastAcc))?.id ?? '');
@@ -43,6 +45,28 @@ function TxForm({ data }: { data: FinanceData }) {
   const kind: CatKind = type === 'income' ? 'income' : 'expense';
   const cats = useMemo(() => sortedCategories(data, kind), [data, kind]);
   const acc = accounts.find((a) => a.id === accountId);
+  /** валюта ввода суммы: по умолчанию — валюта счёта; другая — пересчёт по курсу в валюту счёта */
+  const [cur, setCur] = useState(init.orig?.currency ?? acc?.currency ?? data.prefs.mainCurrency);
+  const inCur = type === 'transfer' || !acc ? (acc?.currency ?? cur) : cur;
+  const foreign = !!acc && inCur !== acc.currency;
+  const typed = parseMoneyInput(amount) || 0;
+  const conv = foreign ? convertAmount(typed, inCur, acc!.currency, data.prefs) : typed;
+  const auto = autoRatesOn(data.prefs);
+  // выбрали валюту без курса — подгрузить курс (если курсы автоматические)
+  useEffect(() => {
+    if (foreign && auto && convertAmount(1, inCur, acc!.currency, data.prefs) === null) void refreshRates(true, undefined, [inCur]);
+  }, [foreign, inCur, acc, auto, data.prefs]);
+  /** счёт сменили: валюта ввода шла за счётом — идёт и дальше */
+  const pickAccount = (id: string) => {
+    const next = accounts.find((a) => a.id === id);
+    if (next && acc && cur === acc.currency) setCur(next.currency);
+    setAccountId(id);
+  };
+  /** валюты для выбора: счёта, основная, счетов, с курсами, затем остальные */
+  const curOptions = useMemo(() => {
+    const first = [acc?.currency, data.prefs.mainCurrency, ...accounts.map((a) => a.currency), ...Object.keys(data.prefs.rates)].filter((c): c is string => !!c);
+    return [...new Set([...first, ...CURRENCIES.map((c) => c.code)])];
+  }, [acc, accounts, data.prefs]);
   const toAcc = accounts.find((a) => a.id === toAccountId);
   const crossCur = type === 'transfer' && !!acc && !!toAcc && acc.currency !== toAcc.currency;
   const today = todayYmd();
@@ -71,11 +95,16 @@ function TxForm({ data }: { data: FinanceData }) {
   const rest = r2((parseMoneyInput(amount) || 0) - partSum);
 
   const save = () => {
-    const v = parseMoneyInput(amount);
-    if (!(v > 0)) return toast('Введите сумму');
+    const typedV = parseMoneyInput(amount);
+    if (!(typedV > 0)) return toast('Введите сумму');
     if (!acc) return toast('Выберите счёт');
-    const split = type === 'transfer' ? [] : parts.map((p) => ({ categoryId: p.cat || undefined, amount: parseMoneyInput(p.amount) || 0 })).filter((p) => p.amount > 0);
-    if (split.length && r2(v - partSum) <= 0) return toast('Части больше всей суммы — уменьшите их');
+    if (foreign && conv === null) return toast(`Нет курса ${curSymbol(inCur)} — ${auto ? 'нужен интернет, чтобы его получить' : 'укажите курс в Финансы → Ещё → Курсы валют'}`);
+    // сумма в валюте счёта (введено в другой — по курсу); части покупки — тем же курсом
+    const k = foreign ? conv! / typedV : 1;
+    const v = r2(typedV * k);
+    const orig = foreign && type !== 'transfer' ? { amount: typedV, currency: inCur } : undefined;
+    const split = type === 'transfer' ? [] : parts.map((p) => ({ categoryId: p.cat || undefined, amount: r2((parseMoneyInput(p.amount) || 0) * k) })).filter((p) => p.amount > 0);
+    if (split.length && r2(typedV - partSum) <= 0) return toast('Части больше всей суммы — уменьшите их');
     const tagList = [...new Set(tags.split(/[,#]/).map((g) => g.trim()).filter(Boolean))];
     const base = { type, amount: v, accountId, date, time: time || undefined, note: note.trim() || undefined, tags: tagList };
     let patch;
@@ -83,9 +112,9 @@ function TxForm({ data }: { data: FinanceData }) {
       if (!toAcc || toAccountId === accountId) return toast('Выберите другой счёт зачисления');
       const tv = crossCur ? parseMoneyInput(toAmount) : v;
       if (!(tv > 0)) return toast('Введите сумму зачисления');
-      patch = { ...base, toAccountId, toAmount: crossCur ? tv : undefined, categoryId: undefined };
+      patch = { ...base, toAccountId, toAmount: crossCur ? tv : undefined, categoryId: undefined, orig: undefined };
     } else {
-      patch = { ...base, categoryId: catByKind[kind] || undefined, toAccountId: undefined, toAmount: undefined };
+      patch = { ...base, categoryId: catByKind[kind] || undefined, toAccountId: undefined, toAmount: undefined, orig };
     }
     let id = edit?.id;
     if (edit) updateTransaction(edit.id, patch);
@@ -152,8 +181,38 @@ function TxForm({ data }: { data: FinanceData }) {
 
       <div className={`fn-amount-box is-${type}`}>
         <AmountInput value={amount} onChange={setAmount} autoFocus={!edit} onEnter={save} className="fn-amount-big" />
-        <span className="fn-amount-cur">{acc ? curSymbol(acc.currency) : ''}</span>
+        {type === 'transfer' || !acc ? (
+          <span className="fn-amount-cur">{acc ? curSymbol(acc.currency) : ''}</span>
+        ) : (
+          // валюта суммы: можно ввести в другой — спишется со счёта по курсу
+          <label className={'fn-amount-cur fn-cur-pick' + (foreign ? ' is-foreign' : '')} title="Валюта суммы">
+            {curSymbol(inCur)}
+            <select value={inCur} onChange={(e) => setCur(e.target.value)} aria-label="Валюта суммы">
+              {curOptions.map((c) => (
+                <option key={c} value={c}>
+                  {curSymbol(c)} {c}
+                  {c === acc.currency ? ' — валюта счёта' : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
       </div>
+      {foreign && (
+        <div className="fn-conv">
+          {conv === null ? (
+            <span className="fn-danger">Нет курса {curSymbol(inCur)} → {curSymbol(acc!.currency)}{auto ? ' — получаю…' : ' — укажите его в Финансы → Ещё → Курсы валют'}</span>
+          ) : (
+            <>
+              <b>
+                {type === 'income' ? '+' : '−'}
+                {fmtMoney(r2(conv), acc!.currency)}
+              </b>{' '}
+              {type === 'income' ? 'на счёт' : 'со счёта'} «{acc!.name}» · {rateText(inCur, acc!.currency, data.prefs)}
+            </>
+          )}
+        </div>
+      )}
 
       {type !== 'transfer' ? (
         <>
@@ -216,13 +275,13 @@ function TxForm({ data }: { data: FinanceData }) {
                   <Plus size={14} /> Ещё часть
                 </button>
                 <span className={'grow tiny ' + (rest > 0 ? 'faint' : 'fn-danger')}>
-                  {(catByKind[kind] && cats.find((c) => c.id === catByKind[kind])?.name) || 'Без категории'}: {fmtMoney(Math.max(0, rest), acc?.currency ?? '')}
+                  {(catByKind[kind] && cats.find((c) => c.id === catByKind[kind])?.name) || 'Без категории'}: {fmtMoney(Math.max(0, rest), inCur)}
                 </span>
               </div>
             </div>
           )}
           <label className="label">Счёт</label>
-          {accChips(accountId, setAccountId)}
+          {accChips(accountId, pickAccount)}
         </>
       ) : (
         <>

@@ -1,4 +1,4 @@
-/** Знакомство с приложением: 5 шагов с пролистыванием */
+/** Знакомство с приложением: 6 шагов с пролистыванием */
 import { useEffect, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
 import {
   ArrowLeft,
@@ -28,6 +28,8 @@ import { HABIT_LIBRARY, habitFromPreset, type HabitPreset } from '../habits/libr
 import { loadPlanner, savePlanner } from '../store/db';
 import { notifyPermission, requestNotifyPermission, syncSoon, type NotifyPermission } from '../tasks/sync';
 import { onBack } from '../ui/dialogs';
+import { TAB_INFO, TAB_SLOTS, tabsFromInterests, type TabBlock } from '../store/phoneNav';
+import { IconTile } from '../ui/icons';
 
 const STARTER_NAMES = ['Пить воду', 'Зарядка', 'Чтение', 'Медитация', 'План на день', 'Прогулка', 'Лечь спать до 23:00', 'Записать расходы'];
 const STARTERS: HabitPreset[] = STARTER_NAMES.map((n) => HABIT_LIBRARY.find((p) => p.name === n)).filter((p): p is HabitPreset => !!p);
@@ -43,7 +45,10 @@ const MODULES: { icon: typeof Network; label: string }[] = [
   { icon: Bot, label: 'ИИ-ассистент' },
 ];
 
-const STEPS = 5;
+const STEPS = 6;
+/** Что важно — сколько можно выбрать: в панели «Сегодня» и ещё два раздела */
+const PICK_MAX = TAB_SLOTS - 1;
+const INTERESTS: TabBlock[] = ['home', 'notes', 'tasks', 'calendar', 'habits', 'health', 'finance', 'goals', 'focus', 'assistant'];
 
 /** Добавить выбранные привычки (без повторов по названию) */
 async function addStarterHabits(picked: HabitPreset[]) {
@@ -64,6 +69,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
   const [dx, setDx] = useState(0);
   const [picked, setPicked] = useState<Set<string>>(() => new Set(['Пить воду', 'Чтение']));
   const [perm, setPerm] = useState<NotifyPermission | null>(null);
+  const [wants, setWants] = useState<TabBlock[]>([]);
   const accent = useApp((s) => s.settings.accent) ?? DEFAULT_ACCENT;
   const drag = useRef<{ x: number; y: number; id: number; active: boolean } | null>(null);
   const busy = useRef(false);
@@ -79,6 +85,8 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
     } catch {
       /* привычки можно добавить и позже */
     }
+    // нижняя панель: «Сегодня» и выбранное (не выбрали — как было)
+    if (!skip && wants.length) useApp.getState().setTabs(tabsFromInterests(wants));
     onDone();
     // «Начать» — на экран дня (привычки, задачи, деньги); настройки — как просили
     useApp.getState().go(to === 'home' ? 'today' : to);
@@ -144,6 +152,9 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
       else n.add(name);
       return n;
     });
+
+  const want = (t: TabBlock) =>
+    setWants((w) => (w.includes(t) ? w.filter((x) => x !== t) : w.length >= PICK_MAX ? [...w.slice(1), t] : [...w, t]));
 
   const enableNotify = async () => {
     setPerm(await requestNotifyPermission());
@@ -231,8 +242,31 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
               </ul>
             </section>
 
-            {/* 3. Под себя: цвет и привычки */}
+            {/* 3. Что важно — разделы нижней панели */}
             <section className="ob-slide" aria-hidden={step !== 2} inert={step !== 2}>
+              <h1 className="ob-title">Что для вас важнее всего?</h1>
+              <p className="ob-text">Выберите до {PICK_MAX} разделов — они встанут в нижнюю панель рядом с «Сегодня». Поменять можно в любой момент в «Ещё».</p>
+              <div className="ob-habits">
+                {INTERESTS.map((t) => {
+                  const n = wants.indexOf(t);
+                  return (
+                    <button key={t} className={`ob-habit${n >= 0 ? ' active' : ''}`} aria-pressed={n >= 0} onClick={() => want(t)}>
+                      <span className="ob-habit-ico">
+                        <IconTile section={t} size="list" />
+                      </span>
+                      <span className="ob-habit-txt">
+                        <b>{TAB_INFO[t].title}</b>
+                        <small>{TAB_INFO[t].hint}</small>
+                      </span>
+                      <span className="ob-habit-check">{n >= 0 && <Check size={14} />}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            {/* 4. Под себя: цвет и привычки */}
+            <section className="ob-slide" aria-hidden={step !== 3} inert={step !== 3}>
               <h1 className="ob-title">Сделайте своим</h1>
               <p className="ob-text">Цвет оформления</p>
               <div className="ob-accents" role="radiogroup" aria-label="Цвет оформления">
@@ -270,8 +304,8 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
               <p className="ob-hint">Ещё больше — в библиотеке раздела «Привычки».</p>
             </section>
 
-            {/* 4. Напоминания и брифинг */}
-            <section className="ob-slide" aria-hidden={step !== 3} inert={step !== 3}>
+            {/* 5. Напоминания и брифинг */}
+            <section className="ob-slide" aria-hidden={step !== 4} inert={step !== 4}>
               <div className="ob-art ob-notifs" aria-hidden="true">
                 <div className="ob-notif">
                   <span className="ob-notif-ico">
@@ -311,8 +345,8 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
               </div>
             </section>
 
-            {/* 5. Сохраните данные */}
-            <section className="ob-slide" aria-hidden={step !== 4} inert={step !== 4}>
+            {/* 6. Сохраните данные */}
+            <section className="ob-slide" aria-hidden={step !== 5} inert={step !== 5}>
               <div className="ob-art ob-cloud" aria-hidden="true">
                 <div className="ob-dev">
                   <Smartphone size={26} />

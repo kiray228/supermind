@@ -106,8 +106,9 @@ export function setupPlatform() {
         if (app.view === 'editor') {
           if (doc.editingId) doc.setEditing(null);
           else await leaveEditor('home');
-        } else if (!isPhoneTab(app.view)) app.go(app.backTab ?? phoneTab(app.view));
-        else if (app.view !== 'today') app.go('today');
+        } else if (!isPhoneTab(app.view, app.tabs)) app.go(app.backTab ?? phoneTab(app.view, app.tabs));
+        // с любой вкладки — на первую вкладку панели, с неё — выход
+        else if (app.view !== app.tabs[0]) app.go(app.tabs[0]);
         else {
           await flushSave();
           App.exitApp();

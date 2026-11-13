@@ -70,7 +70,7 @@ function expectedPlugins(): string[] {
 
 async function screens(docId: string) {
   const { openDoc, leaveEditor } = await import('../actions');
-  const views: View[] = ['today', 'home', 'notes', 'more', 'tasks', 'calendar', 'habits', 'finance', 'goals', 'focus', 'progress', 'assistant', 'board', 'settings'];
+  const views: View[] = ['today', 'home', 'notes', 'more', 'tasks', 'calendar', 'habits', 'finance', 'goals', 'focus', 'progress', 'assistant', 'board', 'settings', 'health'];
   for (const v of views) {
     await check(`экран: ${v}`, async () => {
       useApp.getState().go(v);

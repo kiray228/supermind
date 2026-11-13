@@ -15,6 +15,7 @@ import {
   GearSix,
   MagnifyingGlass,
   SunHorizon,
+  Heartbeat,
   type Icon,
 } from '@phosphor-icons/react';
 
@@ -24,6 +25,7 @@ export type SectionId =
   | 'tasks'
   | 'calendar'
   | 'habits'
+  | 'health'
   | 'more'
   | 'notes'
   | 'goals'
@@ -42,6 +44,7 @@ export const SECTION_ICONS: Record<SectionId, Icon> = {
   tasks: CheckCircle,
   calendar: CalendarDots,
   habits: Repeat,
+  health: Heartbeat,
   more: SquaresFour,
   notes: Notepad,
   goals: Target,
@@ -80,6 +83,7 @@ export const SECTION_TONES: Record<SectionId, Tone> = {
   tasks: 'blue',
   calendar: 'red',
   habits: 'green',
+  health: 'rose',
   more: 'gray',
   notes: 'yellow',
   goals: 'rose',

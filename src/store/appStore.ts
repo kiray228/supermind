@@ -3,15 +3,18 @@ import type { Settings } from '../types';
 import { DEFAULT_SETTINGS, saveSettings } from './db';
 import { shareSettings } from './sharedPrefs';
 
-export type View = 'today' | 'more' | 'home' | 'editor' | 'board' | 'planner' | 'settings' | 'tasks' | 'calendar' | 'focus' | 'notes' | 'goals' | 'finance' | 'assistant' | 'progress' | 'habits';
+export type View = 'today' | 'more' | 'home' | 'editor' | 'board' | 'planner' | 'settings' | 'tasks' | 'calendar' | 'focus' | 'notes' | 'goals' | 'finance' | 'assistant' | 'progress' | 'habits' | 'health';
 
-export { phoneTab, isPhoneTab, type PhoneTab } from './phoneNav';
-import { nextBackTab, type PhoneTab } from './phoneNav';
+export { phoneTab, isPhoneTab, type PhoneTab, type TabBlock } from './phoneNav';
+import { DEFAULT_TABS, nextBackTab, normTabs, type PhoneTab, type TabBlock } from './phoneNav';
 
 interface AppState {
   view: View;
   /** телефон: вкладка, с которой открыли раздел (Финансы с «Сегодня» — назад на «Сегодня») */
   backTab: PhoneTab | null;
+  /** телефон: разделы нижней панели (выбирает пользователь; «Ещё» — всегда) */
+  tabs: TabBlock[];
+  setTabs(tabs: TabBlock[]): void;
   settings: Settings;
   toast: string | null;
   /** кнопка в уведомлении («Отменить») */
@@ -24,7 +27,7 @@ interface AppState {
 }
 
 /** последний открытый раздел — приложение открывается там, где закончили */
-const RESTORABLE: View[] = ['today', 'more', 'home', 'tasks', 'calendar', 'planner', 'board', 'focus', 'settings', 'notes', 'goals', 'finance', 'assistant', 'progress', 'habits'];
+const RESTORABLE: View[] = ['today', 'more', 'home', 'tasks', 'calendar', 'planner', 'board', 'focus', 'settings', 'notes', 'goals', 'finance', 'assistant', 'progress', 'habits', 'health'];
 function initialView(): View {
   try {
     const v = localStorage.getItem('sm-view') as View | null;
@@ -33,6 +36,16 @@ function initialView(): View {
     return v && RESTORABLE.includes(v) ? v : 'today';
   } catch {
     return 'today';
+  }
+}
+
+const TABS_KEY = 'sm-tabs';
+function initialTabs(): TabBlock[] {
+  try {
+    const raw = localStorage.getItem(TABS_KEY);
+    return raw ? normTabs(JSON.parse(raw)) : DEFAULT_TABS;
+  } catch {
+    return DEFAULT_TABS;
   }
 }
 
@@ -50,6 +63,16 @@ function cachedTheme(): Settings['theme'] {
 export const useApp = create<AppState>((set, get) => ({
   view: initialView(),
   backTab: null,
+  tabs: initialTabs(),
+  setTabs(t) {
+    const tabs = normTabs(t);
+    set({ tabs, backTab: null });
+    try {
+      localStorage.setItem(TABS_KEY, JSON.stringify(tabs));
+    } catch {
+      /* хранилище недоступно */
+    }
+  },
   // тема — сразу из прошлого запуска (настройки читаются из базы позже, иначе мелькнула бы другая тема)
   settings: { ...DEFAULT_SETTINGS, theme: cachedTheme() },
   toast: null,
@@ -59,7 +82,7 @@ export const useApp = create<AppState>((set, get) => ({
     // Ежедневник заменён разделом «Привычки» (дневник и настроение — там же)
     if (view === 'planner') view = 'habits';
     const cur = get().view;
-    const backTab = nextBackTab(cur, view, get().backTab);
+    const backTab = nextBackTab(cur, view, get().backTab, get().tabs);
     set({ view, backTab });
     try {
       if (RESTORABLE.includes(view)) localStorage.setItem('sm-view', view);

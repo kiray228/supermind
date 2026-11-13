@@ -1,0 +1,100 @@
+.hl-wrap {
+  max-width: 720px;
+  margin: 0 auto;
+  padding-bottom: 24px;
+}
+.hl-hero {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 16px;
+  margin: 4px 0 18px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, color-mix(in srgb, #e0174f 14%, var(--surface)), color-mix(in srgb, #ff6f96 8%, var(--surface)));
+  border: 1px solid color-mix(in srgb, #e0174f 20%, var(--separator));
+}
+.hl-hero-num {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 76px;
+  height: 76px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 4px color-mix(in srgb, #e0174f 55%, transparent);
+}
+.hl-hero-num b {
+  font-size: 26px;
+  line-height: 1;
+}
+.hl-hero-num span {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.hl-hero-title {
+  font-weight: 600;
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+.hl-hero-sub {
+  font-size: 12px;
+  color: var(--text-2);
+  margin-top: 6px;
+}
+.hl-week {
+  display: flex;
+  gap: 6px;
+  height: 38px;
+  align-items: flex-end;
+}
+.hl-week-bar {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+  overflow: hidden;
+}
+.hl-week-bar i {
+  display: block;
+  width: 100%;
+  border-radius: 6px;
+  background: color-mix(in srgb, #e0174f 55%, transparent);
+}
+.hl-week-bar i.full {
+  background: #e0174f;
+}
+.hl-week-bar.cur {
+  outline: 2px solid color-mix(in srgb, #e0174f 60%, transparent);
+  outline-offset: 1px;
+}
+.hl-habits {
+  padding: 4px 6px;
+}
+.hl-empty {
+  color: var(--text-2);
+  font-size: 14px;
+  margin: 0 4px 16px;
+}
+.hl-ico {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+.hl-add {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: #e0174f;
+  flex: none;
+}
