@@ -16,6 +16,7 @@ import {
   periodLabel,
   STATUS_LABEL,
   timeElapsed,
+  behindPace,
   type Goal,
   type GoalsData,
 } from '../model';
@@ -94,7 +95,7 @@ export function GoalDetail({ data, goal, onClose, onEdit }: { data: GoalsData; g
           {elapsed !== null && (
             <div className="tiny faint gl-elapsed">
               Прошло {elapsed}% срока{goal.deadline ? ` · до ${fullDate(goal.deadline)}` : ''}
-              {elapsed > pct + 15 && pct < 100 ? ' — стоит ускориться' : ''}
+              {behindPace(goal, pct, today) ? ' — стоит ускориться' : ''}
             </div>
           )}
           {goal.mode !== 'savings' && (

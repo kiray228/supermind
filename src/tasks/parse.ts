@@ -131,6 +131,20 @@ export function parseTask(input: string, now = new Date()): ParsedTask {
     out.repeat = { freq: 'weekly', interval: 1, weekdays: [...new Set(days)] };
   });
 
+  // ---------- «20 числа», «к 5-му числу», «каждое 20 число» ----------
+  // до разбора времени: иначе «к 20 числу» при повторе стало бы временем 20:00
+  take(new RegExp(`${B}(кажд(?:ое|ого)\\s+)?(?:(?:до|к|ко|на)\\s+)?(\\d{1,2})(?:-?(?:го|е|ое|му))?\\s+(?:числа|число|числу)${E}`, 'i'), (m) => {
+    const day = +m[2];
+    if (day < 1 || day > 31) return false;
+    const t = fromYmd(today);
+    // 31 числа в ноябре — 30 ноября
+    const at = (y: number, mo: number) => new Date(y, mo, Math.min(day, new Date(y, mo + 1, 0).getDate()));
+    let d = at(t.getFullYear(), t.getMonth());
+    if (toYmd(d) < today) d = at(t.getFullYear(), t.getMonth() + 1);
+    out.date = toYmd(d);
+    if (m[1] && !out.repeat) out.repeat = { freq: 'monthly', interval: 1 };
+  });
+
   // ---------- напоминание ----------
   take(new RegExp(`${B}напомни(?:ть)?\\s+за\\s+${NUM_RE}?\\s*(полчаса|${U_MIN}|${U_HOUR}|${U_DAY}|${U_WEEK})${E}`, 'i'), (m) => {
     const n = numOf(m[1]?.toLowerCase());

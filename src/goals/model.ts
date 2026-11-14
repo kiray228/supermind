@@ -302,6 +302,18 @@ export function timeElapsed(g: Pick<Goal, 'start' | 'deadline'>, today = todayYm
   return clamp(Math.round(((daysBetween(g.start, today) + 1) / total) * 100), 0, 100);
 }
 
+/**
+ * Отстаёт ли цель от графика. Срок считаем с начала периода, но не раньше дня создания:
+ * цель «на этот год», заведённая в ноябре, не должна сразу просить «ускориться».
+ */
+export function behindPace(g: Pick<Goal, 'start' | 'deadline' | 'createdAt'>, pct: number, today = todayYmd()): boolean {
+  if (pct >= 100 || !g.deadline) return false;
+  const created = g.createdAt ? toYmd(new Date(g.createdAt)) : g.start;
+  const from = created > g.start && created <= g.deadline ? created : g.start;
+  const e = timeElapsed({ start: from, deadline: g.deadline }, today);
+  return e !== null && e > pct + 15;
+}
+
 // ---------- Прогресс ----------
 
 export type TaskLookup = (id: string) => TaskItem | undefined;

@@ -136,6 +136,8 @@
 .cv-tg-head.today .cv-tg-date { background: var(--accent); color: #fff; }
 .cv-tg-allday { border-top: var(--hairline) solid var(--separator); max-height: 96px; overflow-y: auto; }
 .cv-tg-gut { padding: 6px 6px 0 0; font-size: 10.5px; line-height: 1.15; color: var(--text-3); text-align: right; }
+/* «весь день» — в две строки и с отступом слева: в одну строку подпись вплотную к краю колонки */
+.cv-tg-allday .cv-tg-gut { padding-left: 4px; }
 .cv-tg-adcell { display: flex; flex-direction: column; gap: 2px; min-width: 0; min-height: 30px; padding: 3px 2px; border-left: var(--hairline) solid var(--separator); cursor: pointer; }
 .cv-tg-body { position: relative; }
 .cv-tg-hours { position: relative; }

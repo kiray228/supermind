@@ -105,6 +105,37 @@ test('быстрый ввод: подсказка даты совпадает с
   assert.doesNotMatch(qa, /\bdate=\{rawDate\}|whenLabel\(\{ date: rawDate/);
 });
 
+test('быстрый ввод: «20 числа» и «каждое 20 число»', async () => {
+  const { parseTask } = await import('../src/tasks/parse.ts');
+  const now = new Date(2026, 10, 14, 12, 0);
+  const a = parseTask('Оплатить интернет каждый месяц 20 числа', now);
+  assert.equal(a.title, 'Оплатить интернет');
+  assert.equal(a.date, '2026-11-20');
+  assert.deepEqual(a.repeat, { freq: 'monthly', interval: 1 });
+  const b = parseTask('Оплатить интернет каждое 20 число', now);
+  assert.equal(b.date, '2026-11-20');
+  assert.deepEqual(b.repeat, { freq: 'monthly', interval: 1 });
+  // число уже прошло — в следующем месяце
+  assert.equal(parseTask('Сдать отчёт к 5-му числу', now).date, '2026-12-05');
+  // «к 20 числу» при повторе — не время 20:00
+  assert.equal(parseTask('Оплатить каждый месяц к 20 числу', now).time, undefined);
+  // в ноябре нет 31-го — последний день месяца
+  assert.equal(parseTask('Аренда 31 числа', now).date, '2026-11-30');
+  assert.equal(parseTask('Купить 20 штук', now).date, undefined);
+});
+
+test('цель «на этот год», заведённая в ноябре, не просит сразу «ускориться»', async () => {
+  const { behindPace } = await import('../src/goals/model.ts');
+  const nov14 = new Date(2026, 10, 14, 12).getTime();
+  const g = { start: '2026-01-01', deadline: '2026-12-31', createdAt: nov14 };
+  assert.equal(behindPace(g, 0, '2026-11-14'), false);
+  // прошло полсрока с создания, а прогресс 0 — пора
+  assert.equal(behindPace(g, 0, '2026-12-10'), true);
+  // старая цель с января: в ноябре при 10% — отстаёт
+  assert.equal(behindPace({ ...g, createdAt: new Date(2026, 0, 2).getTime() }, 10, '2026-11-14'), true);
+  assert.equal(behindPace(g, 100, '2026-12-30'), false);
+});
+
 test('трата в основной валюте со счёта в другой: в отчётах — ровно та сумма, что ввели', async () => {
   const { emptyFinance, txMain } = await import('../src/finance/model.ts');
   const d = emptyFinance();
