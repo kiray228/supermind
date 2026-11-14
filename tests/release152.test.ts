@@ -105,6 +105,27 @@ test('быстрый ввод: подсказка даты совпадает с
   assert.doesNotMatch(qa, /\bdate=\{rawDate\}|whenLabel\(\{ date: rawDate/);
 });
 
+test('трата в основной валюте со счёта в другой: в отчётах — ровно та сумма, что ввели', async () => {
+  const { emptyFinance, txMain } = await import('../src/finance/model.ts');
+  const d = emptyFinance();
+  d.prefs = { ...d.prefs, mainCurrency: 'KZT', rates: { CNY: 66.57 } };
+  d.accounts = [{ ...d.accounts[0], currency: 'CNY' }];
+  const acc = d.accounts[0].id;
+  // ввели 7 000 ₸, со счёта списалось 105,16 ¥ — обратный пересчёт дал бы 7 000,50 ₸
+  const tx = { id: 't1', type: 'expense' as const, amount: 105.16, accountId: acc, date: '2026-11-14', tags: [], orig: { amount: 7000, currency: 'KZT' }, createdAt: 1, updatedAt: 1 };
+  assert.equal(txMain(d, tx), 7000);
+  // без orig — обычный пересчёт по курсу
+  const { orig: _o, ...plain } = tx;
+  assert.equal(Math.round(txMain(d, plain) * 100) / 100, 7000.5);
+});
+
+test('знакомство: без аккаунта не обещаем облако', () => {
+  const ob = readFileSync(new URL('../src/onboarding/Onboarding.tsx', import.meta.url), 'utf8');
+  assert.match(ob, /useCloud\(\(s\) => !!s\.account\)/);
+  assert.match(ob, /\? 'Вы вошли в аккаунт/);
+  assert.match(ob, /: 'Всё хранится на этом устройстве/);
+});
+
 test('политика конфиденциальности — на экране входа и в настройках', () => {
   const auth = readFileSync(new URL('../src/ui/AuthGate.tsx', import.meta.url), 'utf8');
   const settings = readFileSync(new URL('../src/views/Settings.tsx', import.meta.url), 'utf8');

@@ -10,13 +10,17 @@ import { APP_VERSION } from './store/safety';
 mark('main');
 // тестовая сборка для симулятора/эмулятора (CI): без входа и приветствий, затем самопроверка
 const SELFTEST = import.meta.env.VITE_SELFTEST === '1';
+// ?qa — та же сборка, но без автозапуска самопроверки: для ручной проверки разделов
+const QA = SELFTEST && location.search.includes('qa');
 if (SELFTEST) {
   try {
     localStorage.setItem('sm-local-only', '1');
-    localStorage.setItem('sm-onboarded', String(Date.now() - 30 * 86_400_000));
-    localStorage.setItem('sm-whatsnew', APP_VERSION);
-    localStorage.setItem('sm-firststeps-hidden', '1');
-    if (!localStorage.getItem('sm-selftest-seed')) localStorage.setItem('sm-view', 'today');
+    if (!QA) {
+      localStorage.setItem('sm-onboarded', String(Date.now() - 30 * 86_400_000));
+      localStorage.setItem('sm-whatsnew', APP_VERSION);
+      localStorage.setItem('sm-firststeps-hidden', '1');
+      if (!localStorage.getItem('sm-selftest-seed')) localStorage.setItem('sm-view', 'today');
+    }
   } catch {
     /* хранилище недоступно — проверка покажет экран входа */
   }
@@ -32,7 +36,7 @@ createRoot(document.getElementById('root')!).render(
 
 setupPlatform();
 reportPerf();
-if (SELFTEST) void import('./selftest/run').then((m) => m.runSelfTest());
+if (SELFTEST && !QA) void import('./selftest/run').then((m) => m.runSelfTest());
 
 // приложение обновилось, пока было открыто: файлы раздела старой версии уже не найти — перезагрузиться один раз
 window.addEventListener('vite:preloadError', (e) => {

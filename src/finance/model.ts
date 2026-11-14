@@ -526,6 +526,9 @@ export function txCurrency(d: FinanceData, t: Transaction, accs = accountMap(d))
 
 /** Сумма операции в основной валюте */
 export function txMain(d: FinanceData, t: Transaction, accs = accountMap(d)): number {
+  // ввели прямо в основной валюте (7 000 ₸ со счёта в юанях) — берём, как ввели:
+  // обратный пересчёт через курс дал бы «7 000,20 ₸»
+  if (t.orig && t.orig.currency === d.prefs.mainCurrency) return t.orig.amount;
   return toMainLoose(t.amount, txCurrency(d, t, accs), d.prefs);
 }
 

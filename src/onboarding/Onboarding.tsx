@@ -23,6 +23,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { useApp } from '../store/appStore';
+import { useCloud } from '../store/cloud';
 import { ACCENTS, DEFAULT_ACCENT } from '../ui/appearance';
 import { HABIT_LIBRARY, habitFromPreset, type HabitPreset } from '../habits/library';
 import { loadPlanner, savePlanner } from '../store/db';
@@ -71,6 +72,8 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
   const [perm, setPerm] = useState<NotifyPermission | null>(null);
   const [wants, setWants] = useState<TabBlock[]>([]);
   const accent = useApp((s) => s.settings.accent) ?? DEFAULT_ACCENT;
+  // без аккаунта знакомство тоже показывается — последний слайд не должен обещать облако
+  const account = useCloud((s) => !!s.account);
   const drag = useRef<{ x: number; y: number; id: number; active: boolean } | null>(null);
   const busy = useRef(false);
 
@@ -360,16 +363,20 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
                 </div>
               </div>
               <h1 className="ob-title">Данные в безопасности</h1>
-              <p className="ob-text">Вы вошли в аккаунт: всё сохраняется в облаке и одинаково на всех устройствах. Без интернета приложение тоже работает.</p>
+              <p className="ob-text">
+                {account
+                  ? 'Вы вошли в аккаунт: всё сохраняется в облаке и одинаково на всех устройствах. Без интернета приложение тоже работает.'
+                  : 'Всё хранится на этом устройстве и работает без интернета. Войдёте в аккаунт в настройках — данные появятся и на других устройствах.'}
+              </p>
               <ul className="ob-list">
                 <li>
-                  <Cloud size={18} /> Синхронизация телефона и компьютера
-                </li>
-                <li>
-                  <ShieldCheck size={18} /> Облачные копии каждый час, восстановление в один клик
-                </li>
-                <li>
                   <HardDrive size={18} /> Автокопии на устройстве — каждые 3 часа
+                </li>
+                <li>
+                  <Cloud size={18} /> {account ? 'Синхронизация телефона и компьютера' : 'Синхронизация телефона и компьютера — после входа'}
+                </li>
+                <li>
+                  <ShieldCheck size={18} /> {account ? 'Облачные копии каждый час, восстановление в один клик' : 'Облачные копии и восстановление в один клик — после входа'}
                 </li>
               </ul>
               <div className="ob-action">
