@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type CSSProperties } from 'react';
 import { ArrowUp, Bell, CalendarDays, Flag, HelpCircle, Inbox, Repeat, Tag, X } from 'lucide-react';
 import { PRIORITY_META } from '../../utils/mapTasks';
-import { parsedReminder, repeatLabel, whenLabel, type Priority, type TaskItem } from '../model';
+import { parsedReminder, repeatLabel, snapToRule, whenLabel, type Priority, type TaskItem } from '../model';
 import { parseTask } from '../parse';
 import { addTask, defaultReminders, useTasks } from '../store';
 import { askNotifyIfNeeded } from '../sync';
@@ -72,10 +72,12 @@ export function SmartInput({
 
   const listByName = parsed.list ? data?.lists.find((l) => l.name.toLowerCase().startsWith(parsed.list!.toLowerCase())) : undefined;
   // «в 15:00» без даты в разделе «Завтра» или в выбранном дне календаря — на этот день, а не на сегодня
-  const date = 'date' in manual ? manual.date : parsed.dateImplicit && preset.date ? preset.date : parsed.date ?? preset.date;
+  const rawDate = 'date' in manual ? manual.date : parsed.dateImplicit && preset.date ? preset.date : parsed.date ?? preset.date;
   const time = 'time' in manual ? manual.time : parsed.time ?? (parsed.date ? undefined : preset.time);
   const duration = 'duration' in manual ? manual.duration : parsed.duration ?? preset.duration;
   const repeat = 'repeat' in manual ? manual.repeat : parsed.repeat ?? preset.repeat;
+  // «завтра каждый понедельник»: задача встанет на ближайший понедельник (так её запишет addTask) — показываем сразу эту дату
+  const date = repeat && rawDate ? snapToRule(repeat, rawDate) : rawDate;
   const priority = manual.priority ?? parsed.priority ?? preset.priority ?? 0;
   const listId = manual.listId ?? listByName?.id ?? preset.listId;
   const tags = [...new Set([...(preset.tags ?? []), ...parsed.tags, ...(manual.tags ?? [])])];

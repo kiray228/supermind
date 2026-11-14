@@ -88,6 +88,23 @@ test('сумма в другой валюте: тенге со счёта в ю�
   assert.equal(rateText('EUR', 'KZT', prefs), '');
 });
 
+test('быстрый ввод: подсказка даты совпадает с тем, что сохранится', async () => {
+  const { parseTask } = await import('../src/tasks/parse.ts');
+  const { snapToRule } = await import('../src/tasks/model.ts');
+  // суббота 14 ноября 2026
+  const p = parseTask('Купить подарок маме завтра в 18:30 каждый понедельник', new Date(2026, 10, 14, 12, 0));
+  assert.equal(p.title, 'Купить подарок маме');
+  assert.equal(p.time, '18:30');
+  assert.deepEqual(p.repeat, { freq: 'weekly', interval: 1, weekdays: [1] });
+  // «завтра» — воскресенье, но повтор по понедельникам переносит на понедельник: так задачу запишет addTask
+  assert.equal(p.date, '2026-11-15');
+  assert.equal(snapToRule(p.repeat!, p.date!), '2026-11-16');
+  // окно быстрого ввода показывает именно перенесённую дату
+  const qa = readFileSync(new URL('../src/tasks/ui/QuickAdd.tsx', import.meta.url), 'utf8');
+  assert.match(qa, /const date = repeat && rawDate \? snapToRule\(repeat, rawDate\) : rawDate;/);
+  assert.doesNotMatch(qa, /\bdate=\{rawDate\}|whenLabel\(\{ date: rawDate/);
+});
+
 test('политика конфиденциальности — на экране входа и в настройках', () => {
   const auth = readFileSync(new URL('../src/ui/AuthGate.tsx', import.meta.url), 'utf8');
   const settings = readFileSync(new URL('../src/views/Settings.tsx', import.meta.url), 'utf8');
