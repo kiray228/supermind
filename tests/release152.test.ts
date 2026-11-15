@@ -136,6 +136,24 @@ test('цель «на этот год», заведённая в ноябре, �
   assert.equal(behindPace(g, 100, '2026-12-30'), false);
 });
 
+test('автокопия: в подписи видно привычки, цели и операции', async () => {
+  const { summarize } = await import('../src/store/safety.ts');
+  const data = {
+    'docs:index': [{}],
+    tasks: { tasks: [{ id: 'a' }, { id: 'b', deleted: true }] },
+    planner: { habits: [{ id: 'h' }, { id: 'x', archived: true }] },
+    goals: { goals: [{ id: 'g' }] },
+    finance: { transactions: [{ id: 't1' }, { id: 't2' }] },
+  };
+  assert.equal(summarize(data), '1 карта · 1 задача · 1 привычка · 1 цель · 2 операции');
+  assert.equal(summarize({ 'docs:index': [] }), '0 карт · 0 задач');
+});
+
+test('календарь на телефоне: текущий год в заголовке не пишем', () => {
+  const cal = readFileSync(new URL('../src/views/Calendar.tsx', import.meta.url), 'utf8');
+  assert.ok(cal.includes("narrow && d.getFullYear() === new Date().getFullYear() ? ''"));
+});
+
 test('трата в основной валюте со счёта в другой: в отчётах — ровно та сумма, что ввели', async () => {
   const { emptyFinance, txMain } = await import('../src/finance/model.ts');
   const d = emptyFinance();

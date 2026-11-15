@@ -279,15 +279,17 @@ function periodTitle(view: CalView, days: string[], cursor: string, narrow = fal
     const d = fromYmd(cursor);
     return `${WD_SHORT[d.getDay()]}, ${longDate(cursor).split(', ')[1]}`;
   }
+  // на телефоне «Сентябрь 2026» не влезает между стрелками и «Сегодня» — текущий год не пишем
+  const yr = (d: Date) => (narrow && d.getFullYear() === new Date().getFullYear() ? '' : ` ${d.getFullYear()}`);
   if (view === 'month') {
     const d = fromYmd(cursor);
-    return `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+    return `${MONTHS[d.getMonth()]}${yr(d)}`;
   }
   const a = fromYmd(days[0]);
   const b = fromYmd(days[days.length - 1]);
   if (view === 'agenda') return `${a.getDate()} ${shortMonth(a).toLowerCase()} – ${b.getDate()} ${shortMonth(b).toLowerCase()}`;
-  if (a.getMonth() === b.getMonth()) return `${MONTHS[a.getMonth()]} ${a.getFullYear()}`;
-  return `${shortMonth(a)} – ${shortMonth(b)} ${b.getFullYear()}`;
+  if (a.getMonth() === b.getMonth()) return `${MONTHS[a.getMonth()]}${yr(a)}`;
+  return `${shortMonth(a)} – ${shortMonth(b)}${yr(b)}`;
 }
 
 function timeLabel(it: Item): string {
@@ -502,7 +504,7 @@ export default function Calendar() {
           <button className="icon-btn" onClick={() => shift(-1)} aria-label="Назад">
             <ChevronLeft />
           </button>
-          <div className="cv-period ellipsis" title={view === 'day' ? longDate(cursor) : undefined}>
+          <div className="cv-period ellipsis" title={view === 'day' ? longDate(cursor) : periodTitle(view, days, cursor)}>
             {periodTitle(view, days, cursor, narrow)}
           </div>
           <button className="icon-btn" onClick={() => shift(1)} aria-label="Вперёд">

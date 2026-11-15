@@ -60,6 +60,13 @@ export function summarize(data: Record<string, unknown>): string {
   const notes = Object.keys(data).filter((k) => k.startsWith('note:')).length;
   const parts = [`${maps} ${plural(maps, 'карта', 'карты', 'карт')}`, `${tasks} ${plural(tasks, 'задача', 'задачи', 'задач')}`];
   if (notes) parts.push(`${notes} ${plural(notes, 'заметка', 'заметки', 'заметок')}`);
+  // остальное — только если есть: по копии должно быть видно, что привычки, цели и деньги в ней тоже
+  const habits = count(data.planner, 'habits', (h) => !h.deleted && !h.archived);
+  const goals = count(data.goals, 'goals');
+  const ops = count(data.finance, 'transactions');
+  if (habits) parts.push(`${habits} ${plural(habits, 'привычка', 'привычки', 'привычек')}`);
+  if (goals) parts.push(`${goals} ${plural(goals, 'цель', 'цели', 'целей')}`);
+  if (ops) parts.push(`${ops} ${plural(ops, 'операция', 'операции', 'операций')}`);
   return parts.join(' · ');
 }
 
