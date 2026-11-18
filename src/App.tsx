@@ -25,6 +25,7 @@ import { SectionIcon, type SectionId } from './ui/icons';
 import { CaretLeft, type Icon } from '@phosphor-icons/react';
 import './ui/appearance.css';
 import './app.css';
+import './ui/devices.css';
 import { mark, whenIdle } from './perf';
 import { initLock } from './ui/lock';
 import { LockScreen } from './ui/LockScreen';

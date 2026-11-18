@@ -104,7 +104,7 @@ export default function Today() {
               <b>{fin ? (spent ? '−' + fmtMoney(spent, fin.prefs.mainCurrency) : 'Трат нет') : '…'}</b>
             </span>
             <span
-              className="td-add"
+              className="td-money-add"
               role="button"
               tabIndex={0}
               onClick={(e) => {

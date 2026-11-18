@@ -1,0 +1,54 @@
+/* Подгонка под устройства. Боковые безопасные зоны: вырез камеры и «чёлка» iPhone, островок, боковая панель кнопок Android
+   в альбомной ориентации. В портрете и на экранах без выреза --safe-left/--safe-right = 0 — ничего не меняется.
+   :root в селекторах поднимает специфичность над стилями разделов, которые подгружаются позже. */
+:root {
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+/* обычные экраны: боковая панель, шапки и содержимое разделов */
+:root .app { padding-left: var(--safe-left); padding-right: var(--safe-right); }
+
+/* полноэкранные слои */
+:root .editor,
+:root .ob-root,
+:root .lock-screen,
+:root .as-page.kb-open { padding-left: var(--safe-left); padding-right: var(--safe-right); }
+:root .auth-gate {
+  padding-left: calc(20px + var(--safe-left)); padding-right: calc(20px + var(--safe-right));
+}
+
+/* закреплённые у краёв элементы */
+:root .upd-banner { right: calc(16px + var(--safe-right)); }
+@media (max-width: 760px) {
+  :root .tabbar { left: calc(10px + var(--safe-left)); right: calc(10px + var(--safe-right)); }
+  :root .phone-back { left: calc(8px + var(--safe-left)); }
+  :root .tk-fab, :root .fn-fab, :root .gl-fab, :root .nt-fab { right: calc(18px + var(--safe-right)); }
+}
+:root .edit-accessory { left: calc(8px + var(--safe-left)); right: calc(8px + var(--safe-right)); }
+
+/* листы снизу на всю ширину */
+@media (max-width: 640px) {
+  :root .modal-backdrop { padding-left: var(--safe-left); padding-right: var(--safe-right); }
+}
+:root .menu.menu-sheet { padding-left: calc(10px + var(--safe-left)); padding-right: calc(10px + var(--safe-right)); }
+@media (max-width: 760px) {
+  :root .ed-panel { padding-left: var(--safe-left); padding-right: var(--safe-right); }
+}
+
+/* ---------- Узкие экраны ----------
+   ≤ 300px: обложка Galaxy Fold, «Крупный» масштаб интерфейса Android на маленьком телефоне */
+@media (max-width: 300px) {
+  .page-header h1 { font-size: 26px; }
+}
+
+/* ---------- Ширина iPad в портрете (761–900px): рядом с боковой панелью ---------- */
+@media (min-width: 761px) and (max-width: 900px) {
+  /* «Мои карты»: «Скачать для Windows» / «Установить приложение» — только значком, заголовок целиком */
+  .home-page .page-header .btn .hide-xs { display: none; }
+}
+
+/* сенсорный экран без мыши (телефон боком, планшет): подсказка «Ctrl K» в меню ни к чему */
+@media (hover: none) and (pointer: coarse) {
+  .sr-nav-kbd { display: none; }
+}

@@ -165,4 +165,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- голосовой ввод (RECORD_AUDIO) по умолчанию делает микрофон обязательным, и Google Play прячет приложение
+         на планшетах, Chromebook и других устройствах без микрофона. Без него просто не работает диктовка -->
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
 </manifest>

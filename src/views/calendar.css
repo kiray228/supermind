@@ -298,3 +298,12 @@
   .cv-header .cv-today { padding: 0 10px; font-size: 14px; }
   .cv-header .cv-nav { gap: 0; }
 }
+
+/* очень узкий экран (iPhone SE 1, Slide Over на iPad, крупный масштаб интерфейса Android, обложка Fold):
+   стрелки и «Сегодня» компактнее — название месяца помещается целиком */
+@media (max-width: 360px) {
+  .cv-header { column-gap: 4px; }
+  .cv-header .cv-nav .icon-btn { width: 30px; }
+  .cv-period { font-size: 16px; }
+  .cv-header .cv-today { padding: 0 8px; font-size: 13px; }
+}

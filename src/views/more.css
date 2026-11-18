@@ -13,3 +13,11 @@
 .mr-profile-x small { font-size: 13px; color: var(--text-2); }
 .mr-profile-x small.is-err { color: var(--danger); }
 .mr-profile:active { transform: scale(.985); }
+
+/* узкий экран: аватар меньше, имя переносится, а не обрезается до «Без акк…» */
+@media (max-width: 360px) {
+  .mr-profile { gap: 10px; padding-left: 12px; }
+  .mr-ava { width: 42px; height: 42px; font-size: 18px; }
+  .mr-ava svg { width: 26px; height: 26px; }
+  .mr-profile-x b { white-space: normal; overflow-wrap: anywhere; }
+}

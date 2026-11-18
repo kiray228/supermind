@@ -553,3 +553,12 @@
 .fn-conv b { color: var(--text); font-variant-numeric: tabular-nums; }
 /* карточка счёта цветная — строка «≈ в основной валюте» тоже белая, иначе на синем её не видно */
 .fn-acc-card-main { font-size: 11.5px; color: rgba(255, 255, 255, .72); font-weight: 500; }
+
+/* iPad в портрете, складной телефон, телефон боком (ширина 761–900): рядом с боковой панелью
+   заголовок, четыре вкладки и две кнопки в одну строку не помещаются — заголовок сжимался до «Фи…».
+   Вкладки — второй строкой на всю ширину */
+@media (min-width: 761px) and (max-width: 900px) {
+  .fn-header { flex-wrap: wrap; row-gap: 8px; }
+  .fn-header > .segmented { order: 10; flex: 1 0 100%; display: flex; }
+  .fn-header > .segmented > button { flex: 1 1 0; min-width: 0; }
+}

@@ -507,3 +507,11 @@
   background: var(--fill-3); color: var(--text-2); font-variant-numeric: tabular-nums;
 }
 .hp-slot.on { background: color-mix(in srgb, var(--hc) 20%, transparent); color: color-mix(in srgb, var(--hc) 75%, var(--text)); }
+
+/* открыли из другой вкладки — слева сверху «‹ Сегодня»: кнопки встают справа в её строку,
+   крупный заголовок — строкой ниже (как в iOS), а не под кнопкой «назад» */
+@media (max-width: 760px) {
+  .app:has(> .phone-back) .hp-page .hp-top { flex-wrap: wrap; row-gap: 10px; }
+  .app:has(> .phone-back) .hp-page .hp-top .hp-hero-actions { order: -1; margin-left: auto; }
+  .app:has(> .phone-back) .hp-page .hp-top .hp-title { flex: 1 0 100%; }
+}
