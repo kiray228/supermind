@@ -1,0 +1,10 @@
+/* English texts for system prompts and Home Screen quick actions (keys: Info.plist values) */
+"NSMicrophoneUsageDescription" = "The microphone is used to dictate notes and give voice commands.";
+"NSSpeechRecognitionUsageDescription" = "Speech recognition turns your dictation into notes and tasks.";
+"NSPhotoLibraryAddUsageDescription" = "To save images of your maps and notes to Photos.";
+"NSHealthShareUsageDescription" = "SuperMind shows your steps and sleep in Health & fitness and checks off your step and sleep habits automatically. The data stays on your phone.";
+"NSHealthUpdateUsageDescription" = "SuperMind never writes to Health: it only reads steps and sleep to show them and check off your habits.";
+"Новая задача" = "New task";
+"Голосом" = "By voice";
+"Фокус" = "Focus";
+"Новая карта" = "New mind map";
