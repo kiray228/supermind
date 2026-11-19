@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Delete, Lock } from 'lucide-react';
-import { biometricOn, lockWait, tryUnlock, unlockWithBiometric, useLock } from './lock';
-import { Fingerprint } from 'lucide-react';
+import { biometricKind, biometricLabels, biometricOn, lockWait, tryUnlock, unlockWithBiometric, useLock } from './lock';
+import { Fingerprint, ScanFace } from 'lucide-react';
+import type { BioKind } from '../native/system';
 import { onBack } from './dialogs';
 import { t } from '../i18n/index';
 import './lock.css';
@@ -122,6 +123,10 @@ function LockScreenBody(p: {
   setForgot: (v: boolean) => void;
 }) {
   const { busy, setBusy, wait, setWait, error, setError, errorN, setErrorN, bio, forgot, setForgot } = p;
+  const [kind, setKind] = useState<BioKind>('fingerprint');
+  useEffect(() => {
+    if (bio) void biometricKind().then(setKind);
+  }, [bio]);
   // под замком приложение недоступно: клавиши не доходят до разделов (сочетания карт, удаление тем),
   // остальной экран — inert (не получает фокус и нажатия)
   useEffect(() => {
@@ -168,7 +173,7 @@ function LockScreenBody(p: {
       />
       {bio && (
         <button className="lock-bio" onClick={() => void unlockWithBiometric()}>
-          <Fingerprint size={22} /> {t('Отпечаток')}
+          {kind === 'face' || kind === 'optic' ? <ScanFace size={22} /> : <Fingerprint size={22} />} {biometricLabels(kind).button}
         </button>
       )}
       <button className="lock-forgot" onClick={() => setForgot(!forgot)}>

@@ -58,7 +58,7 @@ export async function applyFocusAction(action: string, at = Date.now()) {
       await LocalNotifications.cancel({ notifications: [{ id: 777001 }] }).catch(() => {});
     }
   } else if (action === 'resume') resume();
-  // виджет «Фокус»: «Начать» (идёт уже — просто продолжить)
+  // виджет «Фокус» и Siri «Начни фокус»: запустить (идёт уже — просто продолжить)
   else if (action === 'start') start();
   else if (action === 'stop') {
     freezeAt(when);

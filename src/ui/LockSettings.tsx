@@ -4,7 +4,7 @@ import { EyeSlash, Fingerprint, LockKey, Timer, Password } from '@phosphor-icons
 import { toast } from '../store/appStore';
 import { IconTile } from './icons';
 import { ListRow, ListSection, SelectRow, SwitchRow } from './list';
-import { biometricAvailable, biometricOn, disableLock, LOCK_AFTER_OPTIONS, lockConfig, secureWindow, setBiometric, setLockAfter, setPin, setSecure, useLock } from './lock';
+import { biometricAvailable, biometricKind, biometricLabels, biometricOn, disableLock, LOCK_AFTER_OPTIONS, lockConfig, secureWindow, setBiometric, setLockAfter, setPin, setSecure, useLock } from './lock';
 import { isAndroidApp } from '../platform';
 import { PinPad } from './LockScreen';
 import { onBack } from './dialogs';
@@ -69,8 +69,12 @@ export function LockSettings() {
   const [secure, setSecureState] = useState(secureWindow);
   const [bio, setBio] = useState(biometricOn);
   const [bioAvail, setBioAvail] = useState(false);
+  const [bioLabel, setBioLabel] = useState(() => biometricLabels('fingerprint').setting);
   useEffect(() => {
-    void biometricAvailable().then(setBioAvail);
+    void biometricAvailable().then(async (ok) => {
+      setBioAvail(ok);
+      setBioLabel(biometricLabels(await biometricKind()).setting);
+    });
   }, []);
 
   return (
@@ -106,7 +110,7 @@ export function LockSettings() {
           {bioAvail && (
             <SwitchRow
               icon={<IconTile icon={Fingerprint} tone="blue" size="list" />}
-              title={t('Вход по отпечатку')}
+              title={bioLabel}
               subtitle={t('Код остаётся запасным способом')}
               checked={bio}
               onChange={(v) => {

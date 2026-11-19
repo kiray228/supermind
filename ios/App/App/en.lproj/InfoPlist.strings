@@ -9,3 +9,4 @@
 "Голосом" = "By voice";
 "Фокус" = "Focus";
 "Новая карта" = "New mind map";
+"NSFaceIDUsageDescription" = "Face ID unlocks SuperMind instead of the passcode.";

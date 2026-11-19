@@ -645,5 +645,10 @@ struct SuperMindWidgets: WidgetBundle {
         FocusLiveWidget()
         FinanceWidget()
         FocusWidget()
+        if #available(iOS 18.0, *) {
+            SmNewTaskControl()
+            SmVoiceControl()
+            SmFocusControl()
+        }
     }
 }

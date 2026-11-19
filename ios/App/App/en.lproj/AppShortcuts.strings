@@ -1,0 +1,17 @@
+/* Siri phrases (keys: phrases in SiriShortcuts.swift) */
+"Add a task in ${applicationName}" = "Add a task in ${applicationName}";
+"Add a task to ${applicationName}" = "Add a task to ${applicationName}";
+"New task in ${applicationName}" = "New task in ${applicationName}";
+"Create a task in ${applicationName}" = "Create a task in ${applicationName}";
+"What's on my agenda in ${applicationName}" = "What's on my agenda in ${applicationName}";
+"What's my agenda in ${applicationName}" = "What's my agenda in ${applicationName}";
+"What do I have today in ${applicationName}" = "What do I have today in ${applicationName}";
+"What are my tasks in ${applicationName}" = "What are my tasks in ${applicationName}";
+"Start focus in ${applicationName}" = "Start focus in ${applicationName}";
+"Start a focus session in ${applicationName}" = "Start a focus session in ${applicationName}";
+"Start a pomodoro in ${applicationName}" = "Start a pomodoro in ${applicationName}";
+"Open Today in ${applicationName}" = "Open Today in ${applicationName}";
+"Show my day in ${applicationName}" = "Show my day in ${applicationName}";
+"Add a note in ${applicationName}" = "Add a note in ${applicationName}";
+"New note in ${applicationName}" = "New note in ${applicationName}";
+"Take a note in ${applicationName}" = "Take a note in ${applicationName}";

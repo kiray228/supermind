@@ -43,6 +43,20 @@ app.resources_build_phase.add_file_reference(strings, true)
 regions = project.root_object.known_regions
 %w[en ru kk Base].each { |r| regions << r unless regions.include?(r) }
 
+# 2в. Siri и «Быстрые команды»: фразы (AppShortcuts.strings) и названия действий (Localizable.strings) — если файл есть
+{ 'Localizable.strings' => %w[en ru kk], 'AppShortcuts.strings' => %w[en ru kk] }.each do |file, langs|
+  present = langs.select { |l| File.exist?(File.join(ROOT, 'App', "#{l}.lproj", file)) }
+  next if present.empty?
+  vg = app_group.children.find { |c| c.isa == 'PBXVariantGroup' && c.name == file } || app_group.new_variant_group(file)
+  present.each do |l|
+    path = "#{l}.lproj/#{file}"
+    next if vg.children.any? { |f| f.path == path }
+    ref = vg.new_reference(path)
+    ref.name = l
+  end
+  app.resources_build_phase.add_file_reference(vg, true)
+end
+
 # 3. Расширение виджетов
 widget = project.targets.find { |t| t.name == 'SuperMindWidget' }
 unless widget

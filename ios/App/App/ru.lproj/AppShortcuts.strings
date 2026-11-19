@@ -1,0 +1,17 @@
+/* Фразы Siri (ключи — фразы из SiriShortcuts.swift) */
+"Add a task in ${applicationName}" = "Добавь задачу в ${applicationName}";
+"Add a task to ${applicationName}" = "Добавить задачу в ${applicationName}";
+"New task in ${applicationName}" = "Новая задача в ${applicationName}";
+"Create a task in ${applicationName}" = "Создай задачу в ${applicationName}";
+"What's on my agenda in ${applicationName}" = "Что у меня сегодня в ${applicationName}";
+"What's my agenda in ${applicationName}" = "Какие планы на сегодня в ${applicationName}";
+"What do I have today in ${applicationName}" = "Что на сегодня в ${applicationName}";
+"What are my tasks in ${applicationName}" = "Какие у меня задачи в ${applicationName}";
+"Start focus in ${applicationName}" = "Начни фокус в ${applicationName}";
+"Start a focus session in ${applicationName}" = "Запусти фокус в ${applicationName}";
+"Start a pomodoro in ${applicationName}" = "Запусти помидор в ${applicationName}";
+"Open Today in ${applicationName}" = "Открой «Сегодня» в ${applicationName}";
+"Show my day in ${applicationName}" = "Покажи мой день в ${applicationName}";
+"Add a note in ${applicationName}" = "Добавь заметку в ${applicationName}";
+"New note in ${applicationName}" = "Новая заметка в ${applicationName}";
+"Take a note in ${applicationName}" = "Запиши заметку в ${applicationName}";

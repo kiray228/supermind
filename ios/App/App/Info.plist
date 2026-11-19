@@ -71,6 +71,8 @@
 	<string>SuperMind показывает ваши шаги и сон в разделе «Здоровье и спорт» и сам отмечает привычки «шаги» и «сон». Данные остаются на телефоне.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>SuperMind ничего не записывает в «Здоровье»: он только читает шаги и сон, чтобы показать их и отметить ваши привычки.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Face ID открывает SuperMind вместо кода-пароля.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>UIApplicationShortcutItems</key>

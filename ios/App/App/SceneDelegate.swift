@@ -13,6 +13,8 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         window?.makeKeyAndVisible()
 
         SceneDelegateProxy.shared.scene(scene, willConnectTo: session, options: connectionOptions)
+        // запуск касанием результата Spotlight
+        for activity in connectionOptions.userActivities { SpotlightPlugin.handle(activity) }
     }
 
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
@@ -20,6 +22,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     func scene(_ scene: UIScene, continue userActivity: NSUserActivity) {
+        if SpotlightPlugin.handle(userActivity) { return }
         SceneDelegateProxy.shared.scene(scene, continue: userActivity)
     }
 }
