@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CheckSquare, Loader2, Network, Newspaper, NotebookPen, PenLine, StickyNote } from 'lucide-react';
+import { CheckSquare, Loader2, Network, Newspaper, NotebookPen, PenLine, ScanText, StickyNote } from 'lucide-react';
 import { firstUrl } from '../notes/articleCore';
 import type { ArticleStage } from '../notes/article';
 import { cleanupSharedImages, loadSharedImages, shareAppend, shareToDaily, shareToMap, shareToNote, shareToTask, suggestNotes, type SharedText } from './share';
@@ -112,6 +112,21 @@ export default function ShareSheet({ shared, onClose }: { shared: SharedText; on
             <NotebookPen size={20} />
             {t('В заметку дня')}
           </button>
+          {images.length > 0 && (
+            <button
+              className="btn"
+              style={btn}
+              disabled={busy || loading || !hasPics || !!stage}
+              onClick={() => {
+                const p = pics ?? [];
+                onClose();
+                void import('../notes/photoText').then((m) => m.openPhotoText({ images: p }));
+              }}
+            >
+              <ScanText size={20} />
+              {t('Распознать текст')}
+            </button>
+          )}
           {!images.length && (
             <>
               <button className="btn" style={btn} disabled={off || !!stage} onClick={run((s) => shareToTask(s))}>

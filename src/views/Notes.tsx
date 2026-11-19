@@ -1,6 +1,6 @@
 import { LOCALE, t } from '../i18n/index';
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, Brain, Check, ChevronDown, Compass, Copy, CopyCheck, Download, Equal, GraduationCap, Newspaper, NotebookPen, FolderInput, FolderPlus, LayoutGrid, LayoutTemplate, MoreHorizontal, Pencil, Pin, PinOff, Plus, RotateCcw, Search, StickyNote, Trash2, Upload, Waypoints, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Brain, Check, ChevronDown, Compass, Copy, CopyCheck, Download, Equal, GraduationCap, Newspaper, NotebookPen, FolderInput, FolderPlus, LayoutGrid, LayoutTemplate, MoreHorizontal, Pencil, Pin, PinOff, Plus, RotateCcw, ScanText, Search, StickyNote, Trash2, Upload, Waypoints, X } from 'lucide-react';
 import type { ID } from '../types';
 import { confirmDialog } from '../ui/dialogs';
 import { toast } from '../store/appStore';
@@ -587,6 +587,7 @@ export default function Notes() {
           <MenuItem icon={<LayoutTemplate size={17} />} label={t('Шаблоны заметок')} onClick={fromTemplate} />
           <MenuItem icon={<Brain size={17} />} label={t('Второй мозг: что умеет')} onClick={() => setHub(true)} />
           <MenuItem icon={<Newspaper size={17} />} label={t('Статья по ссылке')} onClick={() => void import('../notes/article').then((m) => m.askArticle())} />
+          <MenuItem icon={<ScanText size={17} />} label={t('Текст с фото')} onClick={() => void import('../notes/photoText').then((m) => m.openPhotoText({ folderId: sel.k === 'folder' ? sel.id : undefined }))} />
           <MenuItem icon={<Compass size={17} />} label={t('Обзор мозга')} onClick={() => setReviewSheet(true)} />
           <MenuItem icon={<GraduationCap size={17} />} label={t('Повторение карточек')} onClick={openCardsReview} />
           <MenuItem icon={<CopyCheck size={17} />} label={t('Найти дубли')} onClick={() => setDupSheet(true)} />

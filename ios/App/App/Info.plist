@@ -63,6 +63,8 @@
 	<string>Микрофон нужен для диктовки заметок и голосовых команд.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Распознавание речи превращает вашу диктовку в текст заметок и задач.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Камера нужна, чтобы фотографировать страницы, доски и чеки и превращать текст на них в заметки, а также добавлять фото в заметки.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Чтобы сохранять картинки карт и заметок в «Фото».</string>
 	<key>NSHealthShareUsageDescription</key>

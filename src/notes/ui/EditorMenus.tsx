@@ -24,6 +24,7 @@ import {
   Mic,
   Minus,
   Quote,
+  ScanText,
   SquareCheck,
   Strikethrough,
   Trash2,
@@ -53,7 +54,7 @@ const HINTS: Partial<Record<BlockType, string>> = { h1: '#', h2: '##', h3: '###'
 const TEXT_ORDER: BlockType[] = ['p', 'h1', 'h2', 'h3', 'bullet', 'number', 'todo', 'quote', 'callout', 'code'];
 
 /** Меню «+» / «/»: выбор типа блока */
-export function TypeMenuItems({ current, onPick, withMedia, onEmbed, onTemplate }: { current?: BlockType; onPick: (t: BlockType) => void; withMedia: boolean; onEmbed?: () => void; onTemplate?: () => void }) {
+export function TypeMenuItems({ current, onPick, withMedia, onEmbed, onTemplate, onPhotoText }: { current?: BlockType; onPick: (t: BlockType) => void; withMedia: boolean; onEmbed?: () => void; onTemplate?: () => void; onPhotoText?: () => void }) {
   return (
     <>
       <MenuLabel>{t('Блоки')}</MenuLabel>
@@ -66,6 +67,7 @@ export function TypeMenuItems({ current, onPick, withMedia, onEmbed, onTemplate 
           <MenuSep />
           <MenuItem icon={BLOCK_ICONS.image} label={t('Фото или картинка')} onClick={() => onPick('image')} />
           <MenuItem icon={BLOCK_ICONS.audio} label={t('Голосовая запись')} onClick={() => onPick('audio')} />
+          {onPhotoText && <MenuItem icon={<ScanText size={17} />} label={t('Текст с фото')} onClick={onPhotoText} />}
         </>
       )}
       {(onEmbed || onTemplate) && <MenuSep />}
