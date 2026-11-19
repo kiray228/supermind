@@ -12,6 +12,7 @@ import { sortedAccounts, sortedCategories, fmtMoney, type FinanceData } from '..
 import { addGoal, addStages, ensureGoals, getGoal } from '../goals/store';
 import { addDaysYmd, todayYmd } from '../utils/mapTasks';
 import { uid } from '../utils/tree';
+import { isEn, LOCALE, t } from '../i18n/index';
 
 export type AssistantAction =
   | { type: 'add_task'; title: string; date?: string; time?: string; priority?: Priority; notes?: string; list?: string; duration?: number }
@@ -194,19 +195,20 @@ export const toItems = (actions: AssistantAction[]): ActionItem[] => actions.map
 
 // ---------- Описание для карточки ----------
 
-const PRIO_LABEL: Record<number, string> = { 1: 'высокий приоритет', 2: 'средний приоритет', 3: 'низкий приоритет' };
+const PRIO_LABEL: Record<number, string> = { 1: t('высокий приоритет'), 2: t('средний приоритет'), 3: t('низкий приоритет') };
 
 function dateLabel(d: string): string {
-  const t = todayYmd();
-  if (d === t) return 'сегодня';
-  if (d === addDaysYmd(t, 1)) return 'завтра';
+  const today = todayYmd();
+  if (d === today) return t('сегодня');
+  if (d === addDaysYmd(today, 1)) return t('завтра');
   const [y, m, day] = d.split('-').map(Number);
-  const months = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
-  return `${day} ${months[m - 1]}${y !== new Date().getFullYear() ? ' ' + y : ''}`;
+  const months = [t('янв'), t('фев'), t('мар'), t('апр'), t('мая'), t('июн'), t('июл'), t('авг'), t('сен'), t('окт'), t('ноя'), t('дек')];
+  const dm = isEn ? `${months[m - 1]} ${day}` : `${day} ${months[m - 1]}`;
+  return `${dm}${y !== new Date().getFullYear() ? (isEn ? ', ' : ' ') + y : ''}`;
 }
 
 export function taskTitle(id: string, fallback?: string): string {
-  return getTask(id)?.title ?? fallback ?? 'задача';
+  return getTask(id)?.title ?? fallback ?? t('задача');
 }
 
 export interface ActionView {
@@ -221,18 +223,18 @@ export function describeAction(a: AssistantAction): ActionView {
     case 'add_task':
       return {
         kind: 'task',
-        label: 'Новая задача',
+        label: t('Новая задача'),
         title: a.title,
-        meta: [a.date && dateLabel(a.date), a.time, a.priority ? PRIO_LABEL[a.priority] : '', a.list].filter(Boolean).join(' · ') || 'без срока',
+        meta: [a.date && dateLabel(a.date), a.time, a.priority ? PRIO_LABEL[a.priority] : '', a.list].filter(Boolean).join(' · ') || t('без срока'),
       };
     case 'complete_task':
-      return { kind: 'done', label: 'Отметить выполненной', title: taskTitle(a.id, a.title) };
+      return { kind: 'done', label: t('Отметить выполненной'), title: taskTitle(a.id, a.title) };
     case 'reschedule_task':
-      return { kind: 'move', label: 'Перенести', title: taskTitle(a.id, a.title), meta: `на ${dateLabel(a.date)}${a.time ? ', ' + a.time : ''}` };
+      return { kind: 'move', label: t('Перенести'), title: taskTitle(a.id, a.title), meta: a.time ? t('на {date}, {time}', { date: dateLabel(a.date), time: a.time }) : t('на {date}', { date: dateLabel(a.date) }) };
     case 'add_note':
       return {
         kind: 'note',
-        label: 'Новая заметка',
+        label: t('Новая заметка'),
         title: a.title,
         meta:
           a.text
@@ -243,23 +245,23 @@ export function describeAction(a: AssistantAction): ActionView {
             .slice(0, 90) || undefined,
       };
     case 'add_journal':
-      return { kind: 'note', label: a.section === 'results' ? 'Итоги дня' : 'В дневник', title: a.text.slice(0, 120), meta: a.date ? dateLabel(a.date) : 'сегодня' };
+      return { kind: 'note', label: a.section === 'results' ? t('Итоги дня') : t('В дневник'), title: a.text.slice(0, 120), meta: a.date ? dateLabel(a.date) : t('сегодня') };
     case 'add_transaction':
       return {
         kind: 'money',
-        label: a.kind === 'income' ? 'Доход' : 'Расход',
-        title: `${a.kind === 'income' ? '+' : '−'}${a.amount.toLocaleString('ru-RU')}${a.category ? ' · ' + a.category : ''}`,
+        label: a.kind === 'income' ? t('Доход') : t('Расход'),
+        title: `${a.kind === 'income' ? '+' : '−'}${a.amount.toLocaleString(LOCALE)}${a.category ? ' · ' + a.category : ''}`,
         meta: [a.note, a.date && dateLabel(a.date)].filter(Boolean).join(' · ') || undefined,
       };
     case 'add_goal':
-      return { kind: 'goal', label: 'Новая цель', title: `${a.emoji ? a.emoji + ' ' : ''}${a.title}`, meta: a.deadline ? `до ${dateLabel(a.deadline)}` : undefined };
+      return { kind: 'goal', label: t('Новая цель'), title: `${a.emoji ? a.emoji + ' ' : ''}${a.title}`, meta: a.deadline ? t('до {date}', { date: dateLabel(a.deadline) }) : undefined };
     case 'add_goal_stage': {
       const g = getGoal(a.goalId);
       return {
         kind: 'goal',
-        label: g ? `Этап цели «${g.title}»` : 'Этап цели',
+        label: g ? t('Этап цели «{title}»', { title: g.title }) : t('Этап цели'),
         title: a.title,
-        meta: a.steps.length ? a.steps.slice(0, 4).join(' · ') + (a.steps.length > 4 ? ` · ещё ${a.steps.length - 4}` : '') : undefined,
+        meta: a.steps.length ? a.steps.slice(0, 4).join(' · ') + (a.steps.length > 4 ? ' · ' + t('ещё {n}', { n: a.steps.length - 4 }) : '') : undefined,
       };
     }
   }
@@ -287,7 +289,7 @@ export async function executeAction(a: AssistantAction): Promise<{ ok: boolean; 
     case 'add_task': {
       const d = await ensureTasks();
       const list = a.list ? pickByName(d.lists, a.list) : undefined;
-      const t = addTask({
+      const task = addTask({
         title: a.title,
         ...(a.date ? { date: a.date } : {}),
         ...(a.date && a.time ? { time: a.time } : {}),
@@ -296,38 +298,38 @@ export async function executeAction(a: AssistantAction): Promise<{ ok: boolean; 
         ...(list ? { listId: list.id } : {}),
         priority: a.priority ?? 0,
       });
-      return t ? { ok: true, info: 'Задача добавлена' } : { ok: false, info: 'Не удалось добавить задачу' };
+      return task ? { ok: true, info: t('Задача добавлена') } : { ok: false, info: t('Не удалось добавить задачу') };
     }
     case 'complete_task': {
       await ensureTasks();
-      const t = getTask(a.id);
-      if (!t || t.deleted) return { ok: false, info: 'Задача не найдена' };
-      if (!isActive(t)) return { ok: true, info: 'Уже выполнена' };
+      const task = getTask(a.id);
+      if (!task || task.deleted) return { ok: false, info: t('Задача не найдена') };
+      if (!isActive(task)) return { ok: true, info: t('Уже выполнена') };
       toggleDone(a.id);
-      return { ok: true, info: 'Выполнено' };
+      return { ok: true, info: t('Выполнено') };
     }
     case 'reschedule_task': {
       await ensureTasks();
-      const t = getTask(a.id);
-      if (!t || t.deleted) return { ok: false, info: 'Задача не найдена' };
+      const task = getTask(a.id);
+      if (!task || task.deleted) return { ok: false, info: t('Задача не найдена') };
       updateTask(a.id, { date: a.date, ...(a.time !== undefined ? { time: a.time ?? undefined } : {}) });
-      return { ok: true, info: `Перенесено на ${dateLabel(a.date)}` };
+      return { ok: true, info: t('Перенесено на {date}', { date: dateLabel(a.date) }) };
     }
     case 'add_journal': {
       const { appendToDaily } = await import('../notes/daily');
       const r = await appendToDaily(a.text, a.section ?? 'thoughts', a.date ?? todayYmd());
-      return r ? { ok: true, info: 'Записано в заметку дня' } : { ok: false, info: 'Не удалось записать' };
+      return r ? { ok: true, info: t('Записано в заметку дня') } : { ok: false, info: t('Не удалось записать') };
     }
     case 'add_note': {
       await ensureNotes();
       const blocks = a.text ? markdownToBlocks(a.text) : [];
       const n = createNote({ title: a.title, blocks });
-      return n ? { ok: true, info: 'Заметка создана' } : { ok: false, info: 'Не удалось создать заметку' };
+      return n ? { ok: true, info: t('Заметка создана') } : { ok: false, info: t('Не удалось создать заметку') };
     }
     case 'add_transaction': {
       const d = await ensureFinance();
       const { account, category } = txTarget(d, a);
-      if (!account) return { ok: false, info: 'Нет счёта — создайте его в Финансах' };
+      if (!account) return { ok: false, info: t('Нет счёта — создайте его в Финансах') };
       const tx = addTransaction({
         type: a.kind,
         amount: a.amount,
@@ -337,8 +339,8 @@ export async function executeAction(a: AssistantAction): Promise<{ ok: boolean; 
         ...(a.note ? { note: a.note } : {}),
       });
       return tx
-        ? { ok: true, info: `${fmtMoney(a.amount, account.currency)} · ${category ? category.emoji + ' ' + category.name : 'без категории'} · ${account.name}` }
-        : { ok: false, info: 'Не удалось записать операцию' };
+        ? { ok: true, info: `${fmtMoney(a.amount, account.currency)} · ${category ? category.emoji + ' ' + category.name : t('без категории')} · ${account.name}` }
+        : { ok: false, info: t('Не удалось записать операцию') };
     }
     case 'add_goal': {
       await ensureGoals();
@@ -348,13 +350,13 @@ export async function executeAction(a: AssistantAction): Promise<{ ok: boolean; 
         ...(a.emoji ? { emoji: a.emoji } : {}),
         ...(a.why ? { why: a.why } : {}),
       });
-      return g ? { ok: true, info: 'Цель создана' } : { ok: false, info: 'Не удалось создать цель' };
+      return g ? { ok: true, info: t('Цель создана') } : { ok: false, info: t('Не удалось создать цель') };
     }
     case 'add_goal_stage': {
       await ensureGoals();
-      if (!getGoal(a.goalId)) return { ok: false, info: 'Цель не найдена' };
+      if (!getGoal(a.goalId)) return { ok: false, info: t('Цель не найдена') };
       addStages(a.goalId, [{ title: a.title, steps: a.steps, ...(a.deadline ? { deadline: a.deadline } : {}) }]);
-      return { ok: true, info: `Этап добавлен${a.steps.length ? `, шагов: ${a.steps.length}` : ''}` };
+      return { ok: true, info: a.steps.length ? t('Этап добавлен, шагов: {n}', { n: a.steps.length }) : t('Этап добавлен') };
     }
   }
 }

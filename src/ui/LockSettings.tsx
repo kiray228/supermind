@@ -8,6 +8,7 @@ import { biometricAvailable, biometricOn, disableLock, LOCK_AFTER_OPTIONS, lockC
 import { isAndroidApp } from '../platform';
 import { PinPad } from './LockScreen';
 import { onBack } from './dialogs';
+import { t } from '../i18n/index';
 
 /** Установка кода: придумать и повторить */
 function PinSetup({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
@@ -24,7 +25,7 @@ function PinSetup({ onClose, onDone }: { onClose: () => void; onDone: () => void
     }
     if (pin !== first) {
       setFirst(null);
-      setError('Коды не совпали — придумайте заново');
+      setError(t('Коды не совпали — придумайте заново'));
       return;
     }
     setBusy(true);
@@ -32,7 +33,7 @@ function PinSetup({ onClose, onDone }: { onClose: () => void; onDone: () => void
       await setPin(pin);
       onDone();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Не удалось сохранить код');
+      setError(e instanceof Error ? e.message : t('Не удалось сохранить код'));
       setFirst(null);
     } finally {
       setBusy(false);
@@ -42,17 +43,17 @@ function PinSetup({ onClose, onDone }: { onClose: () => void; onDone: () => void
   // в корень страницы: у разделов настроек своё «стекло», внутри него окно не легло бы поверх экрана
   return createPortal(
     <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal pin-sheet" role="dialog" aria-label="Код-пароль">
+      <div className="modal pin-sheet" role="dialog" aria-label={t('Код-пароль')}>
         <PinPad
           key={first ? 'repeat' : 'first'}
-          title={first ? 'Повторите код' : 'Придумайте код'}
-          hint={first ? undefined : 'От 4 до 6 цифр'}
+          title={first ? t('Повторите код') : t('Придумайте код')}
+          hint={first ? undefined : t('От 4 до 6 цифр')}
           error={error}
           busy={busy}
           onDone={(p) => void done(p)}
         />
         <button className="lock-forgot" onClick={onClose}>
-          Отмена
+          {t('Отмена')}
         </button>
       </div>
     </div>,
@@ -74,19 +75,19 @@ export function LockSettings() {
 
   return (
     <ListSection
-      header="Защита"
-      footer="Код спрашивается при запуске и при возврате в приложение. Он хранится только на этом устройстве — в облако не попадает."
+      header={t('Защита')}
+      footer={t('Код спрашивается при запуске и при возврате в приложение. Он хранится только на этом устройстве — в облако не попадает.')}
     >
       <SwitchRow
         icon={<IconTile icon={LockKey} tone="green" size="list" />}
-        title="Код-пароль"
-        subtitle={enabled ? 'Включён' : 'Чтобы финансы и дневник не открыл посторонний'}
+        title={t('Код-пароль')}
+        subtitle={enabled ? t('Включён') : t('Чтобы финансы и дневник не открыл посторонний')}
         checked={enabled}
         onChange={(v) => {
           if (v) setSetup(true);
           else {
             disableLock();
-            toast('Код-пароль выключен');
+            toast(t('Код-пароль выключен'));
           }
         }}
       />
@@ -94,7 +95,7 @@ export function LockSettings() {
         <>
           <SelectRow
             icon={<IconTile icon={Timer} tone="orange" size="list" />}
-            title="Запирать"
+            title={t('Запирать')}
             value={String(after)}
             options={LOCK_AFTER_OPTIONS.map((o) => ({ value: String(o.value), label: o.label }))}
             onChange={(v) => {
@@ -105,8 +106,8 @@ export function LockSettings() {
           {bioAvail && (
             <SwitchRow
               icon={<IconTile icon={Fingerprint} tone="blue" size="list" />}
-              title="Вход по отпечатку"
-              subtitle="Код остаётся запасным способом"
+              title={t('Вход по отпечатку')}
+              subtitle={t('Код остаётся запасным способом')}
               checked={bio}
               onChange={(v) => {
                 setBiometric(v);
@@ -114,14 +115,14 @@ export function LockSettings() {
               }}
             />
           )}
-          <ListRow icon={<IconTile icon={Password} tone="gray" size="list" />} title="Сменить код" chevron onClick={() => setSetup(true)} />
+          <ListRow icon={<IconTile icon={Password} tone="gray" size="list" />} title={t('Сменить код')} chevron onClick={() => setSetup(true)} />
         </>
       )}
       {isAndroidApp() && (
         <SwitchRow
           icon={<IconTile icon={EyeSlash} tone="indigo" size="list" />}
-          title="Прятать в недавних"
-          subtitle="Вместо содержимого — пустой экран в списке приложений. Скриншоты при этом недоступны"
+          title={t('Прятать в недавних')}
+          subtitle={t('Вместо содержимого — пустой экран в списке приложений. Скриншоты при этом недоступны')}
           checked={secure}
           onChange={(v) => {
             setSecure(v);
@@ -135,7 +136,7 @@ export function LockSettings() {
           onDone={() => {
             setSetup(false);
             setAfter(lockConfig()?.after ?? 1);
-            toast('Код-пароль включён');
+            toast(t('Код-пароль включён'));
           }}
         />
       )}

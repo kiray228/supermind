@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, useId } from 'react';
 import { create } from 'zustand';
+import { t } from '../i18n/index';
 import './dialogs.css';
 
 interface DialogReq {
@@ -32,7 +33,7 @@ export function askText(
 }
 
 export function askPassword(title: string, message?: string): Promise<string | null> {
-  return push({ kind: 'password', title, message, okText: 'Открыть' }) as Promise<string | null>;
+  return push({ kind: 'password', title, message, okText: t('Открыть') }) as Promise<string | null>;
 }
 
 export function confirmDialog(title: string, message?: string, opts: { okText?: string; cancelText?: string; danger?: boolean } = {}): Promise<boolean> {
@@ -104,8 +105,8 @@ function Dialog({ req }: { req: DialogReq }) {
   const cancel = () => done(req.kind === 'confirm' ? false : null);
   const ok = () => done(req.kind === 'confirm' ? true : value);
   const onKey = (e: KeyboardEvent) => e.key === 'Escape' && cancel();
-  const okText = req.okText ?? (req.kind === 'confirm' ? 'OK' : 'Готово');
-  const cancelText = req.cancelText ?? 'Отмена';
+  const okText = req.okText ?? (req.kind === 'confirm' ? 'OK' : t('Готово'));
+  const cancelText = req.cancelText ?? t('Отмена');
 
   // подтверждение на телефоне — «лист действий» iOS снизу
   if (req.kind === 'confirm' && phone)
@@ -143,7 +144,7 @@ function Dialog({ req }: { req: DialogReq }) {
         type={req.kind === 'password' ? 'password' : 'text'}
         autoComplete={req.kind === 'password' ? 'off' : undefined}
         value={value}
-        placeholder={req.placeholder ?? (req.kind === 'password' ? 'Пароль' : '')}
+        placeholder={req.placeholder ?? (req.kind === 'password' ? t('Пароль') : '')}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => e.key === 'Enter' && ok()}
       />

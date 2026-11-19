@@ -1,15 +1,16 @@
 /** Фон под сдвигаемой строкой: слева — главное действие (зелёный), справа — «Удалить» (красный). */
 import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react';
 import { Check, Trash2 } from 'lucide-react';
+import { t } from '../i18n/index';
 import './swipe.css';
 
 export function SwipeBg({
   dx,
   armed,
   onDelete,
-  rightLabel = 'Готово',
+  rightLabel = t('Готово'),
   rightIcon,
-  deleteLabel = 'Удалить',
+  deleteLabel = t('Удалить'),
 }: {
   dx: number;
   armed: boolean;

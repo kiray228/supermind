@@ -11,22 +11,23 @@ import { Eye, EyeOff, Cloud, ShieldCheck, Smartphone } from 'lucide-react';
 import { InstallAppButton } from './InstallAppButton';
 import { login, register, requestReset, resetPassword, useCloud } from '../store/cloud';
 import { isIOSApp } from '../platform';
+import { t } from '../i18n/index';
 import './auth.css';
 
 type Mode = 'register' | 'login' | 'forgot' | 'reset';
 
 const SUB: Record<Mode, string> = {
-  register: 'Создайте аккаунт — карты, задачи и привычки будут в безопасности и на всех ваших устройствах.',
-  login: 'Войдите — ваши данные загрузятся с сервера.',
-  forgot: 'Укажите email аккаунта — пришлём код для нового пароля.',
+  register: t('Создайте аккаунт — карты, задачи и привычки будут в безопасности и на всех ваших устройствах.'),
+  login: t('Войдите — ваши данные загрузятся с сервера.'),
+  forgot: t('Укажите email аккаунта — пришлём код для нового пароля.'),
   reset: '',
 };
 
 const BUTTON: Record<Mode, string> = {
-  register: 'Создать аккаунт',
-  login: 'Войти',
-  forgot: 'Отправить код',
-  reset: 'Сохранить и войти',
+  register: t('Создать аккаунт'),
+  login: t('Войти'),
+  forgot: t('Отправить код'),
+  reset: t('Сохранить и войти'),
 };
 
 const digits = (s: string) => s.replace(/\D/g, '');
@@ -80,8 +81,8 @@ export function AuthGate() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMsg('');
-    if ((mode === 'register' || mode === 'reset') && password.length < 8) return setMsg('Пароль — минимум 8 символов');
-    if (mode === 'reset' && digits(code).length !== 6) return setMsg('Введите 6 цифр из письма');
+    if ((mode === 'register' || mode === 'reset') && password.length < 8) return setMsg(t('Пароль — минимум 8 символов'));
+    if (mode === 'reset' && digits(code).length !== 6) return setMsg(t('Введите 6 цифр из письма'));
     setBusy(true);
     try {
       if (mode === 'register') await register(name.trim(), email.trim(), password);
@@ -101,7 +102,7 @@ export function AuthGate() {
   };
 
   const recovering = mode === 'forgot' || mode === 'reset';
-  const sub = mode === 'reset' ? `Код отправлен на ${email.trim()}. Проверьте почту и папку «Спам».` : SUB[mode];
+  const sub = mode === 'reset' ? t('Код отправлен на {email}. Проверьте почту и папку «Спам».', { email: email.trim() }) : SUB[mode];
 
   return (
     <div className="auth-gate" role="dialog" aria-modal="true" aria-labelledby="auth-title">
@@ -111,14 +112,14 @@ export function AuthGate() {
         <p className="auth-sub">{sub}</p>
 
         {recovering ? (
-          <h2 className="auth-step">{mode === 'forgot' ? 'Восстановление пароля' : 'Новый пароль'}</h2>
+          <h2 className="auth-step">{mode === 'forgot' ? t('Восстановление пароля') : t('Новый пароль')}</h2>
         ) : (
           <div className="segmented auth-seg" role="tablist">
             <button type="button" role="tab" aria-selected={mode === 'register'} className={mode === 'register' ? 'active' : ''} onClick={() => switchTo('register')}>
-              Регистрация
+              {t('Регистрация')}
             </button>
             <button type="button" role="tab" aria-selected={mode === 'login'} className={mode === 'login' ? 'active' : ''} onClick={() => switchTo('login')}>
-              Вход
+              {t('Вход')}
             </button>
           </div>
         )}
@@ -126,7 +127,7 @@ export function AuthGate() {
         <form className="auth-form" onSubmit={(e) => void submit(e)} noValidate>
           <div className="auth-group">
             {mode === 'register' && (
-              <input className="auth-field" placeholder="Имя" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} />
+              <input className="auth-field" placeholder={t('Имя')} autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} />
             )}
             {mode !== 'reset' && (
               <input
@@ -147,7 +148,7 @@ export function AuthGate() {
                 className="auth-field auth-code"
                 inputMode="numeric"
                 autoComplete="one-time-code"
-                placeholder="Код из письма"
+                placeholder={t('Код из письма')}
                 maxLength={7}
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/[^\d ]/g, ''))}
@@ -158,13 +159,13 @@ export function AuthGate() {
                 <input
                   className="auth-field"
                   type={show ? 'text' : 'password'}
-                  placeholder={mode === 'login' ? 'Пароль' : mode === 'reset' ? 'Новый пароль (минимум 8 символов)' : 'Пароль (минимум 8 символов)'}
+                  placeholder={mode === 'login' ? t('Пароль') : mode === 'reset' ? t('Новый пароль (минимум 8 символов)') : t('Пароль (минимум 8 символов)')}
                   autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                 />
-                <button type="button" className="auth-eye" onClick={() => setShow(!show)} aria-label={show ? 'Скрыть пароль' : 'Показать пароль'}>
+                <button type="button" className="auth-eye" onClick={() => setShow(!show)} aria-label={show ? t('Скрыть пароль') : t('Показать пароль')}>
                   {show ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
@@ -178,11 +179,11 @@ export function AuthGate() {
           )}
 
           <button className="btn btn-primary auth-submit" type="submit" disabled={busy || !email.trim() || (mode !== 'forgot' && !password)}>
-            {busy ? 'Подождите…' : BUTTON[mode]}
+            {busy ? t('Подождите…') : BUTTON[mode]}
           </button>
           {(mode === 'register' || mode === 'login') && (
             <p className="auth-consent">
-              Продолжая, вы соглашаетесь с{' '}
+              {t('Продолжая, вы соглашаетесь с')}{' '}
               <a
                 href={PRIVACY_URL}
                 target="_blank"
@@ -192,7 +193,7 @@ export function AuthGate() {
                   void openExternal(PRIVACY_URL);
                 }}
               >
-                Политикой конфиденциальности
+                {t('Политикой конфиденциальности')}
               </a>
             </p>
           )}
@@ -200,30 +201,30 @@ export function AuthGate() {
 
         {mode === 'login' && (
           <button type="button" className="auth-link" onClick={() => switchTo('forgot')}>
-            Забыли пароль?
+            {t('Забыли пароль?')}
           </button>
         )}
         {mode === 'reset' && (
           <button type="button" className="auth-link" disabled={busy} onClick={() => switchTo('forgot')}>
-            Отправить код ещё раз
+            {t('Отправить код ещё раз')}
           </button>
         )}
         {recovering && (
           <button type="button" className="auth-link" onClick={() => switchTo('login')}>
-            ← Назад ко входу
+            {t('← Назад ко входу')}
           </button>
         )}
 
         {!recovering && (
           <ul className="auth-perks">
             <li>
-              <Cloud size={18} /> Всё сохраняется в облаке
+              <Cloud size={18} /> {t('Всё сохраняется в облаке')}
             </li>
             <li>
-              <Smartphone size={18} /> Одинаково на телефоне и компьютере
+              <Smartphone size={18} /> {t('Одинаково на телефоне и компьютере')}
             </li>
             <li>
-              <ShieldCheck size={18} /> Копии каждый час — ничего не потеряется
+              <ShieldCheck size={18} /> {t('Копии каждый час — ничего не потеряется')}
             </li>
           </ul>
         )}
@@ -244,9 +245,9 @@ export function AuthGate() {
                 setSkipped(true);
               }}
             >
-              Продолжить без аккаунта
+              {t('Продолжить без аккаунта')}
             </button>
-            <p className="auth-note">Данные останутся только на этом iPhone. Войти и включить синхронизацию можно позже в Настройках.</p>
+            <p className="auth-note">{t('Данные останутся только на этом iPhone. Войти и включить синхронизацию можно позже в Настройках.')}</p>
           </>
         )}
       </div>

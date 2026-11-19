@@ -11,6 +11,7 @@ import { APP_VERSION } from '../store/safety';
 import { toast } from '../store/appStore';
 import { pickFile } from '../io/download';
 import { deviceInfo, diagnostics } from './errorReport';
+import { LOCALE, t } from '../i18n/index';
 import './support.css';
 
 export type Kind = 'problem' | 'idea' | 'question';
@@ -30,12 +31,12 @@ interface Item {
 
 /** Статусы обращения — как их видит пользователь (и владелец во «Входящих») */
 export const STATUS_LABEL: Record<string, string> = {
-  new: 'Получено',
-  seen: 'Прочитано',
-  planned: 'В планах',
-  answered: 'Есть ответ',
-  done: 'Решено',
-  rejected: 'Не планируется',
+  new: t('Получено'),
+  seen: t('Прочитано'),
+  planned: t('В планах'),
+  answered: t('Есть ответ'),
+  done: t('Решено'),
+  rejected: t('Не планируется'),
 };
 
 export const KIND_ICON = { problem: Bug, idea: Lightbulb, question: Question } as const;
@@ -67,7 +68,7 @@ async function shrink(file: File): Promise<{ data: string; preview: string }> {
   }
 }
 
-export const when = (ms: number) => new Date(ms).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+export const when = (ms: number) => new Date(ms).toLocaleString(LOCALE, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 /** Сколько сообщений в обращении пользователь уже видел — чтобы отметить новый ответ */
 const SEEN_KEY = 'sm-support-seen';
@@ -88,7 +89,7 @@ function markSeen(id: string, n: number) {
   }
 }
 
-const AUTHOR: Record<Msg['author'], string> = { user: 'Вы', support: 'Поддержка', ai: 'Автоответ ИИ' };
+const AUTHOR: Record<Msg['author'], string> = { user: t('Вы'), support: t('Поддержка'), ai: t('Автоответ ИИ') };
 
 /** Сообщения переписки «пузырями»; you — чьи сообщения справа (у пользователя — свои, у владельца — поддержки) */
 export function Thread({ messages, mine, names = AUTHOR }: { messages: Msg[]; mine: Msg['author'][]; names?: Record<Msg['author'], string> }) {
@@ -115,9 +116,9 @@ export function SupportHost() {
 }
 
 const PLACEHOLDER: Record<Kind, string> = {
-  problem: 'Что случилось? Что вы делали перед этим и что ожидали увидеть?',
-  idea: 'Что добавить или улучшить? Как бы вам было удобнее?',
-  question: 'Что хотите узнать? Например: как поставить напоминание на каждый день',
+  problem: t('Что случилось? Что вы делали перед этим и что ожидали увидеть?'),
+  idea: t('Что добавить или улучшить? Как бы вам было удобнее?'),
+  question: t('Что хотите узнать? Например: как поставить напоминание на каждый день'),
 };
 
 function SupportSheet({ initial, initialText }: { initial: Kind; initialText: string }) {
@@ -153,12 +154,12 @@ function SupportSheet({ initial, initialText }: { initial: Kind; initialText: st
     try {
       setImage(await shrink(f));
     } catch {
-      toast('Не удалось открыть изображение');
+      toast(t('Не удалось открыть изображение'));
     }
   };
 
   const send = async () => {
-    if (text.trim().length < 3) return toast(kind === 'idea' ? 'Опишите идею' : kind === 'question' ? 'Напишите вопрос' : 'Опишите проблему');
+    if (text.trim().length < 3) return toast(kind === 'idea' ? t('Опишите идею') : kind === 'question' ? t('Напишите вопрос') : t('Опишите проблему'));
     setBusy(true);
     try {
       const diag = withInfo ? await diagnostics().catch(() => undefined) : undefined;
@@ -177,20 +178,20 @@ function SupportSheet({ initial, initialText }: { initial: Kind; initialText: st
     }
   };
 
-  const title = kind === 'question' ? 'Вопрос' : 'Поддержка';
+  const title = kind === 'question' ? t('Вопрос') : t('Поддержка');
   return (
     <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && !busy && close()}>
-      <div className="modal sp-sheet" role="dialog" aria-label="Поддержка">
+      <div className="modal sp-sheet" role="dialog" aria-label={t('Поддержка')}>
         <div className="sp-bar">
           <button className="sp-text-btn" onClick={close} disabled={busy}>
-            {sent ? 'Готово' : 'Отмена'}
+            {sent ? t('Готово') : t('Отмена')}
           </button>
           <b>{title}</b>
           {sent ? (
             <span className="sp-text-btn" />
           ) : (
             <button className="sp-text-btn sp-send" onClick={() => void send()} disabled={busy || text.trim().length < 3}>
-              {busy ? '…' : 'Отправить'}
+              {busy ? '…' : t('Отправить')}
             </button>
           )}
         </div>
@@ -200,19 +201,19 @@ function SupportSheet({ initial, initialText }: { initial: Kind; initialText: st
             {sent.answer ? (
               <>
                 <Sparkle size={48} weight="fill" />
-                <h3>Ответ на вопрос №{sent.id}</h3>
+                <h3>{t('Ответ на вопрос №{id}', { id: sent.id })}</h3>
                 <div className="sp-answer">{sent.answer}</div>
-                <p>Это автоответ ИИ по справке. Если не помогло — напишите об этом ниже в обращении, ответит человек.</p>
+                <p>{t('Это автоответ ИИ по справке. Если не помогло — напишите об этом ниже в обращении, ответит человек.')}</p>
               </>
             ) : (
               <>
                 <CheckCircle size={64} weight="fill" />
-                <h3>Спасибо! Обращение №{sent.id}</h3>
-                <p>Мы прочитаем его и ответим на {email ?? 'вашу почту'} — ответ появится и здесь, в «Мои обращения».</p>
+                <h3>{t('Спасибо! Обращение №{id}', { id: sent.id })}</h3>
+                <p>{email ? t('Мы прочитаем его и ответим на {email} — ответ появится и здесь, в «Мои обращения».', { email }) : t('Мы прочитаем его и ответим на вашу почту — ответ появится и здесь, в «Мои обращения».')}</p>
               </>
             )}
             <button className="btn" onClick={() => setSent(null)}>
-              Написать ещё
+              {t('Написать ещё')}
             </button>
           </div>
         ) : (
@@ -222,7 +223,7 @@ function SupportSheet({ initial, initialText }: { initial: Kind; initialText: st
                 const Icon = KIND_ICON[k];
                 return (
                   <button key={k} className={kind === k ? 'active' : ''} onClick={() => setKind(k)}>
-                    <Icon size={16} weight={kind === k ? 'fill' : 'regular'} /> {k === 'problem' ? 'Проблема' : k === 'idea' ? 'Идея' : 'Вопрос'}
+                    <Icon size={16} weight={kind === k ? 'fill' : 'regular'} /> {k === 'problem' ? t('Проблема') : k === 'idea' ? t('Идея') : t('Вопрос')}
                   </button>
                 );
               })}
@@ -232,37 +233,37 @@ function SupportSheet({ initial, initialText }: { initial: Kind; initialText: st
 
             {image ? (
               <div className="sp-shot">
-                <img src={image.preview} alt="Снимок экрана" />
-                <button className="sp-shot-x" onClick={() => setImage(null)} aria-label="Убрать снимок">
+                <img src={image.preview} alt={t('Снимок экрана')} />
+                <button className="sp-shot-x" onClick={() => setImage(null)} aria-label={t('Убрать снимок')}>
                   <X size={16} weight="bold" />
                 </button>
               </div>
             ) : (
               <button className="sp-attach" onClick={() => void attach()}>
-                <ImageIcon size={20} weight="duotone" /> Прикрепить снимок экрана
+                <ImageIcon size={20} weight="duotone" /> {t('Прикрепить снимок экрана')}
               </button>
             )}
 
             <label className="sp-check">
               <input type="checkbox" checked={withInfo} onChange={(e) => setWithInfo(e.target.checked)} />
               <span>
-                Добавить сведения для диагностики
+                {t('Добавить сведения для диагностики')}
                 <small>
-                  {deviceInfo()} · последние ошибки приложения и состояние синхронизации. Ваши заметки, задачи и другие данные не отправляются.
+                  {t('{device} · последние ошибки приложения и состояние синхронизации. Ваши заметки, задачи и другие данные не отправляются.', { device: deviceInfo() })}
                 </small>
               </span>
             </label>
 
             <button className="btn btn-primary sp-big" onClick={() => void send()} disabled={busy || text.trim().length < 3}>
-              <PaperPlaneTilt size={18} weight="fill" /> {busy ? 'Отправляю…' : 'Отправить'}
+              <PaperPlaneTilt size={18} weight="fill" /> {busy ? t('Отправляю…') : t('Отправить')}
             </button>
-            <p className="sp-note">{kind === 'question' ? 'На частые вопросы ИИ ответит сразу, на остальные — человек.' : `Ответ придёт на ${email ?? 'почту аккаунта'} и появится здесь.`}</p>
+            <p className="sp-note">{kind === 'question' ? t('На частые вопросы ИИ ответит сразу, на остальные — человек.') : email ? t('Ответ придёт на {email} и появится здесь.', { email }) : t('Ответ придёт на почту аккаунта и появится здесь.')}</p>
           </>
         )}
 
         {!!items?.length && (
           <div className="sp-history">
-            <h4>Мои обращения</h4>
+            <h4>{t('Мои обращения')}</h4>
             {items.slice(0, 10).map((it) => (
               <HistoryItem key={it.id} it={it} open={openId === it.id} onToggle={() => setOpenId(openId === it.id ? null : it.id)} onSent={() => setReload((n) => n + 1)} />
             ))}
@@ -290,7 +291,7 @@ function HistoryItem({ it, open, onToggle, onSent }: { it: Item; open: boolean; 
       await api(`/feedback/${it.id}/messages`, { method: 'POST', body: JSON.stringify({ text: text.trim() }) });
       setText('');
       onSent();
-      toast('Отправлено — ответим здесь и на почту');
+      toast(t('Отправлено — ответим здесь и на почту'));
     } catch (e) {
       toast(e instanceof Error ? e.message : String(e));
     } finally {
@@ -307,9 +308,9 @@ function HistoryItem({ it, open, onToggle, onSent }: { it: Item; open: boolean; 
         <button className="sp-item-head" onClick={onToggle} aria-expanded={open}>
           <div className={`sp-item-text ${open ? 'full' : ''}`}>{it.text}</div>
           <div className="sp-item-meta">
-            №{it.id} · {when(it.at)} · {STATUS_LABEL[it.status] ?? 'Получено'}
-            {it.messages.length ? ` · сообщений: ${it.messages.length}` : ''}
-            {fresh && !open && <b className="sp-dot"> · новый ответ</b>}
+            №{it.id} · {when(it.at)} · {STATUS_LABEL[it.status] ?? t('Получено')}
+            {it.messages.length ? ' · ' + t('сообщений: {n}', { n: it.messages.length }) : ''}
+            {fresh && !open && <b className="sp-dot"> · {t('новый ответ')}</b>}
           </div>
         </button>
         {open && (
@@ -317,8 +318,8 @@ function HistoryItem({ it, open, onToggle, onSent }: { it: Item; open: boolean; 
             <Thread messages={it.messages} mine={['user']} />
             {it.status !== 'rejected' && (
               <div className="sp-compose">
-                <textarea rows={2} maxLength={5000} value={text} onChange={(e) => setText(e.target.value)} placeholder={answered ? 'Не помогло? Напишите, что не так' : 'Дополнить обращение'} />
-                <button className="btn btn-primary" onClick={() => void send()} disabled={busy || text.trim().length < 2} aria-label="Отправить">
+                <textarea rows={2} maxLength={5000} value={text} onChange={(e) => setText(e.target.value)} placeholder={answered ? t('Не помогло? Напишите, что не так') : t('Дополнить обращение')} />
+                <button className="btn btn-primary" onClick={() => void send()} disabled={busy || text.trim().length < 2} aria-label={t('Отправить')}>
                   <PaperPlaneTilt size={16} weight="fill" />
                 </button>
               </div>

@@ -3,6 +3,7 @@
  * PIN хранится только на этом устройстве — как хеш PBKDF2 с солью, не синхронизируется.
  */
 import { create } from 'zustand';
+import { t } from '../i18n/index';
 
 const KEY = 'sm-lock';
 const FAILS = 'sm-lock-fails';
@@ -18,10 +19,10 @@ export interface LockConfig {
 }
 
 export const LOCK_AFTER_OPTIONS = [
-  { value: 0, label: 'Сразу' },
-  { value: 1, label: 'Через 1 минуту' },
-  { value: 5, label: 'Через 5 минут' },
-  { value: 15, label: 'Через 15 минут' },
+  { value: 0, label: t('Сразу') },
+  { value: 1, label: t('Через 1 минуту') },
+  { value: 5, label: t('Через 5 минут') },
+  { value: 15, label: t('Через 15 минут') },
 ];
 
 export const useLock = create<{ locked: boolean; enabled: boolean }>(() => ({ locked: false, enabled: false }));
@@ -49,7 +50,7 @@ export const validPin = (pin: string) => /^\d{4,6}$/.test(pin);
 
 /** Включить или сменить код */
 export async function setPin(pin: string, after = lockConfig()?.after ?? 1): Promise<void> {
-  if (!validPin(pin)) throw new Error('Код — от 4 до 6 цифр');
+  if (!validPin(pin)) throw new Error(t('Код — от 4 до 6 цифр'));
   const salt = hex(crypto.getRandomValues(new Uint8Array(16)));
   const cfg: LockConfig = { v: 1, salt, hash: await hashPin(pin, salt), after };
   localStorage.setItem(KEY, JSON.stringify(cfg));
@@ -146,7 +147,7 @@ export async function unlockWithBiometric(): Promise<boolean> {
     // окно отпечатка могло не открыться (приложение уходило в фон) — тогда ответа не будет вовсе;
     // без предела ожидания отметка «идёт проверка» осталась бы навсегда и замок больше не включался бы
     const ok = await Promise.race([
-      nativeBiometricVerify({ title: 'SuperMind', subtitle: 'Разблокировать приложение', negative: 'Ввести код' }),
+      nativeBiometricVerify({ title: 'SuperMind', subtitle: t('Разблокировать приложение'), negative: t('Ввести код') }),
       new Promise<boolean>((r) => setTimeout(() => r(false), 60_000)),
     ]);
     if (!ok) return false;

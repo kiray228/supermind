@@ -14,6 +14,7 @@ import { fmtMoney, type FinanceData, type UpcomingPayment } from '../finance/mod
 import { addDaysYmd, fromYmd, todayYmd, toYmd } from '../utils/mapTasks';
 import type { Habit, PlannerData } from '../types';
 import { activeHabits, compareByTime, countOn, doneOn, dueOn, targetOf } from '../habits/model';
+import { t, tn } from '../i18n/index';
 
 type Obj = Record<string, unknown>;
 const isObj = (x: unknown): x is Obj => !!x && typeof x === 'object' && !Array.isArray(x);
@@ -61,10 +62,10 @@ export interface BriefingInputs {
 }
 
 export function greetingFor(hour: number): string {
-  if (hour >= 5 && hour < 12) return 'Доброе утро';
-  if (hour >= 12 && hour < 17) return 'Добрый день';
-  if (hour >= 17 && hour < 23) return 'Добрый вечер';
-  return 'Доброй ночи';
+  if (hour >= 5 && hour < 12) return t('Доброе утро');
+  if (hour >= 12 && hour < 17) return t('Добрый день');
+  if (hour >= 17 && hour < 23) return t('Добрый вечер');
+  return t('Доброй ночи');
 }
 
 export function firstName(full: string | undefined | null): string {
@@ -186,33 +187,37 @@ export function plural(n: number, one: string, few: string, many: string): strin
 
 function relDay(ymd: string, today: string): string {
   const diff = Math.round((fromYmd(ymd).getTime() - fromYmd(today).getTime()) / 86400000);
-  if (diff <= 0) return 'сегодня';
-  if (diff === 1) return 'завтра';
-  return `через ${diff} ${plural(diff, 'день', 'дня', 'дней')}`;
+  if (diff <= 0) return t('сегодня');
+  if (diff === 1) return t('завтра');
+  return t('через {n} {days}', { n: diff, days: tn(diff, 'день', 'дня', 'дней') });
 }
 
 /** Короткий текст для уведомления: заголовок ≤ 50 символов, текст ≤ 180 */
 export function formatBriefing(b: BriefingData): { title: string; body: string } {
-  const icon = b.greeting === 'Доброе утро' ? '☀️' : b.greeting === 'Доброй ночи' ? '🌙' : '👋';
+  const icon = b.greeting === t('Доброе утро') ? '☀️' : b.greeting === t('Доброй ночи') ? '🌙' : '👋';
   let title = `${icon} ${b.greeting}${b.name ? ', ' + b.name : ''}!`;
   if (title.length > 50) title = `${icon} ${b.greeting}!`;
 
   const parts: string[] = [];
   const n = b.todayTasks.length;
-  let first = n ? `Сегодня ${n} ${plural(n, 'задача', 'задачи', 'задач')}` : 'На сегодня задач нет';
-  if (b.overdue.length) first += `, ${b.overdue.length} ${plural(b.overdue.length, 'просрочена', 'просрочены', 'просрочено')}`;
+  const od = b.overdue.length;
+  const v = { n, tasks: tn(n, 'задача', 'задачи', 'задач'), od, overdue: tn(od, 'просрочена', 'просрочены', 'просрочено') };
+  const first = n ? (od ? t('Сегодня {n} {tasks}, {od} {overdue}', v) : t('Сегодня {n} {tasks}', v)) : od ? t('На сегодня задач нет, {od} {overdue}', v) : t('На сегодня задач нет');
   parts.push(first);
   const main = b.top[0];
-  if (main) parts.push(`Главное: ${cut(main.title, 40)}${main.time ? ` в ${main.time}` : ''}`);
+  if (main) parts.push(main.time ? t('Главное: {title} в {time}', { title: cut(main.title, 40), time: main.time }) : t('Главное: {title}', { title: cut(main.title, 40) }));
   const firstTimed = b.scheduled[0];
-  if (firstTimed && firstTimed !== main) parts.push(`Первая задача в ${firstTimed.time}`);
+  if (firstTimed && firstTimed !== main) parts.push(t('Первая задача в {time}', { time: firstTimed.time ?? '' }));
   const habitsLeft = b.habits.filter((h) => !h.done).length;
-  if (habitsLeft) parts.push(`Привычки: ${habitsLeft}`);
+  if (habitsLeft) parts.push(t('Привычки: {n}', { n: habitsLeft }));
   const g = b.goals[0];
-  if (g) parts.push(`Срок «${cut(g.title, 30)}» ${relDay(g.date, b.today)}`);
+  if (g) parts.push(t('Срок «{title}» {when}', { title: cut(g.title, 30), when: relDay(g.date, b.today) }));
   const p = b.payments[0];
-  if (p) parts.push(`${p.income ? 'Поступление' : 'Платёж'} ${cut(p.title, 24)} ${p.income ? '+' : ''}${fmtMoney(p.amount, p.currency)} ${relDay(p.date, b.today)}`);
-  if (b.yesterday.count) parts.push(`Вчера сделано: ${b.yesterday.count}`);
+  if (p) {
+    const vars = { title: cut(p.title, 24), amount: `${p.income ? '+' : ''}${fmtMoney(p.amount, p.currency)}`, when: relDay(p.date, b.today) };
+    parts.push(p.income ? t('Поступление {title} {amount} {when}', vars) : t('Платёж {title} {amount} {when}', vars));
+  }
+  if (b.yesterday.count) parts.push(t('Вчера сделано: {n}', { n: b.yesterday.count }));
 
   let body = '';
   for (const part of parts) {
@@ -254,9 +259,10 @@ function saveAiBrief(text: string, today: string) {
 }
 
 export function briefingAsText(b: BriefingData): string {
-  const t = (x: TaskItem) => `${x.time ? x.time + ' ' : ''}${x.title}${x.priority ? ` (приоритет ${x.priority === 1 ? 'высокий' : x.priority === 2 ? 'средний' : 'низкий'})` : ''}`;
+  // текст для ИИ — по-русски (промпт), язык ответа задаёт системная подсказка
+  const line = (x: TaskItem) => `${x.time ? x.time + ' ' : ''}${x.title}${x.priority ? ` (приоритет ${x.priority === 1 ? 'высокий' : x.priority === 2 ? 'средний' : 'низкий'})` : ''}`;
   const lines = [`Сегодня: ${b.dateLabel}. Сейчас ${new Date().toTimeString().slice(0, 5)}.`];
-  lines.push(b.todayTasks.length ? `Задачи на сегодня (${b.todayTasks.length}):\n${b.todayTasks.slice(0, 15).map((x) => '- ' + t(x)).join('\n')}` : 'Задач на сегодня нет.');
+  lines.push(b.todayTasks.length ? `Задачи на сегодня (${b.todayTasks.length}):\n${b.todayTasks.slice(0, 15).map((x) => '- ' + line(x)).join('\n')}` : 'Задач на сегодня нет.');
   if (b.overdue.length) lines.push(`Просрочено (${b.overdue.length}):\n${b.overdue.slice(0, 8).map((x) => `- ${x.title} (срок ${x.date})`).join('\n')}`);
   if (b.habits.length) lines.push(`Привычки на сегодня: ${b.habits.map((h) => `${h.name}${h.done ? ' ✓' : ''}`).join(', ')}`);
   if (b.goals.length) lines.push(`Сроки целей на неделе: ${b.goals.map((g) => `${g.title} — ${g.date}`).join('; ')}`);

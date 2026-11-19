@@ -21,11 +21,12 @@ import { confirmDialog } from './dialogs';
 import { isNative } from '../platform';
 import { IconTile } from './icons';
 import { ListRow, ListSection } from './list';
+import { LOCALE, t } from '../i18n/index';
 
 const when = (ms: number) =>
-  new Date(ms).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-const size = (b: number) => (b > 1048576 ? `${(b / 1048576).toFixed(1)} МБ` : `${Math.max(1, Math.round(b / 1024))} КБ`);
-const CLOUD_REASON: Record<string, string> = { auto: 'Автоматическая', manual: 'Вручную' };
+  new Date(ms).toLocaleString(LOCALE, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+const size = (b: number) => (b > 1048576 ? t('{n} МБ', { n: (b / 1048576).toFixed(1) }) : t('{n} КБ', { n: Math.max(1, Math.round(b / 1024)) }));
+const CLOUD_REASON: Record<string, string> = { auto: t('Автоматическая'), manual: t('Вручную') };
 
 /** Данные: защита, автокопии на устройстве и в облаке, файл-копия, удаление */
 export function DataCard() {
@@ -55,7 +56,7 @@ export function DataCard() {
     try {
       await fn();
     } catch (e) {
-      toast('Ошибка: ' + (e instanceof Error ? e.message : String(e)));
+      toast(t('Ошибка: {error}', { error: e instanceof Error ? e.message : String(e) }));
     } finally {
       setBusy(false);
       refresh();
@@ -66,16 +67,16 @@ export function DataCard() {
     run(async () => {
       if (
         !(await confirmDialog(
-          'Вернуть данные из копии?',
-          `${label}. Карты, задачи и записи из копии вернутся в том виде, как были; созданное позже — останется. Текущее состояние сохранится отдельной копией — можно передумать.`,
-          { okText: 'Вернуть' },
+          t('Вернуть данные из копии?'),
+          t('{label}. Карты, задачи и записи из копии вернутся в том виде, как были; созданное позже — останется. Текущее состояние сохранится отдельной копией — можно передумать.', { label }),
+          { okText: t('Вернуть') },
         ))
       )
         return;
       const data = await load();
-      if (!data) throw new Error('Копия не найдена');
+      if (!data) throw new Error(t('Копия не найдена'));
       const r = await restoreData(data);
-      toast(`Восстановлено. Карт в копии: ${r.maps}`);
+      toast(t('Восстановлено. Карт в копии: {n}', { n: r.maps }));
     });
 
   const backupFile = () =>
@@ -96,14 +97,14 @@ export function DataCard() {
       if ((j.format !== 'supermind-backup' && j.format !== '2mind-backup') || !j.data) throw new Error();
       data = j.data;
     } catch {
-      toast('Это не резервная копия SuperMind');
+      toast(t('Это не резервная копия SuperMind'));
       return;
     }
-    await restoreFrom(`Файл «${f.name}»`, async () => data);
+    await restoreFrom(t('Файл «{name}»', { name: f.name }), async () => data);
   };
 
   const wipe = async () => {
-    if (!(await confirmDialog('Удалить все данные?', 'Все карты, задачи, ежедневник и настройки будут удалены с этого устройства. Автокопии на устройстве и данные в облаке останутся.', { danger: true, okText: 'Удалить всё' }))) return;
+    if (!(await confirmDialog(t('Удалить все данные?'), t('Все карты, задачи, ежедневник и настройки будут удалены с этого устройства. Автокопии на устройстве и данные в облаке останутся.'), { danger: true, okText: t('Удалить всё') }))) return;
     await takeSnapshot('manual');
     await clear();
     location.reload();
@@ -114,39 +115,39 @@ export function DataCard() {
 
   const restoreBtn = (onClick: () => void) => (
     <button className="btn btn-sm btn-tinted" disabled={busy} onClick={onClick}>
-      Вернуть
+      {t('Вернуть')}
     </button>
   );
 
   return (
     <>
-      <ListSection header="Данные и копии">
+      <ListSection header={t('Данные и копии')}>
         <ListRow
           icon={<IconTile icon={account ? ShieldCheck : ShieldWarning} tone={account ? 'green' : 'orange'} size="list" />}
-          title={account ? 'Данные в безопасности' : 'Данные только на этом устройстве'}
+          title={account ? t('Данные в безопасности') : t('Данные только на этом устройстве')}
           subtitle={
             account
-              ? `Всё сохраняется в облаке аккаунта ${account.user.email}; переустановка, обновление или новый телефон ничего не сотрут — просто войдите.`
-              : 'Создайте аккаунт выше — тогда карты и задачи не потеряются при удалении приложения, очистке Safari или смене телефона.'
+              ? t('Всё сохраняется в облаке аккаунта {email}; переустановка, обновление или новый телефон ничего не сотрут — просто войдите.', { email: account.user.email })
+              : t('Создайте аккаунт выше — тогда карты и задачи не потеряются при удалении приложения, очистке Safari или смене телефона.')
           }
         />
         {!isNative() && persisted === false && (
           <ListRow
             icon={<IconTile icon={HardDrives} tone="gray" size="list" />}
-            title="Запретить браузеру очищать данные"
+            title={t('Запретить браузеру очищать данные')}
             tone="accent"
             onClick={async () => {
               const ok = await requestPersistence();
               setPersisted(ok);
-              toast(ok ? 'Браузер больше не будет очищать данные SuperMind' : 'Браузер не разрешил — установите SuperMind на экран «Домой» или создайте аккаунт');
+              toast(ok ? t('Браузер больше не будет очищать данные SuperMind') : t('Браузер не разрешил — установите SuperMind на экран «Домой» или создайте аккаунт'));
             }}
           />
         )}
       </ListSection>
 
       <ListSection
-        header="Автокопии на устройстве"
-        footer={`${newest ? `Последняя — ${when(newest.at)}. ` : ''}Делаются сами: каждые 3 часа, перед обновлением приложения, перед входом в аккаунт и перед восстановлением. Хранятся свежие, а за прошлые дни — первая и последняя копия каждого дня (2 недели).`}
+        header={t('Автокопии на устройстве')}
+        footer={(newest ? t('Последняя — {when}.', { when: when(newest.at) }) + ' ' : '') + t('Делаются сами: каждые 3 часа, перед обновлением приложения, перед входом в аккаунт и перед восстановлением. Хранятся свежие, а за прошлые дни — первая и последняя копия каждого дня (2 недели).')}
       >
         {shown.map((s) => (
           <ListRow
@@ -157,26 +158,26 @@ export function DataCard() {
               </>
             }
             subtitle={`${s.summary} · ${size(s.bytes)} · v${s.version}`}
-            trailing={restoreBtn(() => void restoreFrom(`Копия от ${when(s.at)}`, () => snapshotData(s.id)))}
+            trailing={restoreBtn(() => void restoreFrom(t('Копия от {when}', { when: when(s.at) }), () => snapshotData(s.id)))}
           />
         ))}
-        {local.length > 3 && <ListRow title={all ? 'Свернуть' : `Все копии (${local.length})`} tone="accent" onClick={() => setAll(!all)} />}
+        {local.length > 3 && <ListRow title={all ? t('Свернуть') : t('Все копии ({n})', { n: local.length })} tone="accent" onClick={() => setAll(!all)} />}
         <ListRow
           icon={<IconTile icon={ClockCounterClockwise} tone="teal" size="list" />}
-          title="Сделать копию сейчас"
+          title={t('Сделать копию сейчас')}
           tone="accent"
           disabled={busy}
-          onClick={() => void run(async () => void ((await takeSnapshot('manual')) ? toast('Копия сохранена на устройстве') : toast('Пока нечего копировать')))}
+          onClick={() => void run(async () => void ((await takeSnapshot('manual')) ? toast(t('Копия сохранена на устройстве')) : toast(t('Пока нечего копировать'))))}
         />
       </ListSection>
 
       {account && (
         <ListSection
-          header="Копии в облаке"
-          footer={`${cloud?.[0] ? `Последняя — ${when(cloud[0].at)}. ` : ''}Сервер сам сохраняет копию каждый час, когда вы что-то меняете: все за последние сутки, а за прошлые дни — первая и последняя копия каждого дня (30 дней) — даже если данные испортятся на всех устройствах.`}
+          header={t('Копии в облаке')}
+          footer={(cloud?.[0] ? t('Последняя — {when}.', { when: when(cloud[0].at) }) + ' ' : '') + t('Сервер сам сохраняет копию каждый час, когда вы что-то меняете: все за последние сутки, а за прошлые дни — первая и последняя копия каждого дня (30 дней) — даже если данные испортятся на всех устройствах.')}
         >
-          {cloudErr && <ListRow title="Не удалось загрузить" subtitle={cloudErr} />}
-          {cloud?.length === 0 && <ListRow title="Копий пока нет" subtitle="Первая копия появится при следующем изменении." />}
+          {cloudErr && <ListRow title={t('Не удалось загрузить')} subtitle={cloudErr} />}
+          {cloud?.length === 0 && <ListRow title={t('Копий пока нет')} subtitle={t('Первая копия появится при следующем изменении.')} />}
           {(cloud ?? []).slice(0, all ? 60 : 3).map((s) => (
             <ListRow
               key={s.id}
@@ -185,30 +186,30 @@ export function DataCard() {
                   {when(s.at)} <span className="dc-tag">{CLOUD_REASON[s.reason] ?? s.reason}</span>
                 </>
               }
-              subtitle={`записей: ${s.keys} · ${size(s.bytes)}`}
-              trailing={restoreBtn(() => void restoreFrom(`Облачная копия от ${when(s.at)}`, () => cloudSnapshotData(s.id)))}
+              subtitle={t('записей: {n} · {size}', { n: s.keys, size: size(s.bytes) })}
+              trailing={restoreBtn(() => void restoreFrom(t('Облачная копия от {when}', { when: when(s.at) }), () => cloudSnapshotData(s.id)))}
             />
           ))}
           <ListRow
             icon={<IconTile icon={Cloud} tone="blue" size="list" />}
-            title="Копия в облако"
+            title={t('Копия в облако')}
             tone="accent"
             disabled={busy}
             onClick={() =>
               void run(async () => {
                 await makeCloudSnapshot();
                 setCloud(await listCloudSnapshots());
-                toast('Копия сохранена в облаке');
+                toast(t('Копия сохранена в облаке'));
               })
             }
           />
         </ListSection>
       )}
 
-      <ListSection header="Файл" footer="Файл-копию можно хранить где угодно и восстановить на любом устройстве.">
-        <ListRow icon={<IconTile icon={DownloadSimple} tone="blue" size="list" />} title="Скачать копию" tone="accent" disabled={busy} onClick={() => void backupFile()} />
-        <ListRow icon={<IconTile icon={UploadSimple} tone="indigo" size="list" />} title="Восстановить из файла" tone="accent" disabled={busy} onClick={() => void restoreFile()} />
-        <ListRow icon={<IconTile icon={Trash} tone="red" size="list" />} title="Удалить всё" tone="danger" onClick={() => void wipe()} />
+      <ListSection header={t('Файл')} footer={t('Файл-копию можно хранить где угодно и восстановить на любом устройстве.')}>
+        <ListRow icon={<IconTile icon={DownloadSimple} tone="blue" size="list" />} title={t('Скачать копию')} tone="accent" disabled={busy} onClick={() => void backupFile()} />
+        <ListRow icon={<IconTile icon={UploadSimple} tone="indigo" size="list" />} title={t('Восстановить из файла')} tone="accent" disabled={busy} onClick={() => void restoreFile()} />
+        <ListRow icon={<IconTile icon={Trash} tone="red" size="list" />} title={t('Удалить всё')} tone="danger" onClick={() => void wipe()} />
       </ListSection>
     </>
   );

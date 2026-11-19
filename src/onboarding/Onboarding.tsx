@@ -31,19 +31,22 @@ import { notifyPermission, requestNotifyPermission, syncSoon, type NotifyPermiss
 import { onBack } from '../ui/dialogs';
 import { TAB_INFO, TAB_SLOTS, tabsFromInterests, type TabBlock } from '../store/phoneNav';
 import { IconTile } from '../ui/icons';
+import { t } from '../i18n/index';
 
 const STARTER_NAMES = ['Пить воду', 'Зарядка', 'Чтение', 'Медитация', 'План на день', 'Прогулка', 'Лечь спать до 23:00', 'Записать расходы'];
-const STARTERS: HabitPreset[] = STARTER_NAMES.map((n) => HABIT_LIBRARY.find((p) => p.name === n)).filter((p): p is HabitPreset => !!p);
+// библиотека привычек может быть переведена — ищем и по русскому названию, и по переводу
+const findPreset = (n: string) => HABIT_LIBRARY.find((p) => p.name === n || p.name === t(n));
+const STARTERS: HabitPreset[] = STARTER_NAMES.map(findPreset).filter((p): p is HabitPreset => !!p);
 
 const MODULES: { icon: typeof Network; label: string }[] = [
-  { icon: Network, label: 'Карты' },
-  { icon: CheckSquare, label: 'Задачи' },
-  { icon: CalendarDays, label: 'Календарь' },
-  { icon: Repeat, label: 'Привычки' },
-  { icon: Target, label: 'Цели' },
-  { icon: Wallet, label: 'Финансы' },
-  { icon: StickyNote, label: 'Заметки' },
-  { icon: Bot, label: 'ИИ-ассистент' },
+  { icon: Network, label: t('Карты') },
+  { icon: CheckSquare, label: t('Задачи') },
+  { icon: CalendarDays, label: t('Календарь') },
+  { icon: Repeat, label: t('Привычки') },
+  { icon: Target, label: t('Цели') },
+  { icon: Wallet, label: t('Финансы') },
+  { icon: StickyNote, label: t('Заметки') },
+  { icon: Bot, label: t('ИИ-ассистент') },
 ];
 
 const STEPS = 6;
@@ -68,7 +71,7 @@ async function addStarterHabits(picked: HabitPreset[]) {
 export default function Onboarding({ onDone }: { onDone: () => void }) {
   const [step, setStep] = useState(0);
   const [dx, setDx] = useState(0);
-  const [picked, setPicked] = useState<Set<string>>(() => new Set(['Пить воду', 'Чтение']));
+  const [picked, setPicked] = useState<Set<string>>(() => new Set(['Пить воду', 'Чтение'].map((n) => findPreset(n)?.name ?? n)));
   const [perm, setPerm] = useState<NotifyPermission | null>(null);
   const [wants, setWants] = useState<TabBlock[]>([]);
   const accent = useApp((s) => s.settings.accent) ?? DEFAULT_ACCENT;
@@ -156,8 +159,8 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
       return n;
     });
 
-  const want = (t: TabBlock) =>
-    setWants((w) => (w.includes(t) ? w.filter((x) => x !== t) : w.length >= PICK_MAX ? [...w.slice(1), t] : [...w, t]));
+  const want = (tab: TabBlock) =>
+    setWants((w) => (w.includes(tab) ? w.filter((x) => x !== tab) : w.length >= PICK_MAX ? [...w.slice(1), tab] : [...w, tab]));
 
   const enableNotify = async () => {
     setPerm(await requestNotifyPermission());
@@ -166,7 +169,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
   const last = step === STEPS - 1;
 
   return (
-    <div className="ob-root" role="dialog" aria-modal="true" aria-label="Знакомство с SuperMind">
+    <div className="ob-root" role="dialog" aria-modal="true" aria-label={t('Знакомство с SuperMind')}>
       <div className="ob-glow" aria-hidden="true" />
       <div className="ob-card">
         <header className="ob-top">
@@ -176,7 +179,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
           </div>
           {!last && (
             <button className="btn btn-ghost btn-sm ob-skip" onClick={() => void finish('home', true)}>
-              Пропустить
+              {t('Пропустить')}
             </button>
           )}
         </header>
@@ -197,8 +200,8 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
                   <img src="./icon.svg" alt="" width={64} height={64} />
                 </div>
               </div>
-              <h1 className="ob-title">Добро пожаловать в SuperMind</h1>
-              <p className="ob-text">Интеллект-карты, задачи и вся ваша жизнь — в одном бесплатном приложении. Без подписок.</p>
+              <h1 className="ob-title">{t('Добро пожаловать в SuperMind')}</h1>
+              <p className="ob-text">{t('Интеллект-карты, задачи и вся ваша жизнь — в одном бесплатном приложении. Без подписок.')}</p>
               <div className="ob-modules">
                 {MODULES.map((m, i) => (
                   <div key={m.label} className="ob-module" style={{ animationDelay: `${i * 45}ms` }}>
@@ -214,52 +217,52 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
               <div className="ob-art ob-flow" aria-hidden="true">
                 <div className="ob-flow-node">
                   <Network size={22} />
-                  <span>Идея</span>
+                  <span>{t('Идея')}</span>
                 </div>
                 <i className="ob-flow-line" />
                 <div className="ob-flow-node">
                   <CheckSquare size={22} />
-                  <span>Задача</span>
+                  <span>{t('Задача')}</span>
                 </div>
                 <i className="ob-flow-line" />
                 <div className="ob-flow-node">
                   <CalendarRange size={22} />
-                  <span>План</span>
+                  <span>{t('План')}</span>
                 </div>
               </div>
-              <h1 className="ob-title">Всё в одном месте</h1>
-              <p className="ob-text">Разделы связаны между собой — не нужно держать пять приложений.</p>
+              <h1 className="ob-title">{t('Всё в одном месте')}</h1>
+              <p className="ob-text">{t('Разделы связаны между собой — не нужно держать пять приложений.')}</p>
               <ul className="ob-list">
                 <li>
-                  <Network size={18} /> Задачи из карт попадают в общий список
+                  <Network size={18} /> {t('Задачи из карт попадают в общий список')}
                 </li>
                 <li>
-                  <CalendarRange size={18} /> Задачи, привычки и сроки целей — в одном календаре
+                  <CalendarRange size={18} /> {t('Задачи, привычки и сроки целей — в одном календаре')}
                 </li>
                 <li>
-                  <Wallet size={18} /> Финансы, цели и заметки всегда под рукой
+                  <Wallet size={18} /> {t('Финансы, цели и заметки всегда под рукой')}
                 </li>
                 <li>
-                  <Bot size={18} /> ИИ-ассистент видит всё и подсказывает следующий шаг
+                  <Bot size={18} /> {t('ИИ-ассистент видит всё и подсказывает следующий шаг')}
                 </li>
               </ul>
             </section>
 
             {/* 3. Что важно — разделы нижней панели */}
             <section className="ob-slide" aria-hidden={step !== 2} inert={step !== 2}>
-              <h1 className="ob-title">Что для вас важнее всего?</h1>
-              <p className="ob-text">Выберите до {PICK_MAX} разделов — они встанут в нижнюю панель рядом с «Сегодня». Поменять можно в любой момент в «Ещё».</p>
+              <h1 className="ob-title">{t('Что для вас важнее всего?')}</h1>
+              <p className="ob-text">{t('Выберите до {n} разделов — они встанут в нижнюю панель рядом с «Сегодня». Поменять можно в любой момент в «Ещё».', { n: PICK_MAX })}</p>
               <div className="ob-habits">
-                {INTERESTS.map((t) => {
-                  const n = wants.indexOf(t);
+                {INTERESTS.map((tab) => {
+                  const n = wants.indexOf(tab);
                   return (
-                    <button key={t} className={`ob-habit${n >= 0 ? ' active' : ''}`} aria-pressed={n >= 0} onClick={() => want(t)}>
+                    <button key={tab} className={`ob-habit${n >= 0 ? ' active' : ''}`} aria-pressed={n >= 0} onClick={() => want(tab)}>
                       <span className="ob-habit-ico">
-                        <IconTile section={t} size="list" />
+                        <IconTile section={tab} size="list" />
                       </span>
                       <span className="ob-habit-txt">
-                        <b>{TAB_INFO[t].title}</b>
-                        <small>{TAB_INFO[t].hint}</small>
+                        <b>{TAB_INFO[tab].title}</b>
+                        <small>{TAB_INFO[tab].hint}</small>
                       </span>
                       <span className="ob-habit-check">{n >= 0 && <Check size={14} />}</span>
                     </button>
@@ -270,9 +273,9 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
 
             {/* 4. Под себя: цвет и привычки */}
             <section className="ob-slide" aria-hidden={step !== 3} inert={step !== 3}>
-              <h1 className="ob-title">Сделайте своим</h1>
-              <p className="ob-text">Цвет оформления</p>
-              <div className="ob-accents" role="radiogroup" aria-label="Цвет оформления">
+              <h1 className="ob-title">{t('Сделайте своим')}</h1>
+              <p className="ob-text">{t('Цвет оформления')}</p>
+              <div className="ob-accents" role="radiogroup" aria-label={t('Цвет оформления')}>
                 {ACCENTS.map((a) => (
                   <button
                     key={a.id}
@@ -288,7 +291,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
                   </button>
                 ))}
               </div>
-              <p className="ob-text">С каких привычек начнём?</p>
+              <p className="ob-text">{t('С каких привычек начнём?')}</p>
               <div className="ob-habits">
                 {STARTERS.map((p) => {
                   const on = picked.has(p.name);
@@ -304,7 +307,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
                   );
                 })}
               </div>
-              <p className="ob-hint">Ещё больше — в библиотеке раздела «Привычки».</p>
+              <p className="ob-hint">{t('Ещё больше — в библиотеке раздела «Привычки».')}</p>
             </section>
 
             {/* 5. Напоминания и брифинг */}
@@ -315,8 +318,8 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
                     <Sunrise size={18} />
                   </span>
                   <span>
-                    <b>Доброе утро! План на сегодня</b>
-                    <small>3 задачи · 4 привычки · платёж завтра</small>
+                    <b>{t('Доброе утро! План на сегодня')}</b>
+                    <small>{t('3 задачи · 4 привычки · платёж завтра')}</small>
                   </span>
                 </div>
                 <div className="ob-notif">
@@ -324,25 +327,25 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
                     <Bell size={18} />
                   </span>
                   <span>
-                    <b>Чтение · 21:00</b>
-                    <small>20 минут книги вместо ленты</small>
+                    <b>{t('Чтение · 21:00')}</b>
+                    <small>{t('20 минут книги вместо ленты')}</small>
                   </span>
                 </div>
               </div>
-              <h1 className="ob-title">Напоминания и брифинг</h1>
-              <p className="ob-text">Напоминания о задачах, привычках и платежах приходят вовремя, а каждое утро — короткий план на день.</p>
+              <h1 className="ob-title">{t('Напоминания и брифинг')}</h1>
+              <p className="ob-text">{t('Напоминания о задачах, привычках и платежах приходят вовремя, а каждое утро — короткий план на день.')}</p>
               <div className="ob-action">
                 {perm === 'granted' ? (
                   <div className="ob-ok">
-                    <Check size={18} /> Уведомления включены
+                    <Check size={18} /> {t('Уведомления включены')}
                   </div>
                 ) : perm === 'unsupported' ? (
-                  <p className="ob-hint">Этот браузер не показывает уведомления — напоминания будут видны в приложении. На телефоне установите SuperMind на главный экран.</p>
+                  <p className="ob-hint">{t('Этот браузер не показывает уведомления — напоминания будут видны в приложении. На телефоне установите SuperMind на главный экран.')}</p>
                 ) : perm === 'denied' ? (
-                  <p className="ob-hint">Уведомления запрещены — включите их в настройках телефона или браузера.</p>
+                  <p className="ob-hint">{t('Уведомления запрещены — включите их в настройках телефона или браузера.')}</p>
                 ) : (
                   <button className="ob-cta" onClick={() => void enableNotify()}>
-                    <BellRing size={18} /> Включить уведомления
+                    <BellRing size={18} /> {t('Включить уведомления')}
                   </button>
                 )}
               </div>
@@ -362,26 +365,29 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
                   <Laptop size={26} />
                 </div>
               </div>
-              <h1 className="ob-title">Данные в безопасности</h1>
+              <h1 className="ob-title">{t('Данные в безопасности')}</h1>
               <p className="ob-text">
-                {account
-                  ? 'Вы вошли в аккаунт: всё сохраняется в облаке и одинаково на всех устройствах. Без интернета приложение тоже работает.'
-                  : 'Всё хранится на этом устройстве и работает без интернета. Войдёте в аккаунт в настройках — данные появятся и на других устройствах.'}
+                {/* одна t() на обе строки: тест release152 проверяет текст ветвей; обе есть в словаре */}
+                {t(
+                  account
+                    ? 'Вы вошли в аккаунт: всё сохраняется в облаке и одинаково на всех устройствах. Без интернета приложение тоже работает.'
+                    : 'Всё хранится на этом устройстве и работает без интернета. Войдёте в аккаунт в настройках — данные появятся и на других устройствах.',
+                )}
               </p>
               <ul className="ob-list">
                 <li>
-                  <HardDrive size={18} /> Автокопии на устройстве — каждые 3 часа
+                  <HardDrive size={18} /> {t('Автокопии на устройстве — каждые 3 часа')}
                 </li>
                 <li>
-                  <Cloud size={18} /> {account ? 'Синхронизация телефона и компьютера' : 'Синхронизация телефона и компьютера — после входа'}
+                  <Cloud size={18} /> {account ? t('Синхронизация телефона и компьютера') : t('Синхронизация телефона и компьютера — после входа')}
                 </li>
                 <li>
-                  <ShieldCheck size={18} /> {account ? 'Облачные копии каждый час, восстановление в один клик' : 'Облачные копии и восстановление в один клик — после входа'}
+                  <ShieldCheck size={18} /> {account ? t('Облачные копии каждый час, восстановление в один клик') : t('Облачные копии и восстановление в один клик — после входа')}
                 </li>
               </ul>
               <div className="ob-action">
                 <button className="ob-cta" onClick={() => void finish('home')}>
-                  <Check size={18} /> Начать
+                  <Check size={18} /> {t('Начать')}
                 </button>
               </div>
             </section>
@@ -389,21 +395,21 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
         </div>
 
         <footer className="ob-bottom">
-          <button className="btn btn-ghost ob-back" onClick={() => go(step - 1)} disabled={step === 0} aria-label="Назад">
+          <button className="btn btn-ghost ob-back" onClick={() => go(step - 1)} disabled={step === 0} aria-label={t('Назад')}>
             <ArrowLeft size={18} />
           </button>
-          <div className="ob-dots" role="tablist" aria-label="Шаги">
+          <div className="ob-dots" role="tablist" aria-label={t('Шаги')}>
             {Array.from({ length: STEPS }, (_, i) => (
-              <button key={i} role="tab" aria-selected={i === step} aria-label={`Шаг ${i + 1}`} className={`ob-dot${i === step ? ' active' : ''}`} onClick={() => go(i)} />
+              <button key={i} role="tab" aria-selected={i === step} aria-label={t('Шаг {n}', { n: i + 1 })} className={`ob-dot${i === step ? ' active' : ''}`} onClick={() => go(i)} />
             ))}
           </div>
           {last ? (
             <button className="btn btn-primary ob-next" onClick={() => void finish('home')}>
-              Начать
+              {t('Начать')}
             </button>
           ) : (
             <button className="btn btn-primary ob-next" onClick={() => go(step + 1)}>
-              Далее <ArrowRight size={18} />
+              {t('Далее')} <ArrowRight size={18} />
             </button>
           )}
         </footer>
