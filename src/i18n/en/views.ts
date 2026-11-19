@@ -853,5 +853,14 @@ const d: Record<string, string> = {
   'Задача на сегодня': 'Task for today',
   'Уровень {level} · {title}': 'Level {level} · {title}',
   ' · серия {n} {days}': ' · streak: {n} {days}',
+  // Иконка приложения (Настройки → Оформление)
+  'Синяя': 'Blue',
+  'Зелёная': 'Green',
+  'Закат': 'Sunset',
+  'Фиолетовая': 'Purple',
+  'Иконка сменится через несколько секунд': 'The icon will change in a few seconds',
+  'Не удалось сменить иконку': "Couldn't change the icon",
+  'Иконка приложения': 'App icon',
+  'Как SuperMind выглядит на экране «Домой»': 'How SuperMind looks on your Home Screen',
 };
 export default d;

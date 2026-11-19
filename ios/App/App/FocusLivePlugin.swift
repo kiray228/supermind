@@ -19,10 +19,6 @@ public class FocusLivePlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func update(_ call: CAPPluginCall) {
-        guard ActivityAuthorizationInfo().areActivitiesEnabled else {
-            call.resolve()
-            return
-        }
         let state = FocusAttributes.ContentState(
             running: call.getBool("running") ?? false,
             stopwatch: call.getBool("stopwatch") ?? false,
@@ -37,6 +33,12 @@ public class FocusLivePlugin: CAPPlugin, CAPBridgedPlugin {
             doneTitle: call.getString("doneTitle") ?? "",
             doneBody: call.getString("doneBody") ?? ""
         )
+        // виджет «Фокус» на экране «Домой» — и без Live Activity
+        FocusWidgetState.save(state)
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else {
+            call.resolve()
+            return
+        }
         let attrs = FocusAttributes(
             pauseLabel: call.getString("pauseLabel") ?? "Pause",
             resumeLabel: call.getString("resumeLabel") ?? "Resume",
@@ -55,6 +57,7 @@ public class FocusLivePlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func end(_ call: CAPPluginCall) {
+        FocusWidgetState.clear()
         Task {
             for a in Activity<FocusAttributes>.activities {
                 await a.end(nil, dismissalPolicy: .immediate)

@@ -91,6 +91,7 @@ struct FocusControlIntent: LiveActivityIntent {
     func perform() async throws -> some IntentResult {
         let now = Date()
         FocusQueue.push(action, at: now)
+        FocusWidgetState.apply(action, at: now)
         for activity in Activity<FocusAttributes>.activities {
             if action == "stop" {
                 await activity.end(nil, dismissalPolicy: .immediate)

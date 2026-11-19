@@ -1,0 +1,14 @@
+/* Выбор иконки приложения (Настройки → Оформление) */
+.ai-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 8px 4px; padding: 4px 0; }
+.ai-item {
+  display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 6px 2px; border: none; background: none;
+  border-radius: 14px; font-size: 12px; font-weight: 500; color: var(--text-2);
+}
+.ai-item img {
+  width: 56px; height: 56px; border-radius: 13px; box-shadow: 0 2px 8px rgba(0, 0, 0, .18);
+  transition: transform .2s cubic-bezier(.3, 1.6, .5, 1);
+}
+.ai-item:active img { transform: scale(.9); }
+.ai-item.active { color: var(--text); font-weight: 600; }
+.ai-item.active img { box-shadow: 0 0 0 2.5px var(--surface), 0 0 0 4.5px var(--accent); }
+.ai-item:disabled { opacity: .6; }

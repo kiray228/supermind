@@ -8,5 +8,6 @@ class MainViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(WidgetBridgePlugin())
         bridge?.registerPluginInstance(FocusLivePlugin())
         bridge?.registerPluginInstance(TextScanPlugin())
+        bridge?.registerPluginInstance(AppIconPlugin())
     }
 }

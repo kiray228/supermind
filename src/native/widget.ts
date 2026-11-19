@@ -12,6 +12,7 @@ import { isNative } from '../platform';
 import { get, onDirty } from '../store/kv';
 import type { View } from '../store/appStore';
 import type { PlannerData } from '../types';
+import type { FinanceData } from '../finance/model';
 import { addDaysYmd, todayYmd } from '../utils/mapTasks';
 import { completeOccurrence, ensureTasks, flushTasks, openQuickAdd, openTask, useTasks } from '../tasks/store';
 import { isActive } from '../tasks/model';
@@ -40,7 +41,9 @@ export type PendingAction =
   /** ярлык «Новая карта» */
   | { type: 'new_map' }
   /** кнопка таймера фокуса на экране блокировки: at — когда нажали */
-  | { type: 'focus'; action: string; at?: number };
+  | { type: 'focus'; action: string; at?: number }
+  /** виджет «Финансы»: окно новой траты */
+  | { type: 'add_expense' };
 
 interface WidgetBridgePlugin {
   update(o: { json: string }): Promise<void>;
@@ -113,8 +116,27 @@ async function buildPayload(): Promise<string> {
     buildHabits(today).catch(() => ({ list: [], days: {} })),
     buildMaps().catch(() => []),
   ]);
+  const [fin, focus] = await Promise.all([financePayload(today).catch(() => null), focusPayload().catch(() => null)]);
   // lang — язык подписей виджетов, как в приложении
-  return JSON.stringify({ v: 2, at: Date.now(), lang, tasks, habits, agenda, hab, maps });
+  return JSON.stringify({ v: 2, at: Date.now(), lang, tasks, habits, agenda, hab, maps, ...(fin ? { fin } : {}), ...(focus ? { focus } : {}) });
+}
+
+/** Виджет «Финансы»: траты сегодня и за месяц, бюджет */
+async function financePayload(today: string) {
+  const [{ useFinance }, { normalizeFinance }, { financeWidget }] = await Promise.all([import('../finance/store'), import('../finance/model'), import('./widgetCore')]);
+  let d = useFinance.getState().data;
+  if (!d) {
+    // раздел ещё не открывали — прочитать сохранённое, не создавая данных по умолчанию
+    const raw = await get<FinanceData>('finance').catch(() => undefined);
+    d = raw ? normalizeFinance(raw) : null;
+  }
+  return financeWidget(d, today);
+}
+
+/** Виджет «Фокус» в покое: помодоро на N минут или секундомер (идущий таймер виджет берёт из экрана блокировки) */
+async function focusPayload() {
+  const [{ useFocus, pomoPrefs }, { focusIdle }] = await Promise.all([import('../tasks/focusTimer'), import('./widgetCore')]);
+  return focusIdle(useFocus.getState().mode, pomoPrefs().work);
 }
 
 let lastSent = '';
@@ -234,6 +256,13 @@ async function applyPending() {
         case 'focus': {
           const { applyFocusAction } = await import('./focusLive');
           await applyFocusAction(a.action, a.at);
+          // «Начать» с виджета открывает приложение — показать таймер
+          if (a.action === 'start') await goView('focus');
+          break;
+        }
+        case 'add_expense': {
+          const { createThing } = await import('../ui/createActions');
+          setTimeout(() => void createThing('expense'), 150);
           break;
         }
         case 'new_map': {
@@ -308,6 +337,9 @@ export function initWidget() {
   });
   window.addEventListener('sm-planner-changed', () => pushSoon());
   subscribeGoals(() => pushSoon());
+  // виджеты «Финансы» и «Фокус»: траты и режим таймера
+  void import('../finance/store').then(({ useFinance }) => useFinance.subscribe((s, p) => s.data !== p.data && pushSoon()));
+  void import('../tasks/focusTimer').then(({ useFocus }) => useFocus.subscribe((s, p) => s.mode !== p.mode && pushSoon()));
   onDirty(() => pushSoon(1500));
   // таймер фокуса — на экран блокировки
   void import('./focusLive').then((m) => m.initFocusLive());

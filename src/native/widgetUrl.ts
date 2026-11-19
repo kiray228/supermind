@@ -21,6 +21,13 @@ export function actionFromUrl(raw: string): PendingAction | null {
     case 'new_map':
     case 'search':
       return { type };
+    case 'add_expense':
+      return { type };
+    // виджет «Фокус» на iPhone: supermind://focus?action=start
+    case 'focus': {
+      const action = q.get('action') ?? '';
+      return ['start', 'pause', 'resume', 'stop'].includes(action) ? { type, action } : null;
+    }
     case 'open_view':
       return q.get('view') ? { type, view: q.get('view')! } : null;
     default:
