@@ -1,3 +1,4 @@
+import { LOCALE, t } from '../i18n/index';
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { ArrowDown, ArrowUp, Brain, Check, ChevronDown, Compass, Copy, CopyCheck, Download, Equal, GraduationCap, Newspaper, NotebookPen, FolderInput, FolderPlus, LayoutGrid, LayoutTemplate, MoreHorizontal, Pencil, Pin, PinOff, Plus, RotateCcw, Search, StickyNote, Trash2, Upload, Waypoints, X } from 'lucide-react';
 import type { ID } from '../types';
@@ -50,9 +51,9 @@ type MenuState = { kind: 'note' | 'move'; id: ID; anchor: MenuAnchor } | { kind:
 const TRASH_DAYS = 30;
 const NO_IDS = new Set<ID>();
 const SORTS: [NotesSort, string][] = [
-  ['updated', 'По изменению'],
-  ['created', 'По созданию'],
-  ['title', 'По названию'],
+  ['updated', t('По изменению')],
+  ['created', t('По созданию')],
+  ['title', t('По названию')],
 ];
 
 function readLS<T>(key: string, def: T): T {
@@ -73,7 +74,7 @@ function writeLS(key: string, v: unknown) {
 
 function sortNotes(list: NoteMeta[], by: NotesSort): NoteMeta[] {
   const s = [...list];
-  if (by === 'title') s.sort((a, b) => (a.title || '￿').localeCompare(b.title || '￿', 'ru'));
+  if (by === 'title') s.sort((a, b) => (a.title || '￿').localeCompare(b.title || '￿', LOCALE));
   else if (by === 'created') s.sort((a, b) => b.createdAt - a.createdAt);
   else s.sort((a, b) => b.updatedAt - a.updatedAt);
   return s;
@@ -105,9 +106,9 @@ function HubNudge({ count, onOpen }: { count: number; onOpen: () => void }) {
   return (
     <div className="nt-rv-nudge">
       <Brain size={18} />
-      <span className="grow">Второй мозг: связи, конспекты, карточки, дневник — что он умеет, за минуту</span>
+      <span className="grow">{t('Второй мозг: связи, конспекты, карточки, дневник — что он умеет, за минуту')}</span>
       <button className="nt-ai-btn" onClick={onOpen}>
-        Посмотреть
+        {t('Посмотреть')}
       </button>
       <button
         className="icon-btn"
@@ -115,7 +116,7 @@ function HubNudge({ count, onOpen }: { count: number; onOpen: () => void }) {
           markHubSeen();
           setHidden(true);
         }}
-        aria-label="Скрыть"
+        aria-label={t('Скрыть')}
       >
         <X size={16} />
       </button>
@@ -127,7 +128,7 @@ function HubNudge({ count, onOpen }: { count: number; onOpen: () => void }) {
 const openDaily = () =>
   import('../notes/daily')
     .then((m) => m.openDailyNote())
-    .catch(() => toast('Не удалось открыть заметку дня'));
+    .catch(() => toast(t('Не удалось открыть заметку дня')));
 
 /** Карточки на сегодня — повторить */
 function CardsNudge() {
@@ -138,9 +139,9 @@ function CardsNudge() {
   return (
     <div className="nt-rv-nudge">
       <GraduationCap size={18} />
-      <span className="grow">Карточек на сегодня: {n}</span>
+      <span className="grow">{t('Карточек на сегодня: {n}', { n })}</span>
       <button className="nt-ai-btn" onClick={openCardsReview}>
-        Повторить
+        {t('Повторить')}
       </button>
     </div>
   );
@@ -167,7 +168,7 @@ function ReviewNudge({ onOpen }: { onOpen: () => void }) {
   return (
     <div className="nt-rv-nudge">
       <Compass size={18} />
-      <span className="grow">Обзор мозга за неделю: забытые и несвязанные заметки, дубли — поводов заглянуть: {n}</span>
+      <span className="grow">{t('Обзор мозга за неделю: забытые и несвязанные заметки, дубли — поводов заглянуть: {n}', { n })}</span>
       <button
         className="nt-ai-btn"
         onClick={() => {
@@ -175,7 +176,7 @@ function ReviewNudge({ onOpen }: { onOpen: () => void }) {
           onOpen();
         }}
       >
-        Открыть
+        {t('Открыть')}
       </button>
       <button
         className="icon-btn"
@@ -183,7 +184,7 @@ function ReviewNudge({ onOpen }: { onOpen: () => void }) {
           markReviewSeen();
           setN(0);
         }}
-        aria-label="Скрыть до следующей недели"
+        aria-label={t('Скрыть до следующей недели')}
       >
         <X size={16} />
       </button>
@@ -314,7 +315,7 @@ export default function Notes() {
       <div className="page">
         <div className="page-header">
           <IconTile section="notes" size="sm" className="ph-tile" />
-          <h1>Заметки</h1>
+          <h1>{t('Заметки')}</h1>
         </div>
         <div className="loading">
           <div className="spinner" />
@@ -327,7 +328,7 @@ export default function Notes() {
   const curFolder = sel.k === 'folder' ? data.folders.find((f) => f.id === sel.id) : undefined;
   const isTrash = sel.k === 'trash' && !q;
   const graphMode = mode === 'graph' && sel.k !== 'trash';
-  const title = q ? 'Поиск' : sel.k === 'pinned' ? 'Закреплённые' : sel.k === 'trash' ? 'Корзина' : curFolder ? (curFolder.emoji ? curFolder.emoji + ' ' : '') + curFolder.name : 'Заметки';
+  const title = q ? t('Поиск') : sel.k === 'pinned' ? t('Закреплённые') : sel.k === 'trash' ? t('Корзина') : curFolder ? (curFolder.emoji ? curFolder.emoji + ' ' : '') + curFolder.name : t('Заметки');
 
   const tplFolders = templateFolderIds(data);
   const inSel = (n: NoteMeta) => {
@@ -377,15 +378,15 @@ export default function Notes() {
 
   const nav = (
     <div className="nt-nav-inner">
-      {navItem('all', { k: 'all' }, <StickyNote size={18} />, 'Все заметки', counts.all, 'var(--accent)')}
-      {navItem('pinned', { k: 'pinned' }, <Pin size={18} />, 'Закреплённые', counts.pinned, '#f59e0b')}
+      {navItem('all', { k: 'all' }, <StickyNote size={18} />, t('Все заметки'), counts.all, 'var(--accent)')}
+      {navItem('pinned', { k: 'pinned' }, <Pin size={18} />, t('Закреплённые'), counts.pinned, '#f59e0b')}
       <div className="nt-nav-sec">
-        <span>Папки</span>
-        <button className="icon-btn" onClick={() => setFolderDlg({})} aria-label="Новая папка">
+        <span>{t('Папки')}</span>
+        <button className="icon-btn" onClick={() => setFolderDlg({})} aria-label={t('Новая папка')}>
           <Plus />
         </button>
       </div>
-      {folders.length === 0 && <div className="nt-nav-hint tiny faint">Раскладывайте заметки по папкам: идеи, учёба, работа…</div>}
+      {folders.length === 0 && <div className="nt-nav-hint tiny faint">{t('Раскладывайте заметки по папкам: идеи, учёба, работа…')}</div>}
       {folders.map((f) =>
         navItem(
           'f:' + f.id,
@@ -394,13 +395,13 @@ export default function Notes() {
           f.name,
           counts['f:' + f.id] ?? 0,
           f.color,
-          <button className="nt-nav-more" onClick={(e) => setMenu({ kind: 'folder', id: f.id, anchor: e.currentTarget })} aria-label="Действия с папкой">
+          <button className="nt-nav-more" onClick={(e) => setMenu({ kind: 'folder', id: f.id, anchor: e.currentTarget })} aria-label={t('Действия с папкой')}>
             <MoreHorizontal size={16} />
           </button>,
         ),
       )}
       <div className="nt-nav-sep" />
-      {navItem('trash', { k: 'trash' }, <Trash2 size={18} />, 'Корзина', counts.trash, '#94a3b8')}
+      {navItem('trash', { k: 'trash' }, <Trash2 size={18} />, t('Корзина'), counts.trash, '#94a3b8')}
     </div>
   );
 
@@ -425,10 +426,10 @@ export default function Notes() {
         <button className="nt-title-btn" onClick={() => setDrawer(true)}>
           <h1 className="ellipsis">
             {/* на телефоне вкладка «Мозг»: все заметки — это «Второй мозг» */}
-            {title === 'Заметки' ? (
+            {title === t('Заметки') && !curFolder ? (
               <>
-                <span className="nt-desk-only">Заметки</span>
-                <span className="nt-phone-only">Второй мозг</span>
+                <span className="nt-desk-only">{t('Заметки')}</span>
+                <span className="nt-phone-only">{t('Второй мозг')}</span>
               </>
             ) : (
               title
@@ -437,31 +438,31 @@ export default function Notes() {
           <ChevronDown size={18} className="nt-mobile-only" />
         </button>
         <div className="grow" />
-        <button className="icon-btn nt-desk-only" onClick={() => void openDaily()} aria-label="Заметка дня" title="Заметка дня">
+        <button className="icon-btn nt-desk-only" onClick={() => void openDaily()} aria-label={t('Заметка дня')} title={t('Заметка дня')}>
           <NotebookPen />
         </button>
-        <button className="icon-btn nt-desk-only" onClick={() => openAsk()} aria-label="Спросить у мозга" title="Спросить у мозга">
+        <button className="icon-btn nt-desk-only" onClick={() => openAsk()} aria-label={t('Спросить у мозга')} title={t('Спросить у мозга')}>
           <Brain />
         </button>
         {sel.k !== 'trash' && (
-          <button className={`icon-btn${mode === 'graph' ? ' active' : ' nt-desk-only'}`} onClick={() => setMode(mode === 'graph' ? 'list' : 'graph')} aria-label={mode === 'graph' ? 'Показать списком' : 'Граф заметок'} title={mode === 'graph' ? 'Списком' : 'Граф связей'}>
+          <button className={`icon-btn${mode === 'graph' ? ' active' : ' nt-desk-only'}`} onClick={() => setMode(mode === 'graph' ? 'list' : 'graph')} aria-label={mode === 'graph' ? t('Показать списком') : t('Граф заметок')} title={mode === 'graph' ? t('Списком') : t('Граф связей')}>
             {mode === 'graph' ? <LayoutGrid /> : <Waypoints />}
           </button>
         )}
         {query !== null ? (
           <div className="nt-search">
             <Search size={16} />
-            <input autoFocus value={query} placeholder="Поиск по заметкам" onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Escape' && setQuery(null)} />
-            <button className="icon-btn" onClick={() => setQuery(null)} aria-label="Закрыть поиск">
+            <input autoFocus value={query} placeholder={t('Поиск по заметкам')} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Escape' && setQuery(null)} />
+            <button className="icon-btn" onClick={() => setQuery(null)} aria-label={t('Закрыть поиск')}>
               <X />
             </button>
           </div>
         ) : (
-          <button className="icon-btn" onClick={() => setQuery('')} aria-label="Поиск">
+          <button className="icon-btn" onClick={() => setQuery('')} aria-label={t('Поиск')}>
             <Search />
           </button>
         )}
-        <button className="icon-btn" onClick={(e) => setMenu({ kind: 'page', anchor: e.currentTarget })} aria-label="Ещё">
+        <button className="icon-btn" onClick={(e) => setMenu({ kind: 'page', anchor: e.currentTarget })} aria-label={t('Ещё')}>
           <MoreHorizontal />
         </button>
       </div>
@@ -494,22 +495,22 @@ export default function Notes() {
                 <ReviewNudge onOpen={() => setReviewSheet(true)} />
               </div>
             )}
-            {isTrash && list.length > 0 && <div className="nt-trash-hint small faint">Заметки в корзине удаляются навсегда через {TRASH_DAYS} дней.</div>}
+            {isTrash && list.length > 0 && <div className="nt-trash-hint small faint">{t('Заметки в корзине удаляются навсегда через {n} дней.', { n: TRASH_DAYS })}</div>}
             {list.length === 0 ? (
               <div className="empty">
                 {isTrash ? <Trash2 size={40} /> : q ? <Search size={40} /> : <IconTile section="notes" size="lg" />}
-                <div>{isTrash ? 'Корзина пуста' : q ? (found ? 'Ничего не найдено' : 'Ищу…') : sel.k === 'pinned' ? 'Закрепите важные заметки — они будут здесь' : 'Здесь пока нет заметок. Нажмите «+», чтобы создать первую'}</div>
+                <div>{isTrash ? t('Корзина пуста') : q ? (found ? t('Ничего не найдено') : t('Ищу…')) : sel.k === 'pinned' ? t('Закрепите важные заметки — они будут здесь') : t('Здесь пока нет заметок. Нажмите «+», чтобы создать первую')}</div>
                 {!isTrash && !q && (
                   <button className="btn btn-primary" onClick={create}>
-                    <Plus size={16} /> Новая заметка
+                    <Plus size={16} /> {t('Новая заметка')}
                   </button>
                 )}
               </div>
             ) : pinned.length ? (
               <>
-                <div className="nt-sec-title">Закреплённые</div>
+                <div className="nt-sec-title">{t('Закреплённые')}</div>
                 {cards(pinned, 'pinned')}
-                {rest.length > 0 && <div className="nt-sec-title">Заметки</div>}
+                {rest.length > 0 && <div className="nt-sec-title">{t('Заметки')}</div>}
                 {cards(rest, 'rest')}
               </>
             ) : (
@@ -521,12 +522,12 @@ export default function Notes() {
       </div>
 
       {!openId && !(graphMode && graphSel) && (
-        <button className="nt-fab" onClick={create} aria-label="Новая заметка">
+        <button className="nt-fab" onClick={create} aria-label={t('Новая заметка')}>
           <Plus size={26} />
         </button>
       )}
       {!openId && !(graphMode && graphSel) && !isTrash && hasTemplates && (
-        <button className="nt-fab nt-fab-mini nt-desk-only" onClick={fromTemplate} aria-label="Новая заметка по шаблону" title="Новая заметка по шаблону">
+        <button className="nt-fab nt-fab-mini nt-desk-only" onClick={fromTemplate} aria-label={t('Новая заметка по шаблону')} title={t('Новая заметка по шаблону')}>
           <LayoutTemplate size={20} />
         </button>
       )}
@@ -577,43 +578,43 @@ export default function Notes() {
 
       {menu?.kind === 'page' && (
         <NtMenu anchor={menu.anchor} onClose={() => setMenu(null)}>
-          <MenuLabel>Сортировка</MenuLabel>
+          <MenuLabel>{t('Сортировка')}</MenuLabel>
           {SORTS.map(([k, l]) => (
             <MenuItem key={k} icon={sort === k ? <Check size={17} /> : null} label={l} active={sort === k} onClick={() => setSort(k)} />
           ))}
           <MenuSep />
-          <MenuItem icon={<FolderPlus size={17} />} label="Новая папка" onClick={() => setFolderDlg({})} />
-          <MenuItem icon={<LayoutTemplate size={17} />} label="Шаблоны заметок" onClick={fromTemplate} />
-          <MenuItem icon={<Brain size={17} />} label="Второй мозг: что умеет" onClick={() => setHub(true)} />
-          <MenuItem icon={<Newspaper size={17} />} label="Статья по ссылке" onClick={() => void import('../notes/article').then((m) => m.askArticle())} />
-          <MenuItem icon={<Compass size={17} />} label="Обзор мозга" onClick={() => setReviewSheet(true)} />
-          <MenuItem icon={<GraduationCap size={17} />} label="Повторение карточек" onClick={openCardsReview} />
-          <MenuItem icon={<CopyCheck size={17} />} label="Найти дубли" onClick={() => setDupSheet(true)} />
-          <MenuItem icon={<Equal size={17} />} label="Синонимы" onClick={() => setSynSheet(true)} />
+          <MenuItem icon={<FolderPlus size={17} />} label={t('Новая папка')} onClick={() => setFolderDlg({})} />
+          <MenuItem icon={<LayoutTemplate size={17} />} label={t('Шаблоны заметок')} onClick={fromTemplate} />
+          <MenuItem icon={<Brain size={17} />} label={t('Второй мозг: что умеет')} onClick={() => setHub(true)} />
+          <MenuItem icon={<Newspaper size={17} />} label={t('Статья по ссылке')} onClick={() => void import('../notes/article').then((m) => m.askArticle())} />
+          <MenuItem icon={<Compass size={17} />} label={t('Обзор мозга')} onClick={() => setReviewSheet(true)} />
+          <MenuItem icon={<GraduationCap size={17} />} label={t('Повторение карточек')} onClick={openCardsReview} />
+          <MenuItem icon={<CopyCheck size={17} />} label={t('Найти дубли')} onClick={() => setDupSheet(true)} />
+          <MenuItem icon={<Equal size={17} />} label={t('Синонимы')} onClick={() => setSynSheet(true)} />
           <MenuItem
             icon={<Download size={17} />}
-            label="Экспорт для Obsidian"
+            label={t('Экспорт для Obsidian')}
             onClick={() => {
-              toast('Готовлю архив заметок…');
+              toast(t('Готовлю архив заметок…'));
               void import('../notes/obsidianExport')
                 .then((m) => m.exportObsidianVault())
-                .then((n) => toast(`Сохранено заметок: ${n}. Распакуйте архив и откройте папку в Obsidian как хранилище`))
-                .catch(() => toast('Не удалось сохранить архив'));
+                .then((n) => toast(t('Сохранено заметок: {n}. Распакуйте архив и откройте папку в Obsidian как хранилище', { n })))
+                .catch(() => toast(t('Не удалось сохранить архив')));
             }}
           />
           <MenuItem
             icon={<Upload size={17} />}
-            label="Импорт из Obsidian"
+            label={t('Импорт из Obsidian')}
             onClick={() => void importObsidianFiles()}
           />
-          {curFolder && <MenuItem icon={<Pencil size={17} />} label="Изменить папку" onClick={() => setFolderDlg({ id: curFolder.id })} />}
+          {curFolder && <MenuItem icon={<Pencil size={17} />} label={t('Изменить папку')} onClick={() => setFolderDlg({ id: curFolder.id })} />}
           {sel.k === 'trash' && counts.trash > 0 && (
             <MenuItem
               icon={<Trash2 size={17} />}
-              label="Очистить корзину"
+              label={t('Очистить корзину')}
               danger
               onClick={async () => {
-                if (await confirmDialog('Очистить корзину?', 'Заметки будут удалены навсегда.', { danger: true, okText: 'Очистить' })) emptyNotesTrash();
+                if (await confirmDialog(t('Очистить корзину?'), t('Заметки будут удалены навсегда.'), { danger: true, okText: t('Очистить') })) emptyNotesTrash();
               }}
             />
           )}
@@ -622,9 +623,9 @@ export default function Notes() {
 
       {menu?.kind === 'folder' && menuFolder && (
         <NtMenu anchor={menu.anchor} onClose={() => setMenu(null)}>
-          <MenuItem icon={<Pencil size={17} />} label="Изменить" onClick={() => setFolderDlg({ id: menuFolder.id })} />
-          {folders[0]?.id !== menuFolder.id && <MenuItem icon={<ArrowUp size={17} />} label="Выше" onClick={() => moveFolder(menuFolder.id, -1)} />}
-          {folders[folders.length - 1]?.id !== menuFolder.id && <MenuItem icon={<ArrowDown size={17} />} label="Ниже" onClick={() => moveFolder(menuFolder.id, 1)} />}
+          <MenuItem icon={<Pencil size={17} />} label={t('Изменить')} onClick={() => setFolderDlg({ id: menuFolder.id })} />
+          {folders[0]?.id !== menuFolder.id && <MenuItem icon={<ArrowUp size={17} />} label={t('Выше')} onClick={() => moveFolder(menuFolder.id, -1)} />}
+          {folders[folders.length - 1]?.id !== menuFolder.id && <MenuItem icon={<ArrowDown size={17} />} label={t('Ниже')} onClick={() => moveFolder(menuFolder.id, 1)} />}
         </NtMenu>
       )}
 
@@ -632,22 +633,22 @@ export default function Notes() {
         <NtMenu anchor={menu.anchor} onClose={() => setMenu(null)}>
           {menuNote.trashed ? (
             <>
-              <MenuItem icon={<RotateCcw size={17} />} label="Восстановить" onClick={() => restoreNote(menuNote.id)} />
+              <MenuItem icon={<RotateCcw size={17} />} label={t('Восстановить')} onClick={() => restoreNote(menuNote.id)} />
               <MenuItem
                 icon={<Trash2 size={17} />}
-                label="Удалить навсегда"
+                label={t('Удалить навсегда')}
                 danger
                 onClick={async () => {
-                  if (await confirmDialog('Удалить заметку навсегда?', 'Это действие нельзя отменить.', { danger: true, okText: 'Удалить' })) purgeNote(menuNote.id);
+                  if (await confirmDialog(t('Удалить заметку навсегда?'), t('Это действие нельзя отменить.'), { danger: true, okText: t('Удалить') })) purgeNote(menuNote.id);
                 }}
               />
             </>
           ) : (
             <>
-              <MenuItem icon={menuNote.pinned ? <PinOff size={17} /> : <Pin size={17} />} label={menuNote.pinned ? 'Открепить' : 'Закрепить'} onClick={() => togglePin(menuNote.id)} />
-              <MenuItem icon={<FolderInput size={17} />} label="Переместить в папку" onClick={() => setTimeout(() => setMenu({ kind: 'move', id: menuNote.id, anchor: menu.anchor }), 0)} />
-              <MenuItem icon={<Copy size={17} />} label="Дублировать" onClick={() => void duplicateNote(menuNote.id)} />
-              <MenuItem icon={<Trash2 size={17} />} label="Удалить" danger onClick={() => trashNote(menuNote.id)} />
+              <MenuItem icon={menuNote.pinned ? <PinOff size={17} /> : <Pin size={17} />} label={menuNote.pinned ? t('Открепить') : t('Закрепить')} onClick={() => togglePin(menuNote.id)} />
+              <MenuItem icon={<FolderInput size={17} />} label={t('Переместить в папку')} onClick={() => setTimeout(() => setMenu({ kind: 'move', id: menuNote.id, anchor: menu.anchor }), 0)} />
+              <MenuItem icon={<Copy size={17} />} label={t('Дублировать')} onClick={() => void duplicateNote(menuNote.id)} />
+              <MenuItem icon={<Trash2 size={17} />} label={t('Удалить')} danger onClick={() => trashNote(menuNote.id)} />
             </>
           )}
         </NtMenu>
@@ -655,8 +656,8 @@ export default function Notes() {
 
       {menu?.kind === 'move' && menuNote && (
         <NtMenu anchor={menu.anchor} onClose={() => setMenu(null)}>
-          <MenuLabel>Переместить в папку</MenuLabel>
-          <MenuItem icon={<FolderInput size={17} />} label="Без папки" active={!menuNote.folderId} onClick={() => moveNote(menuNote.id, undefined)} />
+          <MenuLabel>{t('Переместить в папку')}</MenuLabel>
+          <MenuItem icon={<FolderInput size={17} />} label={t('Без папки')} active={!menuNote.folderId} onClick={() => moveNote(menuNote.id, undefined)} />
           {folders.map((f) => (
             <MenuItem
               key={f.id}
@@ -671,7 +672,7 @@ export default function Notes() {
             />
           ))}
           <MenuSep />
-          <MenuItem icon={<FolderPlus size={17} />} label="Новая папка…" onClick={() => setFolderDlg({})} />
+          <MenuItem icon={<FolderPlus size={17} />} label={t('Новая папка…')} onClick={() => setFolderDlg({})} />
         </NtMenu>
       )}
     </div>
@@ -700,7 +701,7 @@ function GrowList<T>({ items, className, children }: { items: T[]; className: st
       {more && (
         <div ref={end} className="nt-grow">
           <button className="btn btn-sm" onClick={() => setCap((c) => c + STEP)}>
-            Показать ещё
+            {t('Показать ещё')}
           </button>
         </div>
       )}

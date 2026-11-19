@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react';
 import { CaretDown, Flame, ListChecks, LockSimple, NotePencil, Sparkle, Timer, Trophy } from '@phosphor-icons/react';
 import { useApp } from '../store/appStore';
 import { addDaysYmd, fromYmd } from '../utils/mapTasks';
-import { plural } from '../tasks/model';
+import { LOCALE, t, tn } from '../i18n/index';
 import { useProgress, refreshProgressSources } from '../progress/hooks';
 import { LevelRing } from '../progress/LevelBadge';
 import { AREA_IDS, LEVEL_TITLES, XP, xpForLevel, type AreaId, type ProgressStats } from '../progress/model';
@@ -13,12 +13,12 @@ import { WeeklyReviewEntry } from '../review/WeeklyEntry';
 import './progress.css';
 import { IconTile } from '../ui/icons';
 
-const fmt = (n: number) => Math.round(n).toLocaleString('ru-RU');
-const WD = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
-const MONTHS_SHORT = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+const fmt = (n: number) => Math.round(n).toLocaleString(LOCALE);
+const WD = [t('вс'), t('пн'), t('вт'), t('ср'), t('чт'), t('пт'), t('сб')];
+const MONTHS_SHORT = [t('янв'), t('фев'), t('мар'), t('апр'), t('май'), t('июн'), t('июл'), t('авг'), t('сен'), t('окт'), t('ноя'), t('дек')];
 const dateLabel = (ymd: string) => {
   const d = fromYmd(ymd);
-  return `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}, ${WD[d.getDay()]}`;
+  return t('{day} {month}, {weekday}', { day: d.getDate(), month: MONTHS_SHORT[d.getMonth()], weekday: WD[d.getDay()] });
 };
 
 export default function Progress() {
@@ -36,9 +36,9 @@ export default function Progress() {
     <div className="page pg-page">
       <div className="page-header">
         <IconTile section="progress" size="sm" className="ph-tile" />
-        <h1 className="grow">Прогресс</h1>
+        <h1 className="grow">{t('Прогресс')}</h1>
         {p && (
-          <span className="pg-total-chip" title="Весь опыт">
+          <span className="pg-total-chip" title={t('Весь опыт')}>
             <Sparkle size={14} weight="fill" /> {fmt(p.total)} XP
           </span>
         )}
@@ -47,7 +47,7 @@ export default function Progress() {
         {!p ? (
           <div className="empty">
             <Sparkle className="spin" size={22} />
-            Считаем опыт…
+            {t('Считаем опыт…')}
           </div>
         ) : (
           <div className="pg-wrap">
@@ -84,20 +84,20 @@ function Hero({ p, states }: { p: ProgressStats; states: AchievementState[] }) {
       <div className="pg-hero-top">
         <LevelRing pct={lv.pct} size={104} stroke={12}>
           <span className="pg-hero-lvl">{lv.level}</span>
-          <span className="pg-hero-lvl-cap">уровень</span>
+          <span className="pg-hero-lvl-cap">{t('уровень')}</span>
         </LevelRing>
         <div className="pg-hero-main">
-          <div className="pg-hero-kicker">Ваше звание</div>
+          <div className="pg-hero-kicker">{t('Ваше звание')}</div>
           <div className="pg-hero-title">{lv.title}</div>
-          <div className="pg-xpbar" title={`${fmt(lv.cur)} из ${fmt(lv.need)} XP`}>
+          <div className="pg-xpbar" title={t('{cur} из {need} XP', { cur: fmt(lv.cur), need: fmt(lv.need) })}>
             <span style={{ width: `${Math.max(2, lv.pct * 100)}%` }} />
           </div>
           <div className="pg-hero-sub">
-            <b>{fmt(lv.cur)}</b> / {fmt(lv.need)} XP · ещё {fmt(lv.nextAt - lv.xp)} до {lv.level + 1} ур.
+            <b>{fmt(lv.cur)}</b> / {fmt(lv.need)} XP · {t('ещё {xp} до {level} ур.', { xp: fmt(lv.nextAt - lv.xp), level: lv.level + 1 })}
           </div>
           {nextTitle && (
             <div className="pg-hero-hint">
-              «{nextTitle[1]}» — с {nextTitle[0]} уровня
+              {t('«{name}» — с {level} уровня', { name: nextTitle[1], level: nextTitle[0] })}
             </div>
           )}
         </div>
@@ -105,23 +105,23 @@ function Hero({ p, states }: { p: ProgressStats; states: AchievementState[] }) {
       <div className="pg-hero-stats">
         <div className="pg-stat">
           <span className="pg-stat-v">+{fmt(p.todayXp)}</span>
-          <span className="pg-stat-l">сегодня</span>
+          <span className="pg-stat-l">{t('сегодня')}</span>
         </div>
         <div className="pg-stat">
           <span className="pg-stat-v">+{fmt(p.weekXp)}</span>
-          <span className="pg-stat-l">за неделю</span>
+          <span className="pg-stat-l">{t('за неделю')}</span>
         </div>
         <div className={`pg-stat${p.counters.streak ? ' hot' : ''}`}>
           <span className="pg-stat-v">
             <Flame size={17} weight="fill" /> {p.counters.streak}
           </span>
-          <span className="pg-stat-l">{plural(p.counters.streak, 'день', 'дня', 'дней')} подряд</span>
+          <span className="pg-stat-l">{t('{days} подряд', { days: tn(p.counters.streak, 'день', 'дня', 'дней') })}</span>
         </div>
         <div className="pg-stat">
           <span className="pg-stat-v">
             <Trophy size={16} weight="fill" /> {got}
           </span>
-          <span className="pg-stat-l">из {states.length} наград</span>
+          <span className="pg-stat-l">{t('из {n} наград', { n: states.length })}</span>
         </div>
       </div>
       <StreakNote p={p} />
@@ -131,7 +131,7 @@ function Hero({ p, states }: { p: ProgressStats; states: AchievementState[] }) {
             <next.a.icon size={17} weight="fill" />
           </span>
           <span className="grow ellipsis">
-            Следующая награда: <b>{next.a.title}</b>
+            {t('Следующая награда:')} <b>{next.a.title}</b>
           </span>
           <span className="pg-hero-next-n">
             {fmt(Math.min(next.value, next.a.target))}/{fmt(next.a.target)}
@@ -152,16 +152,16 @@ function StreakNote({ p }: { p: ProgressStats }) {
     <div className="pg-streak-note">
       {restart ? (
         <span>
-          Рекорд {c.bestStreak} {plural(c.bestStreak, 'день', 'дня', 'дней')} сохранён — начнём новую серию 🌱
+          {t('Рекорд {n} {days} сохранён — начнём новую серию 🌱', { n: c.bestStreak, days: tn(c.bestStreak, 'день', 'дня', 'дней') })}
         </span>
       ) : (
         <span>
-          {c.freezesUsed > 0 && <>❄️ {c.freezesUsed} {plural(c.freezesUsed, 'заморозка сберегла', 'заморозки сберегли', 'заморозок сберегли')} серию · </>}
-          {c.freezesBanked > 0 ? `в запасе ❄️ ${c.freezesBanked}` : 'каждые 7 дней подряд — заморозка ❄️'}
+          {c.freezesUsed > 0 && <>{t('❄️ {n} {saved} серию ·', { n: c.freezesUsed, saved: tn(c.freezesUsed, 'заморозка сберегла', 'заморозки сберегли', 'заморозок сберегли') })}{' '}</>}
+          {c.freezesBanked > 0 ? t('в запасе ❄️ {n}', { n: c.freezesBanked }) : t('каждые 7 дней подряд — заморозка ❄️')}
         </span>
       )}
       <span className="pg-streak-30">
-        <b>{c.rolling30}</b> из 30 дней
+        <b>{c.rolling30}</b> {t('из 30 дней')}
       </span>
     </div>
   );
@@ -171,19 +171,19 @@ function StartCard() {
   const go = useApp((s) => s.go);
   return (
     <section className="card pg-start">
-      <div className="pg-start-title">Начните копить опыт ✨</div>
+      <div className="pg-start-title">{t('Начните копить опыт ✨')}</div>
       <div className="small muted">
-        Опыт начисляется за всё полезное: выполненные задачи, привычки, записи в дневнике, фокус, цели и учёт финансов. Ничего настраивать не нужно.
+        {t('Опыт начисляется за всё полезное: выполненные задачи, привычки, записи в дневнике, фокус, цели и учёт финансов. Ничего настраивать не нужно.')}
       </div>
       <div className="pg-start-btns">
         <button className="btn btn-primary btn-sm" onClick={() => go('tasks')}>
-          <ListChecks size={16} weight="bold" /> Задачи
+          <ListChecks size={16} weight="bold" /> {t('Задачи')}
         </button>
         <button className="btn btn-sm" onClick={() => go('planner')}>
-          <NotePencil size={16} weight="bold" /> Ежедневник
+          <NotePencil size={16} weight="bold" /> {t('Ежедневник')}
         </button>
         <button className="btn btn-sm" onClick={() => go('focus')}>
-          <Timer size={16} weight="bold" /> Фокус
+          <Timer size={16} weight="bold" /> {t('Фокус')}
         </button>
       </div>
     </section>
@@ -208,13 +208,13 @@ function AreasCard({ p }: { p: ProgressStats }) {
   return (
     <section className="card pg-card">
       <div className="pg-card-head">
-        <h3 className="grow">Сферы жизни</h3>
+        <h3 className="grow">{t('Сферы жизни')}</h3>
         <div className="segmented">
           <button className={range === 'all' ? 'active' : ''} onClick={() => setRange('all')}>
-            Всё время
+            {t('Всё время')}
           </button>
           <button className={range === 30 ? 'active' : ''} onClick={() => setRange(30)}>
-            30 дней
+            {t('30 дней')}
           </button>
         </div>
       </div>
@@ -230,7 +230,7 @@ function AreasCard({ p }: { p: ProgressStats }) {
                 <div className="pg-area-row">
                   <span className="pg-area-name">{m.label}</span>
                   <span className="pg-area-xp">
-                    {r.xp ? `${fmt(r.xp)} XP` : 'пока нет'}
+                    {r.xp ? `${fmt(r.xp)} XP` : t('пока нет')}
                     {r.xp > 0 && sum > 0 && <span className="faint"> · {Math.round((r.xp / sum) * 100)}%</span>}
                   </span>
                 </div>
@@ -259,13 +259,13 @@ function XpChart({ p }: { p: ProgressStats }) {
   return (
     <section className="card pg-card">
       <div className="pg-card-head">
-        <h3 className="grow">Опыт по дням</h3>
+        <h3 className="grow">{t('Опыт по дням')}</h3>
         <div className="segmented">
           <button className={range === 7 ? 'active' : ''} onClick={() => setRange(7)}>
-            7 дней
+            {t('7 дней')}
           </button>
           <button className={range === 30 ? 'active' : ''} onClick={() => setRange(30)}>
-            30 дней
+            {t('30 дней')}
           </button>
         </div>
       </div>
@@ -299,10 +299,10 @@ function XpChart({ p }: { p: ProgressStats }) {
       <div className="tiny faint">
         {sum ? (
           <>
-            {fmt(sum)} XP за {range} {plural(range, 'день', 'дня', 'дней')} · в среднем {fmt(sum / range)} в день · лучший день {fmt(best)}
+            {t('{xp} XP за {n} {days} · в среднем {avg} в день · лучший день {best}', { xp: fmt(sum), n: range, days: tn(range, 'день', 'дня', 'дней'), avg: fmt(sum / range), best: fmt(best) })}
           </>
         ) : (
-          'За этот период опыта пока нет'
+          t('За этот период опыта пока нет')
         )}
       </div>
     </section>
@@ -340,14 +340,14 @@ function Heatmap({ p }: { p: ProgressStats }) {
   return (
     <section className="card pg-card">
       <div className="pg-card-head">
-        <h3 className="grow">Активность</h3>
+        <h3 className="grow">{t('Активность')}</h3>
         <span className="small muted">
-          {active} из {inRange.length} {plural(inRange.length, 'дня', 'дней', 'дней')}
+          {t('{active} из {total} {days}', { active, total: inRange.length, days: tn(inRange.length, 'дня', 'дней', 'дней') })}
         </span>
       </div>
       <div className="pg-heat" style={{ '--weeks': WEEKS } as CSSProperties}>
         <div className="pg-heat-wd">
-          {['пн', '', 'ср', '', 'пт', '', 'вс'].map((l, i) => (
+          {[t('пн'), '', t('ср'), '', t('пт'), '', t('вс')].map((l, i) => (
             <span key={i}>{l}</span>
           ))}
         </div>
@@ -366,7 +366,7 @@ function Heatmap({ p }: { p: ProgressStats }) {
                 <span
                   key={d}
                   className={`pg-cell l${heatLevel(xp)}${future ? ' future' : ''}${d === p.today ? ' today' : ''}${frozen ? ' frozen' : ''}`}
-                  title={future ? undefined : `${dateLabel(d)}: ${xp ? fmt(xp) + ' XP' : frozen ? 'заморозка ❄️ — серия сохранена' : 'нет активности'}`}
+                  title={future ? undefined : `${dateLabel(d)}: ${xp ? fmt(xp) + ' XP' : frozen ? t('заморозка ❄️ — серия сохранена') : t('нет активности')}`}
                 />
               );
             })}
@@ -375,15 +375,15 @@ function Heatmap({ p }: { p: ProgressStats }) {
       </div>
       <div className="pg-heat-foot">
         <span className="tiny faint grow">
-          Серия: {p.counters.streak}
-          {p.counters.freezesUsed > 0 && ` (❄️ ${p.counters.freezesUsed})`} · рекорд: {p.counters.bestStreak} · всего активных дней: {p.counters.activeDays}
+          {t('Серия: {n}', { n: p.counters.streak })}
+          {p.counters.freezesUsed > 0 && ` (❄️ ${p.counters.freezesUsed})`} {t(' · рекорд: {best} · всего активных дней: {active}', { best: p.counters.bestStreak, active: p.counters.activeDays })}
         </span>
         <span className="pg-heat-legend tiny faint">
-          меньше
+          {t('меньше')}
           {[0, 1, 2, 3, 4].map((l) => (
             <span key={l} className={`pg-cell l${l}`} />
           ))}
-          больше
+          {t('больше')}
         </span>
       </div>
     </section>
@@ -393,7 +393,7 @@ function Heatmap({ p }: { p: ProgressStats }) {
 // ================= Достижения =================
 
 type AchFilter = 'all' | 'done' | 'todo';
-const TIER_LABEL = ['', 'Обычное', 'Редкое', 'Легендарное'];
+const TIER_LABEL = ['', t('Обычное'), t('Редкое'), t('Легендарное')];
 
 function AchievementsCard({ states, fresh }: { states: AchievementState[]; fresh: Set<string> }) {
   const [filter, setFilter] = useState<AchFilter>('all');
@@ -413,17 +413,17 @@ function AchievementsCard({ states, fresh }: { states: AchievementState[]; fresh
     <section className="card pg-card">
       <div className="pg-card-head">
         <h3 className="grow">
-          Достижения <span className="pg-count">{got}/{states.length}</span>
+          {t('Достижения')} <span className="pg-count">{got}/{states.length}</span>
         </h3>
         <div className="segmented">
           <button className={filter === 'all' ? 'active' : ''} onClick={() => setFilter('all')}>
-            Все
+            {t('Все')}
           </button>
           <button className={filter === 'done' ? 'active' : ''} onClick={() => setFilter('done')}>
-            Есть
+            {t('Есть')}
           </button>
           <button className={filter === 'todo' ? 'active' : ''} onClick={() => setFilter('todo')}>
-            Впереди
+            {t('Впереди')}
           </button>
         </div>
       </div>
@@ -431,7 +431,7 @@ function AchievementsCard({ states, fresh }: { states: AchievementState[]; fresh
         <span style={{ width: `${(got / Math.max(1, states.length)) * 100}%` }} />
       </div>
       {list.length === 0 ? (
-        <div className="faint small pg-ach-empty">{filter === 'done' ? 'Пока ни одного — первое совсем близко!' : 'Все достижения получены. Вы легенда!'}</div>
+        <div className="faint small pg-ach-empty">{filter === 'done' ? t('Пока ни одного — первое совсем близко!') : t('Все достижения получены. Вы легенда!')}</div>
       ) : (
         <div className="pg-achs">
           {list.map((s) => (
@@ -448,7 +448,7 @@ function AchTile({ s, isNew }: { s: AchievementState; isNew: boolean }) {
   const Icon = a.icon;
   return (
     <div className={`pg-ach${s.done ? ' done' : ''} tier-${a.tier}${isNew ? ' new' : ''}`} style={{ '--c': achievementColor(a) } as CSSProperties} title={TIER_LABEL[a.tier]}>
-      {isNew && <span className="pg-ach-new">Новое</span>}
+      {isNew && <span className="pg-ach-new">{t('Новое')}</span>}
       <span className="pg-ach-ic">
         <Icon size={26} weight={s.done ? 'fill' : 'regular'} />
         {!s.done && (
@@ -482,46 +482,46 @@ const RULES: { area: AreaId; items: [string, string][] }[] = [
   {
     area: 'tasks',
     items: [
-      ['Выполненная задача', `+${XP.task}`],
-      ['Высокий / средний приоритет', `+${XP.taskHigh} / +${XP.taskMedium}`],
-      ['Пункт чек-листа', `+${XP.checkItem}`],
+      [t('Выполненная задача'), `+${XP.task}`],
+      [t('Высокий / средний приоритет'), `+${XP.taskHigh} / +${XP.taskMedium}`],
+      [t('Пункт чек-листа'), `+${XP.checkItem}`],
     ],
   },
-  { area: 'habits', items: [['Отметка привычки', `+${XP.habit}`]] },
+  { area: 'habits', items: [[t('Отметка привычки'), `+${XP.habit}`]] },
   {
     area: 'journal',
     items: [
-      ['Запись в дневнике', `+${XP.journal}`],
-      [`Длинная запись (от ${XP.journalLongChars} знаков)`, `+${XP.journalLong}`],
-      ['Отмеченное настроение', `+${XP.mood}`],
+      [t('Запись в дневнике'), `+${XP.journal}`],
+      [t('Длинная запись (от {n} знаков)', { n: XP.journalLongChars }), `+${XP.journalLong}`],
+      [t('Отмеченное настроение'), `+${XP.mood}`],
     ],
   },
-  { area: 'focus', items: [['Минута фокуса', `+${XP.focusPerMin}`], ['Максимум за день', `${XP.focusDayCap}`]] },
+  { area: 'focus', items: [[t('Минута фокуса'), `+${XP.focusPerMin}`], [t('Максимум за день'), `${XP.focusDayCap}`]] },
   {
     area: 'goals',
     items: [
-      ['Новая цель', `+${XP.goalCreated}`],
-      ['Выполненный шаг', `+${XP.step}`],
-      ['Завершённый этап', `+${XP.stage}`],
-      ['Цель достигнута', `+${XP.goalDone}`],
-      ['Обновление прогресса (раз в день)', `+${XP.goalUpdate}`],
-      ['Оценка колеса баланса', `+${XP.wheel}`],
+      [t('Новая цель'), `+${XP.goalCreated}`],
+      [t('Выполненный шаг'), `+${XP.step}`],
+      [t('Завершённый этап'), `+${XP.stage}`],
+      [t('Цель достигнута'), `+${XP.goalDone}`],
+      [t('Обновление прогресса (раз в день)'), `+${XP.goalUpdate}`],
+      [t('Оценка колеса баланса'), `+${XP.wheel}`],
     ],
   },
   {
     area: 'finance',
     items: [
-      ['День с учётом операций', `+${XP.financeDay}`],
-      [`За каждую операцию (до ${XP.financeTxCap} в день)`, `+${XP.financeTx}`],
-      ['Месяц в рамках бюджета', `+${XP.budgetMonth}`],
-      ['Закрытый долг', `+${XP.debtClosed}`],
+      [t('День с учётом операций'), `+${XP.financeDay}`],
+      [t('За каждую операцию (до {n} в день)', { n: XP.financeTxCap }), `+${XP.financeTx}`],
+      [t('Месяц в рамках бюджета'), `+${XP.budgetMonth}`],
+      [t('Закрытый долг'), `+${XP.debtClosed}`],
     ],
   },
   {
     area: 'knowledge',
     items: [
-      [`Новая заметка (до ${XP.notesDayCap} в день)`, `+${XP.note}`],
-      [`Новая интеллект-карта (до ${XP.mapsDayCap} в день)`, `+${XP.map}`],
+      [t('Новая заметка (до {n} в день)', { n: XP.notesDayCap }), `+${XP.note}`],
+      [t('Новая интеллект-карта (до {n} в день)', { n: XP.mapsDayCap }), `+${XP.map}`],
     ],
   },
 ];
@@ -531,14 +531,13 @@ function HowTo({ level }: { level: number }) {
   return (
     <section className={`card pg-card pg-howto${open ? ' open' : ''}`}>
       <button className="pg-howto-head" onClick={() => setOpen(!open)} aria-expanded={open}>
-        <h3 className="grow">Как получать опыт</h3>
+        <h3 className="grow">{t('Как получать опыт')}</h3>
         <CaretDown size={16} weight="bold" className="pg-howto-chev" />
       </button>
       {open && (
         <div className="pg-howto-body">
           <p className="small muted">
-            Опыт считается сам — из ваших задач, привычек, дневника, фокуса, целей, финансов и заметок. Он одинаков на всех устройствах: если отменить
-            выполнение, опыт тоже вернётся назад.
+            {t('Опыт считается сам — из ваших задач, привычек, дневника, фокуса, целей, финансов и заметок. Он одинаков на всех устройствах: если отменить выполнение, опыт тоже вернётся назад.')}
           </p>
           <div className="pg-rules">
             {RULES.map((g) => {
@@ -561,7 +560,7 @@ function HowTo({ level }: { level: number }) {
               );
             })}
           </div>
-          <h4 className="pg-ladder-title">Звания</h4>
+          <h4 className="pg-ladder-title">{t('Звания')}</h4>
           <div className="pg-ladder">
             {LEVEL_TITLES.map(([from, name], i) => {
               const to = LEVEL_TITLES[i + 1]?.[0];

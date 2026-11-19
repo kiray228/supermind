@@ -1,8 +1,9 @@
+import { LOCALE, t, tn } from '../i18n/index';
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { Check, Clock, Flame, Hourglass, ListChecks, MagnifyingGlass, Pause, Play, Plus, SkipForward, SlidersHorizontal, SpeakerHigh, Stop, Target, Timer, Trash, Trophy, WarningCircle, Watch, X } from '@phosphor-icons/react';
 import type { Countdown, TasksData } from '../tasks/model';
-import { daysBetween, durationLabel, isActive, isOverdue, LIST_COLORS, plural, shortDate, WEEKDAYS, whenLabel } from '../tasks/model';
+import { daysBetween, durationLabel, isActive, isOverdue, LIST_COLORS, shortDate, WEEKDAYS, whenLabel } from '../tasks/model';
 import { deleteCountdown, ensureTasks, saveCountdown, setPrefs, toggleDone, useTasks } from '../tasks/store';
 import type { NoiseKind } from '../tasks/focusTimer';
 import {
@@ -34,18 +35,18 @@ type Tab = 'pomo' | 'stats' | 'countdown';
 const TAB_KEY = 'sm-focus-tab';
 
 const NOISES: { v: NoiseKind; label: string }[] = [
-  { v: 'none', label: 'Нет' },
-  { v: 'white', label: 'Белый шум' },
-  { v: 'pink', label: 'Розовый шум' },
-  { v: 'brown', label: 'Коричневый шум' },
-  { v: 'rain', label: 'Дождь' },
+  { v: 'none', label: t('Нет') },
+  { v: 'white', label: t('Белый шум') },
+  { v: 'pink', label: t('Розовый шум') },
+  { v: 'brown', label: t('Коричневый шум') },
+  { v: 'rain', label: t('Дождь') },
 ];
 
 const EMOJIS = ['🎂', '🎉', '❤️', '💍', '✈️', '🏖️', '🎓', '💼', '🏠', '👶', '🎄', '🎁', '⭐', '🏆', '📅', '⏳'];
-const WD_SHORT = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+const WD_SHORT = [t('Вс'), t('Пн'), t('Вт'), t('Ср'), t('Чт'), t('Пт'), t('Сб')];
 
 const dayOf = (ms: number) => toYmd(new Date(ms));
-const hhmm = (ms: number) => new Date(ms).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+const hhmm = (ms: number) => new Date(ms).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
 const lastDays = (today: string, n: number) => Array.from({ length: n }, (_, i) => addDaysYmd(today, i - (n - 1)));
 
 function readTab(): Tab {
@@ -80,23 +81,23 @@ export default function Focus() {
     <div className="page fx-page">
       <div className="page-header">
         <IconTile section="focus" size="sm" className="ph-tile" />
-        <h1>Фокус</h1>
+        <h1>{t('Фокус')}</h1>
         <div className="grow" />
         <div className="segmented fx-tabs">
           <button className={tab === 'pomo' ? 'active' : ''} onClick={() => setTab('pomo')}>
-            Таймер
+            {t('Таймер')}
           </button>
           <button className={tab === 'stats' ? 'active' : ''} onClick={() => setTab('stats')}>
-            Статистика
+            {t('Статистика')}
           </button>
           <button className={tab === 'countdown' ? 'active' : ''} onClick={() => setTab('countdown')}>
-            Отсчёт
+            {t('Отсчёт')}
           </button>
         </div>
       </div>
       <div className="page-body">
         {!data ? (
-          <div className="empty">Загрузка…</div>
+          <div className="empty">{t('Загрузка…')}</div>
         ) : tab === 'pomo' ? (
           <PomodoroTab data={data} />
         ) : tab === 'stats' ? (
@@ -131,7 +132,7 @@ function PomodoroTab({ data }: { data: TasksData }) {
   const todaySessions = useMemo(() => data.focus.filter((s) => dayOf(s.start) === today).sort((a, b) => b.start - a.start), [data.focus, today]);
   const todayPomos = todaySessions.filter((s) => s.kind === 'pomo').length;
   const todayMin = todaySessions.reduce((a, s) => a + s.minutes, 0);
-  const titleOf = (id?: string) => (id ? data.tasks.find((t) => t.id === id)?.title || 'Без названия' : '');
+  const titleOf = (id?: string) => (id ? data.tasks.find((t) => t.id === id)?.title || t('Без названия') : '');
 
   const completeTask = () => {
     if (!task) return;
@@ -144,20 +145,20 @@ function PomodoroTab({ data }: { data: TasksData }) {
       <div className="fx-pomo-top">
         <div className="segmented fx-mode-seg">
           <button className={!isWatch ? 'active' : ''} onClick={() => setMode('pomo')}>
-            <Timer size={15} weight="bold" /> Помодоро
+            <Timer size={15} weight="bold" /> {t('Помодоро')}
           </button>
           <button className={isWatch ? 'active' : ''} onClick={() => setMode('stopwatch')}>
-            <Watch size={15} weight="bold" /> Секундомер
+            <Watch size={15} weight="bold" /> {t('Секундомер')}
           </button>
         </div>
-        <button className="icon-btn" onClick={() => setSettings(true)} aria-label="Настройки помодоро" title="Настройки помодоро">
+        <button className="icon-btn" onClick={() => setSettings(true)} aria-label={t('Настройки помодоро')} title={t('Настройки помодоро')}>
           <SlidersHorizontal weight="bold" />
         </button>
       </div>
 
       <button className="fx-task-pick" onClick={() => setPicker(true)}>
         <Target size={17} weight="bold" />
-        <span className={'ellipsis' + (task && !isActive(task) ? ' fx-done-text' : '')}>{task ? task.title || 'Без названия' : 'Выбрать задачу'}</span>
+        <span className={'ellipsis' + (task && !isActive(task) ? ' fx-done-text' : '')}>{task ? task.title || t('Без названия') : t('Выбрать задачу')}</span>
       </button>
 
       <div className={'fx-ring' + (isBreak ? ' is-break' : '') + (f.running ? ' is-running' : '')}>
@@ -175,9 +176,9 @@ function PomodoroTab({ data }: { data: TasksData }) {
         </svg>
         <div className="fx-ring-center">
           <div className="fx-time">{timeText}</div>
-          <div className="fx-phase">{isWatch ? 'Секундомер' : PHASE_LABEL[f.phase]}</div>
+          <div className="fx-phase">{isWatch ? t('Секундомер') : PHASE_LABEL[f.phase]}</div>
           {!isWatch && (
-            <div className="fx-dots" title={`Помодоро в цикле: ${Math.min(f.completedPomos, pomo.longEvery)} из ${pomo.longEvery}`}>
+            <div className="fx-dots" title={t('Помодоро в цикле: {done} из {total}', { done: Math.min(f.completedPomos, pomo.longEvery), total: pomo.longEvery })}>
               {Array.from({ length: Math.max(1, pomo.longEvery) }, (_, i) => (
                 <span key={i} className={i < Math.min(f.completedPomos, pomo.longEvery) ? 'on' : ''} />
               ))}
@@ -191,12 +192,12 @@ function PomodoroTab({ data }: { data: TasksData }) {
           <>
             <button className="btn btn-primary fx-main-btn" onClick={start}>
               <Play size={22} weight="fill" />
-              <span>{isBreak ? 'Перерыв' : 'Старт'}</span>
+              <span>{isBreak ? t('Перерыв') : t('Старт')}</span>
             </button>
             {isBreak && (
               <button className="btn fx-side-btn fx-skip" onClick={skip}>
                 <SkipForward size={20} weight="fill" />
-                <span>Пропуск</span>
+                <span>{t('Пропуск')}</span>
               </button>
             )}
           </>
@@ -205,22 +206,22 @@ function PomodoroTab({ data }: { data: TasksData }) {
             {f.running ? (
               <button className="btn btn-primary fx-main-btn" onClick={pause}>
                 <Pause size={22} weight="fill" />
-                <span>Пауза</span>
+                <span>{t('Пауза')}</span>
               </button>
             ) : (
               <button className="btn btn-primary fx-main-btn" onClick={resume}>
                 <Play size={22} weight="fill" />
-                <span>Дальше</span>
+                <span>{t('Дальше')}</span>
               </button>
             )}
             <button className="btn fx-side-btn fx-stop" onClick={stop}>
               <Stop size={20} weight="fill" />
-              <span>Стоп</span>
+              <span>{t('Стоп')}</span>
             </button>
             {!isWatch && (
               <button className="btn fx-side-btn fx-skip" onClick={skip}>
                 <SkipForward size={20} weight="fill" />
-                <span>Пропуск</span>
+                <span>{t('Пропуск')}</span>
               </button>
             )}
           </>
@@ -229,14 +230,14 @@ function PomodoroTab({ data }: { data: TasksData }) {
 
       {task && isActive(task) && (
         <button className="btn btn-sm btn-ghost fx-complete" onClick={completeTask}>
-          <Check size={15} weight="bold" /> Выполнить задачу
+          <Check size={15} weight="bold" /> {t('Выполнить задачу')}
         </button>
       )}
 
       <div className="fx-noise">
         <div className="row fx-noise-head">
           <SpeakerHigh size={17} weight="fill" className="fx-noise-ic" />
-          <span className="small bold">Фоновый звук</span>
+          <span className="small bold">{t('Фоновый звук')}</span>
         </div>
         <div className="fx-chips">
           {NOISES.map((n) => (
@@ -247,19 +248,19 @@ function PomodoroTab({ data }: { data: TasksData }) {
         </div>
         {f.noise !== 'none' && (
           <div className="row fx-volume">
-            <span className="tiny faint">Громкость</span>
+            <span className="tiny faint">{t('Громкость')}</span>
             <input type="range" min={0} max={1} step={0.01} value={f.volume} onChange={(e) => setVolume(Number(e.target.value))} className="grow" />
           </div>
         )}
-        {f.noise !== 'none' && !f.running && <div className="tiny faint">Звук играет, пока идёт таймер</div>}
+        {f.noise !== 'none' && !f.running && <div className="tiny faint">{t('Звук играет, пока идёт таймер')}</div>}
       </div>
 
       <div className="fx-today">
         <div className="fx-today-head">
-          Сегодня: <b>{todayPomos}</b> помодоро · <b>{durationLabel(todayMin)}</b>
+          {t('Сегодня:')} <b>{todayPomos}</b> {tn(todayPomos, 'помодоро', 'помодоро', 'помодоро')} · <b>{durationLabel(todayMin)}</b>
         </div>
         {todaySessions.length === 0 ? (
-          <div className="faint small fx-today-empty">Сессий фокуса сегодня ещё не было</div>
+          <div className="faint small fx-today-empty">{t('Сессий фокуса сегодня ещё не было')}</div>
         ) : (
           <div className="fx-sessions">
             {todaySessions.map((s) => (
@@ -268,7 +269,7 @@ function PomodoroTab({ data }: { data: TasksData }) {
                 <span className="fx-session-time">
                   {hhmm(s.start)}–{hhmm(s.start + s.minutes * 60000)}
                 </span>
-                <span className="grow ellipsis muted small">{titleOf(s.taskId) || (s.kind === 'pomo' ? 'Помодоро' : 'Секундомер')}</span>
+                <span className="grow ellipsis muted small">{titleOf(s.taskId) || (s.kind === 'pomo' ? t('Помодоро') : t('Секундомер'))}</span>
                 <span className="small bold">{durationLabel(s.minutes)}</span>
               </div>
             ))}
@@ -300,37 +301,37 @@ function TaskPicker({ data, selected, onClose }: { data: TasksData; selected?: s
     <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal fx-picker" onKeyDown={(e) => e.key === 'Escape' && onClose()}>
         <div className="row">
-          <h2 className="grow">Задача для фокуса</h2>
-          <button className="icon-btn" onClick={onClose} aria-label="Закрыть">
+          <h2 className="grow">{t('Задача для фокуса')}</h2>
+          <button className="icon-btn" onClick={onClose} aria-label={t('Закрыть')}>
             <X />
           </button>
         </div>
         <div className="fx-search">
           <MagnifyingGlass size={16} />
-          <input className="input" placeholder="Поиск задачи" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
+          <input className="input" placeholder={t('Поиск задачи')} value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
         </div>
         <div className="fx-pick-list">
           <button className={'fx-pick-item' + (!selected ? ' active' : '')} onClick={() => pick(undefined)}>
             <span className="fx-pick-dot" style={{ background: 'var(--text-3)' }} />
-            <span className="grow">Без задачи</span>
+            <span className="grow">{t('Без задачи')}</span>
             {!selected && <Check size={16} />}
           </button>
-          {tasks.map((t) => {
-            const l = lists.get(t.listId);
+          {tasks.map((tk) => {
+            const l = lists.get(tk.listId);
             return (
-              <button key={t.id} className={'fx-pick-item' + (selected === t.id ? ' active' : '')} onClick={() => pick(t.id)}>
+              <button key={tk.id} className={'fx-pick-item' + (selected === tk.id ? ' active' : '')} onClick={() => pick(tk.id)}>
                 <span className="fx-pick-dot" style={{ background: l?.color ?? 'var(--text-3)' }} />
                 <span className="grow fx-pick-main">
-                  <span className="ellipsis">{t.title || 'Без названия'}</span>
+                  <span className="ellipsis">{tk.title || t('Без названия')}</span>
                   <span className="tiny faint ellipsis">
-                    {[l?.name, whenLabel(t), t.focusMinutes ? `фокус ${durationLabel(t.focusMinutes)}` : ''].filter(Boolean).join(' · ')}
+                    {[l?.name, whenLabel(tk), tk.focusMinutes ? t('фокус {time}', { time: durationLabel(tk.focusMinutes) }) : ''].filter(Boolean).join(' · ')}
                   </span>
                 </span>
-                {selected === t.id && <Check size={16} />}
+                {selected === tk.id && <Check size={16} />}
               </button>
             );
           })}
-          {tasks.length === 0 && <div className="faint small fx-today-empty">{q ? 'Ничего не найдено' : 'Нет активных задач'}</div>}
+          {tasks.length === 0 && <div className="faint small fx-today-empty">{q ? t('Ничего не найдено') : t('Нет активных задач')}</div>}
         </div>
       </div>
     </div>
@@ -366,40 +367,40 @@ function PomoSettings({ data, onClose }: { data: TasksData; onClose: () => void 
     <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal" onKeyDown={(e) => e.key === 'Escape' && onClose()}>
         <div className="row">
-          <h2 className="grow">Настройки помодоро</h2>
-          <button className="icon-btn" onClick={onClose} aria-label="Закрыть">
+          <h2 className="grow">{t('Настройки помодоро')}</h2>
+          <button className="icon-btn" onClick={onClose} aria-label={t('Закрыть')}>
             <X />
           </button>
         </div>
         <div className="fx-grid2">
           <div>
-            <label className="label">Фокус, мин</label>
+            <label className="label">{t('Фокус, мин')}</label>
             {num('work', 180)}
           </div>
           <div>
-            <label className="label">Короткий перерыв, мин</label>
+            <label className="label">{t('Короткий перерыв, мин')}</label>
             {num('short', 60)}
           </div>
           <div>
-            <label className="label">Длинный перерыв, мин</label>
+            <label className="label">{t('Длинный перерыв, мин')}</label>
             {num('long', 90)}
           </div>
           <div>
-            <label className="label">Длинный перерыв каждые</label>
+            <label className="label">{t('Длинный перерыв каждые')}</label>
             {num('longEvery', 12)}
           </div>
         </div>
         <label className="row fx-check">
           <input type="checkbox" checked={p.autoNext} onChange={(e) => setP({ ...p, autoNext: e.target.checked })} />
-          <span>Автоматически начинать следующий этап</span>
+          <span>{t('Автоматически начинать следующий этап')}</span>
         </label>
-        <p className="tiny faint">Новые длительности применятся со следующего запуска таймера.</p>
+        <p className="tiny faint">{t('Новые длительности применятся со следующего запуска таймера.')}</p>
         <div className="modal-actions">
           <button className="btn btn-ghost" onClick={onClose}>
-            Отмена
+            {t('Отмена')}
           </button>
           <button className="btn btn-primary" onClick={save}>
-            Сохранить
+            {t('Сохранить')}
           </button>
         </div>
       </div>
@@ -477,7 +478,7 @@ function StatsTab({ data }: { data: TasksData }) {
     return [...m.entries()]
       .map(([id, n]) => {
         const l = data.lists.find((x) => x.id === id);
-        return { id, n, name: l ? `${l.emoji ? l.emoji + ' ' : ''}${l.name}` : 'Удалённый список', color: l?.color ?? 'var(--text-3)' };
+        return { id, n, name: l ? `${l.emoji ? l.emoji + ' ' : ''}${l.name}` : t('Удалённый список'), color: l?.color ?? 'var(--text-3)' };
       })
       .sort((a, b) => b.n - a.n);
   }, [data.log, data.lists, range, today]);
@@ -486,49 +487,49 @@ function StatsTab({ data }: { data: TasksData }) {
   return (
     <div className="fx-stats">
       <div className="card fx-cards">
-        <StatCard icon={<Check size={15} weight="bold" />} value={st.byDay.get(today) ?? 0} label="Выполнено сегодня" />
-        <StatCard icon={<ListChecks size={15} weight="bold" />} value={st.week} label="За 7 дней" />
-        <StatCard icon={<Trophy size={15} weight="bold" />} value={data.log.length} label="Всего выполнено" />
-        <StatCard icon={<WarningCircle size={15} weight="bold" />} value={st.overdue} label="Просрочено сейчас" tone={st.overdue ? 'danger' : undefined} />
-        <StatCard icon={<Target size={15} weight="bold" />} value={`${st.rate}%`} label="Выполнение за 7 дней" />
-        <StatCard icon={<Flame size={15} weight="bold" />} value={st.streak} label={`${plural(st.streak, 'день', 'дня', 'дней')} подряд · рекорд ${st.best}`} tone="warn" />
-        <StatCard icon={<Clock size={15} weight="bold" />} value={durationLabel(st.focusByDay.get(today) ?? 0)} label="Фокус сегодня" />
-        <StatCard icon={<Timer size={15} weight="bold" />} value={durationLabel(st.focusTotal)} label="Фокус всего" />
+        <StatCard icon={<Check size={15} weight="bold" />} value={st.byDay.get(today) ?? 0} label={t('Выполнено сегодня')} />
+        <StatCard icon={<ListChecks size={15} weight="bold" />} value={st.week} label={t('За 7 дней')} />
+        <StatCard icon={<Trophy size={15} weight="bold" />} value={data.log.length} label={t('Всего выполнено')} />
+        <StatCard icon={<WarningCircle size={15} weight="bold" />} value={st.overdue} label={t('Просрочено сейчас')} tone={st.overdue ? 'danger' : undefined} />
+        <StatCard icon={<Target size={15} weight="bold" />} value={`${st.rate}%`} label={t('Выполнение за 7 дней')} />
+        <StatCard icon={<Flame size={15} weight="bold" />} value={st.streak} label={t('{days} подряд · рекорд {best}', { days: tn(st.streak, 'день', 'дня', 'дней'), best: st.best })} tone="warn" />
+        <StatCard icon={<Clock size={15} weight="bold" />} value={durationLabel(st.focusByDay.get(today) ?? 0)} label={t('Фокус сегодня')} />
+        <StatCard icon={<Timer size={15} weight="bold" />} value={durationLabel(st.focusTotal)} label={t('Фокус всего')} />
       </div>
 
       <div className="card fx-panel">
         <div className="row fx-panel-head">
-          <h3 className="grow">Выполненные задачи</h3>
+          <h3 className="grow">{t('Выполненные задачи')}</h3>
           <div className="segmented">
             <button className={range === 7 ? 'active' : ''} onClick={() => setRange(7)}>
-              7 дней
+              {t('7 дней')}
             </button>
             <button className={range === 30 ? 'active' : ''} onClick={() => setRange(30)}>
-              30 дней
+              {t('30 дней')}
             </button>
           </div>
         </div>
         <Bars items={doneBars} showValues={range === 7} />
         <div className="tiny faint">
-          {st.rate}% выполнено за неделю · {st.week} {plural(st.week, 'задача', 'задачи', 'задач')} готово, {st.pending} ещё {plural(st.pending, 'ждёт', 'ждут', 'ждут')}
+          {t('{rate}% выполнено за неделю · {done} {tasks} готово, {pending} ещё {wait}', { rate: st.rate, done: st.week, tasks: tn(st.week, 'задача', 'задачи', 'задач'), pending: st.pending, wait: tn(st.pending, 'ждёт', 'ждут', 'ждут') })}
         </div>
       </div>
 
       <div className="card fx-panel">
         <div className="row fx-panel-head">
-          <h3 className="grow">Фокус за неделю</h3>
+          <h3 className="grow">{t('Фокус за неделю')}</h3>
           <span className="small muted">{durationLabel(focusWeek)}</span>
         </div>
-        <Bars items={focusBars} showValues fmt={(v) => (v >= 60 ? `${Math.floor(v / 60)}ч${v % 60 ? (v % 60) + '' : ''}` : String(v))} tone="ok" />
+        <Bars items={focusBars} showValues fmt={(v) => (v >= 60 ? t('{h}ч{m}', { h: Math.floor(v / 60), m: v % 60 ? v % 60 : '' }) : String(v))} tone="ok" />
       </div>
 
       <div className="card fx-panel">
         <div className="row fx-panel-head">
-          <h3 className="grow">По спискам</h3>
-          <span className="small muted">за {range} {plural(range, 'день', 'дня', 'дней')}</span>
+          <h3 className="grow">{t('По спискам')}</h3>
+          <span className="small muted">{t('за {n} {days}', { n: range, days: tn(range, 'день', 'дня', 'дней') })}</span>
         </div>
         {byList.length === 0 ? (
-          <div className="faint small">Пока нет выполненных задач</div>
+          <div className="faint small">{t('Пока нет выполненных задач')}</div>
         ) : (
           <div className="fx-hbars">
             {byList.map((x) => (
@@ -547,9 +548,9 @@ function StatsTab({ data }: { data: TasksData }) {
       <div className="card fx-panel fx-bestday">
         <Trophy size={22} weight="fill" />
         <div className="grow">
-          <div className="small muted">Лучший день недели</div>
+          <div className="small muted">{t('Лучший день недели')}</div>
           <div className="bold">
-            {st.bestWd >= 0 ? `${WEEKDAYS[st.bestWd]} — ${st.maxWd} ${plural(st.maxWd, 'задача', 'задачи', 'задач')}` : 'Пока недостаточно данных'}
+            {st.bestWd >= 0 ? `${WEEKDAYS[st.bestWd]} — ${st.maxWd} ${tn(st.maxWd, 'задача', 'задачи', 'задач')}` : t('Пока недостаточно данных')}
           </div>
         </div>
       </div>
@@ -626,15 +627,15 @@ function CountdownsTab({ data }: { data: TasksData }) {
   return (
     <div className="fx-cd">
       <div className="row fx-cd-head">
-        <div className="grow muted small">Дни рождения, праздники, поездки и важные даты</div>
+        <div className="grow muted small">{t('Дни рождения, праздники, поездки и важные даты')}</div>
         <button className="btn btn-sm btn-primary" onClick={() => setEdit('new')}>
-          <Plus size={16} weight="bold" /> Добавить
+          <Plus size={16} weight="bold" /> {t('Добавить')}
         </button>
       </div>
       {items.length === 0 ? (
         <div className="empty">
           <IconTile icon={Hourglass} tone="indigo" size="lg" />
-          <div>Добавьте событие, чтобы видеть, сколько дней до него осталось</div>
+          <div>{t('Добавьте событие, чтобы видеть, сколько дней до него осталось')}</div>
         </div>
       ) : (
         <div className="fx-cd-grid">
@@ -645,17 +646,17 @@ function CountdownsTab({ data }: { data: TasksData }) {
                 <span className="fx-cd-title ellipsis">{c.title}</span>
                 <span className="tiny faint">
                   {shortDate(target)} {fromYmd(target).getFullYear()}
-                  {c.yearly ? ` · каждый год${years > 0 ? ` · ${years} ${plural(years, 'год', 'года', 'лет')}` : ''}` : ''}
+                  {c.yearly ? t(' · каждый год') + (years > 0 ? ` · ${years} ${tn(years, 'год', 'года', 'лет')}` : '') : ''}
                 </span>
               </span>
               <span className="fx-cd-days">
                 {diff === 0 ? (
-                  <span className="fx-cd-today">Сегодня!</span>
+                  <span className="fx-cd-today">{t('Сегодня!')}</span>
                 ) : (
                   <>
-                    <span className="tiny faint">{diff > 0 ? 'через' : 'прошло'}</span>
+                    <span className="tiny faint">{diff > 0 ? t('через') : t('прошло')}</span>
                     <span className="fx-cd-num">{Math.abs(diff)}</span>
-                    <span className="tiny faint">{plural(Math.abs(diff), 'день', 'дня', 'дней')}</span>
+                    <span className="tiny faint">{tn(diff < 0 ? -diff : diff, 'день', 'дня', 'дней')}</span>
                   </>
                 )}
               </span>
@@ -676,8 +677,8 @@ function CountdownModal({ item, onClose }: { item: Countdown | null; onClose: ()
   const [yearly, setYearly] = useState(!!item?.yearly);
 
   const save = () => {
-    if (!title.trim()) return toast('Введите название');
-    if (!date) return toast('Выберите дату');
+    if (!title.trim()) return toast(t('Введите название'));
+    if (!date) return toast(t('Выберите дату'));
     const c: Countdown = { id: item?.id ?? uid(), title: title.trim(), date, emoji, color };
     if (yearly) c.yearly = true;
     saveCountdown(c);
@@ -685,7 +686,7 @@ function CountdownModal({ item, onClose }: { item: Countdown | null; onClose: ()
   };
   const remove = async () => {
     if (!item) return;
-    if (await confirmDialog('Удалить отсчёт?', `«${item.title}» будет удалён.`, { okText: 'Удалить', danger: true })) {
+    if (await confirmDialog(t('Удалить отсчёт?'), t('«{name}» будет удалён.', { name: item.title }), { okText: t('Удалить'), danger: true })) {
       deleteCountdown(item.id);
       onClose();
     }
@@ -695,27 +696,27 @@ function CountdownModal({ item, onClose }: { item: Countdown | null; onClose: ()
     <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal" onKeyDown={(e) => e.key === 'Escape' && onClose()}>
         <div className="row">
-          <h2 className="grow">{item ? 'Отсчёт' : 'Новый отсчёт'}</h2>
-          <button className="icon-btn" onClick={onClose} aria-label="Закрыть">
+          <h2 className="grow">{item ? t('Отсчёт') : t('Новый отсчёт')}</h2>
+          <button className="icon-btn" onClick={onClose} aria-label={t('Закрыть')}>
             <X />
           </button>
         </div>
-        <label className="label">Название</label>
+        <label className="label">{t('Название')}</label>
         <input
           className="input"
           value={title}
-          placeholder="Например, День рождения мамы"
+          placeholder={t('Например, День рождения мамы')}
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && save()}
           autoFocus={!item}
         />
-        <label className="label">Дата</label>
+        <label className="label">{t('Дата')}</label>
         <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         <label className="row fx-check">
           <input type="checkbox" checked={yearly} onChange={(e) => setYearly(e.target.checked)} />
-          <span>Каждый год (дни рождения, годовщины)</span>
+          <span>{t('Каждый год (дни рождения, годовщины)')}</span>
         </label>
-        <label className="label">Значок</label>
+        <label className="label">{t('Значок')}</label>
         <div className="fx-emojis">
           {EMOJIS.map((e) => (
             <button key={e} className={'fx-emoji' + (emoji === e ? ' active' : '')} onClick={() => setEmoji(e)}>
@@ -723,7 +724,7 @@ function CountdownModal({ item, onClose }: { item: Countdown | null; onClose: ()
             </button>
           ))}
         </div>
-        <label className="label">Цвет</label>
+        <label className="label">{t('Цвет')}</label>
         <div className="fx-swatches">
           {LIST_COLORS.map((c) => (
             <button key={c} className={'fx-swatch' + (color === c ? ' active' : '')} style={{ background: c }} onClick={() => setColor(c)} aria-label={c} />
@@ -732,15 +733,15 @@ function CountdownModal({ item, onClose }: { item: Countdown | null; onClose: ()
         <div className="modal-actions">
           {item && (
             <button className="btn btn-ghost fx-danger" onClick={() => void remove()}>
-              <Trash size={16} /> Удалить
+              <Trash size={16} /> {t('Удалить')}
             </button>
           )}
           <div className="grow" />
           <button className="btn btn-ghost" onClick={onClose}>
-            Отмена
+            {t('Отмена')}
           </button>
           <button className="btn btn-primary" onClick={save}>
-            Сохранить
+            {t('Сохранить')}
           </button>
         </div>
       </div>

@@ -1,3 +1,4 @@
+import { LOCALE, t } from '../i18n/index';
 import { useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import {
   CalendarDays,
@@ -82,13 +83,13 @@ type Sel = { k: 'smart'; id: SmartId } | { k: 'list'; id: string } | { k: 'tag';
 type GroupBy = 'date' | 'priority' | 'list' | 'none';
 
 const SMART: { id: SmartId; name: string; icon: typeof Sun; color: string }[] = [
-  { id: 'today', name: 'Сегодня', icon: Sun, color: '#f59e0b' },
-  { id: 'tomorrow', name: 'Завтра', icon: Sunrise, color: '#f97316' },
-  { id: 'week', name: 'Следующие 7 дней', icon: CalendarRange, color: '#8b5cf6' },
-  { id: 'inbox', name: 'Входящие', icon: Inbox, color: '#3b82f6' },
-  { id: 'all', name: 'Все задачи', icon: ListTodo, color: '#14b8a6' },
-  { id: 'nodate', name: 'Без даты', icon: CalendarX2, color: '#64748b' },
-  { id: 'maps', name: 'Из карт', icon: Network, color: '#ec4899' },
+  { id: 'today', name: t('Сегодня'), icon: Sun, color: '#f59e0b' },
+  { id: 'tomorrow', name: t('Завтра'), icon: Sunrise, color: '#f97316' },
+  { id: 'week', name: t('Следующие 7 дней'), icon: CalendarRange, color: '#8b5cf6' },
+  { id: 'inbox', name: t('Входящие'), icon: Inbox, color: '#3b82f6' },
+  { id: 'all', name: t('Все задачи'), icon: ListTodo, color: '#14b8a6' },
+  { id: 'nodate', name: t('Без даты'), icon: CalendarX2, color: '#64748b' },
+  { id: 'maps', name: t('Из карт'), icon: Network, color: '#ec4899' },
 ];
 
 function readLS<T>(key: string, def: T): T {
@@ -163,11 +164,11 @@ interface Group {
 }
 
 function groupTasks(tasks: TaskItem[], by: GroupBy, d: TasksData, today: string, perDay: boolean): Group[] {
-  if (by === 'none') return [{ key: 'all', title: 'Задачи', tasks }];
+  if (by === 'none') return [{ key: 'all', title: t('Задачи'), tasks }];
   if (by === 'priority') {
     return ([1, 2, 3, 0] as Priority[]).map((p) => ({
       key: 'p' + p,
-      title: p ? PRIORITY_META[p].label + ' приоритет' : 'Без приоритета',
+      title: p ? t('{level} приоритет', { level: PRIORITY_META[p].label }) : t('Без приоритета'),
       color: p ? PRIORITY_META[p].color : undefined,
       tasks: tasks.filter((t) => t.priority === p),
       drop: { priority: p },
@@ -179,13 +180,13 @@ function groupTasks(tasks: TaskItem[], by: GroupBy, d: TasksData, today: string,
       .map((l) => ({ key: l.id, title: (l.emoji ? l.emoji + ' ' : '') + l.name, color: l.color, tasks: tasks.filter((t) => t.listId === l.id), drop: { listId: l.id } }));
   }
   const g: Group[] = [
-    { key: 'overdue', title: 'Просрочено', color: 'var(--danger)', tasks: [] },
-    { key: 'today', title: 'Сегодня', color: '#3b82f6', tasks: [], drop: { date: today } },
-    { key: 'tomorrow', title: 'Завтра', tasks: [], drop: { date: addDaysYmd(today, 1) } },
+    { key: 'overdue', title: t('Просрочено'), color: 'var(--danger)', tasks: [] },
+    { key: 'today', title: t('Сегодня'), color: '#3b82f6', tasks: [], drop: { date: today } },
+    { key: 'tomorrow', title: t('Завтра'), tasks: [], drop: { date: addDaysYmd(today, 1) } },
   ];
   if (perDay) for (let i = 2; i < 7; i++) g.push({ key: 'd' + i, title: `${dayLabel(addDaysYmd(today, i), today)} · ${longDate(addDaysYmd(today, i)).split(', ')[1]}`, tasks: [], drop: { date: addDaysYmd(today, i) } });
-  else g.push({ key: 'week', title: 'Следующие 7 дней', tasks: [], drop: { date: addDaysYmd(today, 2) } });
-  g.push({ key: 'later', title: 'Позже', tasks: [] }, { key: 'nodate', title: 'Без даты', tasks: [], drop: { date: undefined } });
+  else g.push({ key: 'week', title: t('Следующие 7 дней'), tasks: [], drop: { date: addDaysYmd(today, 2) } });
+  g.push({ key: 'later', title: t('Позже'), tasks: [] }, { key: 'nodate', title: t('Без даты'), tasks: [], drop: { date: undefined } });
   const at = (k: string) => g.find((x) => x.key === k)!;
   for (const t of tasks) {
     if (!t.date) at('nodate').tasks.push(t);
@@ -295,7 +296,7 @@ export default function Tasks() {
       <div className="page">
         <div className="page-header">
           <IconTile section="tasks" size="sm" className="ph-tile" />
-          <h1>Задачи</h1>
+          <h1>{t('Задачи')}</h1>
         </div>
         <div className="loading">
           <div className="spinner" />
@@ -310,18 +311,18 @@ export default function Tasks() {
   const smart = sel.k === 'smart' ? SMART.find((s) => s.id === sel.id) : undefined;
   const title =
     sel.k === 'matrix'
-      ? 'Матрица Эйзенхауэра'
+      ? t('Матрица Эйзенхауэра')
       : sel.k === 'smart'
         ? sel.id === 'completed'
-          ? 'Выполненные'
+          ? t('Выполненные')
           : sel.id === 'trash'
-            ? 'Корзина'
-            : smart?.name ?? 'Задачи'
+            ? t('Корзина')
+            : smart?.name ?? t('Задачи')
         : sel.k === 'list'
           ? (curList?.emoji ? curList.emoji + ' ' : '') + (curList?.name ?? '')
           : sel.k === 'tag'
             ? '#' + sel.id
-            : curFilter?.name ?? 'Фильтр';
+            : curFilter?.name ?? t('Фильтр');
 
   const { q, all, active, done, effectiveGroup, groups, listById } = listView;
   const isTrash = sel.k === 'smart' && sel.id === 'trash';
@@ -371,10 +372,10 @@ export default function Tasks() {
   const nav = (
     <div className="tk-nav-inner">
       {SMART.map((s) => navItem('smart:' + s.id, { k: 'smart', id: s.id }, <s.icon size={18} />, s.name, s.color))}
-      {navItem('matrix', { k: 'matrix' }, <Grid2x2 size={18} />, 'Матрица Эйзенхауэра', '#ef4444')}
+      {navItem('matrix', { k: 'matrix' }, <Grid2x2 size={18} />, t('Матрица Эйзенхауэра'), '#ef4444')}
       <div className="tk-nav-sec">
-        <span>Списки</span>
-        <button className="icon-btn" onClick={() => setListDlg({})} aria-label="Новый список">
+        <span>{t('Списки')}</span>
+        <button className="icon-btn" onClick={() => setListDlg({})} aria-label={t('Новый список')}>
           <Plus />
         </button>
       </div>
@@ -382,22 +383,22 @@ export default function Tasks() {
         .sort((a, b) => a.order - b.order)
         .map((l) => navItem('list:' + l.id, { k: 'list', id: l.id }, l.emoji ? <span className="tk-emoji">{l.emoji}</span> : <i className="tk-dot" style={{ background: l.color }} />, l.name, l.color))}
       <div className="tk-nav-sec">
-        <span>Фильтры</span>
-        <button className="icon-btn" onClick={() => setFilterDlg({ id: uid(), name: '', color: LIST_COLORS[data.filters.length % LIST_COLORS.length] })} aria-label="Новый фильтр">
+        <span>{t('Фильтры')}</span>
+        <button className="icon-btn" onClick={() => setFilterDlg({ id: uid(), name: '', color: LIST_COLORS[data.filters.length % LIST_COLORS.length] })} aria-label={t('Новый фильтр')}>
           <Plus />
         </button>
       </div>
-      {data.filters.length === 0 && <div className="tk-nav-hint tiny faint">Свои подборки: по спискам, тегам, приоритету и сроку</div>}
+      {data.filters.length === 0 && <div className="tk-nav-hint tiny faint">{t('Свои подборки: по спискам, тегам, приоритету и сроку')}</div>}
       {data.filters.map((f) => navItem('filter:' + f.id, { k: 'filter', id: f.id }, <Filter size={17} />, f.name, f.color))}
       {tagNames.length > 0 && (
         <div className="tk-nav-sec">
-          <span>Теги</span>
+          <span>{t('Теги')}</span>
         </div>
       )}
       {tagNames.map((g) => navItem('tag:' + g, { k: 'tag', id: g }, <Hash size={17} />, g, data.tagColors[g]))}
       <div className="tk-nav-sep" />
-      {navItem('smart:completed', { k: 'smart', id: 'completed' }, <CheckCircle2 size={18} />, 'Выполненные', '#22c55e')}
-      {navItem('smart:trash', { k: 'smart', id: 'trash' }, <Trash2 size={18} />, 'Корзина', '#94a3b8')}
+      {navItem('smart:completed', { k: 'smart', id: 'completed' }, <CheckCircle2 size={18} />, t('Выполненные'), '#22c55e')}
+      {navItem('smart:trash', { k: 'smart', id: 'trash' }, <Trash2 size={18} />, t('Корзина'), '#94a3b8')}
     </div>
   );
 
@@ -408,7 +409,7 @@ export default function Tasks() {
       ))}
       {ts.length > rowCap && (
         <button className="tk-more-rows" onClick={() => setRowCap((n) => n + 300)}>
-          Показать ещё {Math.min(300, ts.length - rowCap)} из {ts.length - rowCap}
+          {t('Показать ещё {n} из {total}', { n: Math.min(300, ts.length - rowCap), total: ts.length - rowCap })}
         </button>
       )}
     </>
@@ -420,7 +421,7 @@ export default function Tasks() {
       return (
         <div className="tk-groups">
           {all.length === 0 ? (
-            <Empty icon={<Trash2 />} text="Корзина пуста" />
+            <Empty icon={<Trash2 />} text={t('Корзина пуста')} />
           ) : (
             <section className="tk-group">
               {all.map((t) => (
@@ -450,7 +451,7 @@ export default function Tasks() {
                 <div className="tk-kcol-body">{renderRows(g.tasks)}</div>
                 {g.drop && (
                   <button className="tk-kcol-add" onClick={() => openQuickAdd({ ...preset, ...g.drop })}>
-                    <Plus size={15} /> Добавить
+                    <Plus size={15} /> {t('Добавить')}
                   </button>
                 )}
               </DropZone>
@@ -473,10 +474,10 @@ export default function Tasks() {
                       onClick={(e) => {
                         e.stopPropagation();
                         for (const t of g.tasks) updateTask(t.id, { date: today });
-                        toast(`Перенесено на сегодня: ${g.tasks.length}`);
+                        toast(t('Перенесено на сегодня: {n}', { n: g.tasks.length }));
                       }}
                     >
-                      Перенести на сегодня
+                      {t('Перенести на сегодня')}
                     </button>
                   ) : undefined
                 }
@@ -485,18 +486,18 @@ export default function Tasks() {
               </Collapsible>
             ))}
             {mapList.length > 0 && (
-              <Collapsible title="Из карт" color="#ec4899" count={mapList.length}>
+              <Collapsible title={t('Из карт')} color="#ec4899" count={mapList.length}>
                 {mapList.map((m) => (
                   <MapRow key={m.docId + m.topicId} m={m} onToggle={() => toggleMap(m, setMapTasks)} />
                 ))}
               </Collapsible>
             )}
-            {active.length === 0 && mapList.length === 0 && <Empty icon={<Check />} text={q ? 'Ничего не найдено' : 'Здесь пока нет задач. Добавьте первую!'} />}
+            {active.length === 0 && mapList.length === 0 && <Empty icon={<Check />} text={q ? t('Ничего не найдено') : t('Здесь пока нет задач. Добавьте первую!')} />}
             {done.length > 0 && !data.prefs.hideCompleted && (
               <section className="tk-group tk-done-group">
                 <button className="tk-group-head tk-toggle" onClick={() => setShowDone(!showDone)}>
                   {showDone ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                  <span className="tk-group-title">Выполненные</span>
+                  <span className="tk-group-title">{t('Выполненные')}</span>
                   <span className="tk-group-count">{done.length}</span>
                 </button>
                 {showDone && renderRows(done.slice(0, 100))}
@@ -519,64 +520,64 @@ export default function Tasks() {
       <div className="page-header tk-header">
         <IconTile section="tasks" size="sm" className="ph-tile" />
         <button className="tk-title-btn" onClick={() => setDrawer(true)}>
-          <h1 className="ellipsis">{q ? 'Поиск' : title}</h1>
+          <h1 className="ellipsis">{q ? t('Поиск') : title}</h1>
           <ChevronDown size={18} className="tk-mobile-only" />
         </button>
         <div className="grow" />
         {/* телефон: календарь — соседний вид задач (вкладка «Сегодня») */}
-        <button className="icon-btn phone-only" onClick={() => useApp.getState().go('calendar')} aria-label="Календарь" title="Календарь">
+        <button className="icon-btn phone-only" onClick={() => useApp.getState().go('calendar')} aria-label={t('Календарь')} title={t('Календарь')}>
           <CalendarDays />
         </button>
         {query !== null ? (
           <div className="tk-search">
             <Search size={16} />
-            <input autoFocus value={query} placeholder="Поиск задач" onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Escape' && setQuery(null)} />
-            <button className="icon-btn" onClick={() => setQuery(null)} aria-label="Закрыть поиск">
+            <input autoFocus value={query} placeholder={t('Поиск задач')} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Escape' && setQuery(null)} />
+            <button className="icon-btn" onClick={() => setQuery(null)} aria-label={t('Закрыть поиск')}>
               <X />
             </button>
           </div>
         ) : (
-          <button className="icon-btn" onClick={() => setQuery('')} aria-label="Поиск">
+          <button className="icon-btn" onClick={() => setQuery('')} aria-label={t('Поиск')}>
             <Search />
           </button>
         )}
         {sel.k !== 'matrix' && !isTrash && !isCompleted && (
           <div className="segmented tk-mode">
-            <button className={mode === 'list' ? 'active' : ''} onClick={() => setMode('list')} aria-label="Список">
+            <button className={mode === 'list' ? 'active' : ''} onClick={() => setMode('list')} aria-label={t('Список')}>
               <LayoutList size={16} />
             </button>
-            <button className={mode === 'kanban' ? 'active' : ''} onClick={() => setMode('kanban')} aria-label="Канбан">
+            <button className={mode === 'kanban' ? 'active' : ''} onClick={() => setMode('kanban')} aria-label={t('Канбан')}>
               <Columns3 size={16} />
             </button>
           </div>
         )}
         <div className="td-pop-anchor">
-          <button className="icon-btn" onClick={() => setMenu(!menu)} aria-label="Ещё">
+          <button className="icon-btn" onClick={() => setMenu(!menu)} aria-label={t('Ещё')}>
             <MoreHorizontal />
           </button>
           {menu && (
             <>
               <div className="td-pop right tk-menu" onClick={() => setMenu(false)}>
-                <div className="td-pop-label">Сортировка</div>
+                <div className="td-pop-label">{t('Сортировка')}</div>
                 {(
                   [
-                    ['date', 'По дате'],
-                    ['priority', 'По приоритету'],
-                    ['title', 'По названию'],
-                    ['created', 'Сначала новые'],
+                    ['date', t('По дате')],
+                    ['priority', t('По приоритету')],
+                    ['title', t('По названию')],
+                    ['created', t('Сначала новые')],
                   ] as const
                 ).map(([k, l]) => (
                   <button key={k} className={data.prefs.sortBy === k ? 'active' : ''} onClick={() => setPrefs({ sortBy: k })}>
                     {data.prefs.sortBy === k ? <Check size={16} /> : <span className="tk-sp" />} {l}
                   </button>
                 ))}
-                <div className="td-pop-label">Группировка</div>
+                <div className="td-pop-label">{t('Группировка')}</div>
                 {(
                   [
-                    ['date', 'По дате'],
-                    ['priority', 'По приоритету'],
-                    ['list', 'По спискам'],
-                    ['none', 'Без групп'],
+                    ['date', t('По дате')],
+                    ['priority', t('По приоритету')],
+                    ['list', t('По спискам')],
+                    ['none', t('Без групп')],
                   ] as const
                 ).map(([k, l]) => (
                   <button key={k} className={groupBy === k ? 'active' : ''} onClick={() => setGroupBy(k)}>
@@ -585,36 +586,36 @@ export default function Tasks() {
                 ))}
                 <div className="sep" />
                 <button onClick={() => setTplOpen(true)}>
-                  <LayoutTemplate size={16} /> Из шаблона…
+                  <LayoutTemplate size={16} /> {t('Из шаблона…')}
                 </button>
                 {canBulk && (
                   <button onClick={() => startSelect()}>
-                    <CheckSquare size={16} /> Выбрать задачи
+                    <CheckSquare size={16} /> {t('Выбрать задачи')}
                   </button>
                 )}
                 <button onClick={() => setPrefs({ hideCompleted: !data.prefs.hideCompleted })}>
-                  <Layers size={16} /> {data.prefs.hideCompleted ? 'Показывать выполненные' : 'Скрыть выполненные'}
+                  <Layers size={16} /> {data.prefs.hideCompleted ? t('Показывать выполненные') : t('Скрыть выполненные')}
                 </button>
                 <button onClick={exportCurrent}>
-                  <CalendarPlus size={16} /> Экспорт в календарь (.ics)
+                  <CalendarPlus size={16} /> {t('Экспорт в календарь (.ics)')}
                 </button>
                 <button onClick={() => useApp.getState().go('calendar')}>
-                  <CalendarDays size={16} /> Открыть календарь
+                  <CalendarDays size={16} /> {t('Открыть календарь')}
                 </button>
                 {curList && (
                   <>
                     <div className="sep" />
                     <button onClick={() => setListDlg({ id: curList.id })}>
-                      <Pencil size={16} /> Изменить список
+                      <Pencil size={16} /> {t('Изменить список')}
                     </button>
                     {curList.id !== 'inbox' && (
                       <button
                         className="danger"
                         onClick={async () => {
-                          if (await confirmDialog(`Удалить список «${curList.name}»?`, 'Задачи списка будут перемещены в корзину.', { danger: true, okText: 'Удалить' })) deleteList(curList.id);
+                          if (await confirmDialog(t('Удалить список «{name}»?', { name: curList.name }), t('Задачи списка будут перемещены в корзину.'), { danger: true, okText: t('Удалить') })) deleteList(curList.id);
                         }}
                       >
-                        <Trash2 size={16} /> Удалить список
+                        <Trash2 size={16} /> {t('Удалить список')}
                       </button>
                     )}
                   </>
@@ -624,7 +625,7 @@ export default function Tasks() {
                     <div className="sep" />
                     <button
                       onClick={async () => {
-                        const v = await askText('Переименовать тег', { value: sel.id });
+                        const v = await askText(t('Переименовать тег'), { value: sel.id });
                         const n = v?.trim().replace(/^#/, '').replace(/\s+/g, '_');
                         if (n && n !== sel.id) {
                           renameTag(sel.id, n);
@@ -632,7 +633,7 @@ export default function Tasks() {
                         }
                       }}
                     >
-                      <Pencil size={16} /> Переименовать тег
+                      <Pencil size={16} /> {t('Переименовать тег')}
                     </button>
                     <div className="tk-colors">
                       {LIST_COLORS.map((c) => (
@@ -642,10 +643,10 @@ export default function Tasks() {
                     <button
                       className="danger"
                       onClick={async () => {
-                        if (await confirmDialog(`Удалить тег #${sel.id}?`, 'Тег будет убран из всех задач.', { danger: true, okText: 'Удалить' })) deleteTag(sel.id);
+                        if (await confirmDialog(t('Удалить тег #{tag}?', { tag: sel.id }), t('Тег будет убран из всех задач.'), { danger: true, okText: t('Удалить') })) deleteTag(sel.id);
                       }}
                     >
-                      <Trash2 size={16} /> Удалить тег
+                      <Trash2 size={16} /> {t('Удалить тег')}
                     </button>
                   </>
                 )}
@@ -653,10 +654,10 @@ export default function Tasks() {
                   <>
                     <div className="sep" />
                     <button onClick={() => setFilterDlg(curFilter)}>
-                      <Pencil size={16} /> Изменить фильтр
+                      <Pencil size={16} /> {t('Изменить фильтр')}
                     </button>
                     <button className="danger" onClick={() => deleteFilter(curFilter.id)}>
-                      <Trash2 size={16} /> Удалить фильтр
+                      <Trash2 size={16} /> {t('Удалить фильтр')}
                     </button>
                   </>
                 )}
@@ -666,10 +667,10 @@ export default function Tasks() {
                     <button
                       className="danger"
                       onClick={async () => {
-                        if (await confirmDialog('Очистить корзину?', 'Задачи будут удалены навсегда.', { danger: true, okText: 'Очистить' })) emptyTrash();
+                        if (await confirmDialog(t('Очистить корзину?'), t('Задачи будут удалены навсегда.'), { danger: true, okText: t('Очистить') })) emptyTrash();
                       }}
                     >
-                      <Trash2 size={16} /> Очистить корзину
+                      <Trash2 size={16} /> {t('Очистить корзину')}
                     </button>
                   </>
                 )}
@@ -688,7 +689,7 @@ export default function Tasks() {
       {bulkOn && canBulk ? (
         <BulkBar visible={shownIds} />
       ) : (
-        <button className="tk-fab" onClick={() => openQuickAdd(sel.k === 'matrix' ? {} : preset)} aria-label="Новая задача">
+        <button className="tk-fab" onClick={() => openQuickAdd(sel.k === 'matrix' ? {} : preset)} aria-label={t('Новая задача')}>
           <Plus size={26} />
         </button>
       )}
@@ -733,7 +734,7 @@ function MapRow({ m, onToggle }: { m: MapTask; onToggle: () => void }) {
       <div className="tk-row" onClick={() => void openDoc(m.docId, m.topicId)}>
         <TaskCheck task={{ done: m.task.status === 'done', priority: (m.task.priority ?? 0) as Priority }} onToggle={onToggle} />
         <div className="tk-body">
-          <div className="tk-title">{m.text || 'Без названия'}</div>
+          <div className="tk-title">{m.text || t('Без названия')}</div>
           <div className="tk-meta">
             {m.task.due && <span className={`tk-when${m.task.due < today ? ' overdue' : m.task.due === today ? ' today' : ''}`}>{dayLabel(m.task.due, today)}</span>}
             <Network size={12} className="tk-mi" />
@@ -850,7 +851,7 @@ function Matrix({ data }: { data: TasksData }) {
               {ts.map((t) => (
                 <TaskRow key={t.id} task={t} list={data.lists.find((l) => l.id === t.listId)} showList={false} tagColors={data.tagColors} draggable />
               ))}
-              {ts.length === 0 && <div className="tiny faint tk-quad-empty">Нет задач</div>}
+              {ts.length === 0 && <div className="tiny faint tk-quad-empty">{t('Нет задач')}</div>}
             </div>
             <div className="tk-quad-add">
               <SmartInput preset={{ priority: qd.priority }} compact />
@@ -875,7 +876,7 @@ function CompletedView({ data }: { data: TasksData }) {
     const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     byDay.set(k, [...(byDay.get(k) ?? []), e]);
   }
-  if (!entries.length) return <Empty icon={<CheckCircle2 />} text="Выполненных задач пока нет" />;
+  if (!entries.length) return <Empty icon={<CheckCircle2 />} text={t('Выполненных задач пока нет')} />;
   return (
     <div className="tk-groups">
       {[...byDay.entries()].map(([day, es]) => (
@@ -887,19 +888,19 @@ function CompletedView({ data }: { data: TasksData }) {
             <span className="tk-group-count">{es.length}</span>
           </div>
           {es.map((e, i) => {
-            const t = taskById.get(e.taskId);
+            const task = taskById.get(e.taskId);
             const list = listById.get(e.listId);
             return (
               <div key={e.taskId + e.at + i} className="tk-row-wrap">
-                <div className="tk-row is-done" onClick={() => t && openTask(t.id)}>
+                <div className="tk-row is-done" onClick={() => task && openTask(task.id)}>
                   <span className="tk-check on static">
                     <Check size={13} strokeWidth={3.2} />
                   </span>
                   <div className="tk-body">
                     <div className="tk-title">{e.title}</div>
                     <div className="tk-meta">
-                      {new Date(e.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
-                      {t?.repeat && ' · повторяющаяся'}
+                      {new Date(e.at).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' })}
+                      {task?.repeat && t(' · повторяющаяся')}
                     </div>
                   </div>
                   {list && (
@@ -941,10 +942,10 @@ function ListDialog({ id, onClose, onCreated }: { id?: string; onClose: () => vo
   return (
     <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal">
-        <h2>{cur ? 'Изменить список' : 'Новый список'}</h2>
-        <label className="label">Название</label>
-        <input className="input" autoFocus value={name} placeholder="Напр. «Покупки», «Проект X»" onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && save()} />
-        <label className="label">Значок</label>
+        <h2>{cur ? t('Изменить список') : t('Новый список')}</h2>
+        <label className="label">{t('Название')}</label>
+        <input className="input" autoFocus value={name} placeholder={t('Напр. «Покупки», «Проект X»')} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && save()} />
+        <label className="label">{t('Значок')}</label>
         <div className="tk-emojis">
           <button className={`tk-emoji-btn${!emoji ? ' on' : ''}`} onClick={() => setEmoji(undefined)}>
             <i className="tk-dot" style={{ background: color }} />
@@ -955,7 +956,7 @@ function ListDialog({ id, onClose, onCreated }: { id?: string; onClose: () => vo
             </button>
           ))}
         </div>
-        <label className="label">Цвет</label>
+        <label className="label">{t('Цвет')}</label>
         <div className="tk-colors">
           {LIST_COLORS.map((c) => (
             <button key={c} className={`kb-swatch${c === color ? ' active' : ''}`} style={{ background: c }} onClick={() => setColor(c)} aria-label={c} />
@@ -963,10 +964,10 @@ function ListDialog({ id, onClose, onCreated }: { id?: string; onClose: () => vo
         </div>
         <div className="modal-actions">
           <button className="btn" onClick={onClose}>
-            Отмена
+            {t('Отмена')}
           </button>
           <button className="btn btn-primary" onClick={save} disabled={!name.trim()}>
-            {cur ? 'Сохранить' : 'Создать'}
+            {cur ? t('Сохранить') : t('Создать')}
           </button>
         </div>
       </div>
@@ -975,13 +976,13 @@ function ListDialog({ id, onClose, onCreated }: { id?: string; onClose: () => vo
 }
 
 const WHEN_OPTIONS: [WhenFilter, string][] = [
-  ['any', 'Любой срок'],
-  ['overdue', 'Просроченные'],
-  ['today', 'Сегодня и просроченные'],
-  ['tomorrow', 'Завтра'],
-  ['week', 'Ближайшие 7 дней'],
-  ['hasdate', 'Есть срок'],
-  ['nodate', 'Без срока'],
+  ['any', t('Любой срок')],
+  ['overdue', t('Просроченные')],
+  ['today', t('Сегодня и просроченные')],
+  ['tomorrow', t('Завтра')],
+  ['week', t('Ближайшие 7 дней')],
+  ['hasdate', t('Есть срок')],
+  ['nodate', t('Без срока')],
 ];
 
 function FilterDialog({ filter, data, onClose, onSave }: { filter: TaskFilter; data: TasksData; onClose: () => void; onSave: (f: TaskFilter) => void }) {
@@ -992,10 +993,10 @@ function FilterDialog({ filter, data, onClose, onSave }: { filter: TaskFilter; d
   return (
     <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal">
-        <h2>{filter.name ? 'Изменить фильтр' : 'Новый фильтр'}</h2>
-        <label className="label">Название</label>
-        <input className="input" autoFocus value={f.name} placeholder="Напр. «Срочное по работе»" onChange={(e) => setF({ ...f, name: e.target.value })} />
-        <label className="label">Списки</label>
+        <h2>{filter.name ? t('Изменить фильтр') : t('Новый фильтр')}</h2>
+        <label className="label">{t('Название')}</label>
+        <input className="input" autoFocus value={f.name} placeholder={t('Напр. «Срочное по работе»')} onChange={(e) => setF({ ...f, name: e.target.value })} />
+        <label className="label">{t('Списки')}</label>
         <div className="tk-chips">
           {data.lists.map((l) => (
             <button key={l.id} className={`chip${f.lists?.includes(l.id) ? ' active' : ''}`} onClick={() => setF({ ...f, lists: toggle(f.lists, l.id) })}>
@@ -1005,7 +1006,7 @@ function FilterDialog({ filter, data, onClose, onSave }: { filter: TaskFilter; d
         </div>
         {tags.length > 0 && (
           <>
-            <label className="label">Теги</label>
+            <label className="label">{t('Теги')}</label>
             <div className="tk-chips">
               {tags.map((g) => (
                 <button key={g} className={`chip${f.tags?.includes(g) ? ' active' : ''}`} onClick={() => setF({ ...f, tags: toggle(f.tags, g) })}>
@@ -1015,15 +1016,15 @@ function FilterDialog({ filter, data, onClose, onSave }: { filter: TaskFilter; d
             </div>
           </>
         )}
-        <label className="label">Приоритет</label>
+        <label className="label">{t('Приоритет')}</label>
         <div className="tk-chips">
           {([1, 2, 3, 0] as const).map((p) => (
             <button key={p} className={`chip${f.priorities?.includes(p) ? ' active' : ''}`} onClick={() => setF({ ...f, priorities: toggle(f.priorities, p) })}>
-              {p ? PRIORITY_META[p].label : 'Без приоритета'}
+              {p ? PRIORITY_META[p].label : t('Без приоритета')}
             </button>
           ))}
         </div>
-        <label className="label">Срок</label>
+        <label className="label">{t('Срок')}</label>
         <select className="select" value={f.when ?? 'any'} onChange={(e) => setF({ ...f, when: e.target.value as WhenFilter })}>
           {WHEN_OPTIONS.map(([k, l]) => (
             <option key={k} value={k}>
@@ -1031,15 +1032,15 @@ function FilterDialog({ filter, data, onClose, onSave }: { filter: TaskFilter; d
             </option>
           ))}
         </select>
-        <label className="label">Содержит текст</label>
-        <input className="input" value={f.query ?? ''} placeholder="Необязательно" onChange={(e) => setF({ ...f, query: e.target.value || undefined })} />
+        <label className="label">{t('Содержит текст')}</label>
+        <input className="input" value={f.query ?? ''} placeholder={t('Необязательно')} onChange={(e) => setF({ ...f, query: e.target.value || undefined })} />
         <div className="modal-actions">
-          <span className="small muted grow">Подходит задач: {matched}</span>
+          <span className="small muted grow">{t('Подходит задач: {n}', { n: matched })}</span>
           <button className="btn" onClick={onClose}>
-            Отмена
+            {t('Отмена')}
           </button>
           <button className="btn btn-primary" disabled={!f.name.trim()} onClick={() => onSave({ ...f, name: f.name.trim() })}>
-            Сохранить
+            {t('Сохранить')}
           </button>
         </div>
       </div>

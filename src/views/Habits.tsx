@@ -4,6 +4,7 @@
  * серии, и внизу «Как прошёл день» (настроение + дневник).
  * Данные — те же, что у Ежедневника (IDB 'planner').
  */
+import { t, tn } from '../i18n/index';
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode, TouchEvent as ReactTouchEvent } from 'react';
 import {
@@ -53,7 +54,6 @@ import {
   partNow,
   timesOf,
   PARTS,
-  plural,
   reminderTimeOf,
   streakText,
   targetOf,
@@ -77,22 +77,22 @@ type Days = PlannerData['days'];
 
 // ---------- Константы ----------
 
-const WEEKDAYS = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
-const WD_SHORT = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
-const MONTHS_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
-const MONTHS_SHORT = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+const WEEKDAYS = [t('воскресенье'), t('понедельник'), t('вторник'), t('среда'), t('четверг'), t('пятница'), t('суббота')];
+const WD_SHORT = [t('Вс'), t('Пн'), t('Вт'), t('Ср'), t('Чт'), t('Пт'), t('Сб')];
+const MONTHS_GEN = [t('января'), t('февраля'), t('марта'), t('апреля'), t('мая'), t('июня'), t('июля'), t('августа'), t('сентября'), t('октября'), t('ноября'), t('декабря')];
+const MONTHS_SHORT = [t('янв'), t('фев'), t('мар'), t('апр'), t('мая'), t('июн'), t('июл'), t('авг'), t('сен'), t('окт'), t('ноя'), t('дек')];
 const MOODS: { e: string; name: string }[] = [
-  { e: '🤩', name: 'Восторг' },
-  { e: '😄', name: 'Отлично' },
-  { e: '🙂', name: 'Хорошо' },
-  { e: '😐', name: 'Нормально' },
-  { e: '😕', name: 'Так себе' },
-  { e: '😴', name: 'Устал' },
-  { e: '😢', name: 'Грустно' },
-  { e: '😡', name: 'Злость' },
+  { e: '🤩', name: t('Восторг') },
+  { e: '😄', name: t('Отлично') },
+  { e: '🙂', name: t('Хорошо') },
+  { e: '😐', name: t('Нормально') },
+  { e: '😕', name: t('Так себе') },
+  { e: '😴', name: t('Устал') },
+  { e: '😢', name: t('Грустно') },
+  { e: '😡', name: t('Злость') },
 ];
 const PART_ICONS: Record<HabitPart, Icon> = { morning: SunHorizon, day: Sun, evening: MoonStars, any: Clock };
-/** быстрый старт в пустом разделе */
+/** быстрый старт в пустом разделе: названия из библиотеки привычек (сравниваются с ней — по-русски и в переводе) */
 const QUICK = ['Пить воду', 'Зарядка', 'Чтение', 'Медитация', 'Прогулка', 'Лечь спать до 23:00'];
 
 const emptyDay = (): PlannerDay => ({ journal: '', tasks: [] });
@@ -100,26 +100,26 @@ const emptyDay = (): PlannerDay => ({ journal: '', tasks: [] });
 function dateLine(ymd: string): string {
   const d = fromYmd(ymd);
   const y = d.getFullYear() !== new Date().getFullYear() ? ` ${d.getFullYear()}` : '';
-  return `${WEEKDAYS[d.getDay()]}, ${d.getDate()} ${MONTHS_GEN[d.getMonth()]}${y}`;
+  return t('{weekday}, {day} {month}', { weekday: WEEKDAYS[d.getDay()], day: d.getDate(), month: MONTHS_GEN[d.getMonth()] }) + y;
 }
 
 function relLabel(ymd: string, today: string): string {
-  if (ymd === today) return 'Сегодня';
-  if (ymd === addDaysYmd(today, -1)) return 'Вчера';
-  if (ymd === addDaysYmd(today, 1)) return 'Завтра';
+  if (ymd === today) return t('Сегодня');
+  if (ymd === addDaysYmd(today, -1)) return t('Вчера');
+  if (ymd === addDaysYmd(today, 1)) return t('Завтра');
   const n = Math.round((fromYmd(today).getTime() - fromYmd(ymd).getTime()) / 86400000);
-  return n > 0 ? `${n} ${plural(n, ['день', 'дня', 'дней'])} назад` : `Через ${-n} ${plural(-n, ['день', 'дня', 'дней'])}`;
+  return n > 0 ? t('{n} {days} назад', { n, days: tn(n, 'день', 'дня', 'дней') }) : t('Через {n} {days}', { n: -n, days: tn(-n, 'день', 'дня', 'дней') });
 }
 
 function weekLabel(mon: string, today: string): string {
   const cur = mondayOf(today);
-  if (mon === cur) return 'Эта неделя';
-  if (mon === addDaysYmd(cur, -7)) return 'Прошлая неделя';
+  if (mon === cur) return t('Эта неделя');
+  if (mon === addDaysYmd(cur, -7)) return t('Прошлая неделя');
   const a = fromYmd(mon);
   const b = fromYmd(addDaysYmd(mon, 6));
   return a.getMonth() === b.getMonth()
-    ? `${a.getDate()}–${b.getDate()} ${MONTHS_SHORT[b.getMonth()]}`
-    : `${a.getDate()} ${MONTHS_SHORT[a.getMonth()]} – ${b.getDate()} ${MONTHS_SHORT[b.getMonth()]}`;
+    ? t('{from}–{to} {month}', { from: a.getDate(), to: b.getDate(), month: MONTHS_SHORT[b.getMonth()] })
+    : t('{from} {fromMonth} – {to} {toMonth}', { from: a.getDate(), fromMonth: MONTHS_SHORT[a.getMonth()], to: b.getDate(), toMonth: MONTHS_SHORT[b.getMonth()] });
 }
 
 /** Привычка уже существовала в этот день (до создания — не входит в план и в счёт дня) */
@@ -227,7 +227,7 @@ function usePlannerData() {
           // календарь, виджет, брифинг — пусть обновятся
           announce();
         })
-        .catch(() => toast('Не удалось сохранить привычки'))
+        .catch(() => toast(t('Не удалось сохранить привычки')))
         .finally(() => {
           pending.current--;
           if (pending.current === 0 && reloadAfter.current) {
@@ -358,7 +358,7 @@ export default function Habits() {
   // ----- действия -----
   const tap = (h: Habit, delta?: -1) => {
     if (date > today) {
-      toast('Отметить привычку заранее нельзя');
+      toast(t('Отметить привычку заранее нельзя'));
       return;
     }
     const before = ref.current;
@@ -381,7 +381,7 @@ export default function Habits() {
       const allNow = list.length > 0 && list.every((x) => doneOn(after.days, x, date));
       const allBefore = list.every((x) => doneOn(before.days, x, date));
       if (allNow && !allBefore) {
-        toast(date === today ? '🎉 Все привычки на сегодня выполнены!' : '🎉 Все привычки за этот день выполнены');
+        toast(date === today ? t('🎉 Все привычки на сегодня выполнены!') : t('🎉 Все привычки за этот день выполнены'));
         celebrate();
       }
     }
@@ -405,16 +405,16 @@ export default function Habits() {
 
   const addPreset = (h: Habit) => {
     saveHabit(h);
-    toast(`${h.icon ?? ''} «${h.name}» добавлена`.trim());
+    toast(t('{icon} «{name}» добавлена', { icon: h.icon ?? '', name: h.name }).trim());
   };
   const archiveHabit = (h: Habit, archived: boolean) => {
     saveHabit(cleanHabit({ ...h, archived }));
-    toast(archived ? 'Привычка в архиве — история сохранена' : 'Привычка снова активна');
+    toast(archived ? t('Привычка в архиве — история сохранена') : t('Привычка снова активна'));
     if (archived) setDetailId(null);
   };
   const deleteHabit = async (h: Habit) => {
-    const ok = await confirmDialog(`Удалить привычку «${h.name}»?`, 'История отметок этой привычки тоже будет удалена. Чтобы сохранить историю, отправьте привычку в архив.', {
-      okText: 'Удалить',
+    const ok = await confirmDialog(t('Удалить привычку «{name}»?', { name: h.name }), t('История отметок этой привычки тоже будет удалена. Чтобы сохранить историю, отправьте привычку в архив.'), {
+      okText: t('Удалить'),
       danger: true,
     });
     if (!ok) return;
@@ -447,8 +447,8 @@ export default function Habits() {
     if (detailId === h.id) setDetailId(null);
     haptic();
     syncSoon(300);
-    toast(`«${h.name}» удалена`, {
-      label: 'Вернуть',
+    toast(t('«{name}» удалена', { name: h.name }), {
+      label: t('Вернуть'),
       run: () => {
         const c = ref.current;
         if (!c) return;
@@ -503,21 +503,21 @@ export default function Habits() {
     <div className="page hp-page">
       {/* компактная стеклянная панель — появляется при прокрутке (src/ui/navbar.ts) */}
       <div className="page-header hp-navbar" aria-hidden="true">
-        <h1>Привычки</h1>
+        <h1>{t('Привычки')}</h1>
       </div>
       <div className="page-body hp-body">
         <div className="hp-wrap">
           {/* ----- шапка: заголовок и кнопки ----- */}
           <header className="hp-top">
-            <h1 className="hp-title">Привычки</h1>
+            <h1 className="hp-title">{t('Привычки')}</h1>
             <div className="hp-hero-actions">
-              <button className="hp-round" onClick={() => setManager('library')} aria-label="Библиотека привычек" title="Библиотека привычек">
+              <button className="hp-round" onClick={() => setManager('library')} aria-label={t('Библиотека привычек')} title={t('Библиотека привычек')}>
                 <Sparkle size={20} weight="duotone" />
               </button>
-              <button className="hp-round" onClick={() => setManager('mine')} aria-label="Мои привычки и архив" title="Мои привычки и архив">
+              <button className="hp-round" onClick={() => setManager('mine')} aria-label={t('Мои привычки и архив')} title={t('Мои привычки и архив')}>
                 <SlidersHorizontal size={20} weight="duotone" />
               </button>
-              <button className="hp-round hp-round-accent" onClick={() => setEditing('new')} aria-label="Новая привычка" title="Новая привычка">
+              <button className="hp-round hp-round-accent" onClick={() => setEditing('new')} aria-label={t('Новая привычка')} title={t('Новая привычка')}>
                 <Plus size={20} weight="bold" />
               </button>
             </div>
@@ -540,57 +540,57 @@ export default function Habits() {
                     <div className="hp-sum-big">
                       {due.length === 0 ? (
                         frozen.length > 0 ? (
-                          'Пауза ❄️'
+                          t('Пауза ❄️')
                         ) : (
-                          'Свободный день'
+                          t('Свободный день')
                         )
                       ) : (
                         <>
-                          {doneCount} из {due.length} {isToday ? 'сегодня' : future ? 'по плану' : 'за день'}
+                          {isToday ? t('{done} из {total} сегодня', { done: doneCount, total: due.length }) : future ? t('{done} из {total} по плану', { done: doneCount, total: due.length }) : t('{done} из {total} за день', { done: doneCount, total: due.length })}
                         </>
                       )}
                       {!isToday && <span className="hp-sum-date"> · {relLabel(date, today).toLowerCase()}</span>}
                     </div>
                     <div className="hp-sum-chips">
                       {bestNow && (
-                        <span className="hp-chip fire" title={`Лучшая текущая серия: «${bestNow.h.name}»`}>
+                        <span className="hp-chip fire" title={t('Лучшая текущая серия: «{name}»', { name: bestNow.h.name })}>
                           <Fire size={14} weight="fill" />
                           <b>{streakText(bestNow.s)}</b>
                         </span>
                       )}
                       {weekRate !== null && (bestNow || weekRate > 0) && (
-                        <span className="hp-chip" title="Выполнено за эту неделю">
+                        <span className="hp-chip" title={t('Выполнено за эту неделю')}>
                           <Trophy size={14} weight="duotone" />
                           <b>{Math.round(weekRate * 100)}%</b>
-                          <span className="hp-chip-dim">за неделю</span>
+                          <span className="hp-chip-dim">{t('за неделю')}</span>
                         </span>
                       )}
                       {pausedNow.length > 0 && (
                         <button
                           className="hp-chip hp-chip-pause"
                           onClick={() => (pausedNow.length === 1 ? setSheet({ id: pausedNow[0].id, stage: 'menu' }) : freeze.resume('all'))}
-                          title={pausedNow.length === 1 ? 'Пауза: возобновить или продлить' : 'Снять паузу со всех привычек'}
+                          title={pausedNow.length === 1 ? t('Пауза: возобновить или продлить') : t('Снять паузу со всех привычек')}
                         >
                           <Pause size={14} weight="fill" />
                           <b className="ellipsis">
                             {pausedNow.length === 1
                               ? pausedNow[0].name
                               : pausedNow.length === habits.length
-                                ? 'Все на паузе'
-                                : `${pausedNow.length} на паузе`}
+                                ? t('Все на паузе')
+                                : t('{n} на паузе', { n: pausedNow.length })}
                           </b>
                         </button>
                       )}
                       {!bestNow && !(weekRate !== null && weekRate > 0) && pausedNow.length === 0 && (
                         <span className="hp-sum-hint">
-                          {due.length === 0 && frozen.length > 0 ? 'Серии заморожены — они не прервутся' : heroHint(doneCount, due.length, isToday, future)}
+                          {due.length === 0 && frozen.length > 0 ? t('Серии заморожены — они не прервутся') : heroHint(doneCount, due.length, isToday, future)}
                         </span>
                       )}
                     </div>
                   </div>
                   {(date !== today || weekStart < mondayOf(today)) && (
                     <button className="hp-today-btn" onClick={() => pick(today)}>
-                      Сегодня
+                      {t('Сегодня')}
                     </button>
                   )}
                 </div>
@@ -607,15 +607,15 @@ export default function Habits() {
 
               <div className="hp-layout">
                 <main className="hp-main">
-                  {future && <div className="hp-note">Это будущий день — здесь видно, что запланировано. Отмечать можно в сам день.</div>}
+                  {future && <div className="hp-note">{t('Это будущий день — здесь видно, что запланировано. Отмечать можно в сам день.')}</div>}
                   {due.length === 0 && frozen.length === 0 && (
                     <div className="hp-free">
                       <span className="hp-free-ic">
                         <Sun size={30} weight="duotone" />
                       </span>
                       <div>
-                        <div className="hp-free-title">На этот день привычек нет по плану</div>
-                        <div className="hp-free-sub">Можно отметить любую из списка ниже — это бонус к статистике.</div>
+                        <div className="hp-free-title">{t('На этот день привычек нет по плану')}</div>
+                        <div className="hp-free-sub">{t('Можно отметить любую из списка ниже — это бонус к статистике.')}</div>
                       </div>
                     </div>
                   )}
@@ -644,7 +644,7 @@ export default function Habits() {
                         <span className="hp-part-ic">
                           <Snowflake size={22} weight="duotone" />
                         </span>
-                        <h2>Пауза и пропуски</h2>
+                        <h2>{t('Пауза и пропуски')}</h2>
                         <span className="hp-count">{frozen.length}</span>
                       </div>
                       <div className="hp-list">{frozen.map((h) => card(h, true))}</div>
@@ -654,7 +654,7 @@ export default function Habits() {
                     <section className="hp-group hp-off">
                       <button className={`hp-off-toggle${showOff ? ' open' : ''}`} onClick={() => setShowOff((v) => !v)} aria-expanded={showOff}>
                         <CaretDown size={20} weight="bold" className="hp-off-caret" />
-                        <span className="grow">{isToday ? 'Не по плану сегодня' : 'Не по плану в этот день'}</span>
+                        <span className="grow">{isToday ? t('Не по плану сегодня') : t('Не по плану в этот день')}</span>
                         <span className="hp-count">{off.length}</span>
                       </button>
                       {showOff && <div className="hp-list">{off.map((h) => card(h, true))}</div>}
@@ -740,7 +740,7 @@ export default function Habits() {
           onSave={(h) => {
             saveHabit(h);
             setEditing(null);
-            if (editing === 'new') toast(`Привычка «${h.name}» добавлена`);
+            if (editing === 'new') toast(t('Привычка «{name}» добавлена', { name: h.name }));
           }}
           onDelete={editing === 'new' ? undefined : () => void deleteHabit(editing)}
           onClose={() => setEditing(null)}
@@ -761,12 +761,12 @@ function withHabitMarks(cur: PlannerDay, old: PlannerDay, id: string): PlannerDa
 }
 
 function heroHint(done: number, total: number, isToday: boolean, future: boolean): string {
-  if (total === 0) return 'По плану ничего нет — отдыхайте или отметьте что-то сверх плана';
-  if (future) return 'Запланировано на этот день';
+  if (total === 0) return t('По плану ничего нет — отдыхайте или отметьте что-то сверх плана');
+  if (future) return t('Запланировано на этот день');
   const left = total - done;
-  if (left === 0) return isToday ? 'Всё выполнено — отличный день! 🎉' : 'Всё выполнено 🎉';
-  if (done === 0) return isToday ? 'Начните с самой простой привычки' : `Не отмечено ${total} ${plural(total, ['привычка', 'привычки', 'привычек'])}`;
-  return `Осталось ${left} ${plural(left, ['привычка', 'привычки', 'привычек'])}${isToday ? ' — вы справитесь' : ''}`;
+  if (left === 0) return isToday ? t('Всё выполнено — отличный день! 🎉') : t('Всё выполнено 🎉');
+  if (done === 0) return isToday ? t('Начните с самой простой привычки') : t('Не отмечено {n} {habits}', { n: total, habits: tn(total, 'привычка', 'привычки', 'привычек') });
+  return isToday ? t('Осталось {n} {habits} — вы справитесь', { n: left, habits: tn(left, 'привычка', 'привычки', 'привычек') }) : t('Осталось {n} {habits}', { n: left, habits: tn(left, 'привычка', 'привычки', 'привычек') });
 }
 
 // ---------- Кольца ----------
@@ -807,7 +807,7 @@ function BigRing({ done, total, size = 96 }: { done: number; total: number; size
   const v = total ? done / total : 0;
   const full = total > 0 && done === total;
   return (
-    <span className={`hp-big-ring${full ? ' full' : ''}`} style={{ width: size, height: size }} role="img" aria-label={`Выполнено ${done} из ${total}`}>
+    <span className={`hp-big-ring${full ? ' full' : ''}`} style={{ width: size, height: size }} role="img" aria-label={t('Выполнено {done} из {total}', { done, total })}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden>
         <defs>
           <linearGradient id={gid} x1="0" y1="0" x2="1" y2="1">
@@ -881,10 +881,10 @@ function WeekStrip({
     if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.4) onShift(dx > 0 ? -1 : 1);
   };
   return (
-    <div className="hp-week" aria-label="Неделя">
+    <div className="hp-week" aria-label={t('Неделя')}>
       {!atCurrent && <div className="hp-week-title">{weekLabel(weekStart, today)}</div>}
       <div className="hp-week-row">
-        <button className="hp-week-nav" onClick={() => onShift(-1)} aria-label="Предыдущая неделя">
+        <button className="hp-week-nav" onClick={() => onShift(-1)} aria-label={t('Предыдущая неделя')}>
           <CaretLeft size={16} weight="bold" />
         </button>
       <div key={weekStart} className={`hp-week-days${dir ? ` slide-${dir}` : ''}`} onTouchStart={onStart} onTouchEnd={onEnd}>
@@ -903,7 +903,7 @@ function WeekStrip({
               className={`hp-day${ymd === date ? ' sel' : ''}${ymd === today ? ' today' : ''}${fut ? ' future' : ''}${full ? ' full' : ''}${iced ? ' iced' : ''}`}
               onClick={() => onPick(ymd)}
               aria-pressed={ymd === date}
-              aria-label={`${dateLine(ymd)}${s.due && !fut ? `: ${s.done} из ${s.due}` : ''}${iced ? ' — пауза' : s.frozen ? ` (на паузе: ${s.frozen})` : ''}`}
+              aria-label={`${dateLine(ymd)}${s.due && !fut ? t(': {done} из {total}', { done: s.done, total: s.due }) : ''}${iced ? t(' — пауза') : s.frozen ? t(' (на паузе: {n})', { n: s.frozen }) : ''}`}
             >
               <span className="hp-day-wd">{WD_SHORT[d.getDay()]}</span>
               <Ring size={36} stroke={3.5} value={fut ? 0 : v} className="hp-day-ring">
@@ -918,7 +918,7 @@ function WeekStrip({
           );
         })}
       </div>
-        <button className="hp-week-nav" onClick={() => onShift(1)} disabled={atCurrent} aria-label="Следующая неделя">
+        <button className="hp-week-nav" onClick={() => onShift(1)} disabled={atCurrent} aria-label={t('Следующая неделя')}>
           <CaretRight size={16} weight="bold" />
         </button>
       </div>
@@ -961,23 +961,23 @@ function HabitCard({
   const ice = freezeStatus(days, h, date);
   const fz = frozenOn(days, h, date);
   const on = on0;
-  const t = targetOf(h);
+  const target = targetOf(h);
   const count = countOn(days[date], h);
-  const counter = t > 1;
+  const counter = target > 1;
   const streak = currentStreak(days, h, date);
   const f = freqOf(h);
   const slots = timesOf(h);
   const time = slots.length ? (h.duration ? durationLabel(h.duration) : '') : timeRangeLabel(h) || (h.duration ? durationLabel(h.duration) : '');
-  const freq = f === 'weekly' ? `${weekCount(days, h, date)} из ${weekGoal(days, h, date)} за неделю` : f === 'weekdays' ? freqLabel(h) : '';
+  const freq = f === 'weekly' ? t('{done} из {goal} за неделю', { done: weekCount(days, h, date), goal: weekGoal(days, h, date) }) : f === 'weekdays' ? freqLabel(h) : '';
   return (
     <div ref={swipe.wrap} className={`hp-swipe ${swipe.wrapClass}`}>
-      <SwipeBg dx={swipe.dx} armed={swipe.armed} onDelete={swipe.confirmDelete} rightLabel={counter && !slots.length ? '+1' : 'Отметить'} deleteLabel="Удалить" />
+      <SwipeBg dx={swipe.dx} armed={swipe.armed} onDelete={swipe.confirmDelete} rightLabel={counter && !slots.length ? '+1' : t('Отметить')} deleteLabel={t('Удалить')} />
     <div
       className={`hp-card sw-row${on ? ' on' : ''}${off ? ' off' : ''}${fz ? ` frozen ${fz}` : ''}${burst ? ' burst' : ''}`}
       style={{ '--hc': h.color, ...swipe.style } as CSSProperties}
       {...g}
     >
-      <button className="hp-card-main" onClick={onOpen} aria-label={`${h.name}: статистика и настройки`}>
+      <button className="hp-card-main" onClick={onOpen} aria-label={t('{name}: статистика и настройки', { name: h.name })}>
         <span className="hp-tile" aria-hidden>
           {h.icon ?? '🔥'}
         </span>
@@ -985,7 +985,7 @@ function HabitCard({
           <span className="hp-name">{h.name}</span>
           <span className="hp-meta">
             {slots.length > 0 && (
-              <span className="hp-slots" aria-label={`Отмечено ${Math.min(count, slots.length)} из ${slots.length}`}>
+              <span className="hp-slots" aria-label={t('Отмечено {done} из {total}', { done: Math.min(count, slots.length), total: slots.length })}>
                 {slots.map((tm, i) => (
                   <span key={i} className={`hp-slot${count > i ? ' on' : ''}`}>
                     {count > i ? <Check size={12} weight="bold" /> : <Clock size={12} weight="bold" />}
@@ -996,7 +996,7 @@ function HabitCard({
             )}
             {counter && !slots.length && (
               <span className="hp-meta-count">
-                {count} / {t}
+                {count} / {target}
                 {h.unit ? ` ${h.unit}` : ''}
               </span>
             )}
@@ -1013,12 +1013,12 @@ function HabitCard({
               </span>
             )}
             {!ice && freq && <span className="hp-meta-item">{freq}</span>}
-            {!ice && !counter && !time && !freq && <span className="hp-meta-item">Каждый день</span>}
+            {!ice && !counter && !time && !freq && <span className="hp-meta-item">{t('Каждый день')}</span>}
             {streak.n > 0 && (
-              <span className="hp-streak" title={`Серия: ${streakText(streak)}`}>
+              <span className="hp-streak" title={t('Серия: {streak}', { streak: streakText(streak) })}>
                 <Fire size={15} weight="fill" />
                 {streak.n}
-                {streak.unit === 'week' ? ' нед' : ''}
+                {streak.unit === 'week' ? t(' нед') : ''}
               </span>
             )}
           </span>
@@ -1030,7 +1030,7 @@ function HabitCard({
         </button>
       )}
       {fz ? (
-        <button className="hp-check hp-check-ice" onClick={onMenu} aria-label={`${h.name}: ${ice ?? ''} — изменить`}>
+        <button className="hp-check hp-check-ice" onClick={onMenu} aria-label={t('{name}: {status} — изменить', { name: h.name, status: ice ?? '' })}>
           {fz === 'skip' ? <Snowflake size={26} weight="bold" /> : <Pause size={24} weight="fill" />}
         </button>
       ) : (
@@ -1038,10 +1038,10 @@ function HabitCard({
         className={`hp-check${counter && !on ? ' is-counter' : ''}`}
         onClick={onTap}
         aria-pressed={on}
-        aria-label={counter && !on ? `${h.name}: +1` : on ? `${h.name}: снять отметку` : `${h.name}: отметить`}
+        aria-label={counter && !on ? `${h.name}: +1` : on ? t('{name}: снять отметку', { name: h.name }) : t('{name}: отметить', { name: h.name })}
       >
         {counter && !on ? (
-          <Ring size={56} stroke={5} value={count / t} className="hp-check-ring">
+          <Ring size={56} stroke={5} value={count / target} className="hp-check-ring">
             <span className="hp-check-num">{count > 0 ? count : <Plus size={22} weight="bold" />}</span>
           </Ring>
         ) : (
@@ -1057,23 +1057,23 @@ function HabitCard({
 // ---------- Пусто ----------
 
 function EmptyState({ names, onLibrary, onCreate, onQuick }: { names: Set<string>; onLibrary: () => void; onCreate: () => void; onQuick: (h: Habit) => void }) {
-  const quick = QUICK.map((n) => HABIT_LIBRARY.find((p) => p.name === n)).filter((p) => p !== undefined);
+  const quick = QUICK.map((n) => HABIT_LIBRARY.find((p) => p.name === n || p.name === t(n))).filter((p) => p !== undefined);
   return (
     <section className="hp-empty">
       <span className="hp-empty-art">
         <Plant size={64} weight="duotone" />
       </span>
-      <h2>Начните с одной привычки</h2>
-      <p>Маленькие шаги каждый день дают большой результат. Отмечайте выполнение одним касанием и следите за сериями 🔥</p>
+      <h2>{t('Начните с одной привычки')}</h2>
+      <p>{t('Маленькие шаги каждый день дают большой результат. Отмечайте выполнение одним касанием и следите за сериями 🔥')}</p>
       <div className="hp-empty-actions">
         <button className="hp-btn hp-btn-primary" onClick={onLibrary}>
-          <Sparkle size={22} weight="fill" /> Из библиотеки
+          <Sparkle size={22} weight="fill" /> {t('Из библиотеки')}
         </button>
         <button className="hp-btn" onClick={onCreate}>
-          <Plus size={22} weight="bold" /> Своя привычка
+          <Plus size={22} weight="bold" /> {t('Своя привычка')}
         </button>
       </div>
-      <div className="hp-quick-title">Быстрый старт — одно касание</div>
+      <div className="hp-quick-title">{t('Быстрый старт — одно касание')}</div>
       <div className="hp-quick">
         {quick.map((p) => {
           const added = names.has(p.name.toLowerCase());
@@ -1119,12 +1119,12 @@ function DayCard({
           <NotePencil size={22} weight="duotone" />
         </span>
         <div className="grow">
-          <h2>Как прошёл день</h2>
-          <div className="hp-daycard-sub">{date === today ? 'Сегодня' : dateLine(date)}</div>
+          <h2>{t('Как прошёл день')}</h2>
+          <div className="hp-daycard-sub">{date === today ? t('Сегодня') : dateLine(date)}</div>
         </div>
         {mood && <span className="hp-mood-name">{mood.name}</span>}
       </div>
-      <div className="hp-moods" role="group" aria-label="Настроение">
+      <div className="hp-moods" role="group" aria-label={t('Настроение')}>
         {MOODS.map((m) => (
           <button key={m.e} className={`hp-mood${day.mood === m.e ? ' active' : ''}`} aria-pressed={day.mood === m.e} title={m.name} aria-label={m.name} onClick={() => onMood(m.e)}>
             <span>{m.e}</span>
@@ -1177,10 +1177,10 @@ function Journal({ date, initial, onSave }: { date: string; initial: string; onS
   const words = text.trim() ? text.trim().split(/\s+/).length : 0;
   return (
     <div className="hp-journal">
-      <textarea ref={ref} className="hp-journal-text" placeholder="Мысли, победы дня, за что благодарны…" value={text} onChange={(e) => change(e.target.value)} />
+      <textarea ref={ref} className="hp-journal-text" placeholder={t('Мысли, победы дня, за что благодарны…')} value={text} onChange={(e) => change(e.target.value)} />
       {words > 0 && (
         <div className="hp-journal-count">
-          {words} {plural(words, ['слово', 'слова', 'слов'])}
+          {words} {tn(words, 'слово', 'слова', 'слов')}
         </div>
       )}
     </div>

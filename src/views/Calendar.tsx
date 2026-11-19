@@ -1,3 +1,4 @@
+import { isEn, LOCALE, t } from '../i18n/index';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, MouseEvent as RMouseEvent, PointerEvent as RPointerEvent, RefObject, TouchEvent as RTouchEvent } from 'react';
 import { CalendarDays, Check, ChevronLeft, ChevronRight, Download, ListTodo, MoreHorizontal, Network, NotebookPen, Plus, Repeat } from 'lucide-react';
@@ -25,11 +26,11 @@ import { ensureNotes, useNotes } from '../notes/store';
 export type CalView = 'month' | 'week' | '3day' | 'day' | 'agenda';
 
 const VIEWS: { id: CalView; label: string }[] = [
-  { id: 'month', label: 'Месяц' },
-  { id: 'week', label: 'Неделя' },
-  { id: '3day', label: '3 дня' },
-  { id: 'day', label: 'День' },
-  { id: 'agenda', label: 'Список' },
+  { id: 'month', label: t('Месяц') },
+  { id: 'week', label: t('Неделя') },
+  { id: '3day', label: t('3 дня') },
+  { id: 'day', label: t('День') },
+  { id: 'agenda', label: t('Список') },
 ];
 /** шаг навигации ‹ › в днях (месяц листается отдельно) */
 const STEP: Record<CalView, number> = { month: 0, week: 7, '3day': 3, day: 1, agenda: 30 };
@@ -124,29 +125,29 @@ function buildItems(
   const listColor = new Map(data.lists.map((l) => [l.id, l.color]));
   const linked = new Set<string>();
 
-  for (const t of data.tasks) {
-    if (t.source) linked.add(t.source.topicId);
-    if (t.deleted || !t.date) continue;
-    const lc = listColor.get(t.listId) ?? '#64748b';
-    for (const d of occurrences(t, from, to, 100)) {
-      const base = d === t.date;
+  for (const task of data.tasks) {
+    if (task.source) linked.add(task.source.topicId);
+    if (task.deleted || !task.date) continue;
+    const lc = listColor.get(task.listId) ?? '#64748b';
+    for (const d of occurrences(task, from, to, 100)) {
+      const base = d === task.date;
       // просроченный повтор — только сам он: прошедшие дни после него не «копятся» (выполнение переносит на будущее)
-      if (!base && t.repeat && d < today) continue;
-      const overdue = base && isOverdue(t, today, now);
+      if (!base && task.repeat && d < today) continue;
+      const overdue = base && isOverdue(task, today, now);
       push({
-        key: `t:${t.id}:${d}`,
+        key: `task:${task.id}:${d}`,
         kind: 'task',
         date: d,
-        title: t.title || 'Без названия',
-        start: t.time ? minutesOf(t.time) : undefined,
-        dur: t.duration || 30,
-        color: overdue ? 'var(--danger)' : (PRIORITY_META[t.priority]?.color ?? lc),
+        title: task.title || t('Без названия'),
+        start: task.time ? minutesOf(task.time) : undefined,
+        dur: task.duration || 30,
+        color: overdue ? 'var(--danger)' : (PRIORITY_META[task.priority]?.color ?? lc),
         listColor: lc,
-        done: t.done || !!t.wontDo,
+        done: task.done || !!task.wontDo,
         overdue,
         base,
-        movable: base && isActive(t),
-        task: t,
+        movable: base && isActive(task),
+        task: task,
       });
     }
   }
@@ -159,7 +160,7 @@ function buildItems(
       key: `m:${m.docId}:${m.topicId}`,
       kind: 'map',
       date: due,
-      title: m.text || 'Без названия',
+      title: m.text || t('Без названия'),
       dur: 0,
       color: PRIORITY_META[m.task.priority ?? 0]?.color ?? '#8b5cf6',
       done: m.task.status === 'done',
@@ -173,7 +174,7 @@ function buildItems(
   // события телефона; многодневные — на каждый день
   for (const e of events) {
     const color = e.color || '#64748b';
-    const common = { kind: 'phone' as const, title: e.title || 'Событие', color, done: false, overdue: false, base: true, movable: false, ev: e };
+    const common = { kind: 'phone' as const, title: e.title || t('Событие'), color, done: false, overdue: false, base: true, movable: false, ev: e };
     if (e.allDay) {
       // события «на весь день» хранятся в полночь UTC
       const last = utcYmd(Math.max(e.begin, e.end - 1));
@@ -245,11 +246,11 @@ function buildItems(
   // заметки дня — на весь день
   for (const [d, id] of daily) {
     if (d < from || d > to) continue;
-    push({ key: `n:${id}`, kind: 'note', date: d, title: '📔 Заметка дня', dur: 0, color: '#0ea5e9', done: false, overdue: false, base: true, movable: false, noteId: id });
+    push({ key: `n:${id}`, kind: 'note', date: d, title: t('📔 Заметка дня'), dur: 0, color: '#0ea5e9', done: false, overdue: false, base: true, movable: false, noteId: id });
   }
 
   for (const k of Object.keys(by)) {
-    by[k].sort((a, b) => (a.start ?? -1) - (b.start ?? -1) || Number(a.done) - Number(b.done) || a.title.localeCompare(b.title, 'ru'));
+    by[k].sort((a, b) => (a.start ?? -1) - (b.start ?? -1) || Number(a.done) - Number(b.done) || a.title.localeCompare(b.title, LOCALE));
   }
   return by;
 }
@@ -287,14 +288,14 @@ function periodTitle(view: CalView, days: string[], cursor: string, narrow = fal
   }
   const a = fromYmd(days[0]);
   const b = fromYmd(days[days.length - 1]);
-  if (view === 'agenda') return `${a.getDate()} ${shortMonth(a).toLowerCase()} – ${b.getDate()} ${shortMonth(b).toLowerCase()}`;
+  if (view === 'agenda') return t('{from} {fromMonth} – {to} {toMonth}', { from: a.getDate(), fromMonth: isEn ? shortMonth(a) : shortMonth(a).toLowerCase(), to: b.getDate(), toMonth: isEn ? shortMonth(b) : shortMonth(b).toLowerCase() });
   if (a.getMonth() === b.getMonth()) return `${MONTHS[a.getMonth()]}${yr(a)}`;
   return `${shortMonth(a)} – ${shortMonth(b)}${yr(b)}`;
 }
 
 function timeLabel(it: Item): string {
-  if (it.goal) return it.goal.kind === 'goal' ? 'Срок цели' : 'Срок этапа';
-  if (it.start == null) return 'Весь день';
+  if (it.goal) return it.goal.kind === 'goal' ? t('Срок цели') : t('Срок этапа');
+  if (it.start == null) return t('Весь день');
   if (it.task && !it.task.duration) return timeOf(it.start);
   if (it.habit && !it.habit.duration) return timeOf(it.start);
   return `${timeOf(it.start)}–${timeOf(it.start + it.dur)}`;
@@ -305,16 +306,16 @@ async function tapHabit(it: Item) {
   const h = it.habit!;
   const today = todayYmd();
   if (it.date > today) {
-    toast(`${it.title} — ${dayLabel(it.date, today).toLowerCase()} в ${timeOf(it.start ?? 0)}`);
+    toast(t('{title} — {day} в {time}', { title: it.title, day: dayLabel(it.date, today).toLowerCase(), time: timeOf(it.start ?? 0) }));
     return;
   }
   if (timesOf(h).length) {
     // несколько раз в день: отметить этот приём (или снять последнюю отметку, если он уже отмечен)
     try {
       const n = await bumpHabitOn(h, it.date, it.done ? -1 : 1);
-      toast(it.done ? `${h.name} — отметка снята` : `✓ ${h.name} — ${Math.min(n, timesOf(h).length)} из ${timesOf(h).length}`);
+      toast(it.done ? t('{name} — отметка снята', { name: h.name }) : t('✓ {name} — {done} из {total}', { name: h.name, done: Math.min(n, timesOf(h).length), total: timesOf(h).length }));
     } catch {
-      toast('Не удалось отметить привычку');
+      toast(t('Не удалось отметить привычку'));
     }
     return;
   }
@@ -324,9 +325,9 @@ async function tapHabit(it: Item) {
   }
   try {
     const done = await toggleHabitOn(h, it.date);
-    toast(done ? `✓ ${h.name} — выполнено` : `${h.name} — отметка снята`);
+    toast(done ? t('✓ {name} — выполнено', { name: h.name }) : t('{name} — отметка снята', { name: h.name }));
   } catch {
-    toast('Не удалось отметить привычку');
+    toast(t('Не удалось отметить привычку'));
   }
 }
 
@@ -346,14 +347,14 @@ function activate(it: Item) {
   else if (it.goal) openGoalDue(it.goal);
   else if (it.task) openTask(it.task.id);
   else if (it.map) void openDoc(it.map.docId, it.map.topicId);
-  else if (it.ev) toast(`${it.title} · ${dayLabel(it.date)}, ${timeLabel(it).toLowerCase()} · ${it.ev.calendar || 'Календарь телефона'}`);
+  else if (it.ev) toast(`${it.title} · ${dayLabel(it.date)}, ${timeLabel(it).toLowerCase()} · ${it.ev.calendar || t('Календарь телефона')}`);
 }
 
 /** Заметка дня: открыть (создав по шаблону) */
 function openDaily(ymd: string) {
   return import('../notes/daily')
     .then((m) => m.openDailyNote(ymd))
-    .catch(() => toast('Не удалось открыть заметку дня'));
+    .catch(() => toast(t('Не удалось открыть заметку дня')));
 }
 
 const kindIcon = (it: Item, size = 11) =>
@@ -499,20 +500,20 @@ export default function Calendar() {
     <div className="page cv-page">
       <div className="page-header cv-header">
         <IconTile section="calendar" size="sm" className="ph-tile cv-h1" />
-        <h1 className="cv-h1">Календарь</h1>
+        <h1 className="cv-h1">{t('Календарь')}</h1>
         <div className="cv-nav">
-          <button className="icon-btn" onClick={() => shift(-1)} aria-label="Назад">
+          <button className="icon-btn" onClick={() => shift(-1)} aria-label={t('Назад')}>
             <ChevronLeft />
           </button>
           <div className="cv-period ellipsis" title={view === 'day' ? longDate(cursor) : periodTitle(view, days, cursor)}>
             {periodTitle(view, days, cursor, narrow)}
           </div>
-          <button className="icon-btn" onClick={() => shift(1)} aria-label="Вперёд">
+          <button className="icon-btn" onClick={() => shift(1)} aria-label={t('Вперёд')}>
             <ChevronRight />
           </button>
         </div>
         <button className="btn btn-sm cv-today" onClick={() => setCursor(today)}>
-          Сегодня
+          {t('Сегодня')}
         </button>
         <div className="grow cv-spacer" />
         <div className="segmented cv-views">
@@ -522,17 +523,17 @@ export default function Calendar() {
             </button>
           ))}
         </div>
-        <button className="icon-btn phone-only cv-list-btn" onClick={() => useApp.getState().go('tasks')} aria-label="Список задач" title="Список задач">
+        <button className="icon-btn phone-only cv-list-btn" onClick={() => useApp.getState().go('tasks')} aria-label={t('Список задач')} title={t('Список задач')}>
           <ListTodo />
         </button>
-        <button className="icon-btn cv-more-btn" onClick={(e) => setMenu(e.currentTarget.getBoundingClientRect())} aria-label="Ещё">
+        <button className="icon-btn cv-more-btn" onClick={(e) => setMenu(e.currentTarget.getBoundingClientRect())} aria-label={t('Ещё')}>
           <MoreHorizontal />
         </button>
       </div>
 
       <div className="cv-body" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         {!data ? (
-          <div className="empty">Загрузка…</div>
+          <div className="empty">{t('Загрузка…')}</div>
         ) : view === 'month' ? (
           <MonthView days={days} items={items} cursor={cursor} today={today} narrow={narrow} onSelect={setCursor} onMore={goDay} />
         ) : view === 'agenda' ? (
@@ -542,7 +543,7 @@ export default function Calendar() {
         )}
       </div>
 
-      <button className="cv-fab" onClick={() => openQuickAdd({ date: cursor })} aria-label="Новая задача">
+      <button className="cv-fab" onClick={() => openQuickAdd({ date: cursor })} aria-label={t('Новая задача')}>
         <Plus size={26} />
       </button>
 
@@ -556,7 +557,7 @@ export default function Calendar() {
                 if (data) void exportTasksIcs(data.tasks);
               }}
             >
-              <Download size={16} /> Экспорт .ics
+              <Download size={16} /> {t('Экспорт .ics')}
             </button>
             <button
               onClick={() => {
@@ -564,7 +565,7 @@ export default function Calendar() {
                 void openDaily(cursor);
               }}
             >
-              <NotebookPen size={16} /> Заметка дня: {dayLabel(cursor, today).toLowerCase()}
+              <NotebookPen size={16} /> {t('Заметка дня: {day}', { day: dayLabel(cursor, today).toLowerCase() })}
             </button>
           </div>
         </>
@@ -607,7 +608,7 @@ function Row({ it }: { it: Item }) {
             e.stopPropagation();
             void tapHabit(it);
           }}
-          aria-label={it.done ? 'Снять отметку' : 'Отметить привычку'}
+          aria-label={it.done ? t('Снять отметку') : t('Отметить привычку')}
         >
           {it.done && <Check size={13} strokeWidth={3} />}
         </button>
@@ -624,8 +625,8 @@ function Row({ it }: { it: Item }) {
 }
 
 /** Задача: свайп вправо — выполнить, влево — удалить, долгое нажатие — меню (как в «Задачах») */
-function TaskLine({ it, t }: { it: Item; t: TaskItem }) {
-  const { swipe, handlers, bg, overlays, done, completing } = useTaskActions(t, it.date);
+function TaskLine({ it, t: task }: { it: Item; t: TaskItem }) {
+  const { swipe, handlers, bg, overlays, done, completing } = useTaskActions(task, it.date);
   const on = it.done || completing;
   return (
     <div ref={swipe.wrap} className={`cv-row-wrap ${swipe.wrapClass}`}>
@@ -633,19 +634,19 @@ function TaskLine({ it, t }: { it: Item; t: TaskItem }) {
       <div
         className={`cv-row cv-row-task sw-row${on ? ' done' : ''}${it.overdue ? ' overdue' : ''}`}
         style={swipe.style}
-        onClick={() => openTask(t.id)}
+        onClick={() => openTask(task.id)}
         {...handlers}
       >
         <button
           className={`cv-check${on ? ' on' : ''}`}
-          style={{ '--c': t.priority ? it.color : 'var(--text-3)' } as CSSProperties}
+          style={{ '--c': task.priority ? it.color : 'var(--text-3)' } as CSSProperties}
           disabled={!it.base}
-          title={it.base ? undefined : 'Будущий повтор'}
+          title={it.base ? undefined : t('Будущий повтор')}
           onClick={(e) => {
             e.stopPropagation();
             done();
           }}
-          aria-label="Выполнено"
+          aria-label={t('Выполнено')}
         >
           {on && <Check size={13} strokeWidth={3} />}
         </button>
@@ -780,7 +781,7 @@ function MonthView({
             </div>
           ) : (
             <button className="cv-none" onClick={() => openQuickAdd({ date: cursor })}>
-              Нет задач — нажмите, чтобы добавить
+              {t('Нет задач — нажмите, чтобы добавить')}
             </button>
           )}
         </div>
@@ -803,8 +804,8 @@ function Agenda({ days, items, today }: { days: string[]; items: ByDay; today: s
     return (
       <div className="empty cv-agenda-empty">
         <CalendarDays size={36} />
-        <div>Нет задач</div>
-        <div className="small">на ближайшие {AGENDA_DAYS} дней</div>
+        <div>{t('Нет задач')}</div>
+        <div className="small">{t('на ближайшие {n} дней', { n: AGENDA_DAYS })}</div>
       </div>
     );
   }
@@ -1063,7 +1064,7 @@ function TimeGrid({
           })}
         </div>
         <div className="cv-tg-row cv-tg-allday">
-          <div className="cv-tg-gut">весь день</div>
+          <div className="cv-tg-gut">{t('весь день')}</div>
           {days.map((d) => (
             <div
               key={d}

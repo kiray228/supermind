@@ -18,7 +18,7 @@ import { openTxSheet } from '../finance/ui/state';
 import { openSearch } from '../search/state';
 import { LevelRing } from '../progress/LevelBadge';
 import { useProgress } from '../progress/hooks';
-import { plural } from '../tasks/model';
+import { LOCALE, t, tn } from '../i18n/index';
 import { toast } from '../store/appStore';
 import { haptic } from '../editor/touch';
 import './today.css';
@@ -26,7 +26,7 @@ import './finance.css';
 
 const TxSheet = lazy(() => import('../finance/ui/TxSheet').then((m) => ({ default: m.TxSheet })));
 
-const WD = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+const WD = [t('Пн'), t('Вт'), t('Ср'), t('Чт'), t('Пт'), t('Сб'), t('Вс')];
 const nowMin = () => {
   const d = new Date();
   return d.getHours() * 60 + d.getMinutes();
@@ -82,8 +82,8 @@ export default function Today() {
   return (
     <div className="page td-page">
       <div className="page-header">
-        <h1 className="grow">Сегодня</h1>
-        <button className="icon-btn" onClick={() => openSearch()} aria-label="Поиск по всему" title="Поиск по всему">
+        <h1 className="grow">{t('Сегодня')}</h1>
+        <button className="icon-btn" onClick={() => openSearch()} aria-label={t('Поиск по всему')} title={t('Поиск по всему')}>
           <MagnifyingGlass size={20} weight="bold" />
         </button>
       </div>
@@ -100,8 +100,8 @@ export default function Today() {
               <Wallet size={20} weight="fill" />
             </span>
             <span className="td-money-x">
-              <small>Деньги · сегодня</small>
-              <b>{fin ? (spent ? '−' + fmtMoney(spent, fin.prefs.mainCurrency) : 'Трат нет') : '…'}</b>
+              <small>{t('Деньги · сегодня')}</small>
+              <b>{fin ? (spent ? '−' + fmtMoney(spent, fin.prefs.mainCurrency) : t('Трат нет')) : '…'}</b>
             </span>
             <span
               className="td-money-add"
@@ -119,7 +119,7 @@ export default function Today() {
                 }
               }}
             >
-              + трата
+              {t('+ трата')}
             </span>
             <CaretRight size={16} weight="bold" className="td-chev" />
           </button>
@@ -153,9 +153,9 @@ function Week({ today, tasks }: { today: string; tasks: TaskItem[] }) {
   const open = (day: string) => void import('./Calendar').then((m) => m.openCalendarAt(day, 'day'));
   return (
     <div className="td-card td-week-card">
-      <div className="td-week" role="list" aria-label="Неделя">
+      <div className="td-week" role="list" aria-label={t('Неделя')}>
         {days.map((day, i) => (
-          <button key={day} role="listitem" className={`td-day${day === today ? ' is-today' : ''}`} onClick={() => open(day)} aria-label={`Открыть ${fromYmd(day).getDate()} число в календаре`}>
+          <button key={day} role="listitem" className={`td-day${day === today ? ' is-today' : ''}`} onClick={() => open(day)} aria-label={t('Открыть {day} число в календаре', { day: fromYmd(day).getDate() })}>
             <span>{WD[i]}</span>
             <b>{fromYmd(day).getDate()}</b>
             <i className={busy.has(day) ? 'on' : ''} />
@@ -175,16 +175,16 @@ function NowCard({ task }: { task: TaskItem }) {
       f.start();
       useApp.getState().go('focus');
     } catch {
-      toast('Таймер фокуса недоступен');
+      toast(t('Таймер фокуса недоступен'));
     }
   };
   return (
     <div className="td-now">
       <button className="td-now-x" onClick={() => openTask(task.id)}>
-        <small>Сейчас{task.time ? ' · ' + task.time : ''} · фокус 25 мин</small>
-        <b>{task.title || 'Без названия'}</b>
+        <small>{t('Сейчас')}{task.time ? ' · ' + task.time : ''} · {t('фокус 25 мин')}</small>
+        <b>{task.title || t('Без названия')}</b>
       </button>
-      <button className="td-play" onClick={() => void start()} aria-label="Начать фокус">
+      <button className="td-play" onClick={() => void start()} aria-label={t('Начать фокус')}>
         <Play size={18} weight="fill" />
       </button>
     </div>
@@ -205,24 +205,24 @@ function HabitsRow({ habits, planner, today }: { habits: BriefHabit[]; planner: 
         await bumpHabitOn(h, today, 1);
       } else await toggleHabitOn(h, today);
     } catch {
-      toast('Не удалось отметить привычку');
+      toast(t('Не удалось отметить привычку'));
     }
   };
   return (
     <section className="td-card">
       <div className="td-card-h">
         <span>
-          Привычки · {done} из {habits.length}
+          {t('Привычки · {done} из {total}', { done, total: habits.length })}
         </span>
         <button className="td-link" onClick={() => go('habits')}>
-          Все
+          {t('Все')}
         </button>
       </div>
       <div className="td-habits">
         {habits.slice(0, 8).map((h) => {
           const pct = h.target && h.target > 1 ? Math.min(1, (h.count ?? 0) / h.target) : h.done ? 1 : 0;
           return (
-            <button key={h.id} className={`td-habit${h.done ? ' is-done' : ''}`} onClick={() => void tap(h)} aria-pressed={h.done} aria-label={`${h.name}${h.done ? ', выполнено' : ''}`}>
+            <button key={h.id} className={`td-habit${h.done ? ' is-done' : ''}`} onClick={() => void tap(h)} aria-pressed={h.done} aria-label={`${h.name}${h.done ? t(', выполнено') : ''}`}>
               <span className="td-ring" style={{ ['--c' as string]: h.color }}>
                 <svg viewBox="0 0 44 44" aria-hidden="true">
                   <circle cx="22" cy="22" r="19" className="td-ring-track" />
@@ -244,7 +244,7 @@ function HabitsRow({ habits, planner, today }: { habits: BriefHabit[]; planner: 
   );
 }
 
-function TaskRow({ t, time, late }: { t: TaskItem; time?: string; late?: boolean }) {
+function TaskRow({ t: task, time, late }: { t: TaskItem; time?: string; late?: boolean }) {
   return (
     <div className={`td-task${late ? ' is-late' : ''}`}>
       {time !== undefined && <span className="td-time">{time}</span>}
@@ -252,13 +252,13 @@ function TaskRow({ t, time, late }: { t: TaskItem; time?: string; late?: boolean
         className="td-check"
         onClick={() => {
           haptic(10);
-          toggleDone(t.id);
+          toggleDone(task.id);
         }}
-        aria-label={`Выполнено: ${t.title}`}
+        aria-label={t('Выполнено: {name}', { name: task.title })}
       />
-      <button className="td-task-x" onClick={() => openTask(t.id)}>
-        <span className="ellipsis">{t.title || 'Без названия'}</span>
-        {late && t.date && <small>просрочено · {fromYmd(t.date).getDate()} {MONTHS_SHORT[fromYmd(t.date).getMonth()]}</small>}
+      <button className="td-task-x" onClick={() => openTask(task.id)}>
+        <span className="ellipsis">{task.title || t('Без названия')}</span>
+        {late && task.date && <small>{t('просрочено · {day} {month}', { day: fromYmd(task.date).getDate(), month: MONTHS_SHORT[fromYmd(task.date).getMonth()] })}</small>}
       </button>
     </div>
   );
@@ -272,10 +272,10 @@ function Plan({ timed, allDay, overdue, doneToday, today }: { timed: TaskItem[];
     <section className="td-card td-plan">
       <div className="td-card-h">
         <span>
-          План дня{total + doneToday > 0 ? ` · ${doneToday} из ${total + doneToday}` : ''}
+          {t('План дня')}{total + doneToday > 0 ? t(' · {done} из {total}', { done: doneToday, total: total + doneToday }) : ''}
         </span>
         <button className="td-link" onClick={openDay}>
-          Календарь
+          {t('Календарь')}
         </button>
       </div>
       {overdue.length > 0 && (
@@ -285,7 +285,7 @@ function Plan({ timed, allDay, overdue, doneToday, today }: { timed: TaskItem[];
           ))}
           {overdue.length > 3 && (
             <button className="td-more" onClick={() => go('tasks')}>
-              Ещё просроченных: {overdue.length - 3}
+              {t('Ещё просроченных: {n}', { n: overdue.length - 3 })}
             </button>
           )}
         </div>
@@ -299,19 +299,19 @@ function Plan({ timed, allDay, overdue, doneToday, today }: { timed: TaskItem[];
       )}
       {allDay.length > 0 && (
         <div className="td-group">
-          {timed.length > 0 && <div className="td-sub">Без времени</div>}
+          {timed.length > 0 && <div className="td-sub">{t('Без времени')}</div>}
           {allDay.map((t) => (
             <TaskRow key={t.id} t={t} />
           ))}
         </div>
       )}
-      {total === 0 && overdue.length === 0 && <p className="td-empty">{doneToday ? 'Всё на сегодня сделано 🎉' : 'На сегодня задач нет'}</p>}
+      {total === 0 && overdue.length === 0 && <p className="td-empty">{doneToday ? t('Всё на сегодня сделано 🎉') : t('На сегодня задач нет')}</p>}
       <div className="td-plan-foot">
         <button className="td-link" onClick={() => openQuickAdd({ date: today })}>
-          <Plus size={14} weight="bold" /> Задача на сегодня
+          <Plus size={14} weight="bold" /> {t('Задача на сегодня')}
         </button>
         <button className="td-link" onClick={() => go('tasks')}>
-          Все задачи <CaretRight size={13} weight="bold" />
+          {t('Все задачи')} <CaretRight size={13} weight="bold" />
         </button>
       </div>
     </section>
@@ -332,11 +332,11 @@ function ProgressCard() {
       </LevelRing>
       <span className="td-prog-x">
         <b>
-          Уровень {lv.level} · {lv.title}
+          {t('Уровень {level} · {title}', { level: lv.level, title: lv.title })}
         </b>
         <small>
-          {lv.cur.toLocaleString('ru-RU')} из {lv.need.toLocaleString('ru-RU')} XP
-          {streak > 0 ? ` · серия ${streak} ${plural(streak, 'день', 'дня', 'дней')}` : ''}
+          {t('{cur} из {need} XP', { cur: lv.cur.toLocaleString(LOCALE), need: lv.need.toLocaleString(LOCALE) })}
+          {streak > 0 ? t(' · серия {n} {days}', { n: streak, days: tn(streak, 'день', 'дня', 'дней') }) : ''}
         </small>
       </span>
       {streak > 0 && (

@@ -1,3 +1,4 @@
+import { LOCALE, t } from '../i18n/index';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent, ReactNode, PointerEvent as ReactPointerEvent } from 'react';
 import {
@@ -70,7 +71,7 @@ const isPhone = () => typeof window !== 'undefined' && window.matchMedia(PHONE_M
 
 const COLORS = ['#64748b', '#ef4444', '#f97316', '#f59e0b', '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6', '#6366f1', '#a855f7', '#ec4899'];
 
-const STATUS_FALLBACK: Record<TaskStatus, string> = { todo: 'К выполнению', doing: 'В работе', done: 'Готово' };
+const STATUS_FALLBACK: Record<TaskStatus, string> = { todo: t('К выполнению'), doing: t('В работе'), done: t('Готово') };
 
 const mapKey = (t: MapTask) => `${t.docId}:${t.topicId}`;
 
@@ -140,7 +141,7 @@ export default function Board() {
           setBoard(n);
         }
       })
-      .catch(() => toast('Не удалось сохранить доску'));
+      .catch(() => toast(t('Не удалось сохранить доску')));
   }, []);
   const commit = useCallback(
     (b: BoardData) => {
@@ -228,7 +229,7 @@ export default function Board() {
   const allLabels = useMemo(() => {
     const s = new Set<string>();
     board?.cards.forEach((c) => c.labels?.forEach((l) => s.add(l)));
-    return [...s].sort((a, b) => a.localeCompare(b, 'ru'));
+    return [...s].sort((a, b) => a.localeCompare(b, LOCALE));
   }, [board]);
 
   // ----- операции с карточками -----
@@ -257,8 +258,8 @@ export default function Board() {
     if (!b || !card) return;
     commit({ ...b, cards: b.cards.filter((c) => c.id !== id) });
     setEditCardId(null);
-    toast(`«${card.title}» удалена`, {
-      label: 'Вернуть',
+    toast(t('«{name}» удалена', { name: card.title }), {
+      label: t('Вернуть'),
       run: () => {
         const cur = boardRef.current;
         if (!cur || cur.cards.some((c) => c.id === id)) return;
@@ -295,34 +296,34 @@ export default function Board() {
 
   // ----- операции с задачами из карт -----
 
-  const saveMapTask = async (t: MapTask, patch: Partial<TaskInfo>) => {
-    const key = mapKey(t);
+  const saveMapTask = async (mt: MapTask, patch: Partial<TaskInfo>) => {
+    const key = mapKey(mt);
     setMapTasks((ts) => ts.map((x) => (mapKey(x) === key ? { ...x, task: { ...x.task, ...patch } } : x)));
     try {
-      await updateMapTask(t.docId, t.topicId, patch);
+      await updateMapTask(mt.docId, mt.topicId, patch);
     } catch {
-      toast('Не удалось обновить задачу в карте');
+      toast(t('Не удалось обновить задачу в карте'));
     }
   };
 
-  const setMapStatus = (t: MapTask, status: TaskStatus) => {
+  const setMapStatus = (mt: MapTask, status: TaskStatus) => {
     const patch: Partial<TaskInfo> = { status };
     if (status === 'done') patch.progress = 100;
-    saveMapTask(t, patch);
+    saveMapTask(mt, patch);
   };
 
-  const moveMapTo = (t: MapTask, col: BoardColumn) => {
+  const moveMapTo = (mt: MapTask, col: BoardColumn) => {
     if (!col.status) {
-      toast('Задачи из карт можно переносить только в колонки со статусом');
+      toast(t('Задачи из карт можно переносить только в колонки со статусом'));
       return;
     }
-    if (col.status !== t.task.status) setMapStatus(t, col.status);
+    if (col.status !== mt.task.status) setMapStatus(mt, col.status);
   };
 
   // ----- колонки -----
 
   const addColumn = async () => {
-    const title = await askText('Новая колонка', { placeholder: 'Название колонки', okText: 'Создать' });
+    const title = await askText(t('Новая колонка'), { placeholder: t('Название колонки'), okText: t('Создать') });
     if (!title?.trim()) return;
     const b = boardRef.current!;
     const color = COLORS[(b.columns.length * 3) % COLORS.length];
@@ -336,7 +337,7 @@ export default function Board() {
   };
 
   const renameColumn = async (col: BoardColumn) => {
-    const title = await askText('Переименовать колонку', { value: col.title, okText: 'Сохранить' });
+    const title = await askText(t('Переименовать колонку'), { value: col.title, okText: t('Сохранить') });
     if (title?.trim()) patchColumn(col.id, { title: title.trim() });
   };
 
@@ -346,9 +347,9 @@ export default function Board() {
     const target = b.columns.find((c) => c.id !== col.id);
     if (!target) return;
     const ok = await confirmDialog(
-      `Удалить колонку «${col.title}»?`,
-      n ? `Карточки (${n}) будут перенесены в «${target.title}».` : undefined,
-      { okText: 'Удалить', danger: true },
+      t('Удалить колонку «{name}»?', { name: col.title }),
+      n ? t('Карточки ({n}) будут перенесены в «{column}».', { n, column: target.title }) : undefined,
+      { okText: t('Удалить'), danger: true },
     );
     if (!ok) return;
     const cur = boardRef.current!;
@@ -377,14 +378,14 @@ export default function Board() {
     const visible = columnsData.find((d) => d.col.id === card.columnId)?.cards ?? [];
     const idx = visible.findIndex((c) => c.id === card.id);
     const order: MenuEntry[] = [];
-    if (idx > 0) order.push({ label: 'Выше', icon: <ArrowUp />, onClick: () => moveCard(card.id, card.columnId, idx - 1) });
-    if (idx >= 0 && idx < visible.length - 1) order.push({ label: 'Ниже', icon: <ArrowDown />, onClick: () => moveCard(card.id, card.columnId, idx + 1) });
+    if (idx > 0) order.push({ label: t('Выше'), icon: <ArrowUp />, onClick: () => moveCard(card.id, card.columnId, idx - 1) });
+    if (idx >= 0 && idx < visible.length - 1) order.push({ label: t('Ниже'), icon: <ArrowDown />, onClick: () => moveCard(card.id, card.columnId, idx + 1) });
     openMenu(
       anchor,
       [
-        { label: 'Редактировать', icon: <Pencil />, onClick: () => setEditCardId(card.id) },
+        { label: t('Редактировать'), icon: <Pencil />, onClick: () => setEditCardId(card.id) },
         ...order,
-        { kind: 'header', label: 'Переместить в…' },
+        { kind: 'header', label: t('Переместить в…') },
         ...cols.map(
           (c): MenuEntry => ({
             label: c.title,
@@ -398,34 +399,34 @@ export default function Board() {
           }),
         ),
         { kind: 'sep' },
-        { label: 'Удалить', icon: <Trash2 />, danger: true, onClick: () => deleteCard(card.id) },
+        { label: t('Удалить'), icon: <Trash2 />, danger: true, onClick: () => deleteCard(card.id) },
       ],
-      card.title || 'Без названия',
+      card.title || t('Без названия'),
     );
   };
 
-  const mapMenu = (anchor: DOMRect, t: MapTask) => {
+  const mapMenu = (anchor: DOMRect, mt: MapTask) => {
     const cols = (boardRef.current?.columns ?? []).filter((c) => c.status);
     openMenu(
       anchor,
       [
-        { label: 'Изменить задачу', icon: <Pencil />, onClick: () => setEditMapKey(mapKey(t)) },
-        { label: 'Открыть в карте', icon: <ExternalLink />, onClick: () => openDoc(t.docId, t.topicId) },
-        { kind: 'header', label: 'Переместить в…' },
+        { label: t('Изменить задачу'), icon: <Pencil />, onClick: () => setEditMapKey(mapKey(mt)) },
+        { label: t('Открыть в карте'), icon: <ExternalLink />, onClick: () => openDoc(mt.docId, mt.topicId) },
+        { kind: 'header', label: t('Переместить в…') },
         ...cols.map(
           (c): MenuEntry => ({
             label: c.title,
             icon: <span className="kb-dot" style={{ background: c.color ?? 'var(--text-3)' }} />,
-            active: c.status === t.task.status,
+            active: c.status === mt.task.status,
             onClick: () => {
-              if (c.status === t.task.status) return;
-              moveMapTo(t, c);
+              if (c.status === mt.task.status) return;
+              moveMapTo(mt, c);
               showCol(c.id);
             },
           }),
         ),
       ],
-      t.text || 'Без названия',
+      mt.text || t('Без названия'),
     );
   };
 
@@ -433,13 +434,13 @@ export default function Board() {
     openMenu(
       anchor,
       [
-        { label: 'Добавить карточку', icon: <Plus />, onClick: () => setAddingIn(col.id) },
-        { label: 'Переименовать', icon: <Pencil />, onClick: () => renameColumn(col) },
-        { kind: 'header', label: 'Цвет' },
+        { label: t('Добавить карточку'), icon: <Plus />, onClick: () => setAddingIn(col.id) },
+        { label: t('Переименовать'), icon: <Pencil />, onClick: () => renameColumn(col) },
+        { kind: 'header', label: t('Цвет') },
         { kind: 'colors', value: col.color, onPick: (c) => patchColumn(col.id, { color: c }) },
         ...(col.status
           ? []
-          : ([{ kind: 'sep' }, { label: 'Удалить колонку', icon: <Trash2 />, danger: true, onClick: () => deleteColumn(col) }] as MenuEntry[])),
+          : ([{ kind: 'sep' }, { label: t('Удалить колонку'), icon: <Trash2 />, danger: true, onClick: () => deleteColumn(col) }] as MenuEntry[])),
       ],
       col.title,
     );
@@ -749,10 +750,10 @@ export default function Board() {
       <div className="page kb-page">
         <div className="page-header">
           <IconTile section="board" size="sm" className="ph-tile" />
-          <h1>Доска задач</h1>
+          <h1>{t('Доска задач')}</h1>
         </div>
         <div className="page-body">
-          <div className="empty">Загрузка…</div>
+          <div className="empty">{t('Загрузка…')}</div>
         </div>
       </div>
     );
@@ -779,14 +780,14 @@ export default function Board() {
     <div className="page kb-page">
       <div className="page-header">
         <IconTile section="board" size="sm" className="ph-tile" />
-        <h1>Доска задач</h1>
+        <h1>{t('Доска задач')}</h1>
         <div className="grow" />
         <div className="row">
-          <button className="icon-btn" title="Обновить задачи из карт" onClick={reloadMaps} disabled={loadingMaps}>
+          <button className="icon-btn" title={t('Обновить задачи из карт')} onClick={reloadMaps} disabled={loadingMaps}>
             <RefreshCw className={loadingMaps ? 'spin' : undefined} />
           </button>
-          <button className="btn btn-primary btn-sm" onClick={addColumn} title="Новая колонка" aria-label="Новая колонка">
-            <Plus size={16} /> <span className="kb-hide-xs">Колонка</span>
+          <button className="btn btn-primary btn-sm" onClick={addColumn} title={t('Новая колонка')} aria-label={t('Новая колонка')}>
+            <Plus size={16} /> <span className="kb-hide-xs">{t('Колонка')}</span>
           </button>
         </div>
       </div>
@@ -794,9 +795,9 @@ export default function Board() {
       <div className="kb-toolbar">
         <div className="kb-search">
           <Search size={16} />
-          <input className="input" placeholder="Поиск по задачам" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <input className="input" placeholder={t('Поиск по задачам')} value={query} onChange={(e) => setQuery(e.target.value)} />
           {query && (
-            <button className="kb-search-clear" onClick={() => setQuery('')} aria-label="Очистить">
+            <button className="kb-search-clear" onClick={() => setQuery('')} aria-label={t('Очистить')}>
               <X size={14} />
             </button>
           )}
@@ -805,25 +806,25 @@ export default function Board() {
         <button
           className={`icon-btn kb-filter-btn${filtersOpen ? ' on' : ''}${prio !== 'all' || source !== 'all' ? ' is-set' : ''}`}
           onClick={() => setFiltersOpen((v) => !v)}
-          aria-label="Фильтры"
+          aria-label={t('Фильтры')}
           aria-expanded={filtersOpen}
         >
           <SlidersHorizontal />
         </button>
         <div className={`kb-filters${filtersOpen ? ' is-open' : ''}`}>
           <select className="select kb-prio-select" value={prio} onChange={(e) => setPrio(e.target.value as PrioFilter)}>
-            <option value="all">Любой приоритет</option>
-            <option value="1">Высокий</option>
-            <option value="2">Средний</option>
-            <option value="3">Низкий</option>
-            <option value="0">Без приоритета</option>
+            <option value="all">{t('Любой приоритет')}</option>
+            <option value="1">{t('Высокий')}</option>
+            <option value="2">{t('Средний')}</option>
+            <option value="3">{t('Низкий')}</option>
+            <option value="0">{t('Без приоритета')}</option>
           </select>
           <div className="segmented">
             {(
               [
-                ['all', 'Все'],
-                ['board', 'Доска'],
-                ['maps', 'Из карт'],
+                ['all', t('Все')],
+                ['board', t('Доска')],
+                ['maps', t('Из карт')],
               ] as [SourceFilter, string][]
             ).map(([v, l]) => (
               <button key={v} className={source === v ? 'active' : ''} onClick={() => setSource(v)}>
@@ -835,7 +836,7 @@ export default function Board() {
       </div>
 
       {/* телефон: колонки по одной на экран — переключатель с названиями */}
-      <div className="kb-tabs" ref={tabsRef} role="tablist" aria-label="Колонки">
+      <div className="kb-tabs" ref={tabsRef} role="tablist" aria-label={t('Колонки')}>
         {columnsData.map(({ col, cards, maps }, i) => (
           <button
             key={col.id}
@@ -907,17 +908,17 @@ export default function Board() {
                   </h2>
                   <span className="badge">{count}</span>
                   <div className="grow" />
-                  <button className="icon-btn kb-col-btn" onClick={() => setAddingIn(col.id)} title="Добавить карточку" aria-label="Добавить карточку">
+                  <button className="icon-btn kb-col-btn" onClick={() => setAddingIn(col.id)} title={t('Добавить карточку')} aria-label={t('Добавить карточку')}>
                     <Plus />
                   </button>
-                  <button className="icon-btn kb-col-btn" onClick={(e) => columnMenu(anchorOf(e), col)} title="Действия с колонкой" aria-label="Действия с колонкой">
+                  <button className="icon-btn kb-col-btn" onClick={(e) => columnMenu(anchorOf(e), col)} title={t('Действия с колонкой')} aria-label={t('Действия с колонкой')}>
                     <Ellipsis />
                   </button>
                 </header>
                 <div className="kb-col-list" data-col-list>
                   {items}
                   {count === 0 && !(over && drag) && (
-                    <div className="kb-col-empty">{filtersActive ? 'Ничего не найдено' : 'Пока пусто'}</div>
+                    <div className="kb-col-empty">{filtersActive ? t('Ничего не найдено') : t('Пока пусто')}</div>
                   )}
                 </div>
                 <div className="kb-col-foot">
@@ -928,7 +929,7 @@ export default function Board() {
                     />
                   ) : (
                     <button className="kb-add-btn" onClick={() => setAddingIn(col.id)}>
-                      <Plus size={16} /> Добавить карточку
+                      <Plus size={16} /> {t('Добавить карточку')}
                     </button>
                   )}
                 </div>
@@ -936,7 +937,7 @@ export default function Board() {
             );
           })}
           <button className="kb-new-col" onClick={addColumn}>
-            <Plus size={18} /> Новая колонка
+            <Plus size={18} /> {t('Новая колонка')}
           </button>
         </div>
       </div>
@@ -970,7 +971,7 @@ export default function Board() {
           onDelete={() => deleteCard(editCard.id)}
           onClose={() => {
             const c = boardRef.current?.cards.find((x) => x.id === editCard.id);
-            if (c && !c.title.trim()) patchCard(c.id, { title: 'Без названия' });
+            if (c && !c.title.trim()) patchCard(c.id, { title: t('Без названия') });
             setEditCardId(null);
           }}
         />
@@ -1006,7 +1007,7 @@ function DueChip({ due, done }: { due: string; done?: boolean }) {
   return (
     <span className={`kb-meta kb-due${st ? ' is-' + st : ''}`}>
       <CalendarDays size={13} />
-      {st === 'today' ? 'Сегодня' : formatShortDate(due)}
+      {st === 'today' ? t('Сегодня') : formatShortDate(due)}
     </span>
   );
 }
@@ -1036,10 +1037,10 @@ function ItemShell({
       {pc && <span className="kb-prio-bar" />}
       <div className="kb-card-main">{children}</div>
       <div className="kb-card-side" data-nodrag>
-        <button className="kb-card-btn" onClick={(e) => onMenu?.(e)} aria-label="Меню" data-nodrag>
+        <button className="kb-card-btn" onClick={(e) => onMenu?.(e)} aria-label={t('Меню')} data-nodrag>
           <Ellipsis size={16} />
         </button>
-        <span className="kb-handle" data-drag-handle aria-label="Перетащить" title="Перетащить">
+        <span className="kb-handle" data-drag-handle aria-label={t('Перетащить')} title={t('Перетащить')}>
           <GripVertical size={16} />
         </span>
       </div>
@@ -1061,7 +1062,7 @@ function CardItem({ card, ...h }: ItemHandlers & { card: BoardCard }) {
           ))}
         </div>
       )}
-      <div className="kb-card-title">{card.title || 'Без названия'}</div>
+      <div className="kb-card-title">{card.title || t('Без названия')}</div>
       {(card.due || total > 0 || card.description || card.priority) && (
         <div className="kb-card-meta">
           {!!card.priority && PRIORITY_META[card.priority] && (
@@ -1078,7 +1079,7 @@ function CardItem({ card, ...h }: ItemHandlers & { card: BoardCard }) {
             </span>
           )}
           {card.description && (
-            <span className="kb-meta" title="Есть описание">
+            <span className="kb-meta" title={t('Есть описание')}>
               <AlignLeft size={13} />
             </span>
           )}
@@ -1089,25 +1090,25 @@ function CardItem({ card, ...h }: ItemHandlers & { card: BoardCard }) {
 }
 
 function MapItem({ task, ...h }: ItemHandlers & { task: MapTask }) {
-  const t = task.task;
+  const info = task.task;
   const crumbs = task.path.length > 2 ? ['…', ...task.path.slice(-2)] : task.path;
   return (
-    <ItemShell kind="map" id={mapKey(task)} priority={t.priority} {...h}>
+    <ItemShell kind="map" id={mapKey(task)} priority={info.priority} {...h}>
       <div className="kb-map-badge" title={[task.docTitle, ...task.path].join(' › ')}>
         <Network size={12} />
-        <span className="kb-map-doc ellipsis">{task.docTitle || 'Без названия'}</span>
+        <span className="kb-map-doc ellipsis">{task.docTitle || t('Без названия')}</span>
         {crumbs.length > 0 && <span className="kb-map-path ellipsis">› {crumbs.join(' › ')}</span>}
       </div>
-      <div className={`kb-card-title${t.status === 'done' ? ' is-done' : ''}`}>{task.text || 'Без названия'}</div>
+      <div className={`kb-card-title${info.status === 'done' ? ' is-done' : ''}`}>{task.text || t('Без названия')}</div>
       <div className="kb-card-meta">
-        {!!t.priority && PRIORITY_META[t.priority] && (
-          <span className="kb-meta" style={{ color: PRIORITY_META[t.priority].color }}>
-            <span className="kb-dot" style={{ background: PRIORITY_META[t.priority].color }} />
-            {PRIORITY_META[t.priority].label}
+        {!!info.priority && PRIORITY_META[info.priority] && (
+          <span className="kb-meta" style={{ color: PRIORITY_META[info.priority].color }}>
+            <span className="kb-dot" style={{ background: PRIORITY_META[info.priority].color }} />
+            {PRIORITY_META[info.priority].label}
           </span>
         )}
-        {t.due && <DueChip due={t.due} done={t.status === 'done'} />}
-        {t.assignee && <span className="kb-meta">@{t.assignee}</span>}
+        {info.due && <DueChip due={info.due} done={info.status === 'done'} />}
+        {info.assignee && <span className="kb-meta">@{info.assignee}</span>}
         <button
           className="kb-meta kb-open-map"
           data-nodrag
@@ -1116,12 +1117,12 @@ function MapItem({ task, ...h }: ItemHandlers & { task: MapTask }) {
             openDoc(task.docId, task.topicId);
           }}
         >
-          <ExternalLink size={13} /> В карте
+          <ExternalLink size={13} /> {t('В карте')}
         </button>
       </div>
-      {t.progress != null && t.progress > 0 && (
-        <div className="kb-progress" title={`${t.progress}%`}>
-          <span style={{ width: `${Math.min(100, t.progress)}%` }} />
+      {info.progress != null && info.progress > 0 && (
+        <div className="kb-progress" title={`${info.progress}%`}>
+          <span style={{ width: `${Math.min(100, info.progress)}%` }} />
         </div>
       )}
     </ItemShell>
@@ -1146,7 +1147,7 @@ function AddCardInput({ onAdd, onClose }: { onAdd: (t: string) => void; onClose:
         ref={ref}
         className="textarea kb-add-text"
         rows={2}
-        placeholder="Название карточки…"
+        placeholder={t('Название карточки…')}
         value={text}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
@@ -1161,9 +1162,9 @@ function AddCardInput({ onAdd, onClose }: { onAdd: (t: string) => void; onClose:
       />
       <div className="row">
         <button className="btn btn-primary btn-sm" onMouseDown={(e) => e.preventDefault()} onClick={submit}>
-          Добавить
+          {t('Добавить')}
         </button>
-        <button className="icon-btn" onMouseDown={(e) => e.preventDefault()} onClick={onClose} aria-label="Отмена">
+        <button className="icon-btn" onMouseDown={(e) => e.preventDefault()} onClick={onClose} aria-label={t('Отмена')}>
           <X />
         </button>
       </div>
@@ -1253,10 +1254,10 @@ function PopMenu({ state, onClose }: { state: MenuState; onClose: () => void }) 
 
 function PrioritySelect({ value, onChange }: { value?: number; onChange: (v: number | undefined) => void }) {
   const opts: [number, string, string | undefined][] = [
-    [0, 'Нет', undefined],
-    [1, 'Высокий', PRIORITY_META[1].color],
-    [2, 'Средний', PRIORITY_META[2].color],
-    [3, 'Низкий', PRIORITY_META[3].color],
+    [0, t('Нет'), undefined],
+    [1, t('Высокий'), PRIORITY_META[1].color],
+    [2, t('Средний'), PRIORITY_META[2].color],
+    [3, t('Низкий'), PRIORITY_META[3].color],
   ];
   return (
     <div className="segmented kb-prio-seg">
@@ -1315,18 +1316,18 @@ function CardModal({
           <input
             className="kb-title-input"
             value={card.title}
-            placeholder="Название карточки"
+            placeholder={t('Название карточки')}
             onChange={(e) => onPatch({ title: e.target.value })}
             autoFocus={!card.title}
           />
-          <button className="icon-btn" onClick={onClose} aria-label="Закрыть">
+          <button className="icon-btn" onClick={onClose} aria-label={t('Закрыть')}>
             <X />
           </button>
         </div>
 
         <div className="kb-grid">
           <div>
-            <label className="label">Колонка</label>
+            <label className="label">{t('Колонка')}</label>
             <select className="select" value={card.columnId} onChange={(e) => onMove(e.target.value)}>
               {columns.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -1336,7 +1337,7 @@ function CardModal({
             </select>
           </div>
           <div>
-            <label className="label">Срок</label>
+            <label className="label">{t('Срок')}</label>
             <div className="row">
               <input
                 type="date"
@@ -1345,7 +1346,7 @@ function CardModal({
                 onChange={(e) => onPatch({ due: e.target.value || undefined })}
               />
               {card.due && (
-                <button className="icon-btn" onClick={() => onPatch({ due: undefined })} aria-label="Убрать срок">
+                <button className="icon-btn" onClick={() => onPatch({ due: undefined })} aria-label={t('Убрать срок')}>
                   <X />
                 </button>
               )}
@@ -1353,31 +1354,31 @@ function CardModal({
           </div>
         </div>
 
-        <label className="label">Приоритет</label>
+        <label className="label">{t('Приоритет')}</label>
         <PrioritySelect value={card.priority} onChange={(v) => onPatch({ priority: v })} />
 
-        <label className="label">Описание</label>
+        <label className="label">{t('Описание')}</label>
         <textarea
           className="textarea"
           rows={3}
-          placeholder="Подробности, ссылки, заметки…"
+          placeholder={t('Подробности, ссылки, заметки…')}
           value={card.description ?? ''}
           onChange={(e) => onPatch({ description: e.target.value || undefined })}
         />
 
-        <label className="label">Метки</label>
+        <label className="label">{t('Метки')}</label>
         <div className="kb-label-edit">
           {labels.map((l) => (
             <span key={l} className="chip active">
               {l}
-              <button className="kb-chip-x" onClick={() => onPatch({ labels: labels.filter((x) => x !== l) })} aria-label="Убрать метку">
+              <button className="kb-chip-x" onClick={() => onPatch({ labels: labels.filter((x) => x !== l) })} aria-label={t('Убрать метку')}>
                 <X size={12} />
               </button>
             </span>
           ))}
           <input
             className="input kb-inline-input"
-            placeholder="Новая метка + Enter"
+            placeholder={t('Новая метка + Enter')}
             value={labelText}
             onChange={(e) => setLabelText(e.target.value)}
             onKeyDown={(e) => {
@@ -1401,7 +1402,7 @@ function CardModal({
         )}
 
         <label className="label">
-          Чек-лист {checklist.length > 0 && <span className="faint">· {done}/{checklist.length}</span>}
+          {t('Чек-лист')} {checklist.length > 0 && <span className="faint">· {done}/{checklist.length}</span>}
         </label>
         {checklist.length > 0 && (
           <div className="kb-progress kb-progress-lg">
@@ -1414,7 +1415,7 @@ function CardModal({
               <button
                 className={`kb-check${it.done ? ' on' : ''}`}
                 onClick={() => onPatch({ checklist: checklist.map((x) => (x.id === it.id ? { ...x, done: !x.done } : x)) })}
-                aria-label={it.done ? 'Снять отметку' : 'Отметить'}
+                aria-label={it.done ? t('Снять отметку') : t('Отметить')}
               >
                 {it.done && <Check size={13} strokeWidth={3} />}
               </button>
@@ -1423,7 +1424,7 @@ function CardModal({
                 value={it.text}
                 onChange={(e) => onPatch({ checklist: checklist.map((x) => (x.id === it.id ? { ...x, text: e.target.value } : x)) })}
               />
-              <button className="icon-btn kb-check-del" onClick={() => onPatch({ checklist: checklist.filter((x) => x.id !== it.id) })} aria-label="Удалить пункт">
+              <button className="icon-btn kb-check-del" onClick={() => onPatch({ checklist: checklist.filter((x) => x.id !== it.id) })} aria-label={t('Удалить пункт')}>
                 <Trash2 />
               </button>
             </div>
@@ -1431,7 +1432,7 @@ function CardModal({
           <div className="row">
             <input
               className="input"
-              placeholder="Добавить пункт"
+              placeholder={t('Добавить пункт')}
               value={checkText}
               onChange={(e) => setCheckText(e.target.value)}
               onKeyDown={(e) => {
@@ -1441,7 +1442,7 @@ function CardModal({
                 }
               }}
             />
-            <button className="btn btn-sm" onClick={addCheck} disabled={!checkText.trim()} aria-label="Добавить пункт">
+            <button className="btn btn-sm" onClick={addCheck} disabled={!checkText.trim()} aria-label={t('Добавить пункт')}>
               <Plus size={15} />
             </button>
           </div>
@@ -1449,11 +1450,11 @@ function CardModal({
 
         <div className="modal-actions">
           <button className="btn btn-ghost btn-danger" onClick={onDelete}>
-            <Trash2 size={16} /> Удалить
+            <Trash2 size={16} /> {t('Удалить')}
           </button>
           <div className="grow" />
           <button className="btn btn-primary" onClick={onClose}>
-            Готово
+            {t('Готово')}
           </button>
         </div>
       </div>
@@ -1484,17 +1485,17 @@ function MapTaskModal({
           <div className="grow">
             <div className="kb-map-badge">
               <Network size={12} />
-              <span className="kb-map-doc ellipsis">{task.docTitle || 'Без названия'}</span>
+              <span className="kb-map-doc ellipsis">{task.docTitle || t('Без названия')}</span>
               {task.path.length > 0 && <span className="kb-map-path ellipsis">› {task.path.join(' › ')}</span>}
             </div>
-            <h2 className="kb-map-title">{task.text || 'Без названия'}</h2>
+            <h2 className="kb-map-title">{task.text || t('Без названия')}</h2>
           </div>
-          <button className="icon-btn" onClick={onClose} aria-label="Закрыть">
+          <button className="icon-btn" onClick={onClose} aria-label={t('Закрыть')}>
             <X />
           </button>
         </div>
 
-        <label className="label">Статус</label>
+        <label className="label">{t('Статус')}</label>
         <div className="segmented kb-status-seg">
           {(['todo', 'doing', 'done'] as TaskStatus[]).map((s) => (
             <button
@@ -1507,10 +1508,10 @@ function MapTaskModal({
           ))}
         </div>
 
-        <label className="label">Приоритет</label>
+        <label className="label">{t('Приоритет')}</label>
         <PrioritySelect value={draft.priority} onChange={(v) => set({ priority: v })} />
 
-        <label className="label">Срок</label>
+        <label className="label">{t('Срок')}</label>
         <div className="row">
           <input
             type="date"
@@ -1519,14 +1520,14 @@ function MapTaskModal({
             onChange={(e) => set({ due: e.target.value || undefined })}
           />
           {draft.due && (
-            <button className="icon-btn" onClick={() => set({ due: undefined })} aria-label="Убрать срок">
+            <button className="icon-btn" onClick={() => set({ due: undefined })} aria-label={t('Убрать срок')}>
               <X />
             </button>
           )}
         </div>
 
         <label className="label">
-          Прогресс <span className="faint">· {progress}%</span>
+          {t('Прогресс')} <span className="faint">· {progress}%</span>
         </label>
         <input
           type="range"
@@ -1547,14 +1548,14 @@ function MapTaskModal({
               openDoc(task.docId, task.topicId);
             }}
           >
-            <ArrowRight size={16} /> Открыть в карте
+            <ArrowRight size={16} /> {t('Открыть в карте')}
           </button>
           <div className="grow" />
           <button className="btn btn-ghost" onClick={onClose}>
-            Отмена
+            {t('Отмена')}
           </button>
           <button className="btn btn-primary" onClick={() => onSave(draft)}>
-            Сохранить
+            {t('Сохранить')}
           </button>
         </div>
       </div>
