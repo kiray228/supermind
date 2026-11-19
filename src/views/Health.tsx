@@ -2,6 +2,7 @@
  * «Здоровье и спорт»: привычки про здоровье и спорт на сегодня, неделя, траты на здоровье
  * и быстрые шаблоны (вода, сон, шаги, тренировки). Данные — те же, что в «Привычках».
  */
+import { LOCALE, t } from '../i18n/index';
 import { useEffect, useState } from 'react';
 import { Plus } from '@phosphor-icons/react';
 import type { Habit, PlannerData } from '../types';
@@ -53,11 +54,11 @@ async function addPreset(p: HabitPreset) {
   await savePlanner({ ...pl, days: pl.days ?? {}, habits: [...habits, { ...habitFromPreset(p), createdAt: now, updatedAt: now }] });
   window.dispatchEvent(new Event('sm-planner-changed'));
   syncSoon(300);
-  toast(`Добавлено: ${p.name}`);
+  toast(t('Добавлено: {name}', { name: p.name }));
 }
 
-const SOURCE_NAME: Record<HealthSource, string> = { apple: 'Apple «Здоровье»', connect: 'Health Connect' };
-const fmtSteps = (n: number) => n.toLocaleString('ru-RU');
+const SOURCE_NAME: Record<HealthSource, string> = { apple: t('Apple «Здоровье»'), connect: 'Health Connect' };
+const fmtSteps = (n: number) => n.toLocaleString(LOCALE);
 
 /** Шаги и сон из «Здоровья» телефона: подключение, сегодня, неделя шагов */
 function HealthLink() {
@@ -70,17 +71,17 @@ function HealthLink() {
     if (busy) return;
     setBusy(true);
     const r = await linkHealth().finally(() => setBusy(false));
-    if (r === 'install') toast('Установите Health Connect из Google Play и попробуйте снова');
-    else if (r === 'denied') toast(source === 'connect' ? 'Доступ не дан — его можно включить в Health Connect' : 'Доступ не дан — включите его в «Здоровье» → Доступ');
-    else if (r === 'unavailable') toast(`${name} недоступно на этом устройстве`);
+    if (r === 'install') toast(t('Установите Health Connect из Google Play и попробуйте снова'));
+    else if (r === 'denied') toast(source === 'connect' ? t('Доступ не дан — его можно включить в Health Connect') : t('Доступ не дан — включите его в «Здоровье» → Доступ'));
+    else if (r === 'unavailable') toast(t('{name} недоступно на этом устройстве', { name }));
   };
   if (!linked) {
     return (
       <ListSection
-        header="Шаги и сон"
-        footer={`Шаги и сон читаются из ${name} только на этом телефоне и никуда не отправляются. Привычки вроде «10 000 шагов», «Сон 8 часов» и «Лечь спать до 23:00» будут отмечаться сами.`}
+        header={t('Шаги и сон')}
+        footer={t('Шаги и сон читаются из {name} только на этом телефоне и никуда не отправляются. Привычки вроде «10 000 шагов», «Сон 8 часов» и «Лечь спать до 23:00» будут отмечаться сами.', { name })}
       >
-        <ListRow icon={<span className="hl-ico">👣</span>} title={`Подключить ${name}`} subtitle="Шаги за день и сон за ночь" chevron onClick={() => void connect()} />
+        <ListRow icon={<span className="hl-ico">👣</span>} title={t('Подключить {name}', { name })} subtitle={t('Шаги за день и сон за ночь')} chevron onClick={() => void connect()} />
       </ListSection>
     );
   }
@@ -90,19 +91,19 @@ function HealthLink() {
   const sleep = data?.sleep[today];
   const disconnect = async () => {
     const ok = await confirmDialog(
-      'Отключить «Здоровье»?',
-      source === 'connect' ? 'SuperMind перестанет читать шаги и сон. Доступ можно отозвать и в Health Connect.' : 'SuperMind перестанет показывать шаги и сон. Доступ можно отозвать в «Здоровье» → Доступ.',
-      { okText: 'Отключить' },
+      t('Отключить «Здоровье»?'),
+      source === 'connect' ? t('SuperMind перестанет читать шаги и сон. Доступ можно отозвать и в Health Connect.') : t('SuperMind перестанет показывать шаги и сон. Доступ можно отозвать в «Здоровье» → Доступ.'),
+      { okText: t('Отключить') },
     );
     if (ok) unlinkHealth();
   };
   return (
-    <ListSection header="Шаги и сон" footer={`Из ${name}, только на этом телефоне.`}>
+    <ListSection header={t('Шаги и сон')} footer={t('Из {name}, только на этом телефоне.', { name })}>
       <div className="hl-link">
         <div className="hl-link-stat">
-          <span className="hl-link-label">👣 Шаги сегодня</span>
+          <span className="hl-link-label">{t('👣 Шаги сегодня')}</span>
           <b>{fmtSteps(stepsOf(today))}</b>
-          <div className="hl-steps-week" aria-label="Шаги за неделю">
+          <div className="hl-steps-week" aria-label={t('Шаги за неделю')}>
             {week.map((d) => (
               <span key={d} className={`hl-steps-bar${d === today ? ' cur' : ''}`} title={`${d}: ${fmtSteps(stepsOf(d))}`}>
                 <i style={{ height: `${Math.max(6, Math.round((stepsOf(d) / max) * 100))}%` }} />
@@ -111,13 +112,13 @@ function HealthLink() {
           </div>
         </div>
         <div className="hl-link-stat">
-          <span className="hl-link-label">😴 Сон за ночь</span>
+          <span className="hl-link-label">{t('😴 Сон за ночь')}</span>
           <b>{sleep ? fmtSleep(sleep) : '—'}</b>
-          <span className="hl-link-sub">{sleep ? `по данным ${name}` : 'нет данных за эту ночь'}</span>
+          <span className="hl-link-sub">{sleep ? t('по данным {name}', { name }) : t('нет данных за эту ночь')}</span>
         </div>
       </div>
-      {source === 'connect' && <ListRow title="Доступ в Health Connect" chevron onClick={() => void openHealthSettings()} />}
-      <ListRow title="Отключить" onClick={() => void disconnect()} />
+      {source === 'connect' && <ListRow title={t('Доступ в Health Connect')} chevron onClick={() => void openHealthSettings()} />}
+      <ListRow title={t('Отключить')} onClick={() => void disconnect()} />
     </ListSection>
   );
 }
@@ -162,32 +163,32 @@ export default function Health() {
   return (
     <div className="page hl-page">
       <div className="page-header">
-        <h1 className="grow">Здоровье и спорт</h1>
+        <h1 className="grow">{t('Здоровье и спорт')}</h1>
       </div>
       <div className="page-body">
         <div className="hl-wrap">
           <div className="hl-hero">
             <div className="hl-hero-num">
               <b>{done}</b>
-              <span>из {due.length}</span>
+              <span>{t('из {total}', { total: due.length })}</span>
             </div>
             <div className="grow">
-              <div className="hl-hero-title">{due.length === 0 ? 'На сегодня ничего не запланировано' : done === due.length ? 'Всё на сегодня сделано 💪' : 'Сегодня по здоровью и спорту'}</div>
-              <div className="hl-week" aria-label={`За неделю: ${weekDone} из ${weekDue}`}>
+              <div className="hl-hero-title">{due.length === 0 ? t('На сегодня ничего не запланировано') : done === due.length ? t('Всё на сегодня сделано 💪') : t('Сегодня по здоровью и спорту')}</div>
+              <div className="hl-week" aria-label={t('За неделю: {done} из {total}', { done: weekDone, total: weekDue })}>
                 {week.map((w) => (
-                  <span key={w.d} className={`hl-week-bar${w.d === today ? ' cur' : ''}`} title={`${w.d}: ${w.n} из ${w.of}`}>
+                  <span key={w.d} className={`hl-week-bar${w.d === today ? ' cur' : ''}`} title={t('{date}: {done} из {total}', { date: w.d, done: w.n, total: w.of })}>
                     <i style={{ height: `${w.of ? Math.max(8, Math.round((w.n / w.of) * 100)) : 8}%` }} className={w.of && w.n === w.of ? 'full' : ''} />
                   </span>
                 ))}
               </div>
-              <div className="hl-hero-sub">За 7 дней: {weekDone} из {weekDue}</div>
+              <div className="hl-hero-sub">{t('За 7 дней: {done} из {total}', { done: weekDone, total: weekDue })}</div>
             </div>
           </div>
 
           <HealthLink />
 
           {data && due.length > 0 && (
-            <ListSection header="Сегодня">
+            <ListSection header={t('Сегодня')}>
               <div className="hl-habits">
                 {due.map((h) => (
                   <HabitRow key={h.id} h={h} days={days} date={today} onTap={() => tap(h)} onMinus={() => tap(h, -1)} onOpen={() => go('habits')} />
@@ -197,11 +198,11 @@ export default function Health() {
           )}
 
           {data && habits.length === 0 && (
-            <p className="hl-empty">Добавьте то, за чем хотите следить: воду, сон, шаги, тренировки. Отметки, серии и напоминания — как у привычек.</p>
+            <p className="hl-empty">{t('Добавьте то, за чем хотите следить: воду, сон, шаги, тренировки. Отметки, серии и напоминания — как у привычек.')}</p>
           )}
 
           {presets.length > 0 && (
-            <ListSection header="Добавить" footer="Свои привычки про сон, воду, спорт и здоровье тоже попадают сюда.">
+            <ListSection header={t('Добавить')} footer={t('Свои привычки про сон, воду, спорт и здоровье тоже попадают сюда.')}>
               {presets.map((p) => (
                 <ListRow
                   key={p.name}
@@ -220,18 +221,18 @@ export default function Health() {
           )}
 
           <ListSection>
-            <ListRow icon={<IconTile section="habits" size="list" />} title="Все привычки" subtitle="Настроить, статистика, дневник и настроение" chevron onClick={() => go('habits')} />
+            <ListRow icon={<IconTile section="habits" size="list" />} title={t('Все привычки')} subtitle={t('Настроить, статистика, дневник и настроение')} chevron onClick={() => go('habits')} />
             {fin && (
               <ListRow
                 icon={<IconTile section="finance" size="list" />}
-                title="Траты на здоровье"
-                subtitle="Категория «Здоровье» за этот месяц"
+                title={t('Траты на здоровье')}
+                subtitle={t('Категория «Здоровье» за этот месяц')}
                 value={fmtMoney(healthSpent, fin.prefs.mainCurrency)}
                 chevron
                 onClick={() => go('finance')}
               />
             )}
-            <ListRow icon={<IconTile section="goals" size="list" />} title="Цели" subtitle="Например: пробежать 10 км, сбросить вес" chevron onClick={() => go('goals')} />
+            <ListRow icon={<IconTile section="goals" size="list" />} title={t('Цели')} subtitle={t('Например: пробежать 10 км, сбросить вес')} chevron onClick={() => go('goals')} />
           </ListSection>
         </div>
       </div>

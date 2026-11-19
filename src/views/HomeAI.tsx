@@ -1,4 +1,5 @@
 /** Окно «Создать карту с ИИ» — отдельным модулем: SDK Claude и список структур не нужны при запуске */
+import { t } from '../i18n/index';
 import { useState } from 'react';
 import { Sparkles, X, Square } from 'lucide-react';
 import type { StructureType } from '../types';
@@ -42,31 +43,31 @@ export default function AICreate({ onClose }: { onClose(): void }) {
       <div className="modal" style={{ width: 'min(560px,100%)' }}>
         <div className="row">
           <div className="ai-badge-lg"><Sparkles size={18} /></div>
-          <h2 className="grow">Создать карту с ИИ</h2>
-          <button className="icon-btn" onClick={() => { ac?.abort(); onClose(); }} aria-label="Закрыть"><X /></button>
+          <h2 className="grow">{t('Создать карту с ИИ')}</h2>
+          <button className="icon-btn" onClick={() => { ac?.abort(); onClose(); }} aria-label={t('Закрыть')}><X /></button>
         </div>
         {(
           <>
-            <p className="muted small" style={{ margin: '8px 0 0' }}>Опишите идею одной фразой или вставьте целый текст — статью, конспект, заметки.</p>
-            <textarea className="textarea" rows={4} style={{ marginTop: 12 }} autoFocus placeholder="Например: «Как подготовиться к марафону за 6 месяцев»" value={idea} onChange={(e) => setIdea(e.target.value)} disabled={busy} />
+            <p className="muted small" style={{ margin: '8px 0 0' }}>{t('Опишите идею одной фразой или вставьте целый текст — статью, конспект, заметки.')}</p>
+            <textarea className="textarea" rows={4} style={{ marginTop: 12 }} autoFocus placeholder={t('Например: «Как подготовиться к марафону за 6 месяцев»')} value={idea} onChange={(e) => setIdea(e.target.value)} disabled={busy} />
             <div className="row" style={{ marginTop: 10, flexWrap: 'wrap' }}>
               <div className="segmented">
                 {(['brief', 'normal', 'deep'] as const).map((d) => (
-                  <button key={d} className={depth === d ? 'active' : ''} onClick={() => setDepth(d)}>{d === 'brief' ? 'Кратко' : d === 'normal' ? 'Стандарт' : 'Подробно'}</button>
+                  <button key={d} className={depth === d ? 'active' : ''} onClick={() => setDepth(d)}>{d === 'brief' ? t('Кратко') : d === 'normal' ? t('Стандарт') : t('Подробно')}</button>
                 ))}
               </div>
               <select className="select" style={{ width: 'auto', flex: 1 }} value={structure} onChange={(e) => setStructure(e.target.value as StructureType)}>
                 {STRUCTURES.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </div>
-            {(busy || out) && <pre className="ai-preview">{out || 'Думаю…'}</pre>}
+            {(busy || out) && <pre className="ai-preview">{out || t('Думаю…')}</pre>}
             {!busy && out && <ReportAI text={out} where="Создать карту с ИИ" />}
             {err && <div className="ai-err">{err}</div>}
             <div className="modal-actions">
               {busy ? (
-                <button className="btn" onClick={() => ac?.abort()}><Square size={14} /> Остановить</button>
+                <button className="btn" onClick={() => ac?.abort()}><Square size={14} /> {t('Остановить')}</button>
               ) : (
-                <button className="btn btn-primary" disabled={!idea.trim()} onClick={run}><Sparkles size={16} /> Сгенерировать</button>
+                <button className="btn btn-primary" disabled={!idea.trim()} onClick={run}><Sparkles size={16} /> {t('Сгенерировать')}</button>
               )}
             </div>
           </>

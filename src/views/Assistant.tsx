@@ -1,3 +1,4 @@
+import { t } from '../i18n/index';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ArrowUp, CalendarCheck, CircleAlert, PencilLine, Sparkles, Square, Target, Trash2, Wallet } from 'lucide-react';
 import { AIError, streamText, type ChatTurn } from '../ai/claude';
@@ -22,11 +23,11 @@ interface Suggestion {
 }
 
 const SUGGESTIONS: Suggestion[] = [
-  { label: 'Спланируй мой день', icon: CalendarCheck, prompt: 'Спланируй мой день: расставь задачи по времени с учётом приоритетов и предложи, что перенести.' },
-  { label: 'Что просрочено?', icon: CircleAlert, prompt: 'Что у меня просрочено? Предложи, что сделать сегодня, а что перенести.' },
-  { label: 'Разбей цель на шаги', icon: Target, prompt: 'Помоги разбить мою главную активную цель на этапы и конкретные шаги.' },
-  { label: 'Сколько я потратил в этом месяце?', icon: Wallet, prompt: 'Сколько я потратил в этом месяце и на что больше всего? Дай короткие выводы.' },
-  { label: 'Запиши задачу…', icon: PencilLine, prompt: 'Запиши задачу: ', fill: true },
+  { label: t('Спланируй мой день'), icon: CalendarCheck, prompt: t('Спланируй мой день: расставь задачи по времени с учётом приоритетов и предложи, что перенести.') },
+  { label: t('Что просрочено?'), icon: CircleAlert, prompt: t('Что у меня просрочено? Предложи, что сделать сегодня, а что перенести.') },
+  { label: t('Разбей цель на шаги'), icon: Target, prompt: t('Помоги разбить мою главную активную цель на этапы и конкретные шаги.') },
+  { label: t('Сколько я потратил в этом месяце?'), icon: Wallet, prompt: t('Сколько я потратил в этом месяце и на что больше всего? Дай короткие выводы.') },
+  { label: t('Запиши задачу…'), icon: PencilLine, prompt: t('Запиши задачу:') + ' ', fill: true },
 ];
 
 const stamp = () => Date.now();
@@ -140,7 +141,7 @@ export default function Assistant() {
       addMessage({
         id: uid(),
         role: 'assistant',
-        text: answer || (actions.length ? 'Вот что предлагаю:' : 'Пустой ответ. Попробуйте переформулировать.'),
+        text: answer || (actions.length ? t('Вот что предлагаю:') : t('Пустой ответ. Попробуйте переформулировать.')),
         at,
         updatedAt: at,
         ...(actions.length ? { actions: toItems(actions) } : {}),
@@ -149,9 +150,9 @@ export default function Assistant() {
       const at = stamp();
       const partial = parseActions(liveRef.current).text;
       if (ctrl.signal.aborted) {
-        if (partial) addMessage({ id: uid(), role: 'assistant', text: partial + '\n\n*(остановлено)*', at, updatedAt: at });
+        if (partial) addMessage({ id: uid(), role: 'assistant', text: partial + '\n\n' + t('*(остановлено)*'), at, updatedAt: at });
       } else {
-        addMessage({ id: uid(), role: 'assistant', text: e instanceof AIError ? e.message : 'Не удалось получить ответ. Попробуйте ещё раз.', at, updatedAt: at, error: true });
+        addMessage({ id: uid(), role: 'assistant', text: e instanceof AIError ? e.message : t('Не удалось получить ответ. Попробуйте ещё раз.'), at, updatedAt: at, error: true });
       }
     } finally {
       if (abortRef.current === ctrl) abortRef.current = null;
@@ -186,7 +187,7 @@ export default function Assistant() {
 
   const onClear = async () => {
     if (!messages.length) return;
-    if (await confirmDialog('Очистить чат?', 'История переписки с ассистентом будет удалена на всех устройствах.', { okText: 'Очистить', danger: true })) clearChat();
+    if (await confirmDialog(t('Очистить чат?'), t('История переписки с ассистентом будет удалена на всех устройствах.'), { okText: t('Очистить'), danger: true })) clearChat();
   };
 
   const busy = streaming !== null;
@@ -197,10 +198,10 @@ export default function Assistant() {
     <div className={`page as-page${kb ? ' kb-open' : ''}${hasKey ? '' : ' no-composer'}`}>
       <div className="page-header">
         <IconTile section="assistant" size="sm" className="ph-tile" />
-        <h1>Ассистент</h1>
+        <h1>{t('Ассистент')}</h1>
         <span className="grow" />
         {hasKey && messages.length > 0 && (
-          <button className="icon-btn" onClick={() => void onClear()} title="Очистить чат" aria-label="Очистить чат" disabled={busy}>
+          <button className="icon-btn" onClick={() => void onClear()} title={t('Очистить чат')} aria-label={t('Очистить чат')} disabled={busy}>
             <Trash2 />
           </button>
         )}
@@ -224,8 +225,8 @@ export default function Assistant() {
               <div className="as-welcome-badge">
                 <Sparkles size={22} />
               </div>
-              <h3>Чем помочь?</h3>
-              <p className="muted small">Я вижу ваши задачи, привычки, цели и финансы. Могу спланировать день, найти просрочку, разбить цель на шаги или записать задачу.</p>
+              <h3>{t('Чем помочь?')}</h3>
+              <p className="muted small">{t('Я вижу ваши задачи, привычки, цели и финансы. Могу спланировать день, найти просрочку, разбить цель на шаги или записать задачу.')}</p>
               <div className="as-suggest">
                 {SUGGESTIONS.map((s) => (
                   <button key={s.label} className="as-suggest-item" onClick={() => pick(s)}>
@@ -270,7 +271,7 @@ export default function Assistant() {
               className="as-input"
               rows={1}
               value={input}
-              placeholder="Спросите или попросите что-нибудь…"
+              placeholder={t('Спросите или попросите что-нибудь…')}
               enterKeyHint={coarse ? 'enter' : 'send'}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
@@ -281,7 +282,7 @@ export default function Assistant() {
               }}
             />
             {busy ? (
-              <button type="button" className="as-send stop" onClick={() => abortRef.current?.abort()} aria-label="Остановить">
+              <button type="button" className="as-send stop" onClick={() => abortRef.current?.abort()} aria-label={t('Остановить')}>
                 <Square size={14} fill="currentColor" />
               </button>
             ) : (
@@ -289,7 +290,7 @@ export default function Assistant() {
                 type="submit"
                 className="as-send"
                 disabled={!input.trim()}
-                aria-label="Отправить"
+                aria-label={t('Отправить')}
                 // не забирать фокус у поля: клавиатура на телефоне не закрывается
                 onMouseDown={(e) => e.preventDefault()}
               >

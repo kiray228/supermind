@@ -1,3 +1,4 @@
+import { t } from '../i18n/index';
 import { useEffect } from 'react';
 import { ChartLineUp, DotsThree, Plus } from '@phosphor-icons/react';
 import { ensureFinance, refreshRates, useFinance } from '../finance/store';
@@ -16,10 +17,10 @@ import { IconTile } from '../ui/icons';
 
 /** Сегменты в шапке; «Аналитика» и «Ещё» — круглые кнопки справа, как в приложениях Apple */
 const TABS: [FinTab, string][] = [
-  ['overview', 'Обзор'],
-  ['ops', 'Операции'],
-  ['budget', 'Бюджет'],
-  ['debts', 'Долги'],
+  ['overview', t('Обзор')],
+  ['ops', t('Операции')],
+  ['budget', t('Бюджет')],
+  ['debts', t('Долги')],
 ];
 
 /** Раздел «Финансы»: счета, операции, бюджеты, долги, подписки, аналитика */
@@ -29,7 +30,7 @@ export default function Finance() {
   const moreSection = useFinUi((s) => s.more);
 
   useEffect(() => {
-    ensureFinance().catch(() => toast('Не удалось загрузить финансы'));
+    ensureFinance().catch(() => toast(t('Не удалось загрузить финансы')));
   }, []);
   // курсы валют — раз в день автоматически (и сразу, если у новой валюты нет курса)
   const ratesKey = data ? usedCurrencies(data).join(',') + '|' + data.prefs.mainCurrency : '';
@@ -43,7 +44,7 @@ export default function Finance() {
     <div className="page fn-page">
       <div className="page-header fn-header">
         <IconTile section="finance" size="sm" className="ph-tile" />
-        <h1>Финансы</h1>
+        <h1>{t('Финансы')}</h1>
         <div className="grow" />
         <div className="segmented fn-tabs" role="tablist">
           {TABS.map(([t, l]) => (
@@ -52,19 +53,19 @@ export default function Finance() {
             </button>
           ))}
         </div>
-        <button className={'icon-btn' + (tab === 'analytics' ? ' active' : '')} onClick={() => setFinTab('analytics')} aria-label="Аналитика" title="Аналитика">
+        <button className={'icon-btn' + (tab === 'analytics' ? ' active' : '')} onClick={() => setFinTab('analytics')} aria-label={t('Аналитика')} title={t('Аналитика')}>
           <ChartLineUp weight="bold" />
         </button>
-        <button className={'icon-btn' + (tab === 'more' ? ' active' : '')} onClick={() => setFinTab('more')} aria-label="Ещё: счета, категории, подписки" title="Счета, категории, подписки">
+        <button className={'icon-btn' + (tab === 'more' ? ' active' : '')} onClick={() => setFinTab('more')} aria-label={t('Ещё: счета, категории, подписки')} title={t('Счета, категории, подписки')}>
           <DotsThree weight="bold" />
         </button>
       </div>
       <div className="page-body fn-body">
         {!data ? (
-          <div className="empty">Загрузка…</div>
+          <div className="empty">{t('Загрузка…')}</div>
         ) : (
           <div className="fn-wrap-page" key={tab}>
-            {(tab === 'analytics' || (tab === 'more' && !moreSection)) && <h2 className="fn-page-title">{tab === 'analytics' ? 'Аналитика' : 'Счета и настройки'}</h2>}
+            {(tab === 'analytics' || (tab === 'more' && !moreSection)) && <h2 className="fn-page-title">{tab === 'analytics' ? t('Аналитика') : t('Счета и настройки')}</h2>}
             {tab === 'overview' && <Overview data={data} />}
             {tab === 'ops' && <Operations data={data} />}
             {tab === 'budget' && <BudgetTab data={data} />}
@@ -75,7 +76,7 @@ export default function Finance() {
         )}
       </div>
       {data && (
-        <button className="fn-fab" onClick={add} aria-label={tab === 'debts' ? 'Новый долг' : 'Новая операция'} title={tab === 'debts' ? 'Новый долг' : 'Новая операция'}>
+        <button className="fn-fab" onClick={add} aria-label={tab === 'debts' ? t('Новый долг') : t('Новая операция')} title={tab === 'debts' ? t('Новый долг') : t('Новая операция')}>
           <Plus size={26} weight="bold" />
         </button>
       )}

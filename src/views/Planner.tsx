@@ -1,3 +1,4 @@
+import { t, tn } from '../i18n/index';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   BookOpen,
@@ -37,21 +38,21 @@ import './views.css';
 
 // ---------- Константы ----------
 
-const WEEKDAYS = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
-const WD_SHORT = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
-const WD_SHORT_BY_DAY = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
-const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
-const MONTHS_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+const WEEKDAYS = [t('Воскресенье'), t('Понедельник'), t('Вторник'), t('Среда'), t('Четверг'), t('Пятница'), t('Суббота')];
+const WD_SHORT = [t('Пн'), t('Вт'), t('Ср'), t('Чт'), t('Пт'), t('Сб'), t('Вс')];
+const WD_SHORT_BY_DAY = [t('Вс'), t('Пн'), t('Вт'), t('Ср'), t('Чт'), t('Пт'), t('Сб')];
+const MONTHS = [t('Январь'), t('Февраль'), t('Март'), t('Апрель'), t('Май'), t('Июнь'), t('Июль'), t('Август'), t('Сентябрь'), t('Октябрь'), t('Ноябрь'), t('Декабрь')];
+const MONTHS_GEN = [t('января'), t('февраля'), t('марта'), t('апреля'), t('мая'), t('июня'), t('июля'), t('августа'), t('сентября'), t('октября'), t('ноября'), t('декабря')];
 const MOODS = ['😄', '🙂', '😐', '😕', '😢', '😡', '🤩', '😴'];
 const MOOD_NAMES: Record<string, string> = {
-  '😄': 'Отлично',
-  '🙂': 'Хорошо',
-  '😐': 'Нормально',
-  '😕': 'Так себе',
-  '😢': 'Грустно',
-  '😡': 'Злость',
-  '🤩': 'Восторг',
-  '😴': 'Усталость',
+  '😄': t('Отлично'),
+  '🙂': t('Хорошо'),
+  '😐': t('Нормально'),
+  '😕': t('Так себе'),
+  '😢': t('Грустно'),
+  '😡': t('Злость'),
+  '🤩': t('Восторг'),
+  '😴': t('Усталость'),
 };
 
 const emptyDay = (): PlannerDay => ({ journal: '', tasks: [] });
@@ -66,17 +67,17 @@ function mondayOf(ymd: string): string {
 function longTitle(ymd: string): string {
   const d = fromYmd(ymd);
   const y = d.getFullYear() !== new Date().getFullYear() ? ` ${d.getFullYear()}` : '';
-  return `${WEEKDAYS[d.getDay()]}, ${d.getDate()} ${MONTHS_GEN[d.getMonth()]}${y}`;
+  return t('{weekday}, {day} {month}', { weekday: WEEKDAYS[d.getDay()], day: d.getDate(), month: MONTHS_GEN[d.getMonth()] }) + y;
 }
 
 function relativeLabel(ymd: string, today: string): string {
-  if (ymd === today) return 'Сегодня';
-  if (ymd === addDaysYmd(today, 1)) return 'Завтра';
-  if (ymd === addDaysYmd(today, -1)) return 'Вчера';
+  if (ymd === today) return t('Сегодня');
+  if (ymd === addDaysYmd(today, 1)) return t('Завтра');
+  if (ymd === addDaysYmd(today, -1)) return t('Вчера');
   const diff = Math.round((fromYmd(ymd).getTime() - fromYmd(today).getTime()) / 86400000);
   const n = Math.abs(diff);
-  const word = n % 10 === 1 && n % 100 !== 11 ? 'день' : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? 'дня' : 'дней';
-  return diff > 0 ? `Через ${n} ${word}` : `${n} ${word} назад`;
+  const word = tn(n, 'день', 'дня', 'дней');
+  return diff > 0 ? t('Через {n} {days}', { n, days: word }) : t('{n} {days} назад', { n, days: word });
 }
 
 interface DayMarks {
@@ -167,7 +168,7 @@ export default function Planner() {
         dataRef.current = n;
         setData(n);
       })
-      .catch(() => toast('Не удалось сохранить ежедневник'));
+      .catch(() => toast(t('Не удалось сохранить ежедневник')));
   }, []);
 
   const updateDays = useCallback(
@@ -218,10 +219,10 @@ export default function Planner() {
     return (
       <div className="page pl-page">
         <div className="page-header">
-          <h1>Ежедневник</h1>
+          <h1>{t('Ежедневник')}</h1>
         </div>
         <div className="page-body">
-          <div className="empty">Загрузка…</div>
+          <div className="empty">{t('Загрузка…')}</div>
         </div>
       </div>
     );
@@ -258,14 +259,14 @@ export default function Planner() {
   const unlinked = mapTasks.filter((t) => !linked.has(t.topicId));
   const dueMaps = unlinked.filter((t) => t.task.due === date);
   const overdueMaps = date === today ? unlinked.filter((t) => t.task.due && t.task.due < today && t.task.status !== 'done') : [];
-  const toggleMap = async (t: MapTask) => {
-    const done = t.task.status !== 'done';
+  const toggleMap = async (mt: MapTask) => {
+    const done = mt.task.status !== 'done';
     const patch = done ? { status: 'done' as const, progress: 100 } : { status: 'todo' as const };
-    setMapTasks((ts) => ts.map((x) => (x.docId === t.docId && x.topicId === t.topicId ? { ...x, task: { ...x.task, ...patch } } : x)));
+    setMapTasks((ts) => ts.map((x) => (x.docId === mt.docId && x.topicId === mt.topicId ? { ...x, task: { ...x.task, ...patch } } : x)));
     try {
-      await updateMapTask(t.docId, t.topicId, patch);
+      await updateMapTask(mt.docId, mt.topicId, patch);
     } catch {
-      toast('Не удалось обновить задачу в карте');
+      toast(t('Не удалось обновить задачу в карте'));
     }
   };
 
@@ -278,7 +279,7 @@ export default function Planner() {
   /** нажатие на кружок: отметка или +1 (выполненный счётчик — −1) */
   const tapHabit = (h: Habit, delta?: -1) => {
     if (date > today) {
-      toast('Отметить привычку заранее нельзя');
+      toast(t('Отметить привычку заранее нельзя'));
       return;
     }
     const before = dataRef.current!;
@@ -295,7 +296,7 @@ export default function Planner() {
     const after = dataRef.current!;
     const allNow = dueHabits.length > 0 && dueHabits.every((x) => doneOn(after.days, x, date));
     const allBefore = dueHabits.every((x) => doneOn(before.days, x, date));
-    if (nowDone && allNow && !allBefore) toast('🎉 Все привычки на сегодня выполнены!');
+    if (nowDone && allNow && !allBefore) toast(t('🎉 Все привычки на сегодня выполнены!'));
   };
   /** отметка дня из карточки привычки (тепловая карта) */
   const toggleHabitDay = (h: Habit, ymd: string) => {
@@ -312,11 +313,11 @@ export default function Planner() {
   };
   const addPreset = (h: Habit) => {
     saveHabit(h);
-    toast(`${h.icon ?? ''} «${h.name}» добавлена`.trim());
+    toast(t('{icon} «{name}» добавлена', { icon: h.icon ?? '', name: h.name }).trim());
   };
   const archiveHabit = (h: Habit, archived: boolean) => {
     saveHabit(cleanHabit({ ...h, archived }));
-    toast(archived ? 'Привычка в архиве — история сохранена' : 'Привычка снова активна');
+    toast(archived ? t('Привычка в архиве — история сохранена') : t('Привычка снова активна'));
     if (archived) setDetailId(null);
   };
   /** Удалить сразу — с «Вернуть» в течение нескольких секунд (как в разделе «Привычки») */
@@ -337,8 +338,8 @@ export default function Planner() {
     setDetailId(null);
     setEditing(null);
     syncSoon(300);
-    toast(`«${h.name}» удалена`, {
-      label: 'Вернуть',
+    toast(t('«{name}» удалена', { name: h.name }), {
+      label: t('Вернуть'),
       run: () => {
         const c = dataRef.current;
         if (!c) return;
@@ -369,14 +370,14 @@ export default function Planner() {
   return (
     <div className="page pl-page">
       <div className="page-header">
-        <h1>Ежедневник</h1>
+        <h1>{t('Ежедневник')}</h1>
         <div className="grow" />
         <div className="row">
           <button className="btn btn-sm pl-mobile-only" onClick={() => setCalOpen(true)}>
-            <CalendarDays size={16} /> Календарь
+            <CalendarDays size={16} /> {t('Календарь')}
           </button>
           <button className="btn btn-sm" disabled={date === today} onClick={() => setDate(today)}>
-            Сегодня
+            {t('Сегодня')}
           </button>
         </div>
       </div>
@@ -394,7 +395,7 @@ export default function Planner() {
             <WeekStrip selected={date} today={today} marks={marks} onPick={pick} />
 
             <div className="pl-day-head">
-              <button className="icon-btn pl-nav" onClick={() => setDate(addDaysYmd(date, -1))} aria-label="Предыдущий день">
+              <button className="icon-btn pl-nav" onClick={() => setDate(addDaysYmd(date, -1))} aria-label={t('Предыдущий день')}>
                 <ChevronLeft />
               </button>
               <div className="grow pl-day-title">
@@ -406,7 +407,7 @@ export default function Planner() {
                   {day.mood}
                 </span>
               )}
-              <button className="icon-btn pl-nav" onClick={() => setDate(addDaysYmd(date, 1))} aria-label="Следующий день">
+              <button className="icon-btn pl-nav" onClick={() => setDate(addDaysYmd(date, 1))} aria-label={t('Следующий день')}>
                 <ChevronRight />
               </button>
             </div>
@@ -417,11 +418,11 @@ export default function Planner() {
                 <section className="card pl-section">
                   <header className="pl-sec-head">
                     <ListChecks size={18} className="pl-sec-icon" />
-                    <h3>Задачи дня</h3>
+                    <h3>{t('Задачи дня')}</h3>
                     <div className="grow" />
                     {tasks.length > 0 && (
                       <span className="pl-sec-meta">
-                        {doneCount} из {tasks.length}
+                        {t('{done} из {total}', { done: doneCount, total: tasks.length })}
                       </span>
                     )}
                   </header>
@@ -443,7 +444,7 @@ export default function Planner() {
                   <section className="card pl-section">
                     <header className="pl-sec-head">
                       <Network size={18} className="pl-sec-icon" />
-                      <h3>Из карт</h3>
+                      <h3>{t('Из карт')}</h3>
                       <div className="grow" />
                       <span className="pl-sec-meta">{dueMaps.length + overdueMaps.length}</span>
                     </header>
@@ -464,7 +465,7 @@ export default function Planner() {
                 <section className="card pl-section">
                   <header className="pl-sec-head">
                     <Smile size={18} className="pl-sec-icon" />
-                    <h3>Настроение</h3>
+                    <h3>{t('Настроение')}</h3>
                     <div className="grow" />
                     {day.mood && <span className="pl-sec-meta">{MOOD_NAMES[day.mood] ?? ''}</span>}
                   </header>
@@ -487,29 +488,29 @@ export default function Planner() {
                 <section className="card pl-section">
                   <header className="pl-sec-head">
                     <Flame size={18} className="pl-sec-icon" />
-                    <h3>Привычки</h3>
+                    <h3>{t('Привычки')}</h3>
                     <div className="grow" />
                     {dueHabits.length > 0 && (
                       <span className="pl-sec-meta">
-                        {habitsDoneToday} из {dueHabits.length}
+                        {t('{done} из {total}', { done: habitsDoneToday, total: dueHabits.length })}
                       </span>
                     )}
-                    <button className="icon-btn pl-sec-btn" onClick={() => setHabitsOpen('library')} title="Библиотека привычек">
+                    <button className="icon-btn pl-sec-btn" onClick={() => setHabitsOpen('library')} title={t('Библиотека привычек')}>
                       <Sparkles />
                     </button>
-                    <button className="icon-btn pl-sec-btn" onClick={() => setHabitsOpen('mine')} title="Мои привычки">
+                    <button className="icon-btn pl-sec-btn" onClick={() => setHabitsOpen('mine')} title={t('Мои привычки')}>
                       <Settings2 />
                     </button>
                   </header>
                   {habits.length === 0 ? (
                     <div className="pl-habit-empty">
-                      <div className="small muted">Полезные привычки — по шагу каждый день. Отмечайте и следите за сериями.</div>
+                      <div className="small muted">{t('Полезные привычки — по шагу каждый день. Отмечайте и следите за сериями.')}</div>
                       <div className="row">
                         <button className="btn btn-sm btn-primary" onClick={() => setEditing('new')}>
-                          <Plus size={15} /> Своя привычка
+                          <Plus size={15} /> {t('Своя привычка')}
                         </button>
                         <button className="btn btn-sm" onClick={() => setHabitsOpen('library')}>
-                          <Sparkles size={15} /> Из библиотеки
+                          <Sparkles size={15} /> {t('Из библиотеки')}
                         </button>
                       </div>
                     </div>
@@ -537,7 +538,7 @@ export default function Planner() {
                 <section className="card pl-section">
                   <header className="pl-sec-head">
                     <BookOpen size={18} className="pl-sec-icon" />
-                    <h3>Дневник</h3>
+                    <h3>{t('Дневник')}</h3>
                   </header>
                   <Journal key={date} date={date} initial={day.journal} onSave={saveJournal} />
                 </section>
@@ -551,8 +552,8 @@ export default function Planner() {
         <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && setCalOpen(false)}>
           <div className="modal pl-cal-modal" onKeyDown={(e) => e.key === 'Escape' && setCalOpen(false)}>
             <div className="row" style={{ marginBottom: 8 }}>
-              <h2 className="grow">Календарь</h2>
-              <button className="icon-btn" onClick={() => setCalOpen(false)} aria-label="Закрыть">
+              <h2 className="grow">{t('Календарь')}</h2>
+              <button className="icon-btn" onClick={() => setCalOpen(false)} aria-label={t('Закрыть')}>
                 <X />
               </button>
             </div>
@@ -560,7 +561,7 @@ export default function Planner() {
             <CalendarLegend />
             <div className="modal-actions">
               <button className="btn btn-ghost" onClick={() => pick(today)}>
-                Сегодня
+                {t('Сегодня')}
               </button>
             </div>
           </div>
@@ -613,7 +614,7 @@ export default function Planner() {
           onSave={(h) => {
             saveHabit(h);
             setEditing(null);
-            if (editing === 'new') toast(`Привычка «${h.name}» добавлена`);
+            if (editing === 'new') toast(t('Привычка «{name}» добавлена', { name: h.name }));
           }}
           onDelete={editing === 'new' ? undefined : () => deleteHabit(editing)}
           onClose={() => setEditing(null)}
@@ -657,13 +658,13 @@ function MonthCalendar({
   return (
     <div className="pl-cal">
       <div className="pl-cal-head">
-        <button className="icon-btn" onClick={() => shift(-1)} aria-label="Предыдущий месяц">
+        <button className="icon-btn" onClick={() => shift(-1)} aria-label={t('Предыдущий месяц')}>
           <ChevronLeft />
         </button>
         <div className="grow pl-cal-title">
           {MONTHS[view.m]} <span className="faint">{view.y}</span>
         </div>
-        <button className="icon-btn" onClick={() => shift(1)} aria-label="Следующий месяц">
+        <button className="icon-btn" onClick={() => shift(1)} aria-label={t('Следующий месяц')}>
           <ChevronRight />
         </button>
       </div>
@@ -701,13 +702,13 @@ function CalendarLegend() {
   return (
     <div className="pl-legend tiny muted">
       <span>
-        <i className="pl-dot-t" /> Задачи
+        <i className="pl-dot-t" /> {t('Задачи')}
       </span>
       <span>
-        <i className="pl-dot-j" /> Дневник
+        <i className="pl-dot-j" /> {t('Дневник')}
       </span>
       <span>
-        <i className="pl-dot-m" /> Сроки в картах
+        <i className="pl-dot-m" /> {t('Сроки в картах')}
       </span>
     </div>
   );
@@ -778,7 +779,7 @@ function AddTaskInput({ onAdd }: { onAdd: (t: string) => void }) {
       <Plus size={18} className="pl-add-icon" />
       <input
         className="pl-add-input"
-        placeholder="Новая задача, напр. «Созвон в 9:30»"
+        placeholder={t('Новая задача, напр. «Созвон в 9:30»')}
         value={text}
         enterKeyHint="done"
         onChange={(e) => setText(e.target.value)}
@@ -791,7 +792,7 @@ function AddTaskInput({ onAdd }: { onAdd: (t: string) => void }) {
       />
       {text.trim() && (
         <button className="btn btn-primary btn-sm" onClick={submit}>
-          Добавить
+          {t('Добавить')}
         </button>
       )}
     </div>
@@ -804,20 +805,20 @@ function MapTaskRow({ task, overdue, onToggle }: { task: MapTask; overdue?: bool
   const d = task.task.due ? fromYmd(task.task.due) : null;
   return (
     <div className={`pl-task pl-map-task${done ? ' is-done' : ''}`}>
-      <button className={`pl-check${done ? ' on' : ''}`} onClick={onToggle} aria-label={done ? 'Отметить невыполненной' : 'Отметить выполненной'}>
+      <button className={`pl-check${done ? ' on' : ''}`} onClick={onToggle} aria-label={done ? t('Отметить невыполненной') : t('Отметить выполненной')}>
         {done && <Check size={14} strokeWidth={3} />}
       </button>
-      {pc && <span className="pl-prio static" style={{ background: pc.color, borderColor: pc.color }} title={`Приоритет: ${pc.label}`} />}
-      <button className="pl-map-body" onClick={() => openDoc(task.docId, task.topicId)} title="Открыть в карте">
-        <span className="pl-map-text">{task.text || 'Без названия'}</span>
+      {pc && <span className="pl-prio static" style={{ background: pc.color, borderColor: pc.color }} title={t('Приоритет: {level}', { level: pc.label })} />}
+      <button className="pl-map-body" onClick={() => openDoc(task.docId, task.topicId)} title={t('Открыть в карте')}>
+        <span className="pl-map-text">{task.text || t('Без названия')}</span>
         <span className="pl-map-src ellipsis">
           {overdue && d && (
             <span className="pl-overdue">
-              <CircleAlert size={12} /> Просрочено · {d.getDate()} {MONTHS_GEN[d.getMonth()]}
+              <CircleAlert size={12} /> {t('Просрочено · {day} {month}', { day: d.getDate(), month: MONTHS_GEN[d.getMonth()] })}
             </span>
           )}
           <span className="ellipsis">
-            {task.docTitle || 'Без названия'}
+            {task.docTitle || t('Без названия')}
             {task.path.length > 0 && ` › ${task.path.slice(-2).join(' › ')}`}
           </span>
         </span>
@@ -889,11 +890,11 @@ function Journal({ date, initial, onSave }: { date: string; initial: string; onS
       <textarea
         ref={ref}
         className="pl-journal-text"
-        placeholder="Как прошёл день? Мысли, идеи, благодарности…"
+        placeholder={t('Как прошёл день? Мысли, идеи, благодарности…')}
         value={text}
         onChange={(e) => change(e.target.value)}
       />
-      {words > 0 && <div className="tiny faint pl-journal-count">{words} сл.</div>}
+      {words > 0 && <div className="tiny faint pl-journal-count">{t('{n} сл.', { n: words })}</div>}
     </div>
   );
 }
