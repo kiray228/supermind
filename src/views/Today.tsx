@@ -90,7 +90,7 @@ export default function Today() {
       <div className="page-body">
         <div className="td-wrap">
           <p className="td-date">
-            {WEEKDAYS[d.getDay()]}, {d.getDate()} {MONTHS_GEN[d.getMonth()]}
+            {t('{weekday}, {day} {month}', { weekday: WEEKDAYS[d.getDay()], day: d.getDate(), month: MONTHS_GEN[d.getMonth()] })}
           </p>
           <Week today={today} tasks={tasks} />
           {now && <NowCard task={now} />}
