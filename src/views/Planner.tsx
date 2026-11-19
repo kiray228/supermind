@@ -1,4 +1,4 @@
-import { t, tn } from '../i18n/index';
+import { isEn, t, tn } from '../i18n/index';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   BookOpen,
@@ -894,7 +894,7 @@ function Journal({ date, initial, onSave }: { date: string; initial: string; onS
         value={text}
         onChange={(e) => change(e.target.value)}
       />
-      {words > 0 && <div className="tiny faint pl-journal-count">{t('{n} сл.', { n: words })}</div>}
+      {words > 0 && <div className="tiny faint pl-journal-count">{isEn ? `${words} ${tn(words, 'слово', 'слова', 'слов')}` : t('{n} сл.', { n: words })}</div>}
     </div>
   );
 }
