@@ -19,4 +19,12 @@
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
     </style>
+
+    <!-- Экран будильника: тёмный, панели того же цвета. В Android 15+ панели прозрачные и показывают фон окна. -->
+    <style name="AlarmTheme" parent="@android:style/Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowBackground">@color/alarmBackground</item>
+        <item name="android:statusBarColor">@color/alarmBackground</item>
+        <item name="android:navigationBarColor">@color/alarmBackground</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
 </resources>

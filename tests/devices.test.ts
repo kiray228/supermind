@@ -26,8 +26,11 @@ test('минимальная iOS не ниже 16.4: в коде регуляр�
     const [maj, min = '0'] = t.split('.');
     assert.ok(+maj > 16 || (+maj === 16 && +min >= 4), `IPHONEOS_DEPLOYMENT_TARGET = ${t}, нужно ≥ 16.4`);
   }
-  // и сборка не опускает цель ниже, чем умеет код
-  assert.ok(!/build:\s*\{[^}]*target:/.test(read('vite.config.ts')), 'build.target задан явно — сверить с минимальной iOS');
+  // сборка: iOS не ниже 16.4 (lookbehind), Android WebView от Chrome 87 — синтаксис переводится вниз
+  const tgt = read('vite.config.ts').match(/target: \[([^\]]+)\]/);
+  assert.ok(tgt, 'build.target не задан — Vite соберёт под chrome111, и старые Android не запустятся');
+  assert.match(tgt[1], /'safari16\.4'/);
+  assert.match(tgt[1], /'chrome87'/);
 });
 
 test('Google Play: микрофон не обязателен — приложение видно на планшетах и Chromebook без микрофона', () => {
@@ -51,4 +54,23 @@ test('«+ трата» на «Сегодня» не делит класс с п�
   // .td-add из tasks.css (серый текст, без отступов) перебивал кнопку, как только открывали задачи
   assert.match(read('src/views/Today.tsx'), /className="td-money-add"/);
   assert.ok(!/^\.td-add\b/m.test(read('src/views/today.css')));
+});
+
+test('старые Android WebView: structuredClone и новые методы массивов есть всегда', async () => {
+  const { cloneDeep } = await import('../src/polyfills.ts');
+  assert.match(read('src/main.tsx'), /^import '\.\/polyfills';/);
+  const d = new Date(5);
+  const src: Record<string, unknown> = { a: [1, { b: 'x' }], d, m: new Map([['k', { v: 1 }]]), s: new Set([1, 2]), u: new Uint8Array([1, 2]) };
+  src.self = src;
+  const c = cloneDeep(src);
+  assert.notEqual(c, src);
+  assert.deepEqual((c.a as unknown[])[1], { b: 'x' });
+  assert.notEqual((c.a as unknown[])[1], (src.a as unknown[])[1]);
+  assert.ok(c.d instanceof Date && (c.d as Date).getTime() === 5 && c.d !== d);
+  assert.equal((c.m as Map<string, { v: number }>).get('k')!.v, 1);
+  assert.notEqual((c.m as Map<string, unknown>).get('k'), (src.m as Map<string, unknown>).get('k'));
+  assert.deepEqual([...(c.s as Set<number>)], [1, 2]);
+  assert.deepEqual([...(c.u as Uint8Array)], [1, 2]);
+  assert.equal(c.self, c);
+  assert.throws(() => cloneDeep({ f: () => 1 }));
 });

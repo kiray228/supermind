@@ -19,3 +19,8 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# SuperMind: свои плагины Capacitor и классы, которые система создаёт по имени из манифеста
+-keep class app.twomind.mindmap.** { *; }
+# номера строк в отчётах о сбоях Play Console
+-keepattributes SourceFile,LineNumberTable

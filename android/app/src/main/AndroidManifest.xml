@@ -118,7 +118,7 @@
             android:showWhenLocked="true"
             android:turnScreenOn="true"
             android:taskAffinity="app.twomind.mindmap.alarm"
-            android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
+            android:theme="@style/AlarmTheme" />
         <service
             android:name=".AlarmService"
             android:directBootAware="true"

@@ -98,6 +98,8 @@ export default defineConfig({
   plugins: [react(), serviceWorker()],
   define: { __APP_VERSION__: JSON.stringify(pkg.version), __BUILD_ID__: JSON.stringify(BUILD_ID) },
   build: {
+    // старые Android WebView (от Chrome 87) и iOS от 16.4: синтаксис переводится вниз, недостающее — в src/polyfills.ts
+    target: ['es2020', 'chrome87', 'safari16.4'],
     chunkSizeWarningLimit: 1500,
   },
 })

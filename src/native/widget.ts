@@ -39,6 +39,7 @@ type PendingAction =
 interface WidgetBridgePlugin {
   update(o: { json: string }): Promise<void>;
   setSecure(o: { on: boolean }): Promise<void>;
+  setWindowColor(o: { color: string }): Promise<void>;
   biometricAvailable(): Promise<{ available: boolean }>;
   biometricVerify(o: { title: string; subtitle?: string; negative?: string }): Promise<{ ok: boolean; error?: string }>;
   consumePending(): Promise<{ actions: PendingAction[] }>;
@@ -51,6 +52,9 @@ const WidgetBridge = registerPlugin<WidgetBridgePlugin>('WidgetBridge');
 
 /** Android: прятать содержимое в «недавних» и запретить скриншоты */
 export const setSecureWindow = (on: boolean) => WidgetBridge.setSecure({ on }).catch(() => undefined);
+
+/** Android: цвет окна под приложением (виден под системными панелями на старых WebView) */
+export const setWindowColor = (color: string) => WidgetBridge.setWindowColor({ color }).catch(() => undefined);
 
 /** Android: есть ли отпечаток / лицо для входа */
 export const nativeBiometricAvailable = () =>

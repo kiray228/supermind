@@ -63,7 +63,7 @@ async function shot(name: string) {
 
 /** Плагины, без которых функции не работают (у каждой платформы свои) */
 function expectedPlugins(): string[] {
-  const common = ['App', 'Filesystem', 'LocalNotifications', 'Share', 'SplashScreen', 'StatusBar', 'SpeechRecognition', 'TextToSpeech'];
+  const common = ['App', 'Filesystem', 'LocalNotifications', 'Share', 'SplashScreen', 'SystemBars', 'SpeechRecognition', 'TextToSpeech'];
   if (Capacitor.getPlatform() === 'android') return [...common, 'SmAlarm', 'SmCalendar', 'WidgetBridge'];
   return common;
 }

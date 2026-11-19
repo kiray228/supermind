@@ -109,6 +109,24 @@ public class WidgetBridgePlugin extends Plugin {
         });
     }
 
+    /**
+     * Цвет окна под приложением — под темой SuperMind, а не системы. Его видно в полосах под системными
+     * панелями, когда WebView старше 140 и Capacitor отодвигает содержимое отступами вместо env(safe-area-inset-*)
+     */
+    @PluginMethod
+    public void setWindowColor(PluginCall call) {
+        String c = call.getString("color", "");
+        if (getActivity() == null || c == null || !c.matches("#[0-9a-fA-F]{6}")) {
+            call.resolve();
+            return;
+        }
+        int color = android.graphics.Color.parseColor(c);
+        getActivity().runOnUiThread(() -> {
+            getActivity().getWindow().getDecorView().setBackgroundColor(color);
+            call.resolve();
+        });
+    }
+
     /** Прятать содержимое в списке недавних приложений (FLAG_SECURE — заодно запрещает скриншоты) */
     @PluginMethod
     public void setSecure(PluginCall call) {

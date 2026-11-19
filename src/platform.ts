@@ -116,11 +116,13 @@ export function setupPlatform() {
       });
       App.addListener('pause', () => void flushSave());
     });
-    import('@capacitor/status-bar').then(({ StatusBar, Style }) => {
+    // значки системных панелей под тему; цвет панелей не задаём — приложение рисует фон под ними само (от края до края).
+    // SystemBars встроен в Capacitor: плагин status-bar убран — Google Play отмечал его устаревшие вызовы цвета панелей
+    import('@capacitor/core').then(({ SystemBars, SystemBarsStyle }) => {
       const apply = () => {
         const dark = document.documentElement.dataset.theme === 'dark';
-        StatusBar.setStyle({ style: dark ? Style.Dark : Style.Light }).catch(() => {});
-        StatusBar.setBackgroundColor({ color: dark ? '#000000' : '#f2f2f7' }).catch(() => {});
+        SystemBars.setStyle({ style: dark ? SystemBarsStyle.Dark : SystemBarsStyle.Light }).catch(() => {});
+        if (Capacitor.getPlatform() === 'android') void import('./native/widget').then((m) => m.setWindowColor(dark ? '#000000' : '#f2f2f7'));
       };
       apply();
       new MutationObserver(apply).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });

@@ -3,6 +3,8 @@ package app.twomind.mindmap;
 import android.content.Intent;
 import android.os.Bundle;
 
+import androidx.activity.EdgeToEdge;
+
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
@@ -15,7 +17,10 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(WidgetBridgePlugin.class);
         registerPlugin(SmAlarmPlugin.class);
         restored = savedInstanceState != null;
+        // от края до края и на Android 14 и старше — как в Android 15+ (рекомендация Google Play):
+        // приложение само рисует фон под панелями, отступы берёт из safe-area. После super: окно AppCompat уже создано
         super.onCreate(savedInstanceState);
+        EdgeToEdge.enable(this);
     }
 
     /** Вызывается и для intent запуска (из BridgeActivity.load), и для новых (виджет, «Поделиться») */

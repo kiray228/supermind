@@ -46,8 +46,7 @@ public class AlarmActivity extends Activity {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
         }
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        getWindow().setStatusBarColor(0xFF0B0C10);
-        getWindow().setNavigationBarColor(0xFF0B0C10);
+        // цвет системных панелей — в теме AlarmTheme (styles.xml): вызовы setStatusBarColor устарели в Android 15
         setContentView(build());
         show(getIntent());
     }

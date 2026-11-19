@@ -32,8 +32,11 @@ android {
     buildTypes {
         release {
             if (ksFile.exists()) signingConfig signingConfigs.release
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            // R8: меньше и быстрее (рекомендация Google Play). Правила для плагинов Capacitor приходят из их библиотек,
+            // свои — в proguard-rules.pro
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 }
