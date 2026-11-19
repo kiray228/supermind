@@ -1,5 +1,5 @@
 /** «Что нового»: главное в каждой версии. Новые версии — сверху. */
-import { Heart, Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge, MessageCircleQuestion, CloudOff, LayoutTemplate, SquareArrowOutUpRight, BellRing, Target, Timer, Lock, Crosshair, Move, GitMerge, EyeOff, CalendarRange, Fingerprint, ArrowUpDown, Banknote, MonitorSmartphone, Coins, ListChecks, FileInput, Split, CornerDownRight, KeyRound, Keyboard, LifeBuoy, Zap, FileSpreadsheet, Gauge as GaugeIcon, MessagesSquare, Accessibility, Focus, Save, Flag, RefreshCw, Footprints, Kanban, Smartphone, Languages } from 'lucide-react';
+import { Heart, Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge, MessageCircleQuestion, CloudOff, LayoutTemplate, SquareArrowOutUpRight, BellRing, Target, Timer, Lock, Crosshair, Move, GitMerge, EyeOff, CalendarRange, Fingerprint, ArrowUpDown, Banknote, MonitorSmartphone, Coins, ListChecks, FileInput, Split, CornerDownRight, KeyRound, Keyboard, LifeBuoy, Zap, FileSpreadsheet, Gauge as GaugeIcon, MessagesSquare, Accessibility, Focus, Save, Flag, RefreshCw, Footprints, Kanban, Smartphone, Languages, ScanFace, ScanText, SlidersHorizontal } from 'lucide-react';
 import { t } from '../i18n/index';
 
 export interface ChangeItem {
@@ -19,9 +19,16 @@ export const CHANGELOG: ChangelogEntry[] = [
   // 1.50 и новее — с переводом (t), старые записи остаются по-русски
   {
     version: '1.53',
-    title: t('Английский язык, экран блокировки и «Поделиться» на iPhone'),
+    title: t('Казахский и английский, Siri, Face ID, текст с фото и новые виджеты'),
     items: [
-      { icon: Languages, title: t('Английский язык'), text: t('Если телефон на английском, SuperMind тоже говорит по-английски. Сменить язык: Настройки → Оформление → «Язык».') },
+      { icon: Languages, title: t('Казахский и английский'), text: t('SuperMind говорит на языке телефона: қазақша, русский или English. Сменить: Настройки → Оформление → «Язык».') },
+      { icon: ScanFace, title: t('Вход по Face ID'), text: t('Код-пароль приложения на iPhone открывается по Face ID или Touch ID: Настройки → «Защита».') },
+      { icon: Mic, title: t('Siri и «Команды»'), text: t('«Привет, Siri, добавь задачу в SuperMind», «Начни фокус в SuperMind», «Что у меня сегодня в SuperMind» — и действия в приложении «Команды».') },
+      { icon: SlidersHorizontal, title: t('Пункт управления и кнопка «Действие»'), text: t('С iOS 18 кнопки «Новая задача», «Голосом» и «Фокус» ставятся в Пункт управления, на экран блокировки и на кнопку «Действие».') },
+      { icon: Search, title: t('Поиск Spotlight'), text: t('Карты, заметки и задачи находятся через поиск iPhone — свайп вниз на экране «Домой».') },
+      { icon: ScanText, title: t('Текст с фото'), text: t('Сфотографируйте страницу, доску или чек — текст станет заметкой. Заметки → «Ещё» → «Текст с фото» или удерживайте микрофон.') },
+      { icon: Wallet, title: t('Виджеты «Финансы» и «Фокус»'), text: t('Траты за сегодня и месяц с кнопкой «+ трата» и таймер фокуса с кнопкой «Старт» — на экране «Домой» iPhone и Android.') },
+      { icon: Palette, title: t('Иконка приложения'), text: t('Шесть вариантов значка SuperMind: Настройки → Оформление → «Иконка приложения».') },
       { icon: Timer, title: t('Таймер фокуса на экране блокировки'), text: t('Помодоро и секундомер видны на экране блокировки и в Dynamic Island на iPhone, а на Android — в уведомлении. Пауза и стоп — прямо там, без открытия приложения.') },
       { icon: Lock, title: t('Виджеты на экране блокировки'), text: t('На iPhone: «Сегодня», «Привычки», «Новая задача» и «Голосом». Удерживайте экран блокировки → «Настроить» → «Добавить виджеты».') },
       { icon: Zap, title: t('Быстрые действия с иконки'), text: t('Удерживайте значок SuperMind: новая задача, голосом, фокус или новая карта — сразу, без лишних касаний.') },
