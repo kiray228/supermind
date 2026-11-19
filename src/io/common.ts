@@ -5,6 +5,7 @@
 import type JSZipType from 'jszip';
 import type { MindDoc, Sheet, StructureType, TaskInfo, Topic } from '../types';
 import { uid } from '../utils/tree';
+import { t } from '../i18n/index';
 
 /** Значение accept для <input type="file"> */
 export const IMPORT_ACCEPT =
@@ -59,9 +60,9 @@ export async function newZip(): Promise<Zip> {
 
 // ---------- Модель ----------
 
-export const DEFAULT_ROOT_TEXT = 'Центральная тема';
+export const DEFAULT_ROOT_TEXT = t('Центральная тема');
 
-export function makeSheet(root: Topic, title = 'Лист 1', structure: StructureType = 'map'): Sheet {
+export function makeSheet(root: Topic, title = t('Лист {n}', { n: 1 }), structure: StructureType = 'map'): Sheet {
   return {
     id: uid(),
     title,
@@ -101,12 +102,12 @@ export function fileExt(name: string): string {
 // ---------- Задачи / маркеры (для табличных экспортов) ----------
 
 export const STATUS_TEXT: Record<TaskInfo['status'], string> = {
-  todo: 'К выполнению',
-  doing: 'В работе',
-  done: 'Готово',
+  todo: t('К выполнению'),
+  doing: t('В работе'),
+  done: t('Готово'),
 };
 
-export const PRIORITY_TEXT: Record<number, string> = { 1: 'Высокий', 2: 'Средний', 3: 'Низкий' };
+export const PRIORITY_TEXT: Record<number, string> = { 1: t('Высокий'), 2: t('Средний'), 3: t('Низкий') };
 
 /** Приоритет темы: из задачи (Высокий/Средний/Низкий) или из маркера priority-N */
 export function topicPriority(t: Topic): string {

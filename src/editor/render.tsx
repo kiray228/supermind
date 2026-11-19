@@ -3,6 +3,7 @@ import type { Boundary, Relationship, Summary } from '../types';
 import { type LayoutResult, type LNode, bracePath, formatDue, subtreeBounds } from '../layout/layout';
 import { FONT_FAMILY } from '../layout/measure';
 import { MARKER_MAP } from '../markers';
+import { t } from '../i18n/index';
 
 export const ACCENT = '#ff4a2b';
 
@@ -401,7 +402,7 @@ export function SummaryView({ lay, s, vertical }: { lay: LayoutResult; s: Summar
   const n = lay.nodes.get(s.topicId);
   if (!bb || !n) return null;
   const col = s.color ?? n.color;
-  const text = s.text || 'Итог';
+  const text = s.text || t('Итог');
   const tw = Math.min(260, text.length * 8 + 24);
   if (vertical) {
     const y = bb.y + bb.h + 10;

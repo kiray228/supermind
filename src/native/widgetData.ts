@@ -15,6 +15,9 @@ import { phoneEvents } from '../tasks/sync';
 import { activeHabits, compareByTime, countOn, currentStreak, doneOn, dueOn, partOf, targetOf } from '../habits/model';
 import { goalsDueBetween, useGoals } from '../goals/store';
 
+const untitled = () => t('Без названия');
+import { t } from '../i18n/index';
+
 const AGENDA_DAYS = 14;
 const MAX_AGENDA = 160;
 const HABIT_DAYS = 3;
@@ -59,7 +62,7 @@ async function phoneAgenda(from: string, to: string): Promise<AgendaItem[]> {
   const out: AgendaItem[] = [];
   const events = await phoneEvents(fromYmd(from).getTime(), fromYmd(addDaysYmd(to, 1)).getTime()).catch(() => []);
   for (const ev of events) {
-    const title = clean(ev.title) || 'Событие';
+    const title = clean(ev.title) || t('Событие');
     const color = ev.color || undefined;
     if (ev.allDay) {
       // событие на весь день: begin/end в UTC-полночь — раскладываем по дням
@@ -99,7 +102,7 @@ export async function buildAgenda(today: string): Promise<AgendaItem[]> {
           const end = (h || 0) * 60 + (m || 0) + t.duration;
           if (end < 1440) te = `${pad2(Math.floor(end / 60))}:${pad2(end % 60)}`;
         }
-        out.push({ k: 't', id: t.id, t: clean(t.title) || 'Без названия', d, ...(t.time ? { tm: t.time } : {}), ...(te ? { te } : {}), ...(color ? { c: color } : {}) });
+        out.push({ k: 't', id: t.id, t: clean(t.title) || untitled(), d, ...(t.time ? { tm: t.time } : {}), ...(te ? { te } : {}), ...(color ? { c: color } : {}) });
       }
     }
   }
@@ -141,7 +144,7 @@ export async function buildHabits(today: string) {
     out[d] = rows;
   }
   return {
-    list: sorted.map((h) => ({ id: h.id, n: clean(h.name, 40) || 'Привычка', e: h.icon || '', c: h.color || '#22c55e', ...(targetOf(h) > 1 ? { tg: targetOf(h) } : {}), ...(h.unit ? { u: clean(h.unit, 12) } : {}) })),
+    list: sorted.map((h) => ({ id: h.id, n: clean(h.name, 40) || t('Привычка'), e: h.icon || '', c: h.color || '#22c55e', ...(targetOf(h) > 1 ? { tg: targetOf(h) } : {}), ...(h.unit ? { u: clean(h.unit, 12) } : {}) })),
     days: out,
   };
 }
@@ -191,7 +194,7 @@ function outline(doc: MindDoc): MapOutline | null {
       ...(sides?.get(t.id) === 'left' ? { l: 1 as const } : {}),
     };
   });
-  return { id: doc.id, t: clean(doc.title, 60) || 'Без названия', u: doc.updatedAt, rc, r: clean(root.text, 50) || clean(doc.title, 50) || 'Карта', b, ...(oneSide ? { s: 1 as const } : {}) };
+  return { id: doc.id, t: clean(doc.title, 60) || t('Без названия'), u: doc.updatedAt, rc, r: clean(root.text, 50) || clean(doc.title, 50) || t('Карта'), b, ...(oneSide ? { s: 1 as const } : {}) };
 }
 
 export async function buildMaps(): Promise<MapOutline[]> {

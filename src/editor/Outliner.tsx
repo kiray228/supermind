@@ -4,6 +4,13 @@ import type { Topic } from '../types';
 import { useDoc } from '../store/docStore';
 import { MARKER_MAP } from '../markers';
 import { findInSheet, visibleOrder } from '../utils/tree';
+import { t } from '../i18n/index';
+
+// внутри Row переменная t — тема, поэтому подписи заранее
+const L_EXPAND = t('Развернуть ветку');
+const L_COLLAPSE = t('Свернуть ветку');
+const L_ROOT = t('Центральная тема');
+const L_TOPIC = t('Тема');
 
 /** Режим «Структура»: карта в виде вложенного списка */
 export function Outliner() {
@@ -19,7 +26,7 @@ export function Outliner() {
           </div>
         ))}
         <p className="faint tiny" style={{ marginTop: 24 }}>
-          Enter — новая тема · Tab / Shift+Tab — вложить / вынести · Backspace в пустой — удалить · Alt+↑/↓ — переместить
+          {t('Enter — новая тема · Tab / Shift+Tab — вложить / вынести · Backspace в пустой — удалить · Alt+↑/↓ — переместить')}
         </p>
       </div>
     </div>
@@ -98,7 +105,7 @@ function Row({ t, depth }: { t: Topic; depth: number }) {
         <button
           className={`ol-toggle ${t.children.length ? '' : 'hidden'} ${t.collapsed ? '' : 'open'}`}
           onClick={() => st.toggleCollapse(t.id)}
-          aria-label={t.collapsed ? 'Развернуть ветку' : 'Свернуть ветку'}
+          aria-label={t.collapsed ? L_EXPAND : L_COLLAPSE}
           aria-expanded={t.children.length ? !t.collapsed : undefined}
           tabIndex={t.children.length ? 0 : -1}
         >
@@ -122,7 +129,7 @@ function Row({ t, depth }: { t: Topic; depth: number }) {
           className={`ol-input ${done ? 'done' : ''}`}
           defaultValue={t.text}
           key={t.text}
-          placeholder={depth === 0 ? 'Центральная тема' : 'Тема'}
+          placeholder={depth === 0 ? L_ROOT : L_TOPIC}
           onFocus={() => useDoc.setState({ selection: [t.id], editingId: t.id })}
           onChange={(e) => void (typed.current = e.target.value)}
           onBlur={(e) => {

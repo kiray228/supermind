@@ -5,6 +5,7 @@ import type { Sheet, Topic } from '../types';
 import { newTopic } from '../utils/tree';
 import { DEFAULT_ROOT_TEXT, escAttr, escXml, oneLine } from './common';
 import { safeUrl } from '../utils/url';
+import { t } from '../i18n/index';
 
 function outline(t: Topic, depth: number): string {
   const pad = '  '.repeat(depth + 2);
@@ -65,10 +66,10 @@ function fromOutline(el: Element): Topic {
 
 export function opmlToTopic(xml: string): Topic {
   const dom = new DOMParser().parseFromString(xml.replace(/^﻿/, ''), 'application/xml');
-  if (dom.getElementsByTagName('parsererror').length) throw new Error('Не удалось прочитать OPML: файл повреждён');
+  if (dom.getElementsByTagName('parsererror').length) throw new Error(t('Не удалось прочитать OPML: файл повреждён'));
   const opml = dom.documentElement;
   const body = childEls(opml, 'body')[0];
-  if (!body) throw new Error('В OPML нет раздела body');
+  if (!body) throw new Error(t('В OPML нет раздела body'));
   const tops = childEls(body, 'outline').map(fromOutline);
   const head = childEls(opml, 'head')[0];
   const title = head ? childEls(head, 'title')[0]?.textContent?.trim() : '';

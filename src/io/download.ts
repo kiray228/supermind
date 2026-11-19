@@ -1,3 +1,4 @@
+import { t } from '../i18n/index';
 /**
  * Сохранение и выбор файлов в браузере (desktop + iPhone Safari).
  */
@@ -19,7 +20,7 @@ export function safeFilename(title: string): string {
     .replace(/^[.\s]+|[.\s]+$/g, '')
     .slice(0, 120)
     .trim();
-  if (!s || /^(con|prn|aux|nul|com\d|lpt\d)$/i.test(s)) return s ? `${s}_` : 'Без названия';
+  if (!s || /^(con|prn|aux|nul|com\d|lpt\d)$/i.test(s)) return s ? `${s}_` : t('Без названия');
   return s;
 }
 

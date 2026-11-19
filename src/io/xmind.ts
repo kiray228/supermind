@@ -9,6 +9,9 @@ import { DEFAULT_ROOT_TEXT, compact, loadZip, makeDoc, makeSheet, newZip, stripD
 import type { Zip } from './common';
 import { safeUrl } from '../utils/url';
 
+const summaryText = () => t('Итог');
+import { t } from '../i18n/index';
+
 // ---------------------------------------------------------------------
 // Промежуточный формат (≈ Zen JSON)
 // ---------------------------------------------------------------------
@@ -323,7 +326,7 @@ async function convertTopic(x: XTopic, ctx: Ctx): Promise<Topic> {
       if (a > b) continue;
       target = a === b ? t.children[a] : t;
     }
-    const text = (s.topicId && sumTopics.get(s.topicId)) || 'Итог';
+    const text = (s.topicId && sumTopics.get(s.topicId)) || summaryText();
     ctx.summaries.push({ id: uid(), topicId: target.id, text });
   }
   return t;
@@ -334,7 +337,7 @@ async function convertSheet(xs: XSheet, index: number, zip: Zip): Promise<Sheet>
   const xr = xs.rootTopic ?? { title: DEFAULT_ROOT_TEXT };
   const root = await convertTopic(xr, ctx);
   if (!root.text.trim()) root.text = DEFAULT_ROOT_TEXT;
-  const sheet = makeSheet(root, xs.title?.trim() || `Лист ${index + 1}`, mapStructureClass(xr.structureClass));
+  const sheet = makeSheet(root, xs.title?.trim() || t('Лист {n}', { n: index + 1 }), mapStructureClass(xr.structureClass));
 
   const detached = xr.children?.detached ?? [];
   for (let i = 0; i < detached.length; i++) {
@@ -429,7 +432,7 @@ function legacyTopic(el: Element): XTopic {
 
 function parseLegacy(xml: string): XSheet[] {
   const dom = new DOMParser().parseFromString(xml, 'application/xml');
-  if (dom.getElementsByTagName('parsererror').length) throw new Error('Файл XMind повреждён (content.xml)');
+  if (dom.getElementsByTagName('parsererror').length) throw new Error(t('Файл XMind повреждён (content.xml)'));
   return kids(dom.documentElement, 'sheet').map((s) => {
     const rels = kid(s, 'relationships');
     const topic = kid(s, 'topic');
@@ -458,7 +461,7 @@ export async function importXmind(data: ArrayBuffer, filename?: string): Promise
   try {
     zip = await JSZip.loadAsync(data);
   } catch {
-    throw new Error('Не удалось открыть файл .xmind: это не zip-архив');
+    throw new Error(t('Не удалось открыть файл .xmind: это не zip-архив'));
   }
   let sheetsX: XSheet[] | null = null;
   const json = zip.file('content.json');
@@ -473,15 +476,15 @@ export async function importXmind(data: ArrayBuffer, filename?: string): Promise
   }
   if (!sheetsX) {
     const xml = zip.file('content.xml');
-    if (!xml) throw new Error('В файле .xmind не найдено содержимое карты');
+    if (!xml) throw new Error(t('В файле .xmind не найдено содержимое карты'));
     sheetsX = parseLegacy(await xml.async('string'));
   }
   sheetsX = sheetsX.filter((s) => s && typeof s === 'object');
-  if (!sheetsX.length) throw new Error('В файле .xmind нет листов');
+  if (!sheetsX.length) throw new Error(t('В файле .xmind нет листов'));
 
   const sheets: Sheet[] = [];
   for (let i = 0; i < sheetsX.length; i++) sheets.push(await convertSheet(sheetsX[i], i, zip));
-  const title = sheets[0].root.text.trim() || (filename ? stripExt(filename) : '') || 'Импорт из Xmind';
+  const title = sheets[0].root.text.trim() || (filename ? stripExt(filename) : '') || t('Импорт из Xmind');
   return makeDoc(title, sheets);
 }
 
@@ -578,7 +581,7 @@ function exportTopic(t: Topic, sheet: Sheet, ctx: ExportCtx, isRootLike: boolean
       if (s.topicId !== c.id) continue;
       const sid = uid();
       summaries.push({ id: s.id, range: `(${i},${i})`, topicId: sid });
-      summaryTopics.push({ id: sid, class: 'topic', title: s.text || 'Итог' });
+      summaryTopics.push({ id: sid, class: 'topic', title: s.text || summaryText() });
     }
   });
   if (isRootLike) {
@@ -592,7 +595,7 @@ function exportTopic(t: Topic, sheet: Sheet, ctx: ExportCtx, isRootLike: boolean
       if (s.topicId !== t.id) continue;
       const sid = uid();
       summaries.push({ id: s.id, range: n > 1 ? `(0,${n - 1})` : 'master', topicId: sid });
-      summaryTopics.push({ id: sid, class: 'topic', title: s.text || 'Итог' });
+      summaryTopics.push({ id: sid, class: 'topic', title: s.text || summaryText() });
     }
   }
   if (summaryTopics.length) children.summary = summaryTopics;
@@ -620,7 +623,7 @@ export async function exportXmind(doc: MindDoc): Promise<Blob> {
     const s: Record<string, unknown> = {
       id: sheet.id,
       class: 'sheet',
-      title: sheet.title || 'Лист',
+      title: sheet.title || t('Лист'),
       rootTopic: root,
     };
     if (sheet.relationships.length) {

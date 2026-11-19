@@ -4,6 +4,7 @@ import type { Topic } from '../types';
 import { useDoc } from '../store/docStore';
 import { pathTo, walkSheet } from '../utils/tree';
 import { getTheme } from '../themes';
+import { isEn, LOCALE, t } from '../i18n/index';
 
 const DAY = 86400000;
 /** Сдвиг даты на n дней без ошибок перехода на летнее время */
@@ -18,7 +19,9 @@ const toDate = (s: string) => {
   return new Date(y, m - 1, d);
 };
 const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-const MONTHS = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+const MONTHS = isEn
+  ? Array.from({ length: 12 }, (_, i) => new Date(2000, i, 1).toLocaleDateString(LOCALE, { month: 'short' }))
+  : ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
 
 /** Диаграмма Ганта по задачам листа */
 export function Gantt() {
@@ -55,9 +58,9 @@ export function Gantt() {
     return (
       <div className="gantt-empty empty">
         <CalendarRange size={40} />
-        <div className="bold">Нет задач с датами</div>
-        <div className="small">Сделайте тему задачей (панель «Тема») и укажите дату начала и срок — задача появится на диаграмме.</div>
-        {noDates.length > 0 && <div className="small">Задач без дат: {noDates.length}</div>}
+        <div className="bold">{t('Нет задач с датами')}</div>
+        <div className="small">{t('Сделайте тему задачей (панель «Тема») и укажите дату начала и срок — задача появится на диаграмме.')}</div>
+        {noDates.length > 0 && <div className="small">{t('Задач без дат: {n}', { n: noDates.length })}</div>}
       </div>
     );
   }
@@ -99,13 +102,13 @@ export function Gantt() {
   return (
     <div className="gantt" onPointerMove={onMove} onPointerUp={onUp}>
       <div className="gantt-tools row">
-        <span className="small muted">Масштаб</span>
+        <span className="small muted">{t('Масштаб')}</span>
         <input type="range" min={12} max={60} value={dayW} onChange={(e) => setDayW(Number(e.target.value))} />
       </div>
       <div className="gantt-scroll scroll">
         <div className="gantt-grid" style={{ width: 260 + days * dayW }}>
           <div className="gantt-head">
-            <div className="gantt-name-col">Задача</div>
+            <div className="gantt-name-col">{t('Задача')}</div>
             <div className="gantt-days">
               {Array.from({ length: days }, (_, i) => {
                 const d = addDays(start, i);
@@ -128,7 +131,7 @@ export function Gantt() {
             return (
               <div key={r.t.id} className="gantt-row">
                 <div className="gantt-name-col" onClick={() => useDoc.getState().select(r.t.id)}>
-                  <div className={`ellipsis ${done ? 'faint' : ''}`} style={{ textDecoration: done ? 'line-through' : undefined }}>{r.t.text || 'Без названия'}</div>
+                  <div className={`ellipsis ${done ? 'faint' : ''}`} style={{ textDecoration: done ? 'line-through' : undefined }}>{r.t.text || t('Без названия')}</div>
                   {r.path && <div className="tiny faint ellipsis">{r.path}</div>}
                 </div>
                 <div className="gantt-track" style={{ width: days * dayW }}>

@@ -8,26 +8,28 @@ import { diffVersion, listVersions, sameContent, snapshot, type MapVersion } fro
 import { confirmDialog } from '../ui/dialogs';
 import { clone, countTopics, uid } from '../utils/tree';
 import type { MindDoc, Topic } from '../types';
+import { isEn, LOCALE, t, tn } from '../i18n/index';
 import './map-history.css';
 
-const time = (at: number) => new Date(at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+const time = (at: number) => new Date(at).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
 
 function dayLabel(at: number): string {
   const d = new Date(at);
   const today = new Date();
   const start = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
   const diff = Math.round((start(today) - start(d)) / 86_400_000);
-  if (diff === 0) return 'Сегодня';
-  if (diff === 1) return 'Вчера';
-  return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', ...(d.getFullYear() !== today.getFullYear() ? { year: 'numeric' } : {}) });
+  if (diff === 0) return t('Сегодня');
+  if (diff === 1) return t('Вчера');
+  return d.toLocaleDateString(LOCALE, { day: 'numeric', month: 'long', ...(d.getFullYear() !== today.getFullYear() ? { year: 'numeric' } : {}) });
 }
 
-const plural = (n: number, one: string, few: string, many: string) => {
-  const m10 = n % 10;
-  const m100 = n % 100;
-  return m10 === 1 && m100 !== 11 ? one : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? few : many;
+/** «сегодня» / «вчера» внутри фразы; дату по-английски не переводим в строчные */
+const dayInline = (at: number) => {
+  const s = dayLabel(at);
+  return isEn && s !== t('Сегодня') && s !== t('Вчера') ? s : s.toLowerCase();
 };
-const topicsWord = (n: number) => `${n} ${plural(n, 'тема', 'темы', 'тем')}`;
+const topicsWord = (n: number) => `${n} ${tn(n, 'тема', 'темы', 'тем')}`;
+const untitled = () => t('Без названия');
 
 const PREVIEW_LIMIT = 400;
 
@@ -67,7 +69,7 @@ export default function MapHistory({ onClose }: { onClose(): void }) {
   const current = doc.sheets.reduce((n, s) => n + countTopics(s), 0);
 
   const restore = async (v: MapVersion) => {
-    if (!(await confirmDialog('Восстановить версию?', `Карта станет такой, какой была ${dayLabel(v.at).toLowerCase()} в ${time(v.at)}. Текущее состояние останется в истории, а сразу после — можно отменить.`, { okText: 'Восстановить' }))) return;
+    if (!(await confirmDialog(t('Восстановить версию?'), t('Карта станет такой, какой была {day} в {time}. Текущее состояние останется в истории, а сразу после — можно отменить.', { day: dayInline(v.at), time: time(v.at) }), { okText: t('Восстановить') }))) return;
     setBusy(true);
     try {
       const cur = useDoc.getState().doc;
@@ -79,7 +81,7 @@ export default function MapHistory({ onClose }: { onClose(): void }) {
         d.activeSheet = old.sheets.some((s) => s.id === d.activeSheet) ? d.activeSheet : old.activeSheet;
       });
       useDoc.setState({ selection: [], editingId: null, pendingText: null, selectedRel: null });
-      toast('Версия восстановлена', { label: 'Отменить', run: () => useDoc.getState().undo() });
+      toast(t('Версия восстановлена'), { label: t('Отменить'), run: () => useDoc.getState().undo() });
       onClose();
     } finally {
       setBusy(false);
@@ -90,10 +92,10 @@ export default function MapHistory({ onClose }: { onClose(): void }) {
     setBusy(true);
     try {
       const now = Date.now();
-      const copy: MindDoc = { ...clone(v.doc), id: uid(), title: `${v.doc.title || 'Карта'} (${dayLabel(v.at).toLowerCase()}, ${time(v.at)})`, createdAt: now, updatedAt: now };
+      const copy: MindDoc = { ...clone(v.doc), id: uid(), title: t('{title} ({day}, {time})', { title: v.doc.title || t('Карта'), day: dayInline(v.at), time: time(v.at) }), createdAt: now, updatedAt: now };
       await saveDoc(copy);
       useApp.setState({ docsVersion: now });
-      toast('Копия сохранена в «Мои карты»');
+      toast(t('Копия сохранена в «Мои карты»'));
     } finally {
       setBusy(false);
     }
@@ -101,27 +103,27 @@ export default function MapHistory({ onClose }: { onClose(): void }) {
 
   return (
     <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={`modal mh${sel ? ' mh-has-sel' : ''}`} role="dialog" aria-label="История версий">
+      <div className={`modal mh${sel ? ' mh-has-sel' : ''}`} role="dialog" aria-label={t('История версий')}>
         <div className="mh-head">
-          {sel && <button className="icon-btn mh-back" onClick={() => setSelAt(null)} aria-label="К списку"><CaretLeft /></button>}
+          {sel && <button className="icon-btn mh-back" onClick={() => setSelAt(null)} aria-label={t('К списку')}><CaretLeft /></button>}
           <ClockCounterClockwise className="mh-head-icon" size={22} />
-          <h2>История версий</h2>
-          <button className="icon-btn" onClick={onClose} aria-label="Закрыть"><X /></button>
+          <h2>{t('История версий')}</h2>
+          <button className="icon-btn" onClick={onClose} aria-label={t('Закрыть')}><X /></button>
         </div>
 
         {password ? (
-          <p className="mh-empty">Для карт с паролем история не ведётся: снимки хранились бы без шифрования.</p>
+          <p className="mh-empty">{t('Для карт с паролем история не ведётся: снимки хранились бы без шифрования.')}</p>
         ) : (
           <div className="mh-body">
             <div className="mh-list">
               <div className="mh-row mh-now">
-                <span className="mh-time">Сейчас</span>
+                <span className="mh-time">{t('Сейчас')}</span>
                 <span className="mh-meta">{topicsWord(current)}</span>
               </div>
               {list === null ? (
-                <p className="mh-empty">Загрузка…</p>
+                <p className="mh-empty">{t('Загрузка…')}</p>
               ) : versions.length === 0 ? (
-                <p className="mh-empty">Других версий пока нет. Версия сохраняется, когда вы открываете карту, и каждые 10 минут правок — на этом устройстве.</p>
+                <p className="mh-empty">{t('Других версий пока нет. Версия сохраняется, когда вы открываете карту, и каждые 10 минут правок — на этом устройстве.')}</p>
               ) : (
                 groups.map((g) => (
                   <div key={g.day}>
@@ -138,7 +140,7 @@ export default function MapHistory({ onClose }: { onClose(): void }) {
                   </div>
                 ))
               )}
-              <p className="mh-foot">Хранится на этом устройстве: последние 2 часа — все версии, двое суток — по одной в час, дальше — по одной в день.</p>
+              <p className="mh-foot">{t('Хранится на этом устройстве: последние 2 часа — все версии, двое суток — по одной в час, дальше — по одной в день.')}</p>
             </div>
 
             <div className="mh-preview">
@@ -147,20 +149,20 @@ export default function MapHistory({ onClose }: { onClose(): void }) {
                   <div className="mh-pv-head">
                     <div className="mh-pv-title">{dayLabel(sel.at)}, {time(sel.at)}</div>
                     <div className="mh-diff">
-                      {diff.removed > 0 && <span className="mh-plus">{plural(diff.removed, 'вернётся', 'вернутся', 'вернутся')} {topicsWord(diff.removed)}</span>}
-                      {diff.added > 0 && <span className="mh-minus">{plural(diff.added, 'пропадёт', 'пропадут', 'пропадут')} {topicsWord(diff.added)}</span>}
-                      {diff.changed > 0 && <span>{plural(diff.changed, 'изменится', 'изменятся', 'изменятся')} {topicsWord(diff.changed)}</span>}
-                      {!diff.removed && !diff.added && !diff.changed && <span>отличается оформлением</span>}
+                      {diff.removed > 0 && <span className="mh-plus">{t('{verb} {count}', { verb: tn(diff.removed, 'вернётся', 'вернутся', 'вернутся'), count: topicsWord(diff.removed) })}</span>}
+                      {diff.added > 0 && <span className="mh-minus">{t('{verb} {count}', { verb: tn(diff.added, 'пропадёт', 'пропадут', 'пропадут'), count: topicsWord(diff.added) })}</span>}
+                      {diff.changed > 0 && <span>{t('{verb} {count}', { verb: tn(diff.changed, 'изменится', 'изменятся', 'изменятся'), count: topicsWord(diff.changed) })}</span>}
+                      {!diff.removed && !diff.added && !diff.changed && <span>{t('отличается оформлением')}</span>}
                     </div>
                   </div>
                   <Outline version={sel.doc} current={doc} />
                   <div className="mh-actions">
-                    <button className="btn" disabled={busy} onClick={() => void saveCopy(sel)}>Сохранить копией</button>
-                    <button className="btn btn-primary" disabled={busy} onClick={() => void restore(sel)}>Восстановить</button>
+                    <button className="btn" disabled={busy} onClick={() => void saveCopy(sel)}>{t('Сохранить копией')}</button>
+                    <button className="btn btn-primary" disabled={busy} onClick={() => void restore(sel)}>{t('Восстановить')}</button>
                   </div>
                 </>
               ) : (
-                <p className="mh-empty mh-pick">Выберите версию, чтобы посмотреть, какой была карта.</p>
+                <p className="mh-empty mh-pick">{t('Выберите версию, чтобы посмотреть, какой была карта.')}</p>
               )}
             </div>
           </div>
@@ -186,7 +188,7 @@ function Outline({ version, current }: { version: MindDoc; current: MindDoc }) {
     const multi = version.sheets.length > 1;
     const rec = (t: Topic, depth: number) => {
       if (out.length >= PREVIEW_LIMIT) return;
-      out.push({ id: t.id, text: t.text.trim() || 'Без названия', depth, isNew: !now.has(t.id) });
+      out.push({ id: t.id, text: t.text.trim() || untitled(), depth, isNew: !now.has(t.id) });
       t.children.forEach((c) => rec(c, depth + 1));
     };
     for (const s of version.sheets) {
@@ -205,7 +207,7 @@ function Outline({ version, current }: { version: MindDoc; current: MindDoc }) {
           {r.text}
         </div>
       ))}
-      {total > shown && <div className="mh-ol more">…и ещё {topicsWord(total - shown)}</div>}
+      {total > shown && <div className="mh-ol more">{t('…и ещё {count}', { count: topicsWord(total - shown) })}</div>}
     </div>
   );
 }

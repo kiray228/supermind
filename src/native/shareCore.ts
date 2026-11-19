@@ -2,6 +2,7 @@
  * «Поделиться → SuperMind»: присланный текст и картинки → блоки заметки. Модуль чистый — тесты гоняют его в Node.
  */
 import { type Block, newBlock } from '../notes/model';
+import { t } from '../i18n/index';
 
 /** Текст — абзацами (пустые строки пропускаются), затем картинки */
 export function sharedBlocks(text: string, images: string[] = []): Block[] {
@@ -21,9 +22,9 @@ export function sharedTitle(text: string, title?: string, images = 0, max = 80):
     .map((l) => l.trim())
     .find(Boolean);
   const isUrl = (s: string) => /^https?:\/\/\S+$/i.test(s);
-  let t = first && !isUrl(first) ? first : title?.trim() || first || '';
-  if (!t && images) t = images > 1 ? `Фото (${images})` : 'Фото';
-  return t.length > max ? t.slice(0, max - 1).trimEnd() + '…' : t;
+  let name = first && !isUrl(first) ? first : title?.trim() || first || '';
+  if (!name && images) name = images > 1 ? t('Фото ({n})', { n: images }) : t('Фото');
+  return name.length > max ? name.slice(0, max - 1).trimEnd() + '…' : name;
 }
 
 /** Блоки новой заметки: без строки, ставшей названием */

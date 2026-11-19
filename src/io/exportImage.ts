@@ -3,6 +3,7 @@
  * Карта — inline <svg> с группой <g data-export-root>; служебные элементы помечены class="no-export".
  */
 import { isIOS } from './download';
+import { t } from '../i18n/index';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const XLINK_NS = 'http://www.w3.org/1999/xlink';
@@ -41,7 +42,7 @@ function resolveVars(live: Element, copy: Element) {
 
 function getExportRoot(svg: SVGSVGElement): SVGGElement {
   const g = svg.querySelector<SVGGElement>('g[data-export-root]');
-  if (!g) throw new Error('Не найдена карта для экспорта');
+  if (!g) throw new Error(t('Не найдена карта для экспорта'));
   return g;
 }
 
@@ -137,7 +138,7 @@ function loadImage(url: string): Promise<HTMLImageElement> {
     const img = new Image();
     img.decoding = 'async';
     img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error('Не удалось отрисовать карту'));
+    img.onerror = () => reject(new Error(t('Не удалось отрисовать карту')));
     img.src = url;
   });
 }
@@ -170,7 +171,7 @@ async function renderCanvas(built: Built, bg: string, scale: number): Promise<HT
   canvas.width = cw;
   canvas.height = ch;
   const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Недостаточно памяти для экспорта изображения');
+  if (!ctx) throw new Error(t('Недостаточно памяти для экспорта изображения'));
   const draw = () => {
     ctx.clearRect(0, 0, cw, ch);
     const b = (bg ?? '').trim();
@@ -191,7 +192,7 @@ async function renderCanvas(built: Built, bg: string, scale: number): Promise<HT
 
 function canvasToBlob(canvas: HTMLCanvasElement, type = 'image/png'): Promise<Blob> {
   return new Promise((resolve, reject) => {
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Не удалось создать изображение'))), type);
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error(t('Не удалось создать изображение')))), type);
   });
 }
 
@@ -224,7 +225,7 @@ export async function exportPdf(svg: SVGSVGElement, bg: string, title: string): 
       format: [pw, ph],
       compress: true,
     });
-    pdf.setProperties({ title: title || 'Карта', creator: 'SuperMind' });
+    pdf.setProperties({ title: title || t('Карта'), creator: 'SuperMind' });
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
     // вписать с сохранением пропорций

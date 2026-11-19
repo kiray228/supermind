@@ -4,6 +4,7 @@ import { useDoc, flushSave } from './store/docStore';
 import { decryptDoc } from './utils/crypto';
 import type { MindDoc } from './types';
 import { askPassword } from './ui/dialogs';
+import { t } from './i18n/index';
 
 /**
  * Дописать то, что сейчас в поле ввода (текст темы, название, заметка): поля сохраняются по blur,
@@ -20,21 +21,21 @@ export async function openDoc(id: string, focusTopicId?: string): Promise<void> 
   await flushSave();
   const raw = await loadDoc(id);
   if (!raw) {
-    toast('Документ не найден');
+    toast(t('Документ не найден'));
     return;
   }
   let doc: MindDoc;
   let password: string | null = null;
   if ('locked' in raw) {
     for (;;) {
-      const p = await askPassword('Документ защищён паролем');
+      const p = await askPassword(t('Документ защищён паролем'));
       if (p == null) return;
       try {
         doc = await decryptDoc(raw, p);
         password = p;
         break;
       } catch {
-        toast('Неверный пароль');
+        toast(t('Неверный пароль'));
       }
     }
   } else doc = raw;

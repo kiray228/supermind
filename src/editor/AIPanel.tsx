@@ -10,6 +10,7 @@ import { findInSheet, pathTo, walk } from '../utils/tree';
 import type { Topic } from '../types';
 import { newSheet } from '../store/docStore';
 import { ReportAI } from '../ui/ReportAI';
+import { isEn, t } from '../i18n/index';
 
 type Mode = 'menu' | 'run' | 'chat';
 
@@ -38,7 +39,7 @@ export function AIPanel({ onClose }: { onClose(): void }) {
   if (!sheet) return null;
   const selId = selection[selection.length - 1] ?? sheet.root.id;
   const sel = findInSheet(sheet, selId)?.topic ?? sheet.root;
-  const selPath = pathTo(sheet, sel.id).map((t) => t.text || 'Без названия');
+  const selPath = pathTo(sheet, sel.id).map((x) => x.text || t('Без названия'));
 
   const start = async (title: string, kind: RunState['kind'], p: { system: string; user: string }, targetId?: string, effort: 'low' | 'medium' | 'high' = 'medium') => {
     abortRef.current?.abort();
@@ -67,25 +68,25 @@ export function AIPanel({ onClose }: { onClose(): void }) {
     const st = useDoc.getState();
     if (run.kind === 'children' && run.targetId) {
       const items = textToTopics(stripFences(run.text));
-      if (!items.length) return toast('Не удалось разобрать ответ');
+      if (!items.length) return toast(t('Не удалось разобрать ответ'));
       st.insertChildren(run.targetId, items);
-      toast(`Добавлено тем: ${items.length}`);
+      toast(t('Добавлено тем: {n}', { n: items.length }));
     } else if (run.kind === 'note' && run.targetId) {
       const cur = findInSheet(st.sheet()!, run.targetId)?.topic.note;
       st.updateTopic(run.targetId, { note: (cur ? cur + '\n\n' : '') + run.text.trim() });
-      toast('Сохранено в заметку');
+      toast(t('Сохранено в заметку'));
     } else if (run.kind === 'replace') {
       const root = markdownToTopic(stripFences(run.text));
       if (how === 'newSheet') {
-        const sh = newSheet(root.text.slice(0, 40) || 'ИИ-карта');
+        const sh = newSheet(root.text.slice(0, 40) || t('ИИ-карта'));
         sh.root = root;
         st.addSheet(sh);
       } else st.replaceRoot(root);
-      toast('Карта создана');
+      toast(t('Карта создана'));
     } else if (run.kind === 'summary') {
       const rootId = st.sheet()!.root.id;
       st.updateTopic(rootId, { note: run.text.trim() });
-      toast('Резюме сохранено в заметку центральной темы');
+      toast(t('Резюме сохранено в заметку центральной темы'));
     }
     setMode('menu');
     setRun(null);
@@ -97,7 +98,7 @@ export function AIPanel({ onClose }: { onClose(): void }) {
     const topics: Topic[] = [];
     const roots = scope === 'all' ? [sh.root, ...sh.floating] : [sel];
     roots.forEach((r) => walk(r, (t) => void topics.push(t)));
-    if (topics.length > 400) return toast('Слишком большая карта (более 400 тем)');
+    if (topics.length > 400) return toast(t('Слишком большая карта (более 400 тем)'));
     abortRef.current?.abort();
     const ac = new AbortController();
     abortRef.current = ac;
@@ -106,7 +107,7 @@ export function AIPanel({ onClose }: { onClose(): void }) {
     try {
       const map = await transformTopics(topics, instruction, (t) => setRun((r) => (r ? { ...r, text: t } : r)), ac.signal);
       st.updateTopics([...map.keys()], (t) => void (t.text = map.get(t.id)!));
-      setRun((r) => (r ? { ...r, busy: false, text: `Готово: изменено тем — ${map.size}.` } : r));
+      setRun((r) => (r ? { ...r, busy: false, text: t('Готово: изменено тем — {n}.', { n: map.size }) } : r));
     } catch (e) {
       setRun((r) => (r ? { ...r, busy: false, error: e instanceof AIError ? e.message : String(e) } : r));
     }
@@ -138,14 +139,14 @@ export function AIPanel({ onClose }: { onClose(): void }) {
   const header = (
     <div className="inspector-head">
       {mode !== 'menu' ? (
-        <button className="icon-btn" onClick={() => { stop(); setMode('menu'); setRun(null); }} title="Назад">
+        <button className="icon-btn" onClick={() => { stop(); setMode('menu'); setRun(null); }} title={t('Назад')}>
           <CaretLeft />
         </button>
       ) : (
         <div className="ai-badge"><Sparkle size={17} weight="fill" /></div>
       )}
-      <div className="bold grow">{mode === 'chat' ? 'Чат с картой' : mode === 'run' ? run?.title : 'ИИ-помощник'}</div>
-      <button className="icon-btn" onClick={() => { stop(); onClose(); }} title="Закрыть">
+      <div className="bold grow">{mode === 'chat' ? t('Чат с картой') : mode === 'run' ? run?.title : t('ИИ-помощник')}</div>
+      <button className="icon-btn" onClick={() => { stop(); onClose(); }} title={t('Закрыть')}>
         <X weight="bold" />
       </button>
     </div>
@@ -158,30 +159,30 @@ export function AIPanel({ onClose }: { onClose(): void }) {
         {mode === 'menu' && (
           <div className="col">
             <div className="ai-target small">
-              Тема: <b>{sel.text || 'Без названия'}</b>
+              {t('Тема:')} <b>{sel.text || t('Без названия')}</b>
             </div>
-            <input className="input" placeholder="Пожелание (необязательно)" value={extra} onChange={(e) => setExtra(e.target.value)} />
-            <AIAction icon={<Lightbulb weight="duotone" />} title="Мозговой штурм" desc="Новые идеи-подтемы для выбранной темы" onClick={() => start('Мозговой штурм', 'children', PROMPTS.expand(sheet, selPath, sel.children.map((c) => c.text), extra), sel.id, 'low')} />
-            <AIAction icon={<ListChecks weight="duotone" />} title="Разбить на задачи" desc="План действий с чекбоксами" onClick={() => start('Разбить на задачи', 'children', PROMPTS.tasks(sheet, selPath), sel.id, 'low')} />
-            <AIAction icon={<BookOpen weight="duotone" />} title="Объяснить тему" desc="Подробное пояснение в заметку" onClick={() => start('Объяснение', 'note', PROMPTS.explain(sheet, selPath), sel.id, 'low')} />
-            <AIAction icon={<MagicWand weight="duotone" />} title="Улучшить формулировки" desc="Чётче и короче — для выбранной ветви" onClick={() => transform('Улучшение текста', 'Сделай формулировки чётче, короче и единообразнее, исправь ошибки. Смысл не меняй.' + (extra ? ' ' + extra : ''), 'selection')} />
+            <input className="input" placeholder={t('Пожелание (необязательно)')} value={extra} onChange={(e) => setExtra(e.target.value)} />
+            <AIAction icon={<Lightbulb weight="duotone" />} title={t('Мозговой штурм')} desc={t('Новые идеи-подтемы для выбранной темы')} onClick={() => start(t('Мозговой штурм'), 'children', PROMPTS.expand(sheet, selPath, sel.children.map((c) => c.text), extra), sel.id, 'low')} />
+            <AIAction icon={<ListChecks weight="duotone" />} title={t('Разбить на задачи')} desc={t('План действий с чекбоксами')} onClick={() => start(t('Разбить на задачи'), 'children', PROMPTS.tasks(sheet, selPath), sel.id, 'low')} />
+            <AIAction icon={<BookOpen weight="duotone" />} title={t('Объяснить тему')} desc={t('Подробное пояснение в заметку')} onClick={() => start(t('Объяснение'), 'note', PROMPTS.explain(sheet, selPath), sel.id, 'low')} />
+            <AIAction icon={<MagicWand weight="duotone" />} title={t('Улучшить формулировки')} desc={t('Чётче и короче — для выбранной ветви')} onClick={() => transform(t('Улучшение текста'), 'Сделай формулировки чётче, короче и единообразнее, исправь ошибки. Смысл не меняй.' + (extra ? ' ' + extra : ''), 'selection')} />
             <AIAction
               icon={<Translate weight="duotone" />}
-              title="Перевести карту"
-              desc={`На язык: ${extra || 'английский'} (укажите в пожелании)`}
-              onClick={() => transform('Перевод', `Переведи на ${extra || 'английский'} язык.`, 'all')}
+              title={t('Перевести карту')}
+              desc={t('На язык: {lang} (укажите в пожелании)', { lang: extra || (isEn ? t('русский') : t('английский')) })}
+              onClick={() => transform(t('Перевод'), (extra ? `Переведи на язык: ${extra}.` : isEn ? 'Translate into Russian.' : 'Переведи на английский язык.'), 'all')}
             />
-            <AIAction icon={<Scroll weight="duotone" />} title="Резюме карты" desc="Краткий пересказ и выводы" onClick={() => start('Резюме карты', 'summary', PROMPTS.summarize(sheet))} />
-            <AIAction icon={<ChatCircle weight="duotone" />} title="Чат с картой" desc="Вопросы, идеи, обсуждение" onClick={() => setMode('chat')} />
+            <AIAction icon={<Scroll weight="duotone" />} title={t('Резюме карты')} desc={t('Краткий пересказ и выводы')} onClick={() => start(t('Резюме карты'), 'summary', PROMPTS.summarize(sheet))} />
+            <AIAction icon={<ChatCircle weight="duotone" />} title={t('Чат с картой')} desc={t('Вопросы, идеи, обсуждение')} onClick={() => setMode('chat')} />
             <div className="divider" />
-            <label className="label"><FileText size={12} /> Текст → карта / Идея → карта</label>
-            <textarea className="textarea" rows={4} placeholder="Вставьте статью, конспект или опишите идею: «План запуска кофейни»" value={bigText} onChange={(e) => setBigText(e.target.value)} />
+            <label className="label"><FileText size={12} /> {t('Текст → карта / Идея → карта')}</label>
+            <textarea className="textarea" rows={4} placeholder={t('Вставьте статью, конспект или опишите идею: «План запуска кофейни»')} value={bigText} onChange={(e) => setBigText(e.target.value)} />
             <div className="row">
-              <button className="btn btn-sm grow" disabled={!bigText.trim()} onClick={() => start('Идея → карта', 'replace', PROMPTS.generate(bigText, 'normal'))}>
-                <Sparkle size={14} /> Сгенерировать
+              <button className="btn btn-sm grow" disabled={!bigText.trim()} onClick={() => start(t('Идея → карта'), 'replace', PROMPTS.generate(bigText, 'normal'))}>
+                <Sparkle size={14} /> {t('Сгенерировать')}
               </button>
-              <button className="btn btn-sm grow" disabled={bigText.trim().length < 40} onClick={() => start('Текст → карта', 'replace', PROMPTS.textToMap(bigText))}>
-                <FileText size={14} /> Из текста
+              <button className="btn btn-sm grow" disabled={bigText.trim().length < 40} onClick={() => start(t('Текст → карта'), 'replace', PROMPTS.textToMap(bigText))}>
+                <FileText size={14} /> {t('Из текста')}
               </button>
             </div>
           </div>
@@ -192,27 +193,27 @@ export function AIPanel({ onClose }: { onClose(): void }) {
             {run.error ? (
               <div className="ai-error">{run.error}</div>
             ) : (
-              <pre className="ai-output">{run.text || (run.busy ? 'Думаю…' : '')}</pre>
+              <pre className="ai-output">{run.text || (run.busy ? t('Думаю…') : '')}</pre>
             )}
-            {!run.busy && !run.error && run.kind !== 'info' && run.text && <ReportAI text={run.text} where={`Карта · ${run.title}`} />}
+            {!run.busy && !run.error && run.kind !== 'info' && run.text && <ReportAI text={run.text} where={t('Карта · {title}', { title: run.title })} />}
             {run.busy ? (
-              <button className="btn" onClick={stop}><Stop size={14} /> Остановить</button>
+              <button className="btn" onClick={stop}><Stop size={14} /> {t('Остановить')}</button>
             ) : !run.error && run.kind !== 'info' ? (
               <div className="col">
                 {run.kind === 'replace' ? (
                   <>
-                    <button className="btn btn-primary" onClick={() => apply('newSheet')}><Plus size={16} /> На новый лист</button>
-                    <button className="btn" onClick={() => apply()}><Swap size={16} /> Заменить текущую карту</button>
+                    <button className="btn btn-primary" onClick={() => apply('newSheet')}><Plus size={16} /> {t('На новый лист')}</button>
+                    <button className="btn" onClick={() => apply()}><Swap size={16} /> {t('Заменить текущую карту')}</button>
                   </>
                 ) : (
                   <button className="btn btn-primary" onClick={() => apply()}>
-                    <Plus size={16} /> {run.kind === 'children' ? 'Добавить в карту' : 'Сохранить в заметку'}
+                    <Plus size={16} /> {run.kind === 'children' ? t('Добавить в карту') : t('Сохранить в заметку')}
                   </button>
                 )}
-                <button className="btn btn-ghost" onClick={() => { setMode('menu'); setRun(null); }}>Отмена</button>
+                <button className="btn btn-ghost" onClick={() => { setMode('menu'); setRun(null); }}>{t('Отмена')}</button>
               </div>
             ) : (
-              <button className="btn" onClick={() => { setMode('menu'); setRun(null); }}>Готово</button>
+              <button className="btn" onClick={() => { setMode('menu'); setRun(null); }}>{t('Готово')}</button>
             )}
           </div>
         )}
@@ -220,7 +221,7 @@ export function AIPanel({ onClose }: { onClose(): void }) {
         {mode === 'chat' && (
           <div className="chat">
             <div className="chat-list">
-              {!chat.length && <div className="faint small" style={{ padding: 8 }}>Спросите что-нибудь о карте: «Чего не хватает?», «Какие риски?», «Предложи следующие шаги»</div>}
+              {!chat.length && <div className="faint small" style={{ padding: 8 }}>{t('Спросите что-нибудь о карте: «Чего не хватает?», «Какие риски?», «Предложи следующие шаги»')}</div>}
               {chat.map((m, i) => (
                 <div key={i} className={`bubble ${m.role}`}>
                   {m.content || '…'}
@@ -231,14 +232,14 @@ export function AIPanel({ onClose }: { onClose(): void }) {
                       onClick={() => {
                         const items = textToTopics(m.content.split('\n').filter((l) => /^\s*[-*]\s+/.test(l)).join('\n'));
                         useDoc.getState().insertChildren(sel.id, items);
-                        toast(`Добавлено в «${sel.text}»: ${items.length}`);
+                        toast(t('Добавлено в «{title}»: {n}', { title: sel.text, n: items.length }));
                       }}
                     >
-                      <Plus size={14} /> Вставить пункты в «{(sel.text || '').slice(0, 20)}»
+                      <Plus size={14} /> {t('Вставить пункты в «{title}»', { title: (sel.text || '').slice(0, 20) })}
                     </button>
                   )}
                   {m.role === 'assistant' && m.content && !m.content.startsWith('⚠️') && !(chatBusy && i === chat.length - 1) && (
-                    <ReportAI text={m.content} where="Карта · Чат с картой" />
+                    <ReportAI text={m.content} where={t('Карта · Чат с картой')} />
                   )}
                 </div>
               ))}
@@ -248,7 +249,7 @@ export function AIPanel({ onClose }: { onClose(): void }) {
                 className="textarea"
                 rows={2}
                 style={{ minHeight: 44 }}
-                placeholder="Сообщение…"
+                placeholder={t('Сообщение…')}
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -259,9 +260,9 @@ export function AIPanel({ onClose }: { onClose(): void }) {
                 }}
               />
               {chatBusy ? (
-                <button className="icon-btn" onClick={stop} aria-label="Остановить"><Stop /></button>
+                <button className="icon-btn" onClick={stop} aria-label={t('Остановить')}><Stop /></button>
               ) : (
-                <button className="icon-btn active" onClick={sendChat} aria-label="Отправить"><PaperPlaneRight /></button>
+                <button className="icon-btn active" onClick={sendChat} aria-label={t('Отправить')}><PaperPlaneRight /></button>
               )}
             </div>
           </div>

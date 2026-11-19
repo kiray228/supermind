@@ -1,4 +1,5 @@
 import type { LineStyle, ShapeType } from './types';
+import { t } from './i18n/index';
 
 export interface LevelStyle {
   fill: string;
@@ -44,7 +45,7 @@ const SUB: LevelStyle = {
 export const THEMES: Theme[] = [
   {
     id: 'classic',
-    name: 'Классика',
+    name: t('Классика'),
     background: '#ffffff',
     central: { fill: '#1e293b', textColor: '#ffffff', borderColor: 'transparent', borderWidth: 0, shape: 'rounded', fontSize: 22, bold: true },
     main: { fill: '#eef2ff', textColor: '#1e293b', borderColor: '#c7d2fe', borderWidth: 1.5, shape: 'rounded', fontSize: 16, bold: true },
@@ -58,7 +59,7 @@ export const THEMES: Theme[] = [
   },
   {
     id: 'fire',
-    name: 'Огонь',
+    name: t('Огонь'),
     background: '#fff7f5',
     central: { fill: '#f43f1a', textColor: '#ffffff', borderColor: 'transparent', borderWidth: 0, shape: 'pill', fontSize: 22, bold: true },
     main: { fill: '#ffffff', textColor: '#7c2d12', borderColor: '#fb7d5b', borderWidth: 2, shape: 'pill', fontSize: 16, bold: true },
@@ -72,7 +73,7 @@ export const THEMES: Theme[] = [
   },
   {
     id: 'ocean',
-    name: 'Океан',
+    name: t('Океан'),
     background: '#f0f9ff',
     central: { fill: '#0369a1', textColor: '#ffffff', borderColor: 'transparent', borderWidth: 0, shape: 'ellipse', fontSize: 22, bold: true },
     main: { fill: '#0ea5e9', textColor: '#ffffff', borderColor: 'transparent', borderWidth: 0, shape: 'rounded', fontSize: 16, bold: true },
@@ -87,7 +88,7 @@ export const THEMES: Theme[] = [
   },
   {
     id: 'forest',
-    name: 'Лес',
+    name: t('Лес'),
     background: '#f6fbf4',
     central: { fill: '#166534', textColor: '#ffffff', borderColor: 'transparent', borderWidth: 0, shape: 'hexagon', fontSize: 22, bold: true },
     main: { fill: '#dcfce7', textColor: '#14532d', borderColor: '#4ade80', borderWidth: 1.5, shape: 'rect', fontSize: 16, bold: true },
@@ -101,7 +102,7 @@ export const THEMES: Theme[] = [
   },
   {
     id: 'mono',
-    name: 'Минимализм',
+    name: t('Минимализм'),
     background: '#fafafa',
     central: { fill: '#ffffff', textColor: '#111111', borderColor: '#111111', borderWidth: 2.5, shape: 'rect', fontSize: 22, bold: true },
     main: { fill: '#ffffff', textColor: '#111111', borderColor: '#111111', borderWidth: 1.5, shape: 'rect', fontSize: 16, bold: false },
@@ -115,7 +116,7 @@ export const THEMES: Theme[] = [
   },
   {
     id: 'candy',
-    name: 'Конфетти',
+    name: t('Конфетти'),
     background: '#fffbfe',
     central: { fill: '#a855f7', textColor: '#ffffff', borderColor: 'transparent', borderWidth: 0, shape: 'pill', fontSize: 22, bold: true },
     main: { fill: '#f5d0fe', textColor: '#581c87', borderColor: 'transparent', borderWidth: 0, shape: 'pill', fontSize: 16, bold: true },
@@ -130,7 +131,7 @@ export const THEMES: Theme[] = [
   },
   {
     id: 'night',
-    name: 'Ночь',
+    name: t('Ночь'),
     dark: true,
     background: '#0f172a',
     central: { fill: '#f8fafc', textColor: '#0f172a', borderColor: 'transparent', borderWidth: 0, shape: 'rounded', fontSize: 22, bold: true },
@@ -145,7 +146,7 @@ export const THEMES: Theme[] = [
   },
   {
     id: 'neon',
-    name: 'Неон',
+    name: t('Неон'),
     dark: true,
     background: '#09090b',
     central: { fill: '#09090b', textColor: '#22d3ee', borderColor: '#22d3ee', borderWidth: 3, shape: 'hexagon', fontSize: 22, bold: true },
@@ -160,7 +161,7 @@ export const THEMES: Theme[] = [
   },
   {
     id: 'paper',
-    name: 'Бумага',
+    name: t('Бумага'),
     background: '#f8f4ea',
     central: { fill: '#3f3a32', textColor: '#f8f4ea', borderColor: 'transparent', borderWidth: 0, shape: 'rounded', fontSize: 22, bold: true },
     main: { fill: '#efe7d4', textColor: '#3f3a32', borderColor: '#b8a88a', borderWidth: 1, shape: 'rounded', fontSize: 16, bold: true },

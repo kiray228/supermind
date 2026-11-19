@@ -9,8 +9,9 @@ import { mapSides } from '../layout/layout';
 import { encryptDoc } from '../utils/crypto';
 import { get as kvGet, remoteRev } from './kv';
 import { deleteHistory, maybeSnapshot, snapshot } from './mapHistory';
+import { t } from '../i18n/index';
 
-export function newSheet(title = 'Лист 1', rootText = 'Центральная тема', structure: StructureType = 'map'): Sheet {
+export function newSheet(title = t('Лист {n}', { n: 1 }), rootText = t('Центральная тема'), structure: StructureType = 'map'): Sheet {
   return {
     id: uid(),
     title,
@@ -25,8 +26,8 @@ export function newSheet(title = 'Лист 1', rootText = 'Центральна�
   };
 }
 
-export function newDoc(title = 'Новая карта', sheet?: Sheet): MindDoc {
-  const s = sheet ?? newSheet('Лист 1', title);
+export function newDoc(title = t('Новая карта'), sheet?: Sheet): MindDoc {
+  const s = sheet ?? newSheet(t('Лист {n}', { n: 1 }), title);
   const now = Date.now();
   return { id: uid(), title, sheets: [s], activeSheet: s.id, createdAt: now, updatedAt: now };
 }
@@ -170,7 +171,7 @@ export async function saveNow(): Promise<{ ok: boolean; doc: MindDoc | null }> {
   try {
     const disk = await kvGet<MindDoc | LockedDoc>(`doc:${doc.id}`);
     const ok = !!disk && ('locked' in disk ? !!useDoc.getState().password : disk.updatedAt >= doc.updatedAt);
-    if (!ok) useDoc.setState({ saveError: 'Карта не нашлась на диске после записи' });
+    if (!ok) useDoc.setState({ saveError: t('Карта не нашлась на диске после записи') });
     return { ok, doc };
   } catch (e) {
     useDoc.setState({ saveError: errText(e) });
@@ -178,7 +179,7 @@ export async function saveNow(): Promise<{ ok: boolean; doc: MindDoc | null }> {
   }
 }
 
-const errText = (e: unknown) => (e instanceof Error ? e.message : String(e)) || 'Ошибка записи';
+const errText = (e: unknown) => (e instanceof Error ? e.message : String(e)) || t('Ошибка записи');
 
 async function writeOpen(doc: MindDoc, password: string | null) {
   useDoc.setState({ saving: true });
@@ -204,7 +205,7 @@ async function writeOpen(doc: MindDoc, password: string | null) {
     useDoc.setState({ saveError: errText(e) });
     if (first) {
       const { toast } = await import('./appStore');
-      toast('Карта не сохранилась', { label: 'Сохранить', run: () => void flushSave(true) });
+      toast(t('Карта не сохранилась'), { label: t('Сохранить'), run: () => void flushSave(true) });
     }
   } finally {
     useDoc.setState({ saving: false });
@@ -221,7 +222,7 @@ export function markOpened(doc: MindDoc) {
 async function lockedElsewhere(doc: MindDoc): Promise<boolean> {
   const disk = await kvGet<MindDoc | LockedDoc>(`doc:${doc.id}`);
   if (!disk || !('locked' in disk) || (doc.unlockedAt ?? 0) >= (disk.updatedAt ?? 0)) return false;
-  const copy: MindDoc = { ...doc, id: uid(), title: `${doc.title || 'Карта'} (правки без пароля)`, updatedAt: Date.now() };
+  const copy: MindDoc = { ...doc, id: uid(), title: t('{title} (правки без пароля)', { title: doc.title || t('Карта') }), updatedAt: Date.now() };
   delete copy.unlockedAt;
   await saveDoc(copy);
   const { useApp, toast } = await import('./appStore');
@@ -230,7 +231,7 @@ async function lockedElsewhere(doc: MindDoc): Promise<boolean> {
     if (useApp.getState().view === 'editor') useApp.getState().go('home');
   }
   useApp.setState({ docsVersion: Date.now() });
-  toast('На другом устройстве на карту поставили пароль — откройте её с паролем. Ваши правки сохранены отдельной картой');
+  toast(t('На другом устройстве на карту поставили пароль — откройте её с паролем. Ваши правки сохранены отдельной картой'));
   return true;
 }
 
@@ -240,11 +241,11 @@ async function keepRemoteVersion(doc: MindDoc) {
   const disk = await kvGet<MindDoc | LockedDoc>(`doc:${doc.id}`);
   base.rev = remoteRev(`doc:${doc.id}`);
   if (!disk || 'locked' in disk || !(disk.updatedAt > base.updatedAt)) return;
-  const copy: MindDoc = { ...disk, id: uid(), title: `${disk.title || 'Карта'} (версия с другого устройства)`, updatedAt: Date.now() };
+  const copy: MindDoc = { ...disk, id: uid(), title: t('{title} (версия с другого устройства)', { title: disk.title || t('Карта') }), updatedAt: Date.now() };
   await saveDoc(copy);
   const { useApp, toast } = await import('./appStore');
   useApp.setState({ docsVersion: Date.now() });
-  toast('Карту одновременно меняли на другом устройстве — та версия сохранена отдельной картой');
+  toast(t('Карту одновременно меняли на другом устройстве — та версия сохранена отдельной картой'));
 }
 
 const HISTORY_LIMIT = 150;
@@ -506,30 +507,30 @@ export const useDoc = create<DocState>((set, get) => {
       const s = get().sheet();
       const f = s && tid ? findInSheet(s, tid) : null;
       if (!f || !f.parent) return null;
-      const t = newTopic('Тема');
+      const nt = newTopic(t('Тема'));
       get().mutate((sh) => {
         const ff = findInSheet(sh, tid!);
         if (!ff || !ff.parent) return;
         // главная тема карты: новый родитель встаёт на её сторону, у неё сторона больше не нужна
         if (ff.parent.id === sh.root.id && sh.structure === 'map') {
-          t.side = ff.topic.side ?? topicSide(sh, ff.topic.id);
+          nt.side = ff.topic.side ?? topicSide(sh, ff.topic.id);
           delete ff.topic.side;
         }
-        const [moved] = ff.parent.children.splice(ff.index, 1, t);
-        t.children.push(moved);
+        const [moved] = ff.parent.children.splice(ff.index, 1, nt);
+        nt.children.push(moved);
       });
-      set({ selection: [t.id], editingId: t.id });
-      freshId = t.id;
-      return t.id;
+      set({ selection: [nt.id], editingId: nt.id });
+      freshId = nt.id;
+      return nt.id;
     },
     addFloating(x, y) {
-      const t: FloatingTopic = { ...newTopic('Плавающая тема'), x, y };
+      const ft: FloatingTopic = { ...newTopic(t('Плавающая тема')), x, y };
       get().mutate((s) => {
-        s.floating.push(t);
+        s.floating.push(ft);
       });
-      set({ selection: [t.id], editingId: t.id });
-      freshId = t.id;
-      return t.id;
+      set({ selection: [ft.id], editingId: ft.id });
+      freshId = ft.id;
+      return ft.id;
     },
     insertChildren(parentId, topics) {
       get().mutate((s) => {
@@ -823,7 +824,7 @@ export const useDoc = create<DocState>((set, get) => {
     addSummary(topicId) {
       const ids = topicId ? [topicId] : get().selection;
       get().mutate((s) => {
-        for (const id of ids) if (!s.summaries.some((b) => b.topicId === id)) s.summaries.push({ id: uid(), topicId: id, text: 'Итог' });
+        for (const id of ids) if (!s.summaries.some((b) => b.topicId === id)) s.summaries.push({ id: uid(), topicId: id, text: t('Итог') });
       });
     },
     updateSummary(id, patch) {
@@ -844,7 +845,7 @@ export const useDoc = create<DocState>((set, get) => {
       });
     },
     addSheet(sheet) {
-      const sh = sheet ?? newSheet(`Лист ${(get().doc?.sheets.length ?? 0) + 1}`);
+      const sh = sheet ?? newSheet(t('Лист {n}', { n: (get().doc?.sheets.length ?? 0) + 1 }));
       get().mutateDoc((d) => {
         d.sheets.push(sh);
         d.activeSheet = sh.id;
@@ -867,7 +868,7 @@ export const useDoc = create<DocState>((set, get) => {
       if (!src) return;
       const copy = clone(src);
       copy.id = uid();
-      copy.title = src.title + ' (копия)';
+      copy.title = t('{title} (копия)', { title: src.title });
       // новые id у всех тем, чтобы задачи копии не путались с оригиналом
       const map = new Map<ID, ID>();
       const re = (t: Topic) => {
@@ -927,9 +928,9 @@ function cleanSelection(d: MindDoc, sel: ID[]): ID[] {
 
 /** Текст новой темы по умолчанию, как в Xmind */
 function defaultTopicText(s: Sheet | null, parent: Topic | null): string {
-  if (!s || !parent) return 'Тема';
-  if (parent.id === s.root.id) return `Основная тема ${parent.children.length + 1}`;
-  return 'Подтема';
+  if (!s || !parent) return t('Тема');
+  if (parent.id === s.root.id) return t('Основная тема {n}', { n: parent.children.length + 1 });
+  return t('Подтема');
 }
 
 function collectIds(t: Topic, out: Set<ID>) {

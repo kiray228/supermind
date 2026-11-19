@@ -31,5 +31,7 @@ const d: Record<string, string> = {
   'Удерживайте значок SuperMind: новая задача, голосом, фокус или новая карта — сразу, без лишних касаний.': 'Touch and hold the SuperMind icon: new task, voice, focus or new map — in one tap.',
   '«Поделиться» на iPhone': 'Share on iPhone',
   'В Safari, «Фото» и других приложениях: «Поделиться» → SuperMind. Текст, ссылка и до 5 фото сохраняются в задачи, заметки или карту при открытии приложения.': 'In Safari, Photos and other apps: Share → SuperMind. Text, a link and up to 5 photos are saved to tasks, notes or a map when you open the app.',
+  'Ошибка запроса: ': 'Request error: ',
+  'русский': 'Russian',
 };
 export default d;
