@@ -4,12 +4,13 @@ import { CaretRight } from '@phosphor-icons/react';
 import { categoryMap, fmtMoney, periodRange, summarize, type FinanceData } from '../model';
 import { showOps } from './state';
 import { useToday } from './common';
+import { t } from '../../i18n/index';
 
 type Period = 'week' | 'month' | 'year';
-const PERIODS: { id: Period; label: string; sub: string }[] = [
-  { id: 'week', label: 'Неделя', sub: 'за неделю' },
-  { id: 'month', label: 'Месяц', sub: 'за месяц' },
-  { id: 'year', label: 'Год', sub: 'за год' },
+const PERIODS: { id: Period; label: string; sub: string; all: string; empty: string }[] = [
+  { id: 'week', label: t('Неделя'), sub: t('за неделю'), all: t('Все траты за неделю'), empty: t('Трат за неделю пока нет — кольцо покажет, на что уходят деньги.') },
+  { id: 'month', label: t('Месяц'), sub: t('за месяц'), all: t('Все траты за месяц'), empty: t('Трат за месяц пока нет — кольцо покажет, на что уходят деньги.') },
+  { id: 'year', label: t('Год'), sub: t('за год'), all: t('Все траты за год'), empty: t('Трат за год пока нет — кольцо покажет, на что уходят деньги.') },
 ];
 const PERIOD_KEY = 'sm-fin-ring-period';
 /** сколько категорий показывать отдельно; остальные — «Остальное» */
@@ -57,12 +58,12 @@ export function SpendRing({ data }: { data: FinanceData }) {
       .filter(([, v]) => v > 0)
       .map(([id, v]) => {
         const c = cats.get(id);
-        return { id, name: c?.name ?? 'Без категории', emoji: c?.emoji ?? '•', color: c?.color ?? REST_COLOR, value: v, ids: [id] };
+        return { id, name: c?.name ?? t('Без категории'), emoji: c?.emoji ?? '•', color: c?.color ?? REST_COLOR, value: v, ids: [id] };
       })
       .sort((a, b) => b.value - a.value);
     if (all.length <= TOP + 1) return all;
     const rest = all.slice(TOP);
-    return [...all.slice(0, TOP), { id: '__rest', name: 'Остальное', emoji: '⋯', color: REST_COLOR, value: rest.reduce((a, s) => a + s.value, 0), ids: rest.map((s) => s.id) }];
+    return [...all.slice(0, TOP), { id: '__rest', name: t('Остальное'), emoji: '⋯', color: REST_COLOR, value: rest.reduce((a, s) => a + s.value, 0), ids: rest.map((s) => s.id) }];
   }, [data, range]);
   const total = slices.reduce((a, s) => a + s.value, 0);
   const picked = slices.find((s) => s.id === sel) ?? null;
@@ -73,7 +74,7 @@ export function SpendRing({ data }: { data: FinanceData }) {
 
   return (
     <section className="card fn-panel fn-ring-panel">
-      <div className="segmented fn-ring-periods" role="tablist" aria-label="Период">
+      <div className="segmented fn-ring-periods" role="tablist" aria-label={t('Период')}>
         {PERIODS.map((p) => (
           <button key={p.id} role="tab" aria-selected={period === p.id} className={period === p.id ? 'active' : ''} onClick={() => setPeriod(p.id)}>
             {p.label}
@@ -89,11 +90,11 @@ export function SpendRing({ data }: { data: FinanceData }) {
                   {picked.emoji} {picked.name}
                 </small>
                 <b>{fmtMoney(picked.value, main, { compact: picked.value >= 1e6 })}</b>
-                <em>{Math.round((picked.value / total) * 100)}% расходов</em>
+                <em>{t('{pct}% расходов', { pct: Math.round((picked.value / total) * 100) })}</em>
               </>
             ) : (
               <>
-                <small>Расходы</small>
+                <small>{t('Расходы')}</small>
                 <b>{fmtMoney(total, main, { compact: total >= 1e6 })}</b>
                 <em>{label.sub}</em>
               </>
@@ -112,11 +113,11 @@ export function SpendRing({ data }: { data: FinanceData }) {
             ))}
           </div>
           <button className="fn-link small fn-ring-ops" onClick={() => openOps(picked)}>
-            {picked ? `Траты: ${picked.name}` : 'Все траты ' + label.sub} <CaretRight size={13} weight="bold" />
+            {picked ? t('Траты: {name}', { name: picked.name }) : label.all} <CaretRight size={13} weight="bold" />
           </button>
         </>
       ) : (
-        <p className="small muted fn-m0 fn-ring-empty">Трат {label.sub} пока нет — кольцо покажет, на что уходят деньги.</p>
+        <p className="small muted fn-m0 fn-ring-empty">{label.empty}</p>
       )}
     </section>
   );

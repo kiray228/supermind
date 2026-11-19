@@ -4,9 +4,10 @@
  * синхронизация сливает массивы по id, удалённые запоминаются в gone.
  */
 import type { TaskItem } from '../tasks/model';
-import { daysBetween, mondayOf, MONTHS, plural, shortDate } from '../tasks/model';
+import { daysBetween, mondayOf, MONTHS, shortDate } from '../tasks/model';
 import { addDaysYmd, fromYmd, todayYmd, toYmd } from '../utils/mapTasks';
 import { normalizeSavings, savingsInfo, savingsNext } from './savings';
+import { isEn, LOCALE, t, tn } from '../i18n/index';
 
 export type GoalPeriod = 'year' | 'quarter' | 'month' | 'week' | 'custom';
 export type GoalStatus = 'active' | 'done' | 'paused' | 'archived';
@@ -134,14 +135,14 @@ export const AREA_COLORS = ['#22c55e', '#3b82f6', '#f59e0b', '#ec4899', '#f97316
 
 /** Сферы по умолчанию. id постоянные — на разных устройствах не появятся дубликаты */
 const DEFAULT_AREAS: [string, string, string, string][] = [
-  ['area-health', 'Здоровье', '💪', '#22c55e'],
-  ['area-career', 'Карьера', '💼', '#3b82f6'],
-  ['area-finance', 'Финансы', '💰', '#f59e0b'],
-  ['area-love', 'Отношения', '❤️', '#ec4899'],
-  ['area-family', 'Семья', '👨‍👩‍👧', '#f97316'],
-  ['area-growth', 'Саморазвитие', '📚', '#a855f7'],
-  ['area-fun', 'Отдых и хобби', '🎨', '#14b8a6'],
-  ['area-social', 'Окружение', '🤝', '#6366f1'],
+  ['area-health', t('Здоровье'), '💪', '#22c55e'],
+  ['area-career', t('Карьера'), '💼', '#3b82f6'],
+  ['area-finance', t('Финансы'), '💰', '#f59e0b'],
+  ['area-love', t('Отношения'), '❤️', '#ec4899'],
+  ['area-family', t('Семья'), '👨‍👩‍👧', '#f97316'],
+  ['area-growth', t('Саморазвитие'), '📚', '#a855f7'],
+  ['area-fun', t('Отдых и хобби'), '🎨', '#14b8a6'],
+  ['area-social', t('Окружение'), '🤝', '#6366f1'],
 ];
 
 export function defaultAreas(): LifeArea[] {
@@ -158,33 +159,33 @@ export function emptyGoalsData(): GoalsData {
 export const GOAL_EMOJIS = ['🎯', '🏆', '🚀', '⭐', '💪', '🏃', '🧘', '🥗', '💼', '📈', '💰', '🏠', '🚗', '✈️', '❤️', '👨‍👩‍👧', '📚', '🎓', '🗣️', '🎨', '🎸', '📷', '🌱', '🤝'];
 
 export const PERIODS: { v: GoalPeriod; label: string; group: string }[] = [
-  { v: 'year', label: 'Год', group: 'Цели на год' },
-  { v: 'quarter', label: 'Квартал', group: 'Цели на квартал' },
-  { v: 'month', label: 'Месяц', group: 'Цели на месяц' },
-  { v: 'week', label: 'Неделя', group: 'Цели на неделю' },
-  { v: 'custom', label: 'Свой срок', group: 'Свой срок' },
+  { v: 'year', label: t('Год'), group: t('Цели на год') },
+  { v: 'quarter', label: t('Квартал'), group: t('Цели на квартал') },
+  { v: 'month', label: t('Месяц'), group: t('Цели на месяц') },
+  { v: 'week', label: t('Неделя'), group: t('Цели на неделю') },
+  { v: 'custom', label: t('Свой срок'), group: t('Свой срок') },
 ];
 
 export const STATUS_LABEL: Record<GoalStatus, string> = {
-  active: 'Активна',
-  done: 'Выполнена',
-  paused: 'Отложена',
-  archived: 'В архиве',
+  active: t('Активна'),
+  done: t('Выполнена'),
+  paused: t('Отложена'),
+  archived: t('В архиве'),
 };
 
 export const MODES: { v: ProgressMode; label: string; hint: string }[] = [
-  { v: 'stages', label: 'Этапы', hint: 'Прогресс по выполненным шагам этапов' },
-  { v: 'target', label: 'Число', hint: 'Например, 12 книг или 100 км' },
-  { v: 'tasks', label: 'Задачи', hint: 'Прогресс по выполненным связанным задачам' },
-  { v: 'manual', label: 'Вручную', hint: 'Процент выполнения задаёте сами' },
-  { v: 'savings', label: 'Копилка', hint: 'Деньги на счёте в Финансах — прогресс по остатку' },
+  { v: 'stages', label: t('Этапы'), hint: t('Прогресс по выполненным шагам этапов') },
+  { v: 'target', label: t('Число'), hint: t('Например, 12 книг или 100 км') },
+  { v: 'tasks', label: t('Задачи'), hint: t('Прогресс по выполненным связанным задачам') },
+  { v: 'manual', label: t('Вручную'), hint: t('Процент выполнения задаёте сами') },
+  { v: 'savings', label: t('Копилка'), hint: t('Деньги на счёте в Финансах — прогресс по остатку') },
 ];
 
 export const GOAL_PRIORITIES: { v: GoalPriority; label: string; color: string }[] = [
-  { v: 0, label: 'Нет', color: 'var(--text-3)' },
-  { v: 3, label: 'Низкий', color: '#3b82f6' },
-  { v: 2, label: 'Средний', color: '#f97316' },
-  { v: 1, label: 'Высокий', color: '#ef4444' },
+  { v: 0, label: t('Нет'), color: 'var(--text-3)' },
+  { v: 3, label: t('Низкий'), color: '#3b82f6' },
+  { v: 2, label: t('Средний'), color: '#f97316' },
+  { v: 1, label: t('Высокий'), color: '#ef4444' },
 ];
 
 // ---------- Нормализация ----------
@@ -262,21 +263,21 @@ export function periodLabel(g: Pick<Goal, 'period' | 'start' | 'deadline'>): str
   const y = d.getFullYear();
   switch (g.period) {
     case 'year':
-      return `${y} год`;
+      return t('{y} год', { y });
     case 'quarter':
-      return `${QUARTERS[Math.floor(d.getMonth() / 3)]} квартал ${y}`;
+      return t('{q} квартал {y}', { q: isEn ? Math.floor(d.getMonth() / 3) + 1 : QUARTERS[Math.floor(d.getMonth() / 3)], y });
     case 'month':
       return `${MONTHS[d.getMonth()]} ${y}`;
     case 'week':
-      return `Неделя ${shortDate(g.start)} – ${shortDate(g.deadline ?? addDaysYmd(g.start, 6))}`;
+      return t('Неделя {from} – {to}', { from: shortDate(g.start), to: shortDate(g.deadline ?? addDaysYmd(g.start, 6)) });
     default:
-      return g.deadline ? `до ${fullDate(g.deadline)}` : 'Без срока';
+      return g.deadline ? t('до {date}', { date: fullDate(g.deadline) }) : t('Без срока');
   }
 }
 
 /** «5 окт 2026» */
 export function fullDate(ymd: string): string {
-  return `${shortDate(ymd)} ${fromYmd(ymd).getFullYear()}`;
+  return isEn ? `${shortDate(ymd)}, ${fromYmd(ymd).getFullYear()}` : `${shortDate(ymd)} ${fromYmd(ymd).getFullYear()}`;
 }
 
 export interface DeadlineInfo {
@@ -286,12 +287,12 @@ export interface DeadlineInfo {
 }
 
 export function deadlineInfo(g: Pick<Goal, 'deadline' | 'status' | 'completedAt'>, today = todayYmd()): DeadlineInfo {
-  if (g.status === 'done') return { text: g.completedAt ? `выполнена ${shortDate(toYmd(new Date(g.completedAt)))}` : 'выполнена', state: 'done' };
-  if (!g.deadline) return { text: 'без срока', state: 'none' };
+  if (g.status === 'done') return { text: g.completedAt ? t('выполнена {date}', { date: shortDate(toYmd(new Date(g.completedAt))) }) : t('выполнена'), state: 'done' };
+  if (!g.deadline) return { text: t('без срока'), state: 'none' };
   const n = daysBetween(today, g.deadline);
-  if (n < 0) return { text: `просрочена на ${-n} ${plural(-n, 'день', 'дня', 'дней')}`, state: 'overdue', days: n };
-  if (n === 0) return { text: 'последний день', state: 'soon', days: 0 };
-  return { text: `${plural(n, 'остался', 'осталось', 'осталось')} ${n} ${plural(n, 'день', 'дня', 'дней')}`, state: n <= 7 ? 'soon' : 'ok', days: n };
+  if (n < 0) return { text: t('просрочена на {n} {days}', { n: -n, days: tn(-n, 'день', 'дня', 'дней') }), state: 'overdue', days: n };
+  if (n === 0) return { text: t('последний день'), state: 'soon', days: 0 };
+  return { text: t('{left} {n} {days}', { left: tn(n, 'остался', 'осталось', 'осталось'), n, days: tn(n, 'день', 'дня', 'дней') }), state: n <= 7 ? 'soon' : 'ok', days: n };
 }
 
 /** Какая доля срока уже прошла (0..100) */
@@ -424,7 +425,7 @@ export function goalProgress(g: Goal, look: TaskLookup): number {
 }
 
 export function fmtNum(n: number): string {
-  return Number.isInteger(n) ? String(n) : n.toLocaleString('ru-RU', { maximumFractionDigits: 2 });
+  return Number.isInteger(n) ? String(n) : n.toLocaleString(LOCALE, { maximumFractionDigits: 2 });
 }
 
 /** Следующий шаг для карточки цели */
@@ -434,8 +435,8 @@ export function nextStep(g: Goal, look: TaskLookup): string | null {
   if (g.mode === 'target' && g.target) {
     const left = g.target.target - g.target.current;
     if ((g.target.target >= g.target.start && left > 0) || (g.target.target < g.target.start && left < 0))
-      return `Осталось ${fmtNum(Math.abs(left))}${g.target.unit ? ' ' + g.target.unit : ''}`;
-    return 'Цель по числу достигнута';
+      return t('Осталось {amount}', { amount: `${fmtNum(Math.abs(left))}${g.target.unit ? ' ' + g.target.unit : ''}` });
+    return t('Цель по числу достигнута');
   }
   if (g.mode === 'tasks') {
     for (const id of linkedTaskIds(g)) {

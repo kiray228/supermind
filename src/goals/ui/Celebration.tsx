@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react';
 import type { CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { clearCelebration, useGoals } from '../store';
+import { t } from '../../i18n/index';
 
 const COLORS = ['#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#a855f7', '#ec4899', '#14b8a6', '#facc15'];
 
@@ -41,7 +42,7 @@ export function Celebration() {
       ))}
       <div className="gl-celebrate-card">
         <div className="gl-celebrate-emoji">{c.emoji || '🏆'}</div>
-        <div className="gl-celebrate-title">Цель достигнута!</div>
+        <div className="gl-celebrate-title">{t('Цель достигнута!')}</div>
         <div className="gl-celebrate-sub">{c.title}</div>
       </div>
     </div>,

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { get } from '../store/kv';
 import { blobSync } from '../store/blobSync';
 import { toast } from '../store/appStore';
+import { t } from '../i18n/index';
 import { uid } from '../utils/tree';
 import { todayYmd } from '../utils/mapTasks';
 import { addTask, ensureTasks, getTask, openTask, toggleDone, useTasks } from '../tasks/store';
@@ -92,7 +93,7 @@ const store = blobSync<GoalsData>({
   read: () => useGoals.getState().data,
   write: (data) => useGoals.setState({ data }),
   normalize: (raw) => normalizeGoalsData(raw),
-  onError: () => toast('Не удалось сохранить цели'),
+  onError: () => toast(t('Не удалось сохранить цели')),
 });
 
 /** Сохранить отложенные изменения (только если они есть) */
@@ -207,7 +208,7 @@ export function addGoal(p: Partial<Goal>): Goal | null {
   if (!useGoals.getState().data) return null;
   const now = Date.now();
   const g = normalizeGoal({ ...p, id: uid(), createdAt: now, updatedAt: now });
-  log(g, 'Цель создана', { kind: 'info' });
+  log(g, t('Цель создана'), { kind: 'info' });
   mutateGoals((d) => void d.goals.unshift(g));
   return g;
 }
@@ -230,8 +231,8 @@ export function deleteGoal(id: string) {
     markGone(d, id);
   });
   if (useGoals.getState().openGoalId === id) openGoal(null);
-  toast('Цель удалена', {
-    label: 'Отменить',
+  toast(t('Цель удалена'), {
+    label: t('Отменить'),
     run: () =>
       mutateGoals((d) => {
         if (d.gone) delete d.gone[id];
@@ -241,10 +242,10 @@ export function deleteGoal(id: string) {
 }
 
 const STATUS_LOG: Record<GoalStatus, string> = {
-  active: 'Цель снова активна',
-  done: 'Цель выполнена 🎉',
-  paused: 'Цель отложена',
-  archived: 'Цель в архиве',
+  active: t('Цель снова активна'),
+  done: t('Цель выполнена 🎉'),
+  paused: t('Цель отложена'),
+  archived: t('Цель в архиве'),
 };
 
 export function setGoalStatus(id: string, status: GoalStatus) {
@@ -259,9 +260,9 @@ export function setGoalStatus(id: string, status: GoalStatus) {
   });
   if (status === 'done') {
     useGoals.setState({ celebrate: { emoji: g.emoji, title: g.title, at: Date.now() } });
-    toast('Цель достигнута! Поздравляем 🎉', { label: 'Отменить', run: () => setGoalStatus(id, prev) });
-  } else if (status === 'paused') toast('Цель отложена');
-  else if (status === 'archived') toast('Цель перенесена в архив');
+    toast(t('Цель достигнута! Поздравляем 🎉'), { label: t('Отменить'), run: () => setGoalStatus(id, prev) });
+  } else if (status === 'paused') toast(t('Цель отложена'));
+  else if (status === 'archived') toast(t('Цель перенесена в архив'));
 }
 
 /** Предложить завершить цель, когда прогресс дошёл до 100% */
@@ -269,7 +270,7 @@ function offerComplete(id: string, before: number) {
   const g = getGoal(id);
   if (!g || g.status !== 'active') return;
   const after = goalProgressRaw(g, lookup());
-  if (after >= 100 && before < 100) toast('Прогресс 100%! Завершить цель?', { label: 'Завершить', run: () => setGoalStatus(id, 'done') });
+  if (after >= 100 && before < 100) toast(t('Прогресс 100%! Завершить цель?'), { label: t('Завершить'), run: () => setGoalStatus(id, 'done') });
 }
 
 function withOffer(id: string, fn: () => void) {
@@ -285,7 +286,7 @@ export function setManualProgress(id: string, pct: number) {
     editGoal(id, (g) => {
       g.manual = Math.round(pct);
       const last = g.history[g.history.length - 1];
-      const text = `Прогресс: ${g.manual}%`;
+      const text = t('Прогресс: {pct}%', { pct: g.manual });
       if (last?.kind === 'manual' && Date.now() - last.at < 60_000) {
         last.text = text;
         last.at = Date.now();
@@ -318,30 +319,30 @@ export function depositToSavings(goalId: string, fromAccountId: string, amount: 
   if (!g || !sv || !fin || !(amount > 0)) return false;
   const to = fin.accounts.find((a) => a.id === sv.accountId);
   if (!to) {
-    toast('Счёт-копилка удалён');
+    toast(t('Счёт-копилка удалён'));
     return false;
   }
   if (fromAccountId === to.id) return false;
   const before = goalProgressRaw(g, lookup());
-  const t = addTransaction(
-    { type: 'transfer', amount, accountId: fromAccountId, toAccountId: to.id, ...(toAmount && toAmount > 0 ? { toAmount } : {}), date: todayYmd(), note: `Копилка: ${g.title}` },
+  const tx = addTransaction(
+    { type: 'transfer', amount, accountId: fromAccountId, toAccountId: to.id, ...(toAmount && toAmount > 0 ? { toAmount } : {}), date: todayYmd(), note: t('Копилка: {title}', { title: g.title }) },
     { silent: true },
   );
-  if (!t) return false;
+  if (!tx) return false;
   const got = toAmount && toAmount > 0 ? toAmount : amount;
   let hid = '';
   editGoal(goalId, (x) => {
-    log(x, `+${fmtMoney(got, to.currency)} в копилку`, { kind: 'target', delta: got });
+    log(x, t('+{amount} в копилку', { amount: fmtMoney(got, to.currency) }), { kind: 'target', delta: got });
     hid = x.history[x.history.length - 1].id;
   });
   const after = getGoal(goalId);
   const s = after ? savingsInfo(after) : null;
-  if (s?.reached && before < 100 && after?.status === 'active') toast('Копилка собрана! 🎉 Завершить цель?', { label: 'Завершить', run: () => setGoalStatus(goalId, 'done') });
+  if (s?.reached && before < 100 && after?.status === 'active') toast(t('Копилка собрана! 🎉 Завершить цель?'), { label: t('Завершить'), run: () => setGoalStatus(goalId, 'done') });
   else
-    toast(`+${fmtMoney(got, to.currency)} в копилку`, {
-      label: 'Отменить',
+    toast(t('+{amount} в копилку', { amount: fmtMoney(got, to.currency) }), {
+      label: t('Отменить'),
       run: () => {
-        deleteTransaction(t.id, false);
+        deleteTransaction(tx.id, false);
         editGoal(goalId, (x) => void (x.history = x.history.filter((h) => h.id !== hid)));
       },
     });
@@ -372,7 +373,7 @@ export function addStages(goalId: string, items: { title: string; deadline?: str
   editGoal(goalId, (g) => {
     g.stages.push(...stages);
     if (g.mode === 'manual' && g.manual === 0) g.mode = 'stages';
-    log(g, `Добавлено этапов: ${stages.length}`, { kind: 'info' });
+    log(g, t('Добавлено этапов: {n}', { n: stages.length }), { kind: 'info' });
   });
   return stages.map((s) => s.id);
 }
@@ -411,7 +412,7 @@ export function toggleStageDone(goalId: string, stageId: string) {
       const st = findStage(g, stageId);
       if (!st) return;
       st.done = !st.done;
-      if (st.done) log(g, `Этап выполнен: ${st.title}`, { kind: 'step' });
+      if (st.done) log(g, t('Этап выполнен: {title}', { title: st.title }), { kind: 'step' });
     }),
   );
 }
@@ -450,7 +451,7 @@ export function toggleStep(goalId: string, stageId: string, stepId: string) {
       sp.done = !wasDone;
       if (sp.done) {
         sp.doneAt = Date.now();
-        log(x, `Шаг выполнен: ${sp.title}`, { kind: 'step' });
+        log(x, t('Шаг выполнен: {title}', { title: sp.title }), { kind: 'step' });
       } else delete sp.doneAt;
     });
     if (live && (wasDone ? taskClosed(live) : !live.repeat && !taskClosed(live))) toggleDone(live.id);
@@ -467,22 +468,22 @@ export async function createGoalTask(goalId: string, title: string, opts: { stag
   await ensureTasks();
   const g = getGoal(goalId);
   if (!g || !title.trim()) return null;
-  const t = addTask({
+  const task = addTask({
     title: title.trim(),
     ...(opts.date ? { date: opts.date } : {}),
-    tags: ['цель'],
-    notes: `Цель: ${g.emoji} ${g.title}`,
+    tags: [t('цель')],
+    notes: t('Цель: {emoji} {title}', { emoji: g.emoji, title: g.title }),
   });
-  if (!t) return null;
+  if (!task) return null;
   editGoal(goalId, (x) => {
     const st = opts.stageId ? findStage(x, opts.stageId) : undefined;
     const sp = st && opts.stepId ? st.steps.find((s) => s.id === opts.stepId) : undefined;
-    if (sp) sp.taskId = t.id;
-    else if (st) st.taskIds.push(t.id);
-    else x.taskIds.push(t.id);
+    if (sp) sp.taskId = task.id;
+    else if (st) st.taskIds.push(task.id);
+    else x.taskIds.push(task.id);
   });
-  toast('Задача создана', { label: 'Открыть', run: () => openTask(t.id) });
-  return t.id;
+  toast(t('Задача создана'), { label: t('Открыть'), run: () => openTask(task.id) });
+  return task.id;
 }
 
 /** Привязать существующую задачу к цели (или к этапу) */

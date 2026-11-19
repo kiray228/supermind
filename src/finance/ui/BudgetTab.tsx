@@ -1,6 +1,7 @@
 import { useMemo, useState, type CSSProperties } from 'react';
 import { PencilSimple, Plus, Target } from '@phosphor-icons/react';
 import { toast } from '../../store/appStore';
+import { t } from '../../i18n/index';
 import {
   addMonthsYmd,
   budgetLevel,
@@ -60,59 +61,59 @@ export function BudgetTab({ data }: { data: FinanceData }) {
       <section className="card fn-panel fn-budget-total">
         <div className="fn-panel-head">
           <h3>
-            <Target size={16} /> Бюджет на месяц
+            <Target size={16} /> {t('Бюджет на месяц')}
           </h3>
           <button className="btn btn-sm btn-ghost" onClick={() => setEdit({})}>
-            <PencilSimple size={14} /> {tb ? 'Изменить' : 'Задать'}
+            <PencilSimple size={14} /> {tb ? t('Изменить') : t('Задать')}
           </button>
         </div>
         {tb ? (
           <>
             <div className="fn-budget-big">
               <Money v={s.expense} cur={main} />
-              <span className="faint"> из {fmtMoney(tb.limit, main)}</span>
+              <span className="faint"> {t('из {amount}', { amount: fmtMoney(tb.limit, main) })}</span>
             </div>
             <Progress spent={s.expense} limit={tb.limit} />
             <div className="fn-budget-stats">
               <div>
-                <span className="tiny faint">{tb.limit >= s.expense ? 'Осталось' : 'Перерасход'}</span>
+                <span className="tiny faint">{tb.limit >= s.expense ? t('Осталось') : t('Перерасход')}</span>
                 <b className={tb.limit < s.expense ? 'fn-neg' : ''}>{fmtMoney(Math.abs(tb.limit - s.expense), main)}</b>
               </div>
               {isCur && (
                 <div>
-                  <span className="tiny faint">Осталось на день</span>
+                  <span className="tiny faint">{t('Осталось на день')}</span>
                   <b>{fmtMoney(perDay ?? 0, main)}</b>
                 </div>
               )}
               {isCur && (
                 <div>
-                  <span className="tiny faint">Дней до конца месяца</span>
+                  <span className="tiny faint">{t('Дней до конца месяца')}</span>
                   <b>{leftDays}</b>
                 </div>
               )}
               {isPast && (
                 <div>
-                  <span className="tiny faint">Итог месяца</span>
-                  <b className={budgetLevel(s.expense, tb.limit) === 'over' ? 'fn-neg' : 'fn-pos'}>{budgetLevel(s.expense, tb.limit) === 'over' ? 'Бюджет превышен' : 'Уложились'}</b>
+                  <span className="tiny faint">{t('Итог месяца')}</span>
+                  <b className={budgetLevel(s.expense, tb.limit) === 'over' ? 'fn-neg' : 'fn-pos'}>{budgetLevel(s.expense, tb.limit) === 'over' ? t('Бюджет превышен') : t('Уложились')}</b>
                 </div>
               )}
             </div>
           </>
         ) : (
           <p className="small muted fn-m0">
-            Общий лимит расходов на месяц. Потрачено в этом месяце: <b>{fmtMoney(s.expense, main)}</b>
+            {t('Общий лимит расходов на месяц. Потрачено в этом месяце:')} <b>{fmtMoney(s.expense, main)}</b>
           </p>
         )}
       </section>
 
       <section className="card fn-panel">
         <div className="fn-panel-head">
-          <h3>Лимиты по категориям</h3>
+          <h3>{t('Лимиты по категориям')}</h3>
           <button className="btn btn-sm btn-ghost" onClick={() => setEdit({ pick: true })}>
-            <Plus size={14} /> Добавить
+            <Plus size={14} /> {t('Добавить')}
           </button>
         </div>
-        {catBudgets.length === 0 && <p className="small muted fn-m0">Ограничьте траты, например, на кафе или такси — полоса покраснеет при превышении.</p>}
+        {catBudgets.length === 0 && <p className="small muted fn-m0">{t('Ограничьте траты, например, на кафе или такси — полоса покраснеет при превышении.')}</p>}
         {catBudgets.map(({ b, c, spent }) => (
           <button key={b.id} className="fn-cat-budget" onClick={() => setEdit({ categoryId: c.id })}>
             <CatIcon emoji={c.emoji} color={c.color} size={34} />
@@ -126,19 +127,19 @@ export function BudgetTab({ data }: { data: FinanceData }) {
               </span>
               <Progress spent={spent} limit={b.limit} thin />
               <span className="tiny faint">
-                {spent > b.limit ? `Перерасход ${fmtMoney(spent - b.limit, main)}` : `Осталось ${fmtMoney(b.limit - spent, main)}`}
-                {isCur && spent < b.limit ? ` · ${fmtMoney(perDayLeft(b.limit, spent, today, month) ?? 0, main)} в день` : ''}
+                {spent > b.limit ? t('Перерасход {amount}', { amount: fmtMoney(spent - b.limit, main) }) : t('Осталось {amount}', { amount: fmtMoney(b.limit - spent, main) })}
+                {isCur && spent < b.limit ? t(' · {amount} в день', { amount: fmtMoney(perDayLeft(b.limit, spent, today, month) ?? 0, main) }) : ''}
               </span>
             </span>
           </button>
         ))}
-        {tb && sumLimits > tb.limit && <p className="tiny fn-warn-text fn-m0">Сумма лимитов по категориям ({fmtMoney(sumLimits, main)}) больше общего бюджета.</p>}
+        {tb && sumLimits > tb.limit && <p className="tiny fn-warn-text fn-m0">{t('Сумма лимитов по категориям ({amount}) больше общего бюджета.', { amount: fmtMoney(sumLimits, main) })}</p>}
       </section>
 
       {noLimit.length > 0 && (
         <section className="card fn-panel">
           <div className="fn-panel-head">
-            <h3>Без лимита</h3>
+            <h3>{t('Без лимита')}</h3>
           </div>
           {noLimit.map((c) => (
             <div key={c.id} className="fn-nolimit">
@@ -148,7 +149,7 @@ export function BudgetTab({ data }: { data: FinanceData }) {
               </button>
               <Money v={s.byCat.get(c.id) ?? 0} cur={main} className="small" />
               <button className="btn btn-sm btn-ghost" onClick={() => setEdit({ categoryId: c.id })}>
-                Лимит
+                {t('Лимит')}
               </button>
             </div>
           ))}
@@ -172,15 +173,15 @@ function BudgetSheet({ data, edit, spentByCat, onClose }: { data: FinanceData; e
 
   const save = () => {
     const v = parseMoneyInput(val);
-    if (!isTotal && !catId) return toast('Выберите категорию');
-    if (!(v > 0)) return toast('Введите сумму лимита');
+    if (!isTotal && !catId) return toast(t('Выберите категорию'));
+    if (!(v > 0)) return toast(t('Введите сумму лимита'));
     setBudget(isTotal ? undefined : catId, v);
     onClose();
   };
 
   return (
     <Sheet
-      title={isTotal ? 'Бюджет на месяц' : cat && !edit.pick ? `Лимит: ${cat.name}` : 'Лимит категории'}
+      title={isTotal ? t('Бюджет на месяц') : cat && !edit.pick ? t('Лимит: {name}', { name: cat.name }) : t('Лимит категории')}
       onClose={onClose}
       actions={
         <>
@@ -192,22 +193,22 @@ function BudgetSheet({ data, edit, spentByCat, onClose }: { data: FinanceData; e
                 onClose();
               }}
             >
-              Убрать
+              {t('Убрать')}
             </button>
           )}
           <span className="grow" />
           <button className="btn" onClick={onClose}>
-            Отмена
+            {t('Отмена')}
           </button>
           <button className="btn btn-primary" onClick={save}>
-            Сохранить
+            {t('Сохранить')}
           </button>
         </>
       }
     >
       {edit.pick && (
         <>
-          <label className="label">Категория</label>
+          <label className="label">{t('Категория')}</label>
           <div className="fn-cat-grid">
             {free.map((c) => (
               <button key={c.id} type="button" className={'fn-cat-cell' + (catId === c.id ? ' active' : '')} style={{ '--c': c.color } as CSSProperties} onClick={() => setCatId(c.id)}>
@@ -218,10 +219,10 @@ function BudgetSheet({ data, edit, spentByCat, onClose }: { data: FinanceData; e
           </div>
         </>
       )}
-      <label className="label">Лимит в месяц, {curSymbol(main)}</label>
+      <label className="label">{t('Лимит в месяц, {cur}', { cur: curSymbol(main) })}</label>
       <AmountInput value={val} onChange={setVal} autoFocus={!edit.pick} onEnter={save} />
-      {!isTotal && catId && <p className="tiny faint">Потрачено в выбранном месяце: {fmtMoney(spentByCat.get(catId) ?? 0, main)}</p>}
-      {isTotal && <p className="tiny faint">Лимит действует на каждый месяц. Суммы в других валютах пересчитываются по курсам из настроек.</p>}
+      {!isTotal && catId && <p className="tiny faint">{t('Потрачено в выбранном месяце: {amount}', { amount: fmtMoney(spentByCat.get(catId) ?? 0, main) })}</p>}
+      {isTotal && <p className="tiny faint">{t('Лимит действует на каждый месяц. Суммы в других валютах пересчитываются по курсам из настроек.')}</p>}
     </Sheet>
   );
 }

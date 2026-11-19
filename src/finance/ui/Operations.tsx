@@ -22,6 +22,7 @@ import {
 import { exportCsv } from '../csv';
 import { dayTitle, Sheet, TxRow } from './common';
 import { DEFAULT_FILTER, openTxSheet, setFilter, useFinUi, type OpsFilter } from './state';
+import { t, tn } from '../../i18n/index';
 
 const PAGE = 150;
 
@@ -99,8 +100,8 @@ export function Operations({ data }: { data: FinanceData }) {
   const nFilters = (f.accountId ? 1 : 0) + (f.categoryId ? 1 : 0) + (f.period !== 'all' ? 1 : 0);
 
   const exportList = () => {
-    if (!list.length) return toast('Нет операций для выгрузки');
-    void downloadText(exportCsv(data, list), `Финансы ${todayYmd()}.csv`, 'text/csv').catch(() => toast('Не удалось сохранить файл'));
+    if (!list.length) return toast(t('Нет операций для выгрузки'));
+    void downloadText(exportCsv(data, list), t('Финансы {date}.csv', { date: todayYmd() }), 'text/csv').catch(() => toast(t('Не удалось сохранить файл')));
   };
 
   return (
@@ -108,24 +109,24 @@ export function Operations({ data }: { data: FinanceData }) {
       <div className="fn-ops-bar">
         <div className="fn-search">
           <MagnifyingGlass size={16} />
-          <input className="input" placeholder="Поиск по операциям" value={f.q} onChange={(e) => setFilter({ q: e.target.value })} />
+          <input className="input" placeholder={t('Поиск по операциям')} value={f.q} onChange={(e) => setFilter({ q: e.target.value })} />
           {f.q && (
-            <button className="fn-search-x" onClick={() => setFilter({ q: '' })} aria-label="Очистить">
+            <button className="fn-search-x" onClick={() => setFilter({ q: '' })} aria-label={t('Очистить')}>
               <X size={15} />
             </button>
           )}
         </div>
-        <button className="icon-btn" onClick={exportList} title="Выгрузить в CSV" aria-label="Выгрузить в CSV">
+        <button className="icon-btn" onClick={exportList} title={t('Выгрузить в CSV')} aria-label={t('Выгрузить в CSV')}>
           <DownloadSimple />
         </button>
       </div>
       <div className="segmented fn-seg-wide">
         {(
           [
-            ['all', 'Все'],
-            ['expense', 'Расходы'],
-            ['income', 'Доходы'],
-            ['transfer', 'Переводы'],
+            ['all', t('Все')],
+            ['expense', t('Расходы')],
+            ['income', t('Доходы')],
+            ['transfer', t('Переводы')],
           ] as const
         ).map(([v, l]) => (
           <button key={v} className={f.type === v ? 'active' : ''} onClick={() => setFilter({ type: v })}>
@@ -136,24 +137,24 @@ export function Operations({ data }: { data: FinanceData }) {
       <div className="fn-ops-sum small">
         <button className={'chip fn-filter-chip' + (nFilters ? ' active' : '')} onClick={() => setFiltersOpen(true)}>
           <FunnelSimple size={15} weight={nFilters ? 'fill' : 'bold'} />
-          Фильтры{nFilters ? ` (${nFilters})` : ''}
+          {t('Фильтры')}{nFilters ? ` (${nFilters})` : ''}
         </button>
         <span className="muted">
-          {list.length} опер.
+          {list.length} {tn(list.length, 'операция', 'операции', 'операций')}
         </span>
         {totals.inc > 0 && <span className="fn-pos">+{fmtMoney(totals.inc, main)}</span>}
         {totals.exp > 0 && <span className="fn-neg">−{fmtMoney(totals.exp, main)}</span>}
         <span className="grow" />
         {(filtered || f.q) && (
           <button className="fn-link small" onClick={() => useFinUi.setState({ filter: DEFAULT_FILTER })}>
-            Сбросить
+            {t('Сбросить')}
           </button>
         )}
       </div>
       {filtersOpen && <FiltersSheet data={data} f={f} onClose={() => setFiltersOpen(false)} />}
 
       {!list.length ? (
-        <div className="empty">{data.transactions.length ? 'Ничего не найдено' : 'Операций пока нет. Нажмите «+», чтобы добавить.'}</div>
+        <div className="empty">{data.transactions.length ? t('Ничего не найдено') : t('Операций пока нет. Нажмите «+», чтобы добавить.')}</div>
       ) : (
         groups.map((g) => (
           <section key={g.date} className="fn-day">
@@ -172,7 +173,7 @@ export function Operations({ data }: { data: FinanceData }) {
       )}
       {list.length > limit && (
         <button className="btn fn-more-btn" onClick={() => setLimit(limit + PAGE)}>
-          Показать ещё
+          {t('Показать ещё')}
         </button>
       )}
     </div>
@@ -184,53 +185,53 @@ function FiltersSheet({ data, f, onClose }: { data: FinanceData; f: OpsFilter; o
   const catOptions = [...sortedCategories(data, 'expense'), ...sortedCategories(data, 'income')];
   return (
     <Sheet
-      title="Фильтры"
+      title={t('Фильтры')}
       onClose={onClose}
       className="fn-filter-sheet"
       actions={
         <>
           <button className="btn" onClick={() => setFilter({ accountId: '', categoryId: '', period: 'all', from: '', to: '' })}>
-            Сбросить
+            {t('Сбросить')}
           </button>
           <button className="btn btn-primary" onClick={onClose}>
-            Готово
+            {t('Готово')}
           </button>
         </>
       }
     >
-      <label className="label">Счёт</label>
+      <label className="label">{t('Счёт')}</label>
       <select className="select" value={f.accountId} onChange={(e) => setFilter({ accountId: e.target.value })}>
-        <option value="">Все счета</option>
+        <option value="">{t('Все счета')}</option>
         {sortedAccounts(data, true).map((a) => (
           <option key={a.id} value={a.id}>
             {a.emoji} {a.name}
           </option>
         ))}
       </select>
-      <label className="label">Категория</label>
+      <label className="label">{t('Категория')}</label>
       <select className="select" value={f.categoryId} onChange={(e) => setFilter({ categoryId: e.target.value })}>
-        <option value="">Все категории</option>
-        <option value="-">Без категории</option>
+        <option value="">{t('Все категории')}</option>
+        <option value="-">{t('Без категории')}</option>
         {catOptions.map((c) => (
           <option key={c.id} value={c.id}>
             {c.emoji} {c.name}
-            {c.kind === 'income' ? ' (доход)' : ''}
+            {c.kind === 'income' ? t(' (доход)') : ''}
           </option>
         ))}
       </select>
-      <label className="label">Период</label>
+      <label className="label">{t('Период')}</label>
       <select className="select" value={f.period} onChange={(e) => setFilter({ period: e.target.value as OpsFilter['period'] })}>
-        <option value="all">За всё время</option>
-        <option value="month">Этот месяц</option>
-        <option value="prev">Прошлый месяц</option>
-        <option value="year">Этот год</option>
-        <option value="custom">Свой период…</option>
+        <option value="all">{t('За всё время')}</option>
+        <option value="month">{t('Этот месяц')}</option>
+        <option value="prev">{t('Прошлый месяц')}</option>
+        <option value="year">{t('Этот год')}</option>
+        <option value="custom">{t('Свой период…')}</option>
       </select>
       {f.period === 'custom' && (
         <div className="fn-filter-dates">
-          <input type="date" className="input" value={f.from} onChange={(e) => setFilter({ from: e.target.value })} aria-label="С" />
+          <input type="date" className="input" value={f.from} onChange={(e) => setFilter({ from: e.target.value })} aria-label={t('С')} />
           <span className="faint">—</span>
-          <input type="date" className="input" value={f.to} onChange={(e) => setFilter({ to: e.target.value })} aria-label="По" />
+          <input type="date" className="input" value={f.to} onChange={(e) => setFilter({ to: e.target.value })} aria-label={t('По')} />
         </div>
       )}
     </Sheet>

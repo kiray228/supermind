@@ -7,6 +7,7 @@ import { SwipeBg } from '../../ui/SwipeBg';
 import '../../ui/dialogs.css';
 import { deleteTransaction } from '../store';
 import { openTxSheet } from './state';
+import { isEn, t } from '../../i18n/index';
 import {
   budgetLevel,
   COLORS,
@@ -30,7 +31,7 @@ export function Sheet(props: { title: ReactNode; onClose: () => void; children: 
         <div className="row fn-modal-head">
           <h2 className="grow ellipsis">{title}</h2>
           {head}
-          <button className="icon-btn" onClick={onClose} aria-label="Закрыть">
+          <button className="icon-btn" onClick={onClose} aria-label={t('Закрыть')}>
             <X />
           </button>
         </div>
@@ -65,10 +66,11 @@ export function Progress({ spent, limit, thin }: { spent: number; limit: number;
 }
 
 export function dayTitle(ymd: string): string {
-  const t = todayYmd();
-  if (ymd === t) return 'Сегодня';
-  if (ymd === addDaysYmd(t, -1)) return 'Вчера';
-  return `${dateLong(ymd)}, ${WD_SHORT[fromYmd(ymd).getDay()]}`;
+  const today = todayYmd();
+  if (ymd === today) return t('Сегодня');
+  if (ymd === addDaysYmd(today, -1)) return t('Вчера');
+  const wd = WD_SHORT[fromYmd(ymd).getDay()];
+  return isEn ? `${wd}, ${dateLong(ymd)}` : `${dateLong(ymd)}, ${wd}`;
 }
 
 /** Лист действий снизу (долгое нажатие / правая кнопка на строке). Выводится в body — вне сдвигаемой строки */
@@ -97,7 +99,7 @@ export function ActionSheet({ title, items, onClose }: { title?: ReactNode; item
           ))}
         </div>
         <button className="dlg-as-btn dlg-as-cancel" onClick={onClose}>
-          Отмена
+          {t('Отмена')}
         </button>
       </div>
     </div>,
@@ -128,12 +130,12 @@ export function TxRow(props: TxRowProps) {
       </div>
       {menu && (
         <ActionSheet
-          title={tx.note || (tx.categoryId ? props.cats.get(tx.categoryId)?.name : '') || (tx.type === 'transfer' ? 'Перевод' : 'Операция')}
+          title={tx.note || (tx.categoryId ? props.cats.get(tx.categoryId)?.name : '') || (tx.type === 'transfer' ? t('Перевод') : t('Операция'))}
           onClose={() => setMenu(false)}
           items={[
-            { label: 'Изменить', run: () => openTxSheet({ tx }) },
-            { label: 'Дублировать', run: () => duplicateTx(tx) },
-            { label: 'Удалить', danger: true, run: () => deleteTransaction(tx.id) },
+            { label: t('Изменить'), run: () => openTxSheet({ tx }) },
+            { label: t('Дублировать'), run: () => duplicateTx(tx) },
+            { label: t('Удалить'), danger: true, run: () => deleteTransaction(tx.id) },
           ]}
         />
       )}
@@ -156,7 +158,7 @@ function TxRowBody(props: TxRowProps & { className?: string; style?: CSSProperti
           <ArrowsLeftRight size={17} />
         </span>
         <span className="fn-tx-main">
-          <span className="fn-tx-title ellipsis">{tx.note || 'Перевод'}</span>
+          <span className="fn-tx-title ellipsis">{tx.note || t('Перевод')}</span>
           <span className="fn-tx-sub ellipsis">
             {acc?.name ?? '—'} → {to?.name ?? '—'}
             {showDate ? ' · ' + dayTitle(tx.date) : ''}
@@ -169,12 +171,12 @@ function TxRowBody(props: TxRowProps & { className?: string; style?: CSSProperti
       </button>
     );
   }
-  const sub = [cat && tx.note ? cat.name : '', tx.splitId ? 'часть покупки' : '', acc?.name, showDate ? dayTitle(tx.date) : '', tx.time, ...tx.tags.map((g) => '#' + g)].filter(Boolean).join(' · ');
+  const sub = [cat && tx.note ? cat.name : '', tx.splitId ? t('часть покупки') : '', acc?.name, showDate ? dayTitle(tx.date) : '', tx.time, ...tx.tags.map((g) => '#' + g)].filter(Boolean).join(' · ');
   return (
     <button {...btn}>
       <CatIcon emoji={cat?.emoji ?? (tx.type === 'income' ? '💰' : '📦')} color={cat?.color ?? '#64748b'} />
       <span className="fn-tx-main">
-        <span className="fn-tx-title ellipsis">{tx.note || cat?.name || 'Без категории'}</span>
+        <span className="fn-tx-title ellipsis">{tx.note || cat?.name || t('Без категории')}</span>
         <span className="fn-tx-sub ellipsis">{sub}</span>
       </span>
       <span className={'fn-tx-amt' + (tx.type === 'income' ? ' is-income' : '')}>
@@ -203,7 +205,7 @@ export function CurrencySelect({ value, onChange, className }: { value: string; 
 export function EmojiPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <div className="fn-emoji-pick">
-      <input className="input fn-emoji-input" value={value} onChange={(e) => onChange([...e.target.value].slice(-2).join(''))} aria-label="Эмодзи" />
+      <input className="input fn-emoji-input" value={value} onChange={(e) => onChange([...e.target.value].slice(-2).join(''))} aria-label={t('Эмодзи')} />
       <div className="fn-emoji-grid">
         {EMOJIS.map((e) => (
           <button type="button" key={e} className={'fn-emoji' + (e === value ? ' active' : '')} onClick={() => onChange(e)}>
@@ -264,13 +266,13 @@ export function AmountInput(props: { value: string; onChange: (v: string) => voi
 export function Stepper({ label, onPrev, onNext, onLabel }: { label: ReactNode; onPrev: () => void; onNext: () => void; onLabel?: () => void }) {
   return (
     <div className="fn-stepper">
-      <button className="icon-btn" onClick={onPrev} aria-label="Назад">
+      <button className="icon-btn" onClick={onPrev} aria-label={t('Назад')}>
         <CaretLeft />
       </button>
       <button className="fn-stepper-label" onClick={onLabel} disabled={!onLabel}>
         {label}
       </button>
-      <button className="icon-btn" onClick={onNext} aria-label="Вперёд">
+      <button className="icon-btn" onClick={onNext} aria-label={t('Вперёд')}>
         <CaretRight />
       </button>
     </div>

@@ -4,6 +4,7 @@
  */
 import { addDaysYmd } from '../utils/mapTasks';
 import { goalProgress, goalsDueBetween, type GoalsData, type TaskLookup } from './model';
+import { t } from '../i18n/index';
 
 export interface GoalReminder {
   /** ключ для id уведомления */
@@ -18,7 +19,7 @@ export interface GoalReminder {
 /** за сколько дней до срока напоминать */
 export const GOAL_REMIND_DAYS = [7, 1, 0] as const;
 
-const WHEN: Record<(typeof GOAL_REMIND_DAYS)[number], string> = { 7: 'Через неделю срок', 1: 'Завтра срок', 0: 'Сегодня срок' };
+const WHEN: Record<(typeof GOAL_REMIND_DAYS)[number], string> = { 7: t('Через неделю срок'), 1: t('Завтра срок'), 0: t('Сегодня срок') };
 
 /** Напоминания, приходящиеся на дни [from, to] */
 export function goalReminders(d: GoalsData | null | undefined, look: TaskLookup, from: string, to: string): GoalReminder[] {
@@ -37,13 +38,15 @@ export function goalReminders(d: GoalsData | null | undefined, look: TaskLookup,
       const body =
         due.kind === 'goal'
           ? pct > 0
-            ? `Прогресс ${pct}% — ${off ? 'ещё есть время сделать шаг' : 'отметьте, что сделано'}`
+            ? off
+              ? t('Прогресс {pct}% — ещё есть время сделать шаг', { pct })
+              : t('Прогресс {pct}% — отметьте, что сделано', { pct })
             : off
-              ? 'Пора начать: выберите первый шаг'
-              : 'Загляните в цель: перенести срок или отметить сделанное'
+              ? t('Пора начать: выберите первый шаг')
+              : t('Загляните в цель: перенести срок или отметить сделанное')
           : off
-            ? 'Этап цели — отметьте шаги, когда сделаете'
-            : 'Этап цели — сегодня последний день';
+            ? t('Этап цели — отметьте шаги, когда сделаете')
+            : t('Этап цели — сегодня последний день');
       out.push({ key: `goal|${due.id}|${due.date}|${off}`, day, goalId: due.goalId, title: `${due.emoji || '🎯'} ${WHEN[off]}: ${due.title}`, body });
     }
   }

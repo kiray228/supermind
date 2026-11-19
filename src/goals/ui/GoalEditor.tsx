@@ -24,10 +24,11 @@ import {
 import { addGoal, openGoal, updateGoal } from '../store';
 import { Sheet } from './parts';
 import { SavingsFields } from './Savings';
+import { LOCALE, t } from '../../i18n/index';
 
 /** Последний символ строки (эмодзи из нескольких кодов не разрываются) */
 function lastGrapheme(s: string): string {
-  const parts = [...new Intl.Segmenter('ru', { granularity: 'grapheme' }).segment(s.trim())];
+  const parts = [...new Intl.Segmenter(LOCALE, { granularity: 'grapheme' }).segment(s.trim())];
   return parts.length ? parts[parts.length - 1].segment : '';
 }
 
@@ -72,12 +73,12 @@ export function GoalEditor({ data, goal, preset, onClose }: { data: GoalsData; g
   /** Собрать копилку (новый счёт создаётся здесь же). null — ошибка уже показана */
   const buildSavings = (): GoalSavings | null => {
     if (!fin) {
-      toast('Финансы ещё загружаются');
+      toast(t('Финансы ещё загружаются'));
       return null;
     }
     const amount = parseMoneyInput(sv.amount);
     if (!(amount > 0)) {
-      toast('Укажите, сколько нужно накопить');
+      toast(t('Укажите, сколько нужно накопить'));
       return null;
     }
     if (sv.accountId === NEW_SAVINGS_ACCOUNT) {
@@ -88,7 +89,7 @@ export function GoalEditor({ data, goal, preset, onClose }: { data: GoalsData; g
     }
     const acc = fin.accounts.find((a) => a.id === sv.accountId);
     if (!acc) {
-      toast('Выберите счёт-копилку');
+      toast(t('Выберите счёт-копилку'));
       return null;
     }
     const base = savingsBase(sv, sv0, accountBalance(fin, acc.id));
@@ -113,10 +114,10 @@ export function GoalEditor({ data, goal, preset, onClose }: { data: GoalsData; g
   };
 
   const save = () => {
-    if (!title.trim()) return toast('Введите название цели');
-    if (deadline && start && deadline < start) return toast('Срок не может быть раньше начала');
+    if (!title.trim()) return toast(t('Введите название цели'));
+    if (deadline && start && deadline < start) return toast(t('Срок не может быть раньше начала'));
     const target: GoalTarget = { start: num(tf.start), target: num(tf.target), current: num(tf.current), unit: tf.unit.trim(), step: num(tf.step, 1) };
-    if (mode === 'target' && target.target === target.start) return toast('Целевое значение должно отличаться от начального');
+    if (mode === 'target' && target.target === target.start) return toast(t('Целевое значение должно отличаться от начального'));
     let savings: GoalSavings | null = null;
     if (mode === 'savings' && !(savings = buildSavings())) return;
     const patch: Partial<Goal> = {
@@ -145,7 +146,7 @@ export function GoalEditor({ data, goal, preset, onClose }: { data: GoalsData; g
   const areas = sortedAreas(data);
 
   return (
-    <Sheet onClose={onClose} className="gl-editor" title={goal ? 'Изменить цель' : 'Новая цель'}>
+    <Sheet onClose={onClose} className="gl-editor" title={goal ? t('Изменить цель') : t('Новая цель')}>
       <div className="gl-title-row">
         <span className="gl-emoji-big" aria-hidden>
           {emoji || '🎯'}
@@ -153,7 +154,7 @@ export function GoalEditor({ data, goal, preset, onClose }: { data: GoalsData; g
         <input
           className="input grow"
           value={title}
-          placeholder="Например, Пробежать полумарафон"
+          placeholder={t('Например, Пробежать полумарафон')}
           onChange={(e) => setTitle(e.target.value)}
           autoFocus={!goal}
           maxLength={200}
@@ -165,16 +166,16 @@ export function GoalEditor({ data, goal, preset, onClose }: { data: GoalsData; g
             {e}
           </button>
         ))}
-        <input className="gl-emoji gl-emoji-input" value={GOAL_EMOJIS.includes(emoji) ? '' : emoji} placeholder="✎" aria-label="Свой значок" onChange={(e) => setEmoji(lastGrapheme(e.target.value))} />
+        <input className="gl-emoji gl-emoji-input" value={GOAL_EMOJIS.includes(emoji) ? '' : emoji} placeholder="✎" aria-label={t('Свой значок')} onChange={(e) => setEmoji(lastGrapheme(e.target.value))} />
       </div>
 
-      <label className="label">Зачем мне это</label>
-      <textarea className="textarea gl-why-input" value={why} placeholder="Что изменится, когда я достигну цели? Почему это важно?" onChange={(e) => setWhy(e.target.value)} rows={3} />
+      <label className="label">{t('Зачем мне это')}</label>
+      <textarea className="textarea gl-why-input" value={why} placeholder={t('Что изменится, когда я достигну цели? Почему это важно?')} onChange={(e) => setWhy(e.target.value)} rows={3} />
 
-      <label className="label">Сфера жизни</label>
+      <label className="label">{t('Сфера жизни')}</label>
       <div className="gl-chips">
         <button type="button" className={'chip' + (!areaId ? ' active' : '')} onClick={() => setAreaId(undefined)}>
-          Без сферы
+          {t('Без сферы')}
         </button>
         {areas.map((a) => (
           <button
@@ -189,7 +190,7 @@ export function GoalEditor({ data, goal, preset, onClose }: { data: GoalsData; g
         ))}
       </div>
 
-      <label className="label">Период</label>
+      <label className="label">{t('Период')}</label>
       <div className="gl-chips">
         {PERIODS.map((p) => (
           <button key={p.v} type="button" className={'chip' + (period === p.v ? ' active' : '')} onClick={() => pickPeriod(p.v, 0)}>
@@ -200,25 +201,25 @@ export function GoalEditor({ data, goal, preset, onClose }: { data: GoalsData; g
       {period !== 'custom' && (
         <div className="segmented gl-shift">
           <button type="button" className={shift === 0 ? 'active' : ''} onClick={() => pickPeriod(period, 0)}>
-            {period === 'year' ? 'Этот год' : period === 'quarter' ? 'Этот квартал' : period === 'month' ? 'Этот месяц' : 'Эта неделя'}
+            {period === 'year' ? t('Этот год') : period === 'quarter' ? t('Этот квартал') : period === 'month' ? t('Этот месяц') : t('Эта неделя')}
           </button>
           <button type="button" className={shift === 1 ? 'active' : ''} onClick={() => pickPeriod(period, 1)}>
-            {period === 'year' ? 'Следующий' : period === 'quarter' ? 'Следующий' : period === 'month' ? 'Следующий' : 'Следующая'}
+            {period === 'week' ? t('Следующая') : t('Следующий')}
           </button>
         </div>
       )}
       <div className="gl-grid2">
         <div>
-          <label className="label">Начало</label>
+          <label className="label">{t('Начало')}</label>
           <input className="input" type="date" value={start} onChange={(e) => setStart(e.target.value)} />
         </div>
         <div>
-          <label className="label">Срок</label>
+          <label className="label">{t('Срок')}</label>
           <input className="input" type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
         </div>
       </div>
 
-      <label className="label">Важность</label>
+      <label className="label">{t('Важность')}</label>
       <div className="gl-chips">
         {GOAL_PRIORITIES.map((p) => (
           <button key={p.v} type="button" className={'chip' + (priority === p.v ? ' active' : '')} onClick={() => setPriority(p.v)}>
@@ -228,7 +229,7 @@ export function GoalEditor({ data, goal, preset, onClose }: { data: GoalsData; g
         ))}
       </div>
 
-      <label className="label">Как считать прогресс</label>
+      <label className="label">{t('Как считать прогресс')}</label>
       <div className="gl-modes">
         {MODES.map((m) => (
           <button key={m.v} type="button" className={'gl-mode' + (m.v === 'savings' ? ' is-wide' : '') + (mode === m.v ? ' active' : '')} onClick={() => pickMode(m.v)}>
@@ -240,24 +241,24 @@ export function GoalEditor({ data, goal, preset, onClose }: { data: GoalsData; g
       {mode === 'target' && (
         <div className="gl-grid2 gl-target-fields">
           <div>
-            <label className="label">Начальное</label>
+            <label className="label">{t('Начальное')}</label>
             <input className="input" inputMode="decimal" value={tf.start} onChange={tfSet('start')} />
           </div>
           <div>
-            <label className="label">Цель</label>
+            <label className="label">{t('Цель')}</label>
             <input className="input" inputMode="decimal" value={tf.target} onChange={tfSet('target')} />
           </div>
           <div>
-            <label className="label">Единица</label>
-            <input className="input" value={tf.unit} placeholder="книг, км, ₽…" onChange={tfSet('unit')} />
+            <label className="label">{t('Единица')}</label>
+            <input className="input" value={tf.unit} placeholder={t('книг, км, ₽…')} onChange={tfSet('unit')} />
           </div>
           <div>
-            <label className="label">Шаг кнопок ±</label>
+            <label className="label">{t('Шаг кнопок ±')}</label>
             <input className="input" inputMode="decimal" value={tf.step} onChange={tfSet('step')} />
           </div>
           {goal && (
             <div>
-              <label className="label">Сейчас</label>
+              <label className="label">{t('Сейчас')}</label>
               <input className="input" inputMode="decimal" value={tf.current} onChange={tfSet('current')} />
             </div>
           )}
@@ -267,10 +268,10 @@ export function GoalEditor({ data, goal, preset, onClose }: { data: GoalsData; g
 
       <div className="modal-actions">
         <button className="btn btn-ghost" onClick={onClose}>
-          Отмена
+          {t('Отмена')}
         </button>
         <button className="btn btn-primary" onClick={save}>
-          {goal ? 'Сохранить' : 'Создать цель'}
+          {goal ? t('Сохранить') : t('Создать цель')}
         </button>
       </div>
     </Sheet>

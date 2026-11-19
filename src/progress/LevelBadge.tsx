@@ -2,7 +2,7 @@ import { useId } from 'react';
 import type { ReactNode } from 'react';
 import { useApp } from '../store/appStore';
 import { Flame } from '@phosphor-icons/react';
-import { plural } from '../tasks/model';
+import { LOCALE, t, tn } from '../i18n/index';
 import { useProgress } from './hooks';
 import './level.css';
 
@@ -55,7 +55,10 @@ export function LevelBadge({ compact = false, onClick, className = '' }: { compa
       type="button"
       className={`lvl-badge${compact ? ' compact' : ''} ${className}`}
       onClick={onClick ?? (() => useApp.getState().go('progress'))}
-      title={`Уровень ${lv.level} · ${lv.title} · ${lv.xp.toLocaleString('ru-RU')} XP${streak ? ` · серия ${streak} ${plural(streak, 'день', 'дня', 'дней')}` : ''}`}
+      title={
+        t('Уровень {n} · {title} · {xp} XP', { n: lv.level, title: lv.title, xp: lv.xp.toLocaleString(LOCALE) }) +
+        (streak ? t(' · серия {n} {days}', { n: streak, days: tn(streak, 'день', 'дня', 'дней') }) : '')
+      }
     >
       <LevelRing pct={lv.pct} size={compact ? 24 : 28} stroke={3}>
         <b>{lv.level}</b>
@@ -63,11 +66,11 @@ export function LevelBadge({ compact = false, onClick, className = '' }: { compa
       {!compact && (
         <span className="lvl-badge-text">
           <span className="lvl-badge-title">{lv.title}</span>
-          <span className="lvl-badge-xp">{lv.cur.toLocaleString('ru-RU')} / {lv.need.toLocaleString('ru-RU')} XP</span>
+          <span className="lvl-badge-xp">{lv.cur.toLocaleString(LOCALE)} / {lv.need.toLocaleString(LOCALE)} XP</span>
         </span>
       )}
       {streak > 0 && (
-        <span className="lvl-badge-streak" aria-label={`Серия ${streak} ${plural(streak, 'день', 'дня', 'дней')}`}>
+        <span className="lvl-badge-streak" aria-label={t('Серия {n} {days}', { n: streak, days: tn(streak, 'день', 'дня', 'дней') })}>
           <Flame size={13} weight="fill" />
           {streak}
         </span>

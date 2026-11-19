@@ -24,6 +24,7 @@ import {
 } from '../model';
 import { deleteSubscription, paySubscription, saveSubscription, skipSubscription } from '../store';
 import { AmountInput, CatIcon, CurTotals, Money, Sheet, useToday } from './common';
+import { LOCALE, t } from '../../i18n/index';
 
 // ================= Подписки и регулярные платежи =================
 
@@ -32,7 +33,7 @@ export function SubscriptionsSection({ data }: { data: FinanceData }) {
   const [edit, setEdit] = useState<Subscription | 'new' | null>(null);
   const accs = useMemo(() => accountMap(data), [data]);
   const cats = useMemo(() => categoryMap(data), [data]);
-  const list = [...data.subscriptions].sort((a, b) => Number(b.active) - Number(a.active) || (a.nextDate ?? '').localeCompare(b.nextDate ?? '') || a.name.localeCompare(b.name, 'ru'));
+  const list = [...data.subscriptions].sort((a, b) => Number(b.active) - Number(a.active) || (a.nextDate ?? '').localeCompare(b.nextDate ?? '') || a.name.localeCompare(b.name, LOCALE));
   const main = data.prefs.mainCurrency;
 
   // стоимость в месяц: по валютам и общий итог (доходы — отдельно)
@@ -59,18 +60,20 @@ export function SubscriptionsSection({ data }: { data: FinanceData }) {
   return (
     <div className="fn-stack">
       <div className="card fn-panel">
-        <span className="tiny faint">Регулярные платежи в месяц</span>
+        <span className="tiny faint">{t('Регулярные платежи в месяц')}</span>
         <div className="fn-budget-big">{Object.keys(monthly).length > 1 && !missing ? <Money v={total} cur={main} /> : <CurTotals totals={monthly} />}</div>
         {Object.keys(monthly).length > 1 && !missing && <CurTotals totals={monthly} className="small muted" />}
         {/* в год: одна валюта — в ней же; несколько — только если все курсы известны */}
         {(Object.keys(monthly).length <= 1 || !missing) && (
           <span className="tiny faint">
-            ≈ {Object.keys(monthly).length === 1 ? fmtMoney(Object.values(monthly)[0] * 12, Object.keys(monthly)[0], { compact: true }) : fmtMoney(total * 12, main, { compact: true })} в год
+            {t('≈ {amount} в год', {
+              amount: Object.keys(monthly).length === 1 ? fmtMoney(Object.values(monthly)[0] * 12, Object.keys(monthly)[0], { compact: true }) : fmtMoney(total * 12, main, { compact: true }),
+            })}
           </span>
         )}
         {Object.keys(incomeMonthly).length > 0 && (
           <span className="small fn-pos">
-            Регулярные доходы: <CurTotals totals={incomeMonthly} className="fn-inline" /> в месяц
+            {t('Регулярные доходы в месяц:')} <CurTotals totals={incomeMonthly} className="fn-inline" />
           </span>
         )}
       </div>
@@ -86,23 +89,27 @@ export function SubscriptionsSection({ data }: { data: FinanceData }) {
                 <span className="grow fn-tx-main">
                   <span className="fn-tx-title ellipsis">{s.name}</span>
                   <span className={'fn-tx-sub ellipsis' + (overdue ? ' fn-neg' : '')}>
-                    {s.active ? `${overdue ? 'просрочен: ' : 'след. '}${dateShort(s.nextDate)}` : 'приостановлен'} · {periodText(s)}
+                    {s.active ? (overdue ? t('просрочен: {date}', { date: dateShort(s.nextDate) }) : t('след. {date}', { date: dateShort(s.nextDate) })) : t('приостановлен')} · {periodText(s)}
                   </span>
                 </span>
                 <Money v={s.amount} cur={a?.currency ?? main} className={'small' + (s.income ? ' fn-pos' : '')} />
               </button>
               {s.active && (
                 <button className="btn btn-sm fn-pay-btn" onClick={() => paySubscription(s.id)}>
-                  {s.income ? 'Получено' : 'Оплачено'}
+                  {s.income ? t('Получено') : t('Оплачено')}
                 </button>
               )}
             </div>
           );
         })}
-        {!list.length && <p className="muted small fn-pad">Добавьте подписки, аренду, кредит, связь — и зарплату: приложение напомнит о платеже или поступлении и посчитает, сколько уходит и приходит в месяц.</p>}
+        {!list.length && (
+          <p className="muted small fn-pad">
+            {t('Добавьте подписки, аренду, кредит, связь — и зарплату: приложение напомнит о платеже или поступлении и посчитает, сколько уходит и приходит в месяц.')}
+          </p>
+        )}
       </div>
       <button className="btn btn-primary fn-self-start" onClick={() => setEdit('new')}>
-        <Plus size={16} /> Новый платёж
+        <Plus size={16} /> {t('Новый платёж')}
       </button>
       {edit && <SubSheet data={data} sub={edit === 'new' ? null : edit} onClose={() => setEdit(null)} />}
     </div>
@@ -128,10 +135,10 @@ function SubSheet({ data, sub, onClose }: { data: FinanceData; sub: Subscription
 
   const save = () => {
     const v = parseMoneyInput(amount);
-    if (!name.trim()) return toast('Введите название');
-    if (!(v > 0)) return toast('Введите сумму');
-    if (!accountId) return toast('Выберите счёт');
-    if (!nextDate) return toast('Укажите дату платежа');
+    if (!name.trim()) return toast(t('Введите название'));
+    if (!(v > 0)) return toast(t('Введите сумму'));
+    if (!accountId) return toast(t('Выберите счёт'));
+    if (!nextDate) return toast(t('Укажите дату платежа'));
     const p: SubPeriod = period === 'months' ? 'month' : period;
     const n = period === 'months' ? Math.max(1, Math.round(Number(every) || 1)) : 1;
     // день месяца сохраняем, чтобы 31-е не «сползало» после коротких месяцев
@@ -158,28 +165,28 @@ function SubSheet({ data, sub, onClose }: { data: FinanceData; sub: Subscription
 
   const remove = async () => {
     if (!sub) return;
-    if (!(await confirmDialog(`Удалить «${sub.name}»?`, 'Уже записанные платежи останутся в операциях.', { okText: 'Удалить', danger: true }))) return;
+    if (!(await confirmDialog(t('Удалить «{name}»?', { name: sub.name }), t('Уже записанные платежи останутся в операциях.'), { okText: t('Удалить'), danger: true }))) return;
     deleteSubscription(sub.id);
     onClose();
   };
 
   return (
     <Sheet
-      title={sub ? (income ? 'Регулярный доход' : 'Регулярный платёж') : income ? 'Новый регулярный доход' : 'Новый регулярный платёж'}
+      title={sub ? (income ? t('Регулярный доход') : t('Регулярный платёж')) : income ? t('Новый регулярный доход') : t('Новый регулярный платёж')}
       onClose={onClose}
       actions={
         <>
           {sub && (
             <button className="btn btn-ghost btn-danger" onClick={() => void remove()}>
-              Удалить
+              {t('Удалить')}
             </button>
           )}
           <span className="grow" />
           <button className="btn" onClick={onClose}>
-            Отмена
+            {t('Отмена')}
           </button>
           <button className="btn btn-primary" onClick={save}>
-            Сохранить
+            {t('Сохранить')}
           </button>
         </>
       }
@@ -192,7 +199,7 @@ function SubSheet({ data, sub, onClose }: { data: FinanceData; sub: Subscription
             if (categoryId && !sortedCategories(data, 'expense').some((c) => c.id === categoryId)) setCategoryId('');
           }}
         >
-          Расход
+          {t('Расход')}
         </button>
         <button
           className={income ? 'active' : ''}
@@ -201,42 +208,42 @@ function SubSheet({ data, sub, onClose }: { data: FinanceData; sub: Subscription
             if (categoryId && !sortedCategories(data, 'income').some((c) => c.id === categoryId)) setCategoryId('');
           }}
         >
-          Доход
+          {t('Доход')}
         </button>
       </div>
-      <label className="label">Название</label>
-      <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder={income ? 'Зарплата, аванс, аренда…' : 'Netflix, аренда, кредит…'} autoFocus={!sub} />
+      <label className="label">{t('Название')}</label>
+      <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder={income ? t('Зарплата, аванс, аренда…') : t('Netflix, аренда, кредит…')} autoFocus={!sub} />
       <div className="fn-grid2">
         <div>
-          <label className="label">Сумма, {curSymbol(cur)}</label>
+          <label className="label">{t('Сумма, {cur}', { cur: curSymbol(cur) })}</label>
           <AmountInput value={amount} onChange={setAmount} onEnter={save} />
         </div>
         <div>
-          <label className="label">{income ? 'Следующее поступление' : 'Следующий платёж'}</label>
+          <label className="label">{income ? t('Следующее поступление') : t('Следующий платёж')}</label>
           <input type="date" className="input" value={nextDate} onChange={(e) => setNextDate(e.target.value)} />
         </div>
         <div>
-          <label className="label">Периодичность</label>
+          <label className="label">{t('Периодичность')}</label>
           <select className="select" value={period} onChange={(e) => setPeriod(e.target.value as PeriodOpt)}>
-            <option value="week">Каждую неделю</option>
-            <option value="month">Каждый месяц</option>
-            <option value="months">Раз в N месяцев</option>
-            <option value="year">Каждый год</option>
+            <option value="week">{t('Каждую неделю')}</option>
+            <option value="month">{t('Каждый месяц')}</option>
+            <option value="months">{t('Раз в N месяцев')}</option>
+            <option value="year">{t('Каждый год')}</option>
           </select>
         </div>
         {period === 'months' ? (
           <div>
-            <label className="label">Каждые N месяцев</label>
+            <label className="label">{t('Каждые N месяцев')}</label>
             <input className="input" inputMode="numeric" value={every} onChange={(e) => setEvery(e.target.value.replace(/\D/g, ''))} />
           </div>
         ) : (
           <div>
-            <label className="label">Напомнить</label>
+            <label className="label">{t('Напомнить')}</label>
             <RemindSelect value={remindDays} onChange={setRemindDays} />
           </div>
         )}
         <div>
-          <label className="label">Счёт</label>
+          <label className="label">{t('Счёт')}</label>
           <select className="select" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
             {accounts.map((a) => (
               <option key={a.id} value={a.id}>
@@ -246,9 +253,9 @@ function SubSheet({ data, sub, onClose }: { data: FinanceData; sub: Subscription
           </select>
         </div>
         <div>
-          <label className="label">Категория</label>
+          <label className="label">{t('Категория')}</label>
           <select className="select" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-            <option value="">Без категории</option>
+            <option value="">{t('Без категории')}</option>
             {sortedCategories(data, income ? 'income' : 'expense').map((c) => (
               <option key={c.id} value={c.id}>
                 {c.emoji} {c.name}
@@ -258,27 +265,27 @@ function SubSheet({ data, sub, onClose }: { data: FinanceData; sub: Subscription
         </div>
         {period === 'months' && (
           <div>
-            <label className="label">Напомнить</label>
+            <label className="label">{t('Напомнить')}</label>
             <RemindSelect value={remindDays} onChange={setRemindDays} />
           </div>
         )}
       </div>
-      <label className="label">Заметка</label>
+      <label className="label">{t('Заметка')}</label>
       <input className="input" value={note} onChange={(e) => setNote(e.target.value)} />
       <label className="row fn-check">
         <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
-        <span>Активен</span>
+        <span>{t('Активен')}</span>
       </label>
       {sub?.active && (
         <button
           className="fn-link small"
           onClick={() => {
             skipSubscription(sub.id);
-            toast('Платёж пропущен');
+            toast(t('Платёж пропущен'));
             onClose();
           }}
         >
-          Пропустить ближайший платёж ({dateShort(sub.nextDate)})
+          {t('Пропустить ближайший платёж ({date})', { date: dateShort(sub.nextDate) })}
         </button>
       )}
     </Sheet>
@@ -288,12 +295,12 @@ function SubSheet({ data, sub, onClose }: { data: FinanceData; sub: Subscription
 function RemindSelect({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   return (
     <select className="select" value={value} onChange={(e) => onChange(Number(e.target.value))}>
-      <option value={-1}>Не напоминать</option>
-      <option value={0}>В день платежа</option>
-      <option value={1}>За 1 день</option>
-      <option value={2}>За 2 дня</option>
-      <option value={3}>За 3 дня</option>
-      <option value={7}>За неделю</option>
+      <option value={-1}>{t('Не напоминать')}</option>
+      <option value={0}>{t('В день платежа')}</option>
+      <option value={1}>{t('За 1 день')}</option>
+      <option value={2}>{t('За 2 дня')}</option>
+      <option value={3}>{t('За 3 дня')}</option>
+      <option value={7}>{t('За неделю')}</option>
     </select>
   );
 }

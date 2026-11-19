@@ -3,6 +3,7 @@
  * Все суммы — числа в основных единицах (тенге, рубли…) с точностью до копеек.
  */
 import { addDaysYmd, fromYmd, toYmd } from '../utils/mapTasks';
+import { isEn, LOCALE, t } from '../i18n/index';
 
 export type TxType = 'expense' | 'income' | 'transfer';
 export type CatKind = 'expense' | 'income';
@@ -140,22 +141,22 @@ export const ENTITY_KEYS: EntityKey[] = ['accounts', 'transactions', 'categories
 // ---------- Валюты и деньги ----------
 
 export const CURRENCIES: { code: string; symbol: string; name: string }[] = [
-  { code: 'KZT', symbol: '₸', name: 'Тенге' },
-  { code: 'RUB', symbol: '₽', name: 'Рубль' },
-  { code: 'USD', symbol: '$', name: 'Доллар США' },
-  { code: 'EUR', symbol: '€', name: 'Евро' },
-  { code: 'UZS', symbol: 'сўм', name: 'Узбекский сум' },
-  { code: 'KGS', symbol: 'сом', name: 'Киргизский сом' },
-  { code: 'UAH', symbol: '₴', name: 'Гривна' },
-  { code: 'BYN', symbol: 'Br', name: 'Белорусский рубль' },
-  { code: 'GEL', symbol: '₾', name: 'Лари' },
-  { code: 'AMD', symbol: '֏', name: 'Драм' },
-  { code: 'AZN', symbol: '₼', name: 'Манат' },
-  { code: 'TRY', symbol: '₺', name: 'Турецкая лира' },
-  { code: 'CNY', symbol: '¥', name: 'Юань' },
-  { code: 'GBP', symbol: '£', name: 'Фунт стерлингов' },
-  { code: 'AED', symbol: 'AED', name: 'Дирхам ОАЭ' },
-  { code: 'THB', symbol: '฿', name: 'Бат' },
+  { code: 'KZT', symbol: '₸', name: t('Тенге') },
+  { code: 'RUB', symbol: '₽', name: t('Рубль') },
+  { code: 'USD', symbol: '$', name: t('Доллар США') },
+  { code: 'EUR', symbol: '€', name: t('Евро') },
+  { code: 'UZS', symbol: 'сўм', name: t('Узбекский сум') },
+  { code: 'KGS', symbol: 'сом', name: t('Киргизский сом') },
+  { code: 'UAH', symbol: '₴', name: t('Гривна') },
+  { code: 'BYN', symbol: 'Br', name: t('Белорусский рубль') },
+  { code: 'GEL', symbol: '₾', name: t('Лари') },
+  { code: 'AMD', symbol: '֏', name: t('Драм') },
+  { code: 'AZN', symbol: '₼', name: t('Манат') },
+  { code: 'TRY', symbol: '₺', name: t('Турецкая лира') },
+  { code: 'CNY', symbol: '¥', name: t('Юань') },
+  { code: 'GBP', symbol: '£', name: t('Фунт стерлингов') },
+  { code: 'AED', symbol: 'AED', name: t('Дирхам ОАЭ') },
+  { code: 'THB', symbol: '฿', name: t('Бат') },
 ];
 
 export function curSymbol(code: string): string {
@@ -169,18 +170,20 @@ function nf(frac: boolean): Intl.NumberFormat {
   const k = frac ? 'f' : 'i';
   let f = nfCache.get(k);
   if (!f) {
-    f = new Intl.NumberFormat('ru-RU', { minimumFractionDigits: frac ? 2 : 0, maximumFractionDigits: frac ? 2 : 0 });
+    f = new Intl.NumberFormat(LOCALE, { minimumFractionDigits: frac ? 2 : 0, maximumFractionDigits: frac ? 2 : 0 });
     nfCache.set(k, f);
   }
   return f;
 }
 
-const nf1 = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 });
+const nf1 = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 1 });
+/** По-английски разряды тоже пробелами («12 500.50»): запятая сбила бы разбор суммы в поле ввода («12,500» → 12,5) */
+const spaced = (s: string) => (isEn ? s.replace(/,/g, '\u00a0') : s);
 
 /** Число без валюты: «12 500» / «12 500,50» */
 export function fmtNum(x: number): string {
   const v = r2(x);
-  return nf(!Number.isInteger(v)).format(Math.abs(v) < 0.005 ? 0 : v);
+  return spaced(nf(!Number.isInteger(v)).format(Math.abs(v) < 0.005 ? 0 : v));
 }
 
 /** Сумма с валютой. sign — показывать «+» у положительных */
@@ -189,7 +192,7 @@ export function fmtMoney(x: number, cur: string, opts: { sign?: boolean; compact
   let body: string;
   if (opts.compact && Math.abs(v) >= 10000) {
     const a = Math.abs(v);
-    body = a >= 1e6 ? `${nf1.format(a / 1e6)} млн` : `${nf(false).format(Math.round(a / 1000))} тыс.`;
+    body = a >= 1e6 ? t('{n} млн', { n: nf1.format(a / 1e6) }) : t('{n} тыс.', { n: spaced(nf(false).format(Math.round(a / 1000))) });
     body = (v < 0 ? '−' : '') + body;
   } else {
     body = fmtNum(Math.abs(v));
@@ -260,29 +263,29 @@ export const EMOJIS = [
 
 /** Постоянные id: на всех устройствах одинаковые, синхронизация не создаёт дубликатов */
 const DEFAULT_CATS: [string, string, string, string, CatKind][] = [
-  ['c-food', 'Продукты', '🛒', '#22c55e', 'expense'],
-  ['c-cafe', 'Кафе и рестораны', '🍽️', '#f97316', 'expense'],
-  ['c-transport', 'Транспорт', '🚕', '#3b82f6', 'expense'],
-  ['c-home', 'Дом и ЖКХ', '🏠', '#8b5cf6', 'expense'],
-  ['c-mobile', 'Связь и интернет', '📱', '#06b6d4', 'expense'],
-  ['c-health', 'Здоровье', '💊', '#ef4444', 'expense'],
-  ['c-clothes', 'Одежда', '👕', '#ec4899', 'expense'],
-  ['c-fun', 'Развлечения', '🎮', '#a855f7', 'expense'],
-  ['c-subs', 'Подписки', '🔁', '#6366f1', 'expense'],
-  ['c-edu', 'Образование', '📚', '#0ea5e9', 'expense'],
-  ['c-gifts', 'Подарки', '🎁', '#f43f5e', 'expense'],
-  ['c-travel', 'Путешествия', '✈️', '#14b8a6', 'expense'],
-  ['c-beauty', 'Красота', '💅', '#d946ef', 'expense'],
-  ['c-kids', 'Дети', '🧸', '#f59e0b', 'expense'],
-  ['c-pets', 'Животные', '🐾', '#84cc16', 'expense'],
-  ['c-other', 'Другое', '📦', '#64748b', 'expense'],
-  ['i-salary', 'Зарплата', '💼', '#16a34a', 'income'],
-  ['i-side', 'Подработка', '🛠️', '#0ea5e9', 'income'],
-  ['i-gifts', 'Подарки', '🎁', '#f43f5e', 'income'],
-  ['i-cashback', 'Кэшбэк', '💳', '#f59e0b', 'income'],
-  ['i-interest', 'Проценты', '🏦', '#6366f1', 'income'],
-  ['i-sale', 'Продажа', '🏷️', '#14b8a6', 'income'],
-  ['i-other', 'Другое', '💰', '#64748b', 'income'],
+  ['c-food', t('Продукты'), '🛒', '#22c55e', 'expense'],
+  ['c-cafe', t('Кафе и рестораны'), '🍽️', '#f97316', 'expense'],
+  ['c-transport', t('Транспорт'), '🚕', '#3b82f6', 'expense'],
+  ['c-home', t('Дом и ЖКХ'), '🏠', '#8b5cf6', 'expense'],
+  ['c-mobile', t('Связь и интернет'), '📱', '#06b6d4', 'expense'],
+  ['c-health', t('Здоровье'), '💊', '#ef4444', 'expense'],
+  ['c-clothes', t('Одежда'), '👕', '#ec4899', 'expense'],
+  ['c-fun', t('Развлечения'), '🎮', '#a855f7', 'expense'],
+  ['c-subs', t('Подписки'), '🔁', '#6366f1', 'expense'],
+  ['c-edu', t('Образование'), '📚', '#0ea5e9', 'expense'],
+  ['c-gifts', t('Подарки'), '🎁', '#f43f5e', 'expense'],
+  ['c-travel', t('Путешествия'), '✈️', '#14b8a6', 'expense'],
+  ['c-beauty', t('Красота'), '💅', '#d946ef', 'expense'],
+  ['c-kids', t('Дети'), '🧸', '#f59e0b', 'expense'],
+  ['c-pets', t('Животные'), '🐾', '#84cc16', 'expense'],
+  ['c-other', t('Другое'), '📦', '#64748b', 'expense'],
+  ['i-salary', t('Зарплата'), '💼', '#16a34a', 'income'],
+  ['i-side', t('Подработка'), '🛠️', '#0ea5e9', 'income'],
+  ['i-gifts', t('Подарки'), '🎁', '#f43f5e', 'income'],
+  ['i-cashback', t('Кэшбэк'), '💳', '#f59e0b', 'income'],
+  ['i-interest', t('Проценты'), '🏦', '#6366f1', 'income'],
+  ['i-sale', t('Продажа'), '🏷️', '#14b8a6', 'income'],
+  ['i-other', t('Другое'), '💰', '#64748b', 'income'],
 ];
 
 // updatedAt = 1: любая правка пользователя на другом устройстве новее значений по умолчанию
@@ -292,8 +295,8 @@ export function defaultCategories(): Category[] {
 
 export function defaultAccounts(cur = 'KZT'): Account[] {
   return [
-    { id: 'a-cash', name: 'Наличные', emoji: '💵', color: '#22c55e', currency: cur, initial: 0, order: 0, updatedAt: 1 },
-    { id: 'a-card', name: 'Карта', emoji: '💳', color: '#3b82f6', currency: cur, initial: 0, order: 1, updatedAt: 1 },
+    { id: 'a-cash', name: t('Наличные'), emoji: '💵', color: '#22c55e', currency: cur, initial: 0, order: 0, updatedAt: 1 },
+    { id: 'a-card', name: t('Карта'), emoji: '💳', color: '#3b82f6', currency: cur, initial: 0, order: 1, updatedAt: 1 },
   ];
 }
 
@@ -334,10 +337,10 @@ export function normalizeFinance(raw: Partial<FinanceData> | undefined | null): 
 
 // ---------- Даты и периоды ----------
 
-export const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
-export const MONTHS_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
-export const MONTHS_SHORT = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
-export const WD_SHORT = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
+export const MONTHS = [t('Январь'), t('Февраль'), t('Март'), t('Апрель'), t('Май'), t('Июнь'), t('Июль'), t('Август'), t('Сентябрь'), t('Октябрь'), t('Ноябрь'), t('Декабрь')];
+export const MONTHS_GEN = [t('января'), t('февраля'), t('марта'), t('апреля'), t('мая'), t('июня'), t('июля'), t('августа'), t('сентября'), t('октября'), t('ноября'), t('декабря')];
+export const MONTHS_SHORT = [t('янв'), t('фев'), t('мар'), t('апр'), t('май'), t('июн'), t('июл'), t('авг'), t('сен'), t('окт'), t('ноя'), t('дек')];
+export const WD_SHORT = [t('вс'), t('пн'), t('вт'), t('ср'), t('чт'), t('пт'), t('сб')];
 
 export const monthKey = (ymd: string) => ymd.slice(0, 7);
 export const monthStart = (ymd: string) => ymd.slice(0, 7) + '-01';
@@ -367,11 +370,13 @@ export function monthTitle(ymd: string): string {
 export function dateLong(ymd: string): string {
   const d = fromYmd(ymd);
   const y = d.getFullYear() !== new Date().getFullYear() ? ` ${d.getFullYear()}` : '';
+  if (isEn) return `${MONTHS_GEN[d.getMonth()]} ${d.getDate()}${y && ',' + y}`;
   return `${d.getDate()} ${MONTHS_GEN[d.getMonth()]}${y}`;
 }
 export function dateShort(ymd: string): string {
   const d = fromYmd(ymd);
   const y = d.getFullYear() !== new Date().getFullYear() ? ` ${String(d.getFullYear()).slice(2)}` : '';
+  if (isEn) return `${MONTHS_SHORT[d.getMonth()]} ${d.getDate()}${y && ` '${y.trim()}`}`;
   return `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}${y}`;
 }
 
@@ -517,7 +522,7 @@ export function sortedCategories(d: FinanceData, kind: CatKind): Category[] {
   return d.categories.filter((c) => c.kind === kind).sort((a, b) => a.order - b.order);
 }
 export function sortedAccounts(d: FinanceData, withArchived = false): Account[] {
-  return d.accounts.filter((a) => withArchived || !a.archived).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, 'ru'));
+  return d.accounts.filter((a) => withArchived || !a.archived).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, LOCALE));
 }
 
 export function txCurrency(d: FinanceData, t: Transaction, accs = accountMap(d)): string {
@@ -602,9 +607,9 @@ export function advanceSub(s: Pick<Subscription, 'period' | 'every' | 'anchorDay
 
 export function periodText(s: Pick<Subscription, 'period' | 'every'>): string {
   const n = Math.max(1, s.every || 1);
-  if (s.period === 'week') return n === 1 ? 'каждую неделю' : `каждые ${n} нед.`;
-  if (s.period === 'year') return n === 1 ? 'каждый год' : `каждые ${n} г.`;
-  return n === 1 ? 'каждый месяц' : `каждые ${n} мес.`;
+  if (s.period === 'week') return n === 1 ? t('каждую неделю') : t('каждые {n} нед.', { n });
+  if (s.period === 'year') return n === 1 ? t('каждый год') : t('каждые {n} г.', { n });
+  return n === 1 ? t('каждый месяц') : t('каждые {n} мес.', { n });
 }
 
 /** Стоимость подписки в месяц (в её валюте) */
@@ -642,7 +647,7 @@ export function upcomingPayments(data: FinanceData, fromYmd: string, toYmdArg: s
       date = advanceSub(s, date);
     }
   }
-  return out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.title.localeCompare(b.title, 'ru')));
+  return out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.title.localeCompare(b.title, LOCALE)));
 }
 
 // ---------- Долги ----------

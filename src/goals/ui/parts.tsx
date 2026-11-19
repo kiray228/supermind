@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { X } from '@phosphor-icons/react';
 import { useTasks } from '../../tasks/store';
 import { makeTaskLookup, type GoalsData, type LifeArea, type TaskLookup } from '../model';
+import { t } from '../../i18n/index';
 
 /** Поиск задач по id (обновляется вместе с задачами) */
 export function useTaskLookup(): TaskLookup {
@@ -24,7 +25,7 @@ export function Sheet({ onClose, className, children, title, head }: { onClose: 
         {(title || head) && (
           <div className="row gl-modal-head">
             {head ?? <h2 className="grow">{title}</h2>}
-            <button className="icon-btn" onClick={onClose} aria-label="Закрыть">
+            <button className="icon-btn" onClick={onClose} aria-label={t('Закрыть')}>
               <X />
             </button>
           </div>

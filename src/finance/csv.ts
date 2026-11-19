@@ -3,6 +3,7 @@
  */
 import { accountMap, categoryMap, r2, sortTx, type FinanceData, type Transaction } from './model';
 import type { TxDraft } from './store';
+import { t } from '../i18n/index';
 
 /**
  * Разделитель — по первым 20 строкам: тот, что делит больше всего строк на одинаковое число столбцов.
@@ -149,7 +150,7 @@ export function guessColumns(header: string[]): ColumnMap {
   if (amount < 0) amount = find(/сумм|amount|sum|приход|расход|value/);
   // сначала точные слова (продавец, назначение), потом общие («Операция» у Kaspi — лишь «Покупки»/«Пополнения»)
   let description = find(/описан|назначен|детал|description|details|memo|payee|получател|merchant|наимен|контрагент/);
-  if (description < 0 || description === amount || description === date) description = find(/коммент|операц/);
+  if (description < 0 || description === amount || description === date) description = find(/коммент|операц|comment|note/);
   const category = find(/категор|category/);
   if (description === amount || description === date) description = -1;
   const d = date >= 0 ? date : 0;
@@ -291,8 +292,8 @@ export const safeText = (s: string) => (/^[=+\-@\t\r]/.test(s) ? `'${s}` : s);
 export function exportCsv(d: FinanceData, list: Transaction[] = d.transactions): string {
   const accs = accountMap(d);
   const cats = categoryMap(d);
-  const TYPE = { expense: 'Расход', income: 'Доход', transfer: 'Перевод' };
-  const head = ['Дата', 'Время', 'Тип', 'Сумма', 'Валюта', 'Счёт', 'Категория', 'Счёт зачисления', 'Сумма зачисления', 'Комментарий', 'Теги'];
+  const TYPE = { expense: t('Расход'), income: t('Доход'), transfer: t('Перевод') };
+  const head = [t('Дата'), t('Время'), t('Тип'), t('Сумма'), t('Валюта'), t('Счёт'), t('Категория'), t('Счёт зачисления'), t('Сумма зачисления'), t('Комментарий'), t('Теги')];
   const lines = [head.join(';')];
   for (const t of [...list].sort(sortTx)) {
     const a = accs.get(t.accountId);

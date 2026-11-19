@@ -4,6 +4,7 @@ import { blobSync } from '../store/blobSync';
 import { uid } from '../utils/tree';
 import { todayYmd } from '../utils/mapTasks';
 import { toast } from '../store/appStore';
+import { t } from '../i18n/index';
 import { crossRates, fetchUsdRates, ratesStale, usedCurrencies } from './rates';
 import {
   accountMap,
@@ -79,7 +80,7 @@ const store = blobSync<FinanceData>({
   read: () => useFinance.getState().data,
   write: (data) => useFinance.setState({ data }),
   normalize: (raw) => normalizeFinance(raw),
-  onError: () => toast('Не удалось сохранить финансы'),
+  onError: () => toast(t('Не удалось сохранить финансы')),
 });
 
 /** Сохранить отложенные изменения (только если они есть) */
@@ -210,10 +211,10 @@ export function updateTransaction(id: string, patch: Partial<Transaction>) {
 }
 
 export function deleteTransaction(id: string, undo = true) {
-  const t = useFinance.getState().data?.transactions.find((x) => x.id === id);
-  if (!t) return;
+  const tx = useFinance.getState().data?.transactions.find((x) => x.id === id);
+  if (!tx) return;
   patchFinance((d) => ({ ...d, transactions: d.transactions.filter((x) => x.id !== id), gone: { ...(d.gone ?? {}), [id]: Date.now() } }));
-  if (undo) toast('Операция удалена', { label: 'Отменить', run: () => mutateFinance((d) => upsertIn(d, 'transactions', t)) });
+  if (undo) toast(t('Операция удалена'), { label: t('Отменить'), run: () => mutateFinance((d) => upsertIn(d, 'transactions', tx)) });
 }
 
 // ---------- Разделённые покупки ----------
@@ -281,11 +282,11 @@ export function mergeSplit(id: string): number {
 }
 
 /** Сообщение о превышении бюджета, если новая трата выводит категорию или общий бюджет за лимит */
-function budgetAlert(d: FinanceData, t: Transaction): string | null {
+function budgetAlert(d: FinanceData, tx: Transaction): string | null {
   if (!d.budgets.length) return null;
-  const r = { from: monthStart(t.date), to: monthEnd(t.date) };
+  const r = { from: monthStart(tx.date), to: monthEnd(tx.date) };
   const before = summarize(d, r);
-  const after = summarize({ ...d, transactions: [...d.transactions, t] }, r);
+  const after = summarize({ ...d, transactions: [...d.transactions, tx] }, r);
   const main = d.prefs.mainCurrency;
   const msgs: string[] = [];
   const cats = categoryMap(d);
@@ -293,12 +294,15 @@ function budgetAlert(d: FinanceData, t: Transaction): string | null {
     const was = b.categoryId ? (before.byCat.get(b.categoryId) ?? 0) : before.expense;
     const now = b.categoryId ? (after.byCat.get(b.categoryId) ?? 0) : after.expense;
     if (now <= was || budgetLevel(now, b.limit) !== 'over') continue;
-    const name = b.categoryId ? `«${cats.get(b.categoryId)?.name ?? 'Категория'}»` : 'на месяц';
-    msgs.push(`бюджет ${name} превышен на ${fmtMoney(now - b.limit, main)}`);
+    const amount = fmtMoney(now - b.limit, main);
+    msgs.push(
+      b.categoryId
+        ? t('бюджет «{name}» превышен на {amount}', { name: cats.get(b.categoryId)?.name ?? t('Категория'), amount })
+        : t('бюджет на месяц превышен на {amount}', { amount }),
+    );
   }
   if (!msgs.length) return null;
-  const s = msgs.join('; ');
-  return 'Внимание: ' + s;
+  return t('Внимание: {list}', { list: msgs.join('; ') });
 }
 
 // ---------- Счета ----------
@@ -422,29 +426,29 @@ export function paySubscription(id: string, date = todayYmd()): Transaction | nu
   const s = d?.subscriptions.find((x) => x.id === id);
   if (!d || !s) return null;
   if (!accountMap(d).has(s.accountId)) {
-    toast('Выберите счёт для этого платежа');
+    toast(t('Выберите счёт для этого платежа'));
     return null;
   }
   const prevNext = s.nextDate;
   // id по подписке и сроку: оплату одного срока на двух устройствах синхронизация сольёт в одну операцию
   const txId = `sub-${s.id}-${prevNext}`;
   if (d.transactions.some((x) => x.id === txId)) {
-    toast('Этот платёж уже записан');
+    toast(t('Этот платёж уже записан'));
     return null;
   }
-  const t = addTransaction({ type: s.income ? 'income' : 'expense', amount: s.amount, accountId: s.accountId, categoryId: s.categoryId, date, note: s.name, subscriptionId: s.id }, { id: txId });
+  const tx = addTransaction({ type: s.income ? 'income' : 'expense', amount: s.amount, accountId: s.accountId, categoryId: s.categoryId, date, note: s.name, subscriptionId: s.id }, { id: txId });
   mutateFinance((x) => {
     const y = x.subscriptions.find((z) => z.id === id);
     if (!y) return;
     y.nextDate = advanceSub(y, y.nextDate);
     y.updatedAt = Date.now();
   });
-  if (t)
-    toast(`${s.income ? 'Получено' : 'Оплачено'}: ${s.name}`, {
-      label: 'Отменить',
+  if (tx)
+    toast(s.income ? t('Получено: {name}', { name: s.name }) : t('Оплачено: {name}', { name: s.name }), {
+      label: t('Отменить'),
       run: () =>
         mutateFinance((x) => {
-          removeIn(x, 'transactions', t.id);
+          removeIn(x, 'transactions', tx.id);
           const y = x.subscriptions.find((z) => z.id === id);
           if (y) {
             y.nextDate = prevNext;
@@ -452,7 +456,7 @@ export function paySubscription(id: string, date = todayYmd()): Transaction | nu
           }
         }),
     });
-  return t;
+  return tx;
 }
 
 /** Пропустить платёж (перенести дату без операции) */

@@ -7,6 +7,7 @@ import { addTransaction, deleteTransaction, mergeSplit, refreshRates, splitParts
 import { autoRatesOn } from '../rates';
 import { AmountInput, Sheet } from './common';
 import { closeTxSheet, openMore, useFinUi } from './state';
+import { t, tn } from '../../i18n/index';
 
 const numStr = fmtInputNum;
 
@@ -74,8 +75,8 @@ function TxForm({ data }: { data: FinanceData }) {
 
   if (!accounts.length) {
     return (
-      <Sheet title="Нет счетов" onClose={closeTxSheet}>
-        <p className="muted">Сначала добавьте счёт — наличные, карту или вклад.</p>
+      <Sheet title={t('Нет счетов')} onClose={closeTxSheet}>
+        <p className="muted">{t('Сначала добавьте счёт — наличные, карту или вклад.')}</p>
         <div className="modal-actions">
           <button
             className="btn btn-primary"
@@ -84,7 +85,7 @@ function TxForm({ data }: { data: FinanceData }) {
               openMore('accounts');
             }}
           >
-            Добавить счёт
+            {t('Добавить счёт')}
           </button>
         </div>
       </Sheet>
@@ -96,22 +97,23 @@ function TxForm({ data }: { data: FinanceData }) {
 
   const save = () => {
     const typedV = parseMoneyInput(amount);
-    if (!(typedV > 0)) return toast('Введите сумму');
-    if (!acc) return toast('Выберите счёт');
-    if (foreign && conv === null) return toast(`Нет курса ${curSymbol(inCur)} — ${auto ? 'нужен интернет, чтобы его получить' : 'укажите курс в Финансы → Ещё → Курсы валют'}`);
+    if (!(typedV > 0)) return toast(t('Введите сумму'));
+    if (!acc) return toast(t('Выберите счёт'));
+    if (foreign && conv === null)
+      return toast(auto ? t('Нет курса {cur} — нужен интернет, чтобы его получить', { cur: curSymbol(inCur) }) : t('Нет курса {cur} — укажите курс в Финансы → Ещё → Курсы валют', { cur: curSymbol(inCur) }));
     // сумма в валюте счёта (введено в другой — по курсу); части покупки — тем же курсом
     const k = foreign ? conv! / typedV : 1;
     const v = r2(typedV * k);
     const orig = foreign && type !== 'transfer' ? { amount: typedV, currency: inCur } : undefined;
     const split = type === 'transfer' ? [] : parts.map((p) => ({ categoryId: p.cat || undefined, amount: r2((parseMoneyInput(p.amount) || 0) * k) })).filter((p) => p.amount > 0);
-    if (split.length && r2(typedV - partSum) <= 0) return toast('Части больше всей суммы — уменьшите их');
+    if (split.length && r2(typedV - partSum) <= 0) return toast(t('Части больше всей суммы — уменьшите их'));
     const tagList = [...new Set(tags.split(/[,#]/).map((g) => g.trim()).filter(Boolean))];
     const base = { type, amount: v, accountId, date, time: time || undefined, note: note.trim() || undefined, tags: tagList };
     let patch;
     if (type === 'transfer') {
-      if (!toAcc || toAccountId === accountId) return toast('Выберите другой счёт зачисления');
+      if (!toAcc || toAccountId === accountId) return toast(t('Выберите другой счёт зачисления'));
       const tv = crossCur ? parseMoneyInput(toAmount) : v;
-      if (!(tv > 0)) return toast('Введите сумму зачисления');
+      if (!(tv > 0)) return toast(t('Введите сумму зачисления'));
       patch = { ...base, toAccountId, toAmount: crossCur ? tv : undefined, categoryId: undefined, orig: undefined };
     } else {
       patch = { ...base, categoryId: catByKind[kind] || undefined, toAccountId: undefined, toAmount: undefined, orig };
@@ -119,7 +121,7 @@ function TxForm({ data }: { data: FinanceData }) {
     let id = edit?.id;
     if (edit) updateTransaction(edit.id, patch);
     else id = addTransaction({ ...patch, subscriptionId: sheet.preset?.subscriptionId })?.id;
-    if (id && split.length && splitTransaction(id, split)) toast(`Покупка разделена на ${split.length + 1} части`);
+    if (id && split.length && splitTransaction(id, split)) toast(t('Покупка разделена на {n} {parts}', { n: split.length + 1, parts: tn(split.length + 1, 'часть', 'части', 'частей') }));
     closeTxSheet();
   };
 
@@ -144,12 +146,12 @@ function TxForm({ data }: { data: FinanceData }) {
 
   return (
     <Sheet
-      title={edit ? 'Операция' : 'Новая операция'}
+      title={edit ? t('Операция') : t('Новая операция')}
       onClose={closeTxSheet}
       className="fn-tx-sheet"
       head={
         edit && (
-          <button className="icon-btn fn-danger" onClick={remove} aria-label="Удалить" title="Удалить">
+          <button className="icon-btn fn-danger" onClick={remove} aria-label={t('Удалить')} title={t('Удалить')}>
             <Trash />
           </button>
         )
@@ -157,10 +159,10 @@ function TxForm({ data }: { data: FinanceData }) {
       actions={
         <>
           <button className="btn" onClick={closeTxSheet}>
-            Отмена
+            {t('Отмена')}
           </button>
           <button className="btn btn-primary" onClick={save}>
-            Сохранить
+            {t('Сохранить')}
           </button>
         </>
       }
@@ -168,12 +170,12 @@ function TxForm({ data }: { data: FinanceData }) {
       <div className="segmented fn-type-seg">
         {(
           [
-            ['expense', 'Расход'],
-            ['income', 'Доход'],
-            ['transfer', 'Перевод'],
+            ['expense', t('Расход')],
+            ['income', t('Доход')],
+            ['transfer', t('Перевод')],
           ] as const
-        ).map(([t, l]) => (
-          <button key={t} className={(type === t ? 'active ' : '') + `fn-type-${t}`} onClick={() => setType(t)}>
+        ).map(([k, l]) => (
+          <button key={k} className={(type === k ? 'active ' : '') + `fn-type-${k}`} onClick={() => setType(k)}>
             {l}
           </button>
         ))}
@@ -185,13 +187,13 @@ function TxForm({ data }: { data: FinanceData }) {
           <span className="fn-amount-cur">{acc ? curSymbol(acc.currency) : ''}</span>
         ) : (
           // валюта суммы: можно ввести в другой — спишется со счёта по курсу
-          <label className={'fn-amount-cur fn-cur-pick' + (foreign ? ' is-foreign' : '')} title="Валюта суммы">
+          <label className={'fn-amount-cur fn-cur-pick' + (foreign ? ' is-foreign' : '')} title={t('Валюта суммы')}>
             {curSymbol(inCur)}
-            <select value={inCur} onChange={(e) => setCur(e.target.value)} aria-label="Валюта суммы">
+            <select value={inCur} onChange={(e) => setCur(e.target.value)} aria-label={t('Валюта суммы')}>
               {curOptions.map((c) => (
                 <option key={c} value={c}>
                   {curSymbol(c)} {c}
-                  {c === acc.currency ? ' — валюта счёта' : ''}
+                  {c === acc.currency ? t(' — валюта счёта') : ''}
                 </option>
               ))}
             </select>
@@ -201,14 +203,18 @@ function TxForm({ data }: { data: FinanceData }) {
       {foreign && (
         <div className="fn-conv">
           {conv === null ? (
-            <span className="fn-danger">Нет курса {curSymbol(inCur)} → {curSymbol(acc!.currency)}{auto ? ' — получаю…' : ' — укажите его в Финансы → Ещё → Курсы валют'}</span>
+            <span className="fn-danger">
+              {auto
+                ? t('Нет курса {from} → {to} — получаю…', { from: curSymbol(inCur), to: curSymbol(acc!.currency) })
+                : t('Нет курса {from} → {to} — укажите его в Финансы → Ещё → Курсы валют', { from: curSymbol(inCur), to: curSymbol(acc!.currency) })}
+            </span>
           ) : (
             <>
               <b>
                 {type === 'income' ? '+' : '−'}
                 {fmtMoney(r2(conv), acc!.currency)}
               </b>{' '}
-              {type === 'income' ? 'на счёт' : 'со счёта'} «{acc!.name}» · {rateText(inCur, acc!.currency, data.prefs)}
+              {type === 'income' ? t('на счёт «{name}»', { name: acc!.name }) : t('со счёта «{name}»', { name: acc!.name })} · {rateText(inCur, acc!.currency, data.prefs)}
             </>
           )}
         </div>
@@ -233,7 +239,7 @@ function TxForm({ data }: { data: FinanceData }) {
           {group.length > 1 ? (
             <div className="fn-split-info">
               <span className="grow">
-                Часть покупки: {group.length} {group.length < 5 ? 'части' : 'частей'} на {fmtMoney(r2(group.reduce((a, x) => a + x.amount, 0)), acc?.currency ?? '')}
+                {t('Часть покупки: {n} {parts} на {amount}', { n: group.length, parts: tn(group.length, 'часть', 'части', 'частей'), amount: fmtMoney(r2(group.reduce((a, x) => a + x.amount, 0)), acc?.currency ?? '') })}
               </span>
               <button
                 type="button"
@@ -241,93 +247,93 @@ function TxForm({ data }: { data: FinanceData }) {
                 onClick={() => {
                   const n = mergeSplit(edit!.id);
                   closeTxSheet();
-                  if (n) toast('Части собраны в одну операцию');
+                  if (n) toast(t('Части собраны в одну операцию'));
                 }}
               >
-                Собрать в одну
+                {t('Собрать в одну')}
               </button>
             </div>
           ) : parts.length === 0 ? (
             <button type="button" className="fn-link fn-split-add" onClick={() => setParts([{ cat: '', amount: '' }])}>
-              <Plus size={14} /> Разделить по категориям
+              <Plus size={14} /> {t('Разделить по категориям')}
             </button>
           ) : (
             <div className="fn-split">
-              <div className="fn-split-h">Ещё категории в этой покупке</div>
+              <div className="fn-split-h">{t('Ещё категории в этой покупке')}</div>
               {parts.map((p, i) => (
                 <div key={i} className="row fn-split-row">
-                  <select className="select" value={p.cat} onChange={(e) => setParts(parts.map((x, j) => (j === i ? { ...x, cat: e.target.value } : x)))} aria-label="Категория части">
-                    <option value="">Без категории</option>
+                  <select className="select" value={p.cat} onChange={(e) => setParts(parts.map((x, j) => (j === i ? { ...x, cat: e.target.value } : x)))} aria-label={t('Категория части')}>
+                    <option value="">{t('Без категории')}</option>
                     {cats.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.emoji} {c.name}
                       </option>
                     ))}
                   </select>
-                  <AmountInput value={p.amount} onChange={(v) => setParts(parts.map((x, j) => (j === i ? { ...x, amount: v } : x)))} placeholder="сумма" />
-                  <button type="button" className="icon-btn" onClick={() => setParts(parts.filter((_, j) => j !== i))} aria-label="Убрать часть">
+                  <AmountInput value={p.amount} onChange={(v) => setParts(parts.map((x, j) => (j === i ? { ...x, amount: v } : x)))} placeholder={t('сумма')} />
+                  <button type="button" className="icon-btn" onClick={() => setParts(parts.filter((_, j) => j !== i))} aria-label={t('Убрать часть')}>
                     <X size={16} />
                   </button>
                 </div>
               ))}
               <div className="row fn-split-foot">
                 <button type="button" className="fn-link" onClick={() => setParts([...parts, { cat: '', amount: '' }])}>
-                  <Plus size={14} /> Ещё часть
+                  <Plus size={14} /> {t('Ещё часть')}
                 </button>
                 <span className={'grow tiny ' + (rest > 0 ? 'faint' : 'fn-danger')}>
-                  {(catByKind[kind] && cats.find((c) => c.id === catByKind[kind])?.name) || 'Без категории'}: {fmtMoney(Math.max(0, rest), inCur)}
+                  {(catByKind[kind] && cats.find((c) => c.id === catByKind[kind])?.name) || t('Без категории')}: {fmtMoney(Math.max(0, rest), inCur)}
                 </span>
               </div>
             </div>
           )}
-          <label className="label">Счёт</label>
+          <label className="label">{t('Счёт')}</label>
           {accChips(accountId, pickAccount)}
         </>
       ) : (
         <>
-          <label className="label">Со счёта</label>
+          <label className="label">{t('Со счёта')}</label>
           {accChips(accountId, (id) => {
             setAccountId(id);
             if (id === toAccountId) setToAccountId(accounts.find((a) => a.id !== id)?.id ?? '');
           })}
-          <label className="label">На счёт</label>
+          <label className="label">{t('На счёт')}</label>
           {accChips(toAccountId, setToAccountId, accountId)}
           {crossCur && (
             <>
-              <label className="label">Зачислено, {curSymbol(toAcc!.currency)}</label>
+              <label className="label">{t('Зачислено, {cur}', { cur: curSymbol(toAcc!.currency) })}</label>
               <AmountInput value={toAmount} onChange={setToAmount} onEnter={save} />
             </>
           )}
         </>
       )}
 
-      <label className="label">Дата</label>
+      <label className="label">{t('Дата')}</label>
       <div className="fn-date-row">
         <button type="button" className={'chip fn-chip' + (date === today ? ' active' : '')} onClick={() => setDate(today)}>
-          Сегодня
+          {t('Сегодня')}
         </button>
         <button type="button" className={'chip fn-chip' + (date === yesterday ? ' active' : '')} onClick={() => setDate(yesterday)}>
-          Вчера
+          {t('Вчера')}
         </button>
         <label className={'chip fn-chip fn-date-chip' + (date !== today && date !== yesterday ? ' active' : '')}>
-          {date !== today && date !== yesterday ? dateShort(date) : 'Дата…'}
+          {date !== today && date !== yesterday ? dateShort(date) : t('Дата…')}
           <input type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} />
         </label>
         <label className={'chip fn-chip fn-date-chip' + (time ? ' active' : '')}>
-          {time || 'Время'}
-          <input type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="Время" />
+          {time || t('Время')}
+          <input type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label={t('Время')} />
         </label>
         {time && (
-          <button type="button" className="chip fn-chip" onClick={() => setTime('')} aria-label="Без времени">
+          <button type="button" className="chip fn-chip" onClick={() => setTime('')} aria-label={t('Без времени')}>
             ✕
           </button>
         )}
       </div>
 
-      <label className="label">Комментарий</label>
-      <input className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Например: обед с коллегами" onKeyDown={(e) => e.key === 'Enter' && save()} />
-      <label className="label">Теги</label>
-      <input className="input" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="через запятую" />
+      <label className="label">{t('Комментарий')}</label>
+      <input className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('Например: обед с коллегами')} onKeyDown={(e) => e.key === 'Enter' && save()} />
+      <label className="label">{t('Теги')}</label>
+      <input className="input" value={tags} onChange={(e) => setTags(e.target.value)} placeholder={t('через запятую')} />
     </Sheet>
   );
 }

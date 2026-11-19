@@ -10,6 +10,7 @@ import { useFinance } from '../../finance/store';
 import { ActionSheet } from '../../finance/ui/common';
 import { mergeHandlers, useLongPress, useSwipeActions } from '../../ui/gestures';
 import { SwipeBg } from '../../ui/SwipeBg';
+import { t } from '../../i18n/index';
 
 /** Строка цели в сгруппированном списке: кольцо прогресса с эмодзи, название, сфера и срок, полоса прогресса.
  *  Свайп влево — удалить (с «Отменить»), долгое нажатие — меню: пополнить, отложить, в архив, удалить */
@@ -31,11 +32,11 @@ export function GoalCard({ goal, area, look, today, hidePeriod }: { goal: Goal; 
   const canDeposit = !!sv && !sv.loading && !sv.missing && !sv.reached && goal.status === 'active';
   const st = goal.status;
   const items = [
-    ...(canDeposit ? [{ label: 'Пополнить', run: () => setDeposit(true) }] : []),
-    ...(st === 'active' ? [{ label: 'Отложить', run: () => setGoalStatus(goal.id, 'paused') }] : []),
-    ...(st === 'paused' || st === 'archived' ? [{ label: st === 'paused' ? 'Возобновить' : 'Вернуть из архива', run: () => setGoalStatus(goal.id, 'active') }] : []),
-    ...(st !== 'archived' ? [{ label: 'В архив', run: () => setGoalStatus(goal.id, 'archived') }] : []),
-    { label: 'Удалить', danger: true, run: () => deleteGoal(goal.id) },
+    ...(canDeposit ? [{ label: t('Пополнить'), run: () => setDeposit(true) }] : []),
+    ...(st === 'active' ? [{ label: t('Отложить'), run: () => setGoalStatus(goal.id, 'paused') }] : []),
+    ...(st === 'paused' || st === 'archived' ? [{ label: st === 'paused' ? t('Возобновить') : t('Вернуть из архива'), run: () => setGoalStatus(goal.id, 'active') }] : []),
+    ...(st !== 'archived' ? [{ label: t('В архив'), run: () => setGoalStatus(goal.id, 'archived') }] : []),
+    { label: t('Удалить'), danger: true, run: () => deleteGoal(goal.id) },
   ];
   return (
     <>
@@ -64,7 +65,7 @@ export function GoalCard({ goal, area, look, today, hidePeriod }: { goal: Goal; 
           <span className="gl-card-main">
             <span className="gl-card-title">
               {goal.priority > 0 && <span className={'gl-prio p' + goal.priority} aria-hidden />}
-              <span className="ellipsis">{goal.title || 'Без названия'}</span>
+              <span className="ellipsis">{goal.title || t('Без названия')}</span>
             </span>
             <span className="gl-card-meta">
               {area && <span className="gl-card-area ellipsis">{area.name}</span>}
@@ -77,7 +78,7 @@ export function GoalCard({ goal, area, look, today, hidePeriod }: { goal: Goal; 
               {(area || !hidePeriod) && <span className="gl-card-sep">·</span>}
               {/* у отложенной и архивной цели срок не «горит» */}
               <span className={'gl-due is-' + (goal.status === 'paused' ? 'paused' : goal.status === 'archived' ? 'none' : dl.state)}>
-                {goal.status === 'paused' ? 'отложена' : goal.status === 'archived' ? 'в архиве' : dl.text}
+                {goal.status === 'paused' ? t('отложена') : goal.status === 'archived' ? t('в архиве') : dl.text}
               </span>
             </span>
             {savings && <SavingsCardRow goal={goal} />}
@@ -95,7 +96,7 @@ export function GoalCard({ goal, area, look, today, hidePeriod }: { goal: Goal; 
           <CaretRight className="gl-card-chev" size={15} weight="bold" />
         </Root>
       </div>
-      {menu && <ActionSheet title={`${goal.emoji || '🎯'} ${goal.title || 'Без названия'}`} items={items} onClose={() => setMenu(false)} />}
+      {menu && <ActionSheet title={`${goal.emoji || '🎯'} ${goal.title || t('Без названия')}`} items={items} onClose={() => setMenu(false)} />}
       {deposit && <DepositPortal goal={goal} onClose={() => setDeposit(false)} />}
     </>
   );
