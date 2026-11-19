@@ -11,6 +11,7 @@ import { isIOS } from '../io/download';
 import { isNative } from '../platform';
 import { closeVoice, useVoice } from './state';
 import { speak, speakEnabled, setSpeakEnabled, stopSpeaking } from './speak';
+import { t } from '../i18n/index';
 import './voice.css';
 
 /** Окно открыто, пока VoiceHost в DOM; закрывается снаружи через closeVoice */
@@ -25,7 +26,7 @@ type Phase = 'listening' | 'thinking' | 'done' | 'idle' | 'unknown';
 type Card = Done & { key: number; kind: VoiceAction['type']; undone?: boolean };
 
 const KIND_ICON = { add_task: CheckSquare, add_transaction: Wallet, add_habit: Plant, add_note: NotePencil, add_journal: NotePencil, mark_done: CheckCircle, ask: ChatCircleText } as const;
-const EXAMPLES = ['Купить хлеб завтра в 9', 'Каждый день выпивать 2 л воды', 'Потратил 2000 на такси и 3500 на обед', 'Выпил стакан воды', 'Выполнил задачу купить хлеб', 'Что у меня сегодня?', 'Сколько я потратил за месяц?', 'Новая привычка — читать 20 минут', 'Запиши в дневник: сегодня пробежал 10 км'];
+const EXAMPLES = [t('Купить хлеб завтра в 9'), t('Каждый день выпивать 2 л воды'), t('Потратил 2000 на такси и 3500 на обед'), t('Выпил стакан воды'), t('Выполнил задачу купить хлеб'), t('Что у меня сегодня?'), t('Сколько я потратил за месяц?'), t('Новая привычка — читать 20 минут'), t('Запиши в дневник: сегодня пробежал 10 км')];
 
 function VoiceSheet() {
   const [phase, setPhase] = useState<Phase>('idle');
@@ -76,13 +77,13 @@ function VoiceSheet() {
     setPhase('listening');
     haptic();
     const r = await listen({
-      onText: (t) => alive.current && setHeard(t),
-      onDone: (t) => {
+      onText: (s) => alive.current && setHeard(s),
+      onDone: (s) => {
         rec.current = null;
         if (!alive.current) return;
-        if (t.trim()) void run(t, true);
+        if (s.trim()) void run(s, true);
         else {
-          setError('Ничего не услышал — нажмите на микрофон и скажите ещё раз');
+          setError(t('Ничего не услышал — нажмите на микрофон и скажите ещё раз'));
           setPhase('idle');
         }
       },
@@ -135,21 +136,21 @@ function VoiceSheet() {
   const status =
     phase === 'listening'
       ? heard
-        ? 'Слушаю…'
-        : 'Говорите…'
+        ? t('Слушаю…')
+        : t('Говорите…')
       : phase === 'thinking'
-        ? 'Разбираю команду…'
+        ? t('Разбираю команду…')
         : phase === 'unknown'
-          ? 'Не понял команду — скажите иначе'
+          ? t('Не понял команду — скажите иначе')
           : phase === 'done'
-            ? 'Готово'
+            ? t('Готово')
             : voiceOk
-              ? 'Нажмите на микрофон и скажите команду'
-              : 'Напишите команду';
+              ? t('Нажмите на микрофон и скажите команду')
+              : t('Напишите команду');
 
   return (
     <div className="modal-backdrop vc-backdrop" onPointerDown={(e) => e.target === e.currentTarget && close()}>
-      <div className="modal vc-sheet" role="dialog" aria-label="Голосовая команда">
+      <div className="modal vc-sheet" role="dialog" aria-label={t('Голосовая команда')}>
         <button
           className="vc-speaker"
           onClick={() => {
@@ -158,12 +159,12 @@ function VoiceSheet() {
             setSpeakEnabled(on);
             if (!on) void stopSpeaking();
           }}
-          aria-label={voiceOut ? 'Не озвучивать ответы' : 'Озвучивать ответы'}
-          title={voiceOut ? 'Ответы озвучиваются' : 'Ответы без звука'}
+          aria-label={voiceOut ? t('Не озвучивать ответы') : t('Озвучивать ответы')}
+          title={voiceOut ? t('Ответы озвучиваются') : t('Ответы без звука')}
         >
           {voiceOut ? <SpeakerHigh size={18} weight="fill" /> : <SpeakerSlash size={18} weight="fill" />}
         </button>
-        <button className="vc-close" onClick={close} aria-label="Закрыть">
+        <button className="vc-close" onClick={close} aria-label={t('Закрыть')}>
           <X size={18} weight="bold" />
         </button>
 
@@ -172,7 +173,7 @@ function VoiceSheet() {
             <button
               className={`vc-orb${listening ? ' on' : ''}${phase === 'thinking' ? ' busy' : ''}`}
               onClick={() => (listening ? stop() : phase !== 'thinking' && void start())}
-              aria-label={listening ? 'Закончить' : 'Сказать команду'}
+              aria-label={listening ? t('Закончить') : t('Сказать команду')}
             >
               <span className="vc-ring" />
               <span className="vc-ring r2" />
@@ -184,7 +185,7 @@ function VoiceSheet() {
           {error && <div className="vc-error">{error}</div>}
           {listening && (
             <button className="vc-stop" onClick={stop}>
-              Готово
+              {t('Готово')}
             </button>
           )}
         </div>
@@ -199,12 +200,12 @@ function VoiceSheet() {
                     <Icon size={20} weight="fill" />
                   </span>
                   <button className="vc-card-body" onClick={() => !c.undone && c.open && (close(), c.open())} disabled={c.undone || !c.open}>
-                    <span className="vc-label">{c.undone ? 'Отменено' : c.label}</span>
+                    <span className="vc-label">{c.undone ? t('Отменено') : c.label}</span>
                     <span className="vc-title">{c.title}</span>
                     {c.meta && <span className="vc-meta">{c.meta}</span>}
                   </button>
                   {c.ok && !c.undone && c.undo ? (
-                    <button className="vc-undo" onClick={() => void undo(c)} aria-label="Отменить" title="Отменить">
+                    <button className="vc-undo" onClick={() => void undo(c)} aria-label={t('Отменить')} title={t('Отменить')}>
                       <ArrowCounterClockwise size={18} weight="bold" />
                     </button>
                   ) : c.open && !c.undone ? (
@@ -218,7 +219,7 @@ function VoiceSheet() {
 
         {(phase === 'idle' || phase === 'unknown' || (listening && !heard)) && !cards.length && (
           <div className="vc-examples">
-            <div className="vc-ex-title">Например</div>
+            <div className="vc-ex-title">{t('Например')}</div>
             {EXAMPLES.map((x) => (
               <button key={x} className="vc-ex" onClick={() => (setTyped(x), inputRef.current?.focus())}>
                 «{x}»
@@ -244,16 +245,16 @@ function VoiceSheet() {
               rec.current = null;
               setPhase('idle');
             }}
-            placeholder={voiceOk ? 'Или напишите команду' : isIOS() && !isNative() ? 'Напишите или нажмите 🎤 на клавиатуре' : 'Например: купить хлеб завтра'}
+            placeholder={voiceOk ? t('Или напишите команду') : isIOS() && !isNative() ? t('Напишите или нажмите 🎤 на клавиатуре') : t('Например: купить хлеб завтра')}
             enterKeyHint="send"
           />
-          <button type="submit" className="vc-send" disabled={!typed.trim() || phase === 'thinking'} aria-label="Выполнить">
+          <button type="submit" className="vc-send" disabled={!typed.trim() || phase === 'thinking'} aria-label={t('Выполнить')}>
             <ArrowUp size={18} weight="bold" />
           </button>
         </form>
         {phase === 'done' && voiceOk && (
           <button className="vc-again" onClick={() => void start()}>
-            <Microphone size={18} weight="fill" /> Ещё команда
+            <Microphone size={18} weight="fill" /> {t('Ещё команда')}
           </button>
         )}
       </div>

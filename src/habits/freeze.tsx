@@ -9,6 +9,7 @@ import { addDaysYmd } from '../utils/mapTasks';
 import { doneOn, frozenOn, pausedOn } from './model';
 import { freezeStatus, hasPauseAhead, shortDay } from './freezeActions';
 import type { FreezeHandlers } from './freezeActions';
+import { t } from '../i18n/index';
 import '../ui/dialogs.css';
 import './freeze.css';
 
@@ -60,7 +61,7 @@ export function FreezeSheet({
       <div className="dlg-as fz-sheet" role="dialog" aria-label={label} onKeyDown={(e) => e.key === 'Escape' && onClose()}>
         {children}
         <button className="dlg-as-btn dlg-as-cancel" onClick={stage === 'pause' && initial === 'menu' ? () => setStage('menu') : onClose}>
-          {stage === 'pause' && initial === 'menu' ? 'Назад' : 'Отмена'}
+          {stage === 'pause' && initial === 'menu' ? t('Назад') : t('Отмена')}
         </button>
       </div>
     </div>
@@ -71,43 +72,45 @@ export function FreezeSheet({
     return backdrop(
       <div className="dlg-as-group">
         <div className="dlg-as-head">
-          <div className="dlg-as-title">⏸ Пауза{all ? ' для всех привычек' : ` · ${h.icon ?? ''} ${h.name}`.replace(/\s+/g, ' ')}</div>
+          <div className="dlg-as-title">{all ? t('⏸ Пауза для всех привычек') : `${t('⏸ Пауза')} · ${h.icon ?? ''} ${h.name}`.replace(/\s+/g, ' ')}</div>
           <div className="dlg-as-msg">
-            Больничный, отпуск, поездка: в эти дни {all ? 'привычки не напоминают' : 'привычка не напоминает'}, не считается пропущенной, а серия не прерывается.
-            {from !== today && ` Начало — ${shortDay(from)}.`}
+            {all
+              ? t('Больничный, отпуск, поездка: в эти дни привычки не напоминают, не считаются пропущенными, а серия не прерывается.')
+              : t('Больничный, отпуск, поездка: в эти дни привычка не напоминает, не считается пропущенной, а серия не прерывается.')}
+            {from !== today && t(' Начало — {day}.', { day: shortDay(from) })}
           </div>
         </div>
         <button className="dlg-as-btn" onClick={() => pause(from)}>
-          {from === today ? 'До завтра' : 'Только этот день'}
+          {from === today ? t('До завтра') : t('Только этот день')}
         </button>
         <button className="dlg-as-btn" onClick={() => pause(addDaysYmd(from, 2))}>
-          3 дня
+          {t('3 дня')}
         </button>
         <button className="dlg-as-btn" onClick={() => pause(addDaysYmd(from, 6))}>
-          Неделя
+          {t('Неделя')}
         </button>
         <div className="fz-row">
-          <span className="grow">До даты</span>
+          <span className="grow">{t('До даты')}</span>
           <input
             className="input fz-date"
             type="date"
             min={minUntil}
             value={until}
-            aria-label="Возобновить с даты"
+            aria-label={t('Возобновить с даты')}
             onChange={(e) => setUntil(e.target.value)}
           />
         </div>
         {until && until >= minUntil && (
           <button className="dlg-as-btn fz-strong" onClick={() => pause(addDaysYmd(until, -1))}>
-            Пауза до {shortDay(until)}
+            {t('Пауза до {day}', { day: shortDay(until) })}
           </button>
         )}
         <label className="fz-row fz-switch-row">
-          <span className="grow">Для всех привычек</span>
+          <span className="grow">{t('Для всех привычек')}</span>
           <input type="checkbox" className="switch" checked={all} onChange={(e) => setAll(e.target.checked)} />
         </label>
       </div>,
-      'Пауза',
+      t('Пауза'),
     );
   }
 
@@ -119,41 +122,41 @@ export function FreezeSheet({
         <div className="dlg-as-title">
           {h.icon ?? '🔥'} {h.name}
         </div>
-        <div className="dlg-as-msg">{status ?? (isToday ? 'Сегодня' : shortDay(date))}</div>
+        <div className="dlg-as-msg">{status ?? (isToday ? t('Сегодня') : shortDay(date))}</div>
       </div>
       {fz === 'skip' ? (
         <button className="dlg-as-btn" onClick={() => act(() => handlers.skip(h, date, false))}>
-          Отменить пропуск
+          {t('Отменить пропуск')}
         </button>
       ) : (
         !done &&
         !fz && (
           <button className="dlg-as-btn" onClick={() => act(() => handlers.skip(h, date, true))}>
-            ❄️ Пропустить {isToday ? 'сегодня' : 'этот день'} (не ломая серию)
+            {isToday ? t('❄️ Пропустить сегодня (не ломая серию)') : t('❄️ Пропустить этот день (не ломая серию)')}
           </button>
         )
       )}
       {fz && onDone && date <= today && (
         <button className="dlg-as-btn" onClick={() => act(onDone)}>
-          ✓ Всё-таки выполнено
+          {t('✓ Всё-таки выполнено')}
         </button>
       )}
       {ahead && (
         <button className="dlg-as-btn" onClick={() => act(() => handlers.resume(h))}>
-          ▶︎ Возобновить
+          {t('▶︎ Возобновить')}
         </button>
       )}
       <button className="dlg-as-btn" onClick={() => setStage('pause')}>
-        ⏸ {pausedOn(h, date) ? 'Продлить паузу…' : 'Пауза…'}
+        ⏸ {pausedOn(h, date) ? t('Продлить паузу…') : t('Пауза…')}
       </button>
       {onOpen && (
         <button className="dlg-as-btn" onClick={() => act(onOpen)}>
-          Статистика и настройки
+          {t('Статистика и настройки')}
         </button>
       )}
       {onDelete && (
         <button className="dlg-as-btn danger" onClick={() => act(onDelete)}>
-          Удалить привычку
+          {t('Удалить привычку')}
         </button>
       )}
     </div>,

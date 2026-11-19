@@ -2,7 +2,7 @@ import { useRef, useState, type CSSProperties, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { Bell, Check, CornerDownRight, ListChecks, Network, Pin, Repeat, Timer, AlignLeft, Undo2 } from 'lucide-react';
 import { PRIORITY_META, addDaysYmd, todayYmd } from '../../utils/mapTasks';
-import { dayLabel, isOverdue, whenLabel, type TaskItem, type TaskList } from '../model';
+import { dayLabelInline, isOverdue, whenLabel, type TaskItem, type TaskList } from '../model';
 import { toast } from '../../store/appStore';
 import { moveOccurrence, openTask, purgeTask, restoreTask, skipOccurrence, toggleDone, trashTask, updateTask, useTasks } from '../store';
 import { mergeHandlers, useLongPressDrag, useSwipeActions } from '../../ui/gestures';
@@ -10,6 +10,7 @@ import { startTouchDrag } from './touchDrag';
 import { startSelect, toggleSelect, useBulk } from '../bulk';
 import { SwipeBg } from '../../ui/SwipeBg';
 import { DatePicker } from './DatePicker';
+import { t } from '../../i18n/index';
 import '../../ui/dialogs.css';
 import './tasks.css';
 
@@ -26,7 +27,7 @@ export function TaskCheck({ task, onToggle }: { task: Pick<TaskItem, 'done' | 'p
         e.stopPropagation();
         onToggle();
       }}
-      aria-label={task.done ? 'Отметить невыполненной' : 'Выполнить'}
+      aria-label={task.done ? t('Отметить невыполненной') : t('Выполнить')}
     >
       {task.done && <Check size={13} strokeWidth={3.2} />}
     </button>
@@ -54,7 +55,7 @@ export function useTaskActions(task: TaskItem, occurrence?: string, dragRow?: Re
   const done = () => {
     if (completing) return;
     if (future) {
-      toast(`Сначала отметьте повтор ${dayLabel(task.date!).toLowerCase()}`);
+      toast(t('Сначала отметьте повтор {day}', { day: dayLabelInline(task.date!) }));
       return;
     }
     if (task.done) return toggleDone(task.id);
@@ -69,7 +70,7 @@ export function useTaskActions(task: TaskItem, occurrence?: string, dragRow?: Re
   /** удалить всю серию повторов (или обычную задачу) */
   const removeAll = () => {
     trashTask(task.id);
-    toast(repeating ? 'Задача удалена со всеми повторами' : 'Задача удалена', { label: 'Вернуть', run: () => restoreTask(task.id) });
+    toast(repeating ? t('Задача удалена со всеми повторами') : t('Задача удалена'), { label: t('Вернуть'), run: () => restoreTask(task.id) });
   };
   const remove = () => {
     // у повторяющейся — только этот повтор (вся серия — из меню)
@@ -79,11 +80,11 @@ export function useTaskActions(task: TaskItem, occurrence?: string, dragRow?: Re
     }
     if (trashed) {
       purgeTask(task.id);
-      toast('Задача удалена навсегда');
+      toast(t('Задача удалена навсегда'));
       return;
     }
     trashTask(task.id);
-    toast('Задача удалена', { label: 'Вернуть', run: () => restoreTask(task.id) });
+    toast(t('Задача удалена'), { label: t('Вернуть'), run: () => restoreTask(task.id) });
   };
 
   // сенсорный экран: вправо — выполнить (в корзине — восстановить), влево — удалить; долгое нажатие — меню
@@ -109,9 +110,9 @@ export function useTaskActions(task: TaskItem, occurrence?: string, dragRow?: Re
       dx={swipe.dx}
       armed={swipe.armed}
       onDelete={swipe.confirmDelete}
-      rightLabel={trashed ? 'Вернуть' : task.done ? 'Не готово' : 'Выполнить'}
+      rightLabel={trashed ? t('Вернуть') : task.done ? t('Не готово') : t('Выполнить')}
       rightIcon={trashed || task.done ? <Undo2 size={22} strokeWidth={2.4} /> : undefined}
-      deleteLabel={trashed ? 'Навсегда' : repeating ? 'Пропустить' : 'Удалить'}
+      deleteLabel={trashed ? t('Навсегда') : repeating ? t('Пропустить') : t('Удалить')}
     />
   );
   const overlays = (
@@ -131,57 +132,57 @@ export function useTaskActions(task: TaskItem, occurrence?: string, dragRow?: Re
             <div className="dlg-as" role="menu" onKeyDown={(e) => e.key === 'Escape' && setMenu(false)}>
               <div className="dlg-as-group">
                 <div className="dlg-as-head">
-                  <div className="dlg-as-title">{task.title || 'Без названия'}</div>
+                  <div className="dlg-as-title">{task.title || t('Без названия')}</div>
                 </div>
                 {trashed ? (
                   <>
                     <button className="dlg-as-btn" onClick={act(() => restoreTask(task.id))}>
-                      Восстановить
+                      {t('Восстановить')}
                     </button>
                     <button className="dlg-as-btn danger" onClick={act(remove)}>
-                      Удалить навсегда
+                      {t('Удалить навсегда')}
                     </button>
                   </>
                 ) : (
                   <>
                     <button className="dlg-as-btn" onClick={act(done)}>
-                      {task.done ? 'Отметить невыполненной' : 'Выполнить'}
+                      {task.done ? t('Отметить невыполненной') : t('Выполнить')}
                     </button>
                     {!task.done && occ !== tomorrow && (
                       <button className="dlg-as-btn" onClick={act(() => (repeating && future ? moveOccurrence(task.id, occ!, tomorrow) : updateTask(task.id, { date: tomorrow })))}>
-                        {repeating && future ? 'Перенести этот повтор на завтра' : 'Перенести на завтра'}
+                        {repeating && future ? t('Перенести этот повтор на завтра') : t('Перенести на завтра')}
                       </button>
                     )}
                     <button className="dlg-as-btn" onClick={act(() => setPicking(true))}>
-                      Выбрать дату
+                      {t('Выбрать дату')}
                     </button>
                     <button className="dlg-as-btn" onClick={act(() => updateTask(task.id, { pinned: !task.pinned }))}>
-                      {task.pinned ? 'Открепить' : 'Закрепить'}
+                      {task.pinned ? t('Открепить') : t('Закрепить')}
                     </button>
                     {selectable && (
                       <button className="dlg-as-btn" onClick={act(() => startSelect(task.id))}>
-                        Выбрать несколько
+                        {t('Выбрать несколько')}
                       </button>
                     )}
                     {repeating ? (
                       <>
                         <button className="dlg-as-btn" onClick={act(remove)}>
-                          Пропустить этот повтор
+                          {t('Пропустить этот повтор')}
                         </button>
                         <button className="dlg-as-btn danger" onClick={act(removeAll)}>
-                          Удалить все повторы
+                          {t('Удалить все повторы')}
                         </button>
                       </>
                     ) : (
                       <button className="dlg-as-btn danger" onClick={act(remove)}>
-                        Удалить
+                        {t('Удалить')}
                       </button>
                     )}
                   </>
                 )}
               </div>
               <button className="dlg-as-btn dlg-as-cancel" autoFocus onClick={() => setMenu(false)}>
-                Отмена
+                {t('Отмена')}
               </button>
             </div>
           </div>,
@@ -208,6 +209,12 @@ export function useTaskActions(task: TaskItem, occurrence?: string, dragRow?: Re
   );
   return { swipe, handlers, bg, overlays, done, completing, future };
 }
+
+/** «Сегодня, 10:00» → «10:00» */
+const stripToday = (s: string) => {
+  const p = `${t('Сегодня')}, `;
+  return s.startsWith(p) ? s.slice(p.length) : s;
+};
 
 export function TaskRow({
   task,
@@ -240,10 +247,10 @@ export function TaskRow({
     ? ''
     : timeOnly
       ? task.time
-        ? whenLabel({ ...task, date: today }, today).replace(/^Сегодня, /, '')
+        ? stripToday(whenLabel({ ...task, date: today }, today))
         : ''
       : task.date === today && task.time
-        ? whenLabel(task, today).replace(/^Сегодня, /, '')
+        ? stripToday(whenLabel(task, today))
         : whenLabel(task, today);
   const checklistDone = task.checklist.filter((c) => c.done).length;
   // подзадача: название родительской задачи
@@ -288,13 +295,13 @@ export function TaskRow({
         <div className="tk-body">
           <div className="tk-title">
             {task.pinned && <Pin size={12} className="tk-pin" />}
-            {task.title || <span className="faint">Без названия</span>}
+            {task.title || <span className="faint">{t('Без названия')}</span>}
           </div>
           {(when || task.repeat || task.reminders.length > 0 || task.checklist.length > 0 || task.tags.length > 0 || task.source || task.notes || parentTitle) && (
             <div className="tk-meta">
               {parentTitle !== undefined && (
                 <span className="tk-mi-text tk-parent">
-                  <CornerDownRight size={12} /> <span className="ellipsis">{parentTitle || 'Без названия'}</span>
+                  <CornerDownRight size={12} /> <span className="ellipsis">{parentTitle || t('Без названия')}</span>
                 </span>
               )}
               {showDate && when && <span className={`tk-when${overdue ? ' overdue' : task.date === today ? ' today' : ''}`}>{when}</span>}
@@ -308,7 +315,7 @@ export function TaskRow({
               {task.notes?.trim() && <AlignLeft size={12} className="tk-mi" />}
               {!!task.focusMinutes && (
                 <span className="tk-mi-text">
-                  <Timer size={12} /> {task.focusMinutes}м
+                  <Timer size={12} /> {t('{n}м', { n: task.focusMinutes })}
                 </span>
               )}
               {task.source && <Network size={12} className="tk-mi" />}

@@ -12,7 +12,8 @@ import { activeHabits, countOn, doneOn, dueOn, isCounter, targetOf } from '../ha
 import { loadPlanner } from '../store/db';
 import { syncSoon } from '../tasks/sync';
 import { useApp, type View } from '../store/appStore';
-import { addDaysYmd, todayYmd } from '../utils/mapTasks';
+import { addDaysYmd, fromYmd, todayYmd } from '../utils/mapTasks';
+import { isEn, LOCALE, t, tn } from '../i18n/index';
 
 export interface Done {
   ok: boolean;
@@ -31,10 +32,11 @@ const lower = (s: string) => s.toLowerCase().replace(/ё/g, 'е');
 
 const MONTHS = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
 export function dayLabel(d: string): string {
-  const t = todayYmd();
-  if (d === t) return 'сегодня';
-  if (d === addDaysYmd(t, 1)) return 'завтра';
-  if (d === addDaysYmd(t, -1)) return 'вчера';
+  const today = todayYmd();
+  if (d === today) return t('сегодня');
+  if (d === addDaysYmd(today, 1)) return t('завтра');
+  if (d === addDaysYmd(today, -1)) return t('вчера');
+  if (isEn) return fromYmd(d).toLocaleDateString(LOCALE, { month: 'short', day: 'numeric' });
   const [, m, day] = d.split('-').map(Number);
   return `${day} ${MONTHS[m - 1]}`;
 }
@@ -100,7 +102,7 @@ export async function findDone(query: string, strict: boolean, kind?: 'task' | '
 export async function markDone(query: string, strict: boolean, n?: number, kind?: 'task' | 'habit'): Promise<Done> {
   const f = await findDone(query, strict, kind);
   const today = todayYmd();
-  if (!f) return { ok: false, label: 'Не нашёл', title: query, meta: 'Нет такой задачи или привычки' };
+  if (!f) return { ok: false, label: t('Не нашёл'), title: query, meta: t('Нет такой задачи или привычки') };
   if (f.kind === 'habit') {
     const h = f.habit;
     const title = `${h.icon ?? '✨'} ${h.name}`;
@@ -109,30 +111,30 @@ export async function markDone(query: string, strict: boolean, n?: number, kind?
       const now = await bumpHabitOn(h, today, add);
       return {
         ok: true,
-        label: 'Привычка',
+        label: t('Привычка'),
         title,
-        meta: `${now} из ${targetOf(h)}${h.unit ? ' · ' + h.unit : ''}${now >= targetOf(h) ? ' — цель на сегодня выполнена 🎉' : ''}`,
+        meta: `${t('{n} из {total}', { n: now, total: targetOf(h) })}${h.unit ? ' · ' + h.unit : ''}${now >= targetOf(h) ? t(' — цель на сегодня выполнена 🎉') : ''}`,
         undo: () => void bumpHabitOn(h, today, -add),
         open: () => go('habits'),
       };
     }
     const p = await loadPlanner();
-    if (doneOn(p.days ?? {}, h, today)) return { ok: true, label: 'Привычка', title, meta: 'Уже отмечена сегодня', open: () => go('habits') };
+    if (doneOn(p.days ?? {}, h, today)) return { ok: true, label: t('Привычка'), title, meta: t('Уже отмечена сегодня'), open: () => go('habits') };
     await toggleHabitOn(h, today);
-    return { ok: true, label: 'Привычка выполнена', title, meta: 'сегодня ✓', undo: () => void toggleHabitOn(h, today), open: () => go('habits') };
+    return { ok: true, label: t('Привычка выполнена'), title, meta: t('сегодня ✓'), undo: () => void toggleHabitOn(h, today), open: () => go('habits') };
   }
   const d = await ensureTasks();
-  const before = d.tasks.find((t) => t.id === f.id);
-  if (!before) return { ok: false, label: 'Задача', title: f.title, meta: 'Не найдена' };
+  const before = d.tasks.find((x) => x.id === f.id);
+  if (!before) return { ok: false, label: t('Задача'), title: f.title, meta: t('Не найдена') };
   const snap = structuredClone(before);
   toggleDone(f.id);
-  const after = (await ensureTasks()).tasks.find((t) => t.id === f.id);
+  const after = (await ensureTasks()).tasks.find((x) => x.id === f.id);
   syncSoon(800);
   return {
     ok: true,
-    label: 'Задача выполнена',
+    label: t('Задача выполнена'),
     title: f.title,
-    meta: snap.repeat && after?.date && after.date !== snap.date ? `следующий раз — ${dayLabel(after.date)}` : 'отмечено ✓',
+    meta: snap.repeat && after?.date && after.date !== snap.date ? t('следующий раз — {day}', { day: dayLabel(after.date) }) : t('отмечено ✓'),
     undo: () => {
       if (!snap.repeat) return toggleDone(f.id);
       // повтор уже перенесён на следующий срок — возвращаем задачу как была
@@ -151,32 +153,28 @@ export async function markDone(query: string, strict: boolean, n?: number, kind?
 
 // ---------- Ответы на вопросы ----------
 
-function plural(n: number, f: [string, string, string]) {
-  const a = Math.abs(n) % 100;
-  const b = a % 10;
-  return a > 10 && a < 20 ? f[2] : b === 1 ? f[0] : b >= 2 && b <= 4 ? f[1] : f[2];
-}
-
 export async function answer(a: Extract<VoiceAction, { type: 'ask' }>): Promise<Done> {
   if (a.what === 'agenda') {
     const d = await ensureTasks();
     const today = todayYmd();
     const items = d.tasks
-      .filter((t) => isActive(t) && !t.deleted && !!t.date && (t.repeat ? occurrences(t, a.date, a.date, 1).length > 0 : t.date === a.date || (a.date === today && t.date! < today)))
+      .filter((x) => isActive(x) && !x.deleted && !!x.date && (x.repeat ? occurrences(x, a.date, a.date, 1).length > 0 : x.date === a.date || (a.date === today && x.date! < today)))
       .sort((x, y) => (x.time ?? '99').localeCompare(y.time ?? '99'));
     const p = await loadPlanner();
     const left = activeHabits(p.habits).filter(
       (h) => dueOn(p.days ?? {}, h, a.date) && !(isCounter(h) ? countOn(p.days?.[a.date], h) >= targetOf(h) : doneOn(p.days ?? {}, h, a.date)),
     );
     const day = dayLabel(a.date);
-    const nTasks = `${items.length} ${plural(items.length, ['задача', 'задачи', 'задач'])}`;
-    const list = items.slice(0, 6).map((t) => (t.time ? `${t.title} в ${t.time}` : t.title));
-    const sayTasks = items.length ? `${day[0].toUpperCase() + day.slice(1)} ${nTasks}: ${list.join(', ')}${items.length > 6 ? ' и другие' : ''}.` : `На ${day} задач нет.`;
-    const sayHabits = left.length ? ` Привычки: ${left.slice(0, 5).map((h) => h.name).join(', ')}.` : '';
+    const nTasks = `${items.length} ${tn(items.length, 'задача', 'задачи', 'задач')}`;
+    const list = items.slice(0, 6).map((x) => (x.time ? t('{title} в {time}', { title: x.title, time: x.time }) : x.title));
+    const sayTasks = items.length
+      ? t('{day} {count}: {list}{more}.', { day: day[0].toUpperCase() + day.slice(1), count: nTasks, list: list.join(', '), more: items.length > 6 ? t(' и другие') : '' })
+      : t('На {day} задач нет.', { day });
+    const sayHabits = left.length ? t(' Привычки: {list}.', { list: left.slice(0, 5).map((h) => h.name).join(', ') }) : '';
     return {
       ok: true,
-      label: `План на ${day}`,
-      title: items.length ? nTasks + (left.length ? ` · ${left.length} ${plural(left.length, ['привычка', 'привычки', 'привычек'])}` : '') : 'Задач нет',
+      label: t('План на {day}', { day }),
+      title: items.length ? nTasks + (left.length ? ` · ${left.length} ${tn(left.length, 'привычка', 'привычки', 'привычек')}` : '') : t('Задач нет'),
       meta: (list.join(' · ') || sayHabits.trim()).slice(0, 140) || undefined,
       say: sayTasks + sayHabits,
       open: () => go(a.date === today ? 'tasks' : 'calendar'),
@@ -189,7 +187,7 @@ export async function answer(a: Extract<VoiceAction, { type: 'ask' }>): Promise<
     const accs = sortedAccounts(d);
     const total = accs.reduce((s, x) => s + toMainLoose(bal.get(x.id) ?? 0, x.currency, d.prefs), 0);
     const parts = accs.map((x) => `${x.name} ${fmtMoney(bal.get(x.id) ?? 0, x.currency)}`);
-    return { ok: true, label: 'Баланс', title: fmtMoney(total, cur), meta: parts.join(' · '), say: `Всего ${fmtMoney(total, cur)}. ${parts.join(', ')}.`, open: () => go('finance') };
+    return { ok: true, label: t('Баланс'), title: fmtMoney(total, cur), meta: parts.join(' · '), say: t('Всего {total}. {parts}.', { total: fmtMoney(total, cur), parts: parts.join(', ') }), open: () => go('finance') };
   }
   const s = summarize(d, { from: a.from, to: a.to });
   const cats = categoryMap(d);
@@ -199,17 +197,24 @@ export async function answer(a: Extract<VoiceAction, { type: 'ask' }>): Promise<
     a.categoryId ??
     (a.category ? [...cats.values()].find((c) => c.kind === (a.what === 'income' ? 'income' : 'expense') && lower(c.name).startsWith(lower(a.category!).slice(0, 5)))?.id : undefined);
   const sum = catId ? (byCat.get(catId) ?? 0) : a.what === 'income' ? s.income : s.expense;
-  const verb = a.what === 'income' ? 'Получено' : 'Потрачено';
   const top = catId ? [] : [...byCat].sort((x, y) => y[1] - x[1]).slice(0, 3);
-  const topText = top.map(([id, v]) => `${cats.get(id)?.name ?? 'Без категории'} ${fmtMoney(v, cur)}`).join(', ');
-  const what = a.category ? ` на «${a.category}»` : '';
+  const topText = top.map(([id, v]) => `${cats.get(id)?.name ?? t('Без категории')} ${fmtMoney(v, cur)}`).join(', ');
+  const vars = { cat: a.category ?? '', period: a.period };
+  const label =
+    a.what === 'income'
+      ? a.category
+        ? t('Получено на «{cat}» {period}', vars)
+        : t('Получено {period}', vars)
+      : a.category
+        ? t('Потрачено на «{cat}» {period}', vars)
+        : t('Потрачено {period}', vars);
   const title = fmtMoney(sum, cur);
   return {
     ok: true,
-    label: `${verb}${what} ${a.period}`,
+    label,
     title,
     meta: topText || undefined,
-    say: `${verb}${what} ${a.period}: ${title}.${topText ? ` Больше всего: ${topText}.` : ''}`,
+    say: `${label}: ${title}.${topText ? t(' Больше всего: {top}.', { top: topText }) : ''}`,
     open: () => go('finance'),
   };
 }

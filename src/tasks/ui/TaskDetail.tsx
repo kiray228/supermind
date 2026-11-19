@@ -34,6 +34,7 @@ import { askText } from '../../ui/dialogs';
 import { DatePicker } from './DatePicker';
 import { TaskCheck } from './TaskRow';
 import { Popover } from './Popover';
+import { LOCALE, t } from '../../i18n/index';
 import './tasks.css';
 import { RelatedNotes } from '../../notes/ui/RelatedNotes';
 import { itemId } from '../../notes/brainDocs';
@@ -47,10 +48,10 @@ export function TaskDetailHost() {
 }
 
 const PRIORITIES: { p: Priority; label: string; color: string }[] = [
-  { p: 1, label: 'Высокий', color: PRIORITY_META[1].color },
-  { p: 2, label: 'Средний', color: PRIORITY_META[2].color },
-  { p: 3, label: 'Низкий', color: PRIORITY_META[3].color },
-  { p: 0, label: 'Без приоритета', color: 'var(--text-3)' },
+  { p: 1, label: t('Высокий'), color: PRIORITY_META[1].color },
+  { p: 2, label: t('Средний'), color: PRIORITY_META[2].color },
+  { p: 3, label: t('Низкий'), color: PRIORITY_META[3].color },
+  { p: 0, label: t('Без приоритета'), color: 'var(--text-3)' },
 ];
 
 function TaskDetail({ task, onClose }: { task: TaskItem; onClose: () => void }) {
@@ -69,9 +70,9 @@ function TaskDetail({ task, onClose }: { task: TaskItem; onClose: () => void }) 
   // несохранённые название и описание записываются при закрытии окна
   useEffect(
     () => () => {
-      const { title: t, notes: n, task: tk } = latest.current;
+      const { title: ti, notes: n, task: tk } = latest.current;
       const patch: Partial<TaskItem> = {};
-      if (t.trim() && t.trim() !== tk.title) patch.title = t.trim();
+      if (ti.trim() && ti.trim() !== tk.title) patch.title = ti.trim();
       if (n !== (tk.notes ?? '')) patch.notes = n || undefined;
       if (Object.keys(patch).length) updateTask(tk.id, patch);
     },
@@ -111,7 +112,7 @@ function TaskDetail({ task, onClose }: { task: TaskItem; onClose: () => void }) 
         .filter(Boolean)
         .slice(0, 12);
       if (steps.length) setChecklist((c) => [...c, ...steps.map((text) => ({ id: uid(), text, done: false }))]);
-      toast(`Добавлено подзадач: ${steps.length}`);
+      toast(t('Добавлено подзадач: {n}', { n: steps.length }));
     } catch (e) {
       toast(e instanceof Error ? e.message : String(e));
     } finally {
@@ -128,7 +129,7 @@ function TaskDetail({ task, onClose }: { task: TaskItem; onClose: () => void }) 
       onClose();
       useApp.getState().go('focus');
     } catch {
-      toast('Таймер фокуса недоступен');
+      toast(t('Таймер фокуса недоступен'));
     }
   };
 
@@ -143,13 +144,13 @@ function TaskDetail({ task, onClose }: { task: TaskItem; onClose: () => void }) 
           <TaskCheck task={task} onToggle={() => toggleDone(task.id)} />
           <button className={`td-when${overdue ? ' overdue' : ''}${task.date ? ' set' : ''}`} onClick={() => setPicking(true)}>
             <CalendarDays size={16} />
-            <span className="ellipsis">{task.date ? whenLabel(task) : 'Дата и напоминание'}</span>
+            <span className="ellipsis">{task.date ? whenLabel(task) : t('Дата и напоминание')}</span>
             {task.repeat && <Repeat size={13} />}
             {task.date && task.reminders.length > 0 && <Bell size={13} />}
           </button>
           <div className="grow" />
           <div className="td-pop-anchor">
-            <button ref={prioRef} className="icon-btn" onClick={() => setMenu(menu === 'prio' ? null : 'prio')} aria-label="Приоритет" style={pc ? { color: pc.color } : undefined}>
+            <button ref={prioRef} className="icon-btn" onClick={() => setMenu(menu === 'prio' ? null : 'prio')} aria-label={t('Приоритет')} style={pc ? { color: pc.color } : undefined}>
               <Flag fill={pc ? pc.color : 'none'} />
             </button>
             {menu === 'prio' && (
@@ -170,22 +171,22 @@ function TaskDetail({ task, onClose }: { task: TaskItem; onClose: () => void }) 
             )}
           </div>
           <div className="td-pop-anchor">
-            <button ref={moreRef} className="icon-btn" onClick={() => setMenu(menu === 'more' ? null : 'more')} aria-label="Ещё">
+            <button ref={moreRef} className="icon-btn" onClick={() => setMenu(menu === 'more' ? null : 'more')} aria-label={t('Ещё')}>
               <MoreHorizontal />
             </button>
             {menu === 'more' && (
               <Popover anchor={moreRef} align="right" onClose={() => setMenu(null)}>
                 <button onClick={() => (setMenu(null), void addTaskToCalendar(task))}>
-                  <CalendarPlus size={16} /> Добавить в календарь телефона
+                  <CalendarPlus size={16} /> {t('Добавить в календарь телефона')}
                 </button>
                 <button onClick={() => (setMenu(null), void startFocus())}>
-                  <Timer size={16} /> Начать фокус (помодоро)
+                  <Timer size={16} /> {t('Начать фокус (помодоро)')}
                 </button>
                 <button onClick={() => (setMenu(null), void aiSplit())} disabled={aiBusy}>
-                  <Sparkles size={16} /> ИИ: разбить на подзадачи
+                  <Sparkles size={16} /> {t('ИИ: разбить на подзадачи')}
                 </button>
                 <button onClick={() => (setMenu(null), save({ pinned: !task.pinned || undefined }))}>
-                  <Pin size={16} /> {task.pinned ? 'Открепить' : 'Закрепить сверху'}
+                  <Pin size={16} /> {task.pinned ? t('Открепить') : t('Закрепить сверху')}
                 </button>
                 <button
                   onClick={() => {
@@ -194,35 +195,35 @@ function TaskDetail({ task, onClose }: { task: TaskItem; onClose: () => void }) 
                     if (c) openTask(c.id);
                   }}
                 >
-                  <Copy size={16} /> Дублировать
+                  <Copy size={16} /> {t('Дублировать')}
                 </button>
                 <button
                   onClick={async () => {
                     setMenu(null);
-                    const name = await askText('Сохранить как шаблон', { value: task.title, message: 'Название, описание, чек-лист, теги и время — для похожих задач. Новая задача по шаблону: «Задачи» → «⋯» → «Из шаблона…».' });
-                    if (name?.trim() && saveTaskTemplate(task.id, name)) toast(`Шаблон «${name.trim()}» сохранён`);
+                    const name = await askText(t('Сохранить как шаблон'), { value: task.title, message: t('Название, описание, чек-лист, теги и время — для похожих задач. Новая задача по шаблону: «Задачи» → «⋯» → «Из шаблона…».') });
+                    if (name?.trim() && saveTaskTemplate(task.id, name)) toast(t('Шаблон «{name}» сохранён', { name: name.trim() }));
                   }}
                 >
-                  <LayoutTemplate size={16} /> Сохранить как шаблон
+                  <LayoutTemplate size={16} /> {t('Сохранить как шаблон')}
                 </button>
                 {!task.done && !task.wontDo && (
                   <button onClick={() => (setMenu(null), setWontDo(task.id))}>
-                    <Ban size={16} /> Не буду делать
+                    <Ban size={16} /> {t('Не буду делать')}
                   </button>
                 )}
                 {task.source && (
                   <button onClick={() => (onClose(), void openDoc(task.source!.docId, task.source!.topicId))}>
-                    <Network size={16} /> Открыть в карте
+                    <Network size={16} /> {t('Открыть в карте')}
                   </button>
                 )}
                 <div className="sep" />
                 {task.deleted ? (
                   <>
                     <button onClick={() => (setMenu(null), restoreTask(task.id))}>
-                      <Undo2 size={16} /> Восстановить
+                      <Undo2 size={16} /> {t('Восстановить')}
                     </button>
                     <button className="danger" onClick={() => (onClose(), purgeTask(task.id))}>
-                      <Trash2 size={16} /> Удалить навсегда
+                      <Trash2 size={16} /> {t('Удалить навсегда')}
                     </button>
                   </>
                 ) : (
@@ -231,25 +232,25 @@ function TaskDetail({ task, onClose }: { task: TaskItem; onClose: () => void }) 
                     onClick={() => {
                       onClose();
                       trashTask(task.id);
-                      toast('Задача удалена', { label: 'Вернуть', run: () => restoreTask(task.id) });
+                      toast(t('Задача удалена'), { label: t('Вернуть'), run: () => restoreTask(task.id) });
                     }}
                   >
-                    <Trash2 size={16} /> Удалить
+                    <Trash2 size={16} /> {t('Удалить')}
                   </button>
                 )}
               </Popover>
             )}
           </div>
-          <button className="icon-btn" onClick={onClose} aria-label="Закрыть">
+          <button className="icon-btn" onClick={onClose} aria-label={t('Закрыть')}>
             <X />
           </button>
         </div>
 
         {(task.deleted || task.wontDo) && (
           <div className="td-banner">
-            {task.deleted ? 'Задача в корзине' : 'Отмечено «Не буду делать»'}
+            {task.deleted ? t('Задача в корзине') : t('Отмечено «Не буду делать»')}
             <button className="btn btn-sm" onClick={() => (task.deleted ? restoreTask(task.id) : toggleDone(task.id))}>
-              Вернуть
+              {t('Вернуть')}
             </button>
           </div>
         )}
@@ -257,12 +258,12 @@ function TaskDetail({ task, onClose }: { task: TaskItem; onClose: () => void }) 
         <AutoText
           className={`td-title${task.done ? ' done' : ''}`}
           value={title}
-          placeholder="Что нужно сделать?"
+          placeholder={t('Что нужно сделать?')}
           onChange={setTitle}
           onBlur={commitTitle}
           onEnter={commitTitle}
         />
-        <AutoText className="td-notes" value={notes} placeholder="Описание, заметки, ссылки…" onChange={setNotes} onBlur={commitNotes} multiline />
+        <AutoText className="td-notes" value={notes} placeholder={t('Описание, заметки, ссылки…')} onChange={setNotes} onBlur={commitNotes} multiline />
 
         {/* подзадачи */}
         <div className="td-section">
@@ -279,7 +280,7 @@ function TaskDetail({ task, onClose }: { task: TaskItem; onClose: () => void }) 
               onDelete={() => setChecklist((all) => all.filter((x) => x.id !== c.id))}
               onPromote={() => {
                 const n = promoteChecklistItem(task.id, c.id);
-                if (n) toast(`«${n.title}» — теперь отдельная задача`, { label: 'Открыть', run: () => openTask(n.id) });
+                if (n) toast(t('«{title}» — теперь отдельная задача', { title: n.title }), { label: t('Открыть'), run: () => openTask(n.id) });
               }}
               onEnter={() => {
                 const n = { id: uid(), text: '', done: false };
@@ -298,17 +299,17 @@ function TaskDetail({ task, onClose }: { task: TaskItem; onClose: () => void }) 
             />
           ))}
           <AddLine
-            placeholder="Добавить подзадачу"
+            placeholder={t('Добавить подзадачу')}
             onAdd={(text) => setChecklist((all) => [...all, { id: uid(), text, done: false }])}
           />
           {children.length > 0 && (
             <div className="td-children">
-              <div className="td-children-h">Отдельные задачи</div>
+              <div className="td-children-h">{t('Отдельные задачи')}</div>
               {children.map((c) => (
                 <div key={c.id} className={`td-child${c.done ? ' done' : ''}`}>
                   <TaskCheck task={c} onToggle={() => toggleDone(c.id)} />
                   <button className="td-child-title ellipsis" onClick={() => openTask(c.id)}>
-                    {c.title || 'Без названия'}
+                    {c.title || t('Без названия')}
                   </button>
                   {c.date && <span className={`td-child-when${isOverdue(c) ? ' overdue' : ''}`}>{whenLabel(c, todayYmd())}</span>}
                 </div>
@@ -317,7 +318,7 @@ function TaskDetail({ task, onClose }: { task: TaskItem; onClose: () => void }) 
           )}
           {parent && (
             <button className="td-parent" onClick={() => openTask(parent.id)}>
-              <CornerLeftUp size={14} /> Из задачи «{parent.title || 'Без названия'}»
+              <CornerLeftUp size={14} /> {t('Из задачи «{title}»', { title: parent.title || t('Без названия') })}
             </button>
           )}
         </div>
@@ -325,7 +326,7 @@ function TaskDetail({ task, onClose }: { task: TaskItem; onClose: () => void }) 
         {/* параметры */}
         <div className="td-props">
           <label className="td-prop">
-            <span className="td-prop-label">Список</span>
+            <span className="td-prop-label">{t('Список')}</span>
             <span className="td-list-dot" style={{ background: list?.color }} />
             <select className="td-select" value={task.listId} onChange={(e) => save({ listId: e.target.value })}>
               {data.lists.map((l) => (
@@ -339,19 +340,19 @@ function TaskDetail({ task, onClose }: { task: TaskItem; onClose: () => void }) 
 
           <div className="td-prop td-tags">
             <span className="td-prop-label">
-              <Tag size={14} /> Теги
+              <Tag size={14} /> {t('Теги')}
             </span>
             {task.tags.map((g) => (
               <span key={g} className="tk-tag big" style={data.tagColors[g] ? ({ '--tc': data.tagColors[g] } as CSSProperties) : undefined}>
                 #{g}
-                <button onClick={() => save({ tags: task.tags.filter((x) => x !== g) })} aria-label="Убрать тег">
+                <button onClick={() => save({ tags: task.tags.filter((x) => x !== g) })} aria-label={t('Убрать тег')}>
                   <X size={12} />
                 </button>
               </span>
             ))}
             <input
               className="td-tag-input"
-              placeholder="+ тег"
+              placeholder={t('+ тег')}
               value={tagInput}
               onChange={(e) => setTagInput(e.target.value)}
               onKeyDown={(e) => {
@@ -376,15 +377,15 @@ function TaskDetail({ task, onClose }: { task: TaskItem; onClose: () => void }) 
           {task.date && (
             <button className="td-prop td-prop-btn" onClick={() => setPicking(true)}>
               <span className="td-prop-label">
-                <Bell size={14} /> Напоминания
+                <Bell size={14} /> {t('Напоминания')}
               </span>
-              <span className="small grow">{task.reminders.length ? task.reminders.map((r) => reminderLabel(r, !!task.time)).join(', ') : 'нет'}</span>
+              <span className="small grow">{task.reminders.length ? task.reminders.map((r) => reminderLabel(r, !!task.time)).join(', ') : t('нет')}</span>
             </button>
           )}
           {task.repeat && (
             <button className="td-prop td-prop-btn" onClick={() => setPicking(true)}>
               <span className="td-prop-label">
-                <Repeat size={14} /> Повтор
+                <Repeat size={14} /> {t('Повтор')}
               </span>
               <span className="small grow">{repeatLabel(task.repeat)}</span>
             </button>
@@ -392,9 +393,9 @@ function TaskDetail({ task, onClose }: { task: TaskItem; onClose: () => void }) 
           {task.source && (
             <button className="td-prop td-prop-btn" onClick={() => (onClose(), void openDoc(task.source!.docId, task.source!.topicId))}>
               <span className="td-prop-label">
-                <Network size={14} /> Карта
+                <Network size={14} /> {t('Карта')}
               </span>
-              <span className="small grow ellipsis">{task.source.docTitle || 'Открыть тему'}</span>
+              <span className="small grow ellipsis">{task.source.docTitle || t('Открыть тему')}</span>
             </button>
           )}
         </div>
@@ -405,10 +406,10 @@ function TaskDetail({ task, onClose }: { task: TaskItem; onClose: () => void }) 
         </div>
 
         <div className="td-foot tiny faint">
-          Создано {new Date(task.createdAt).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-          {task.completedAt && ` · выполнено ${new Date(task.completedAt).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`}
-          {!!task.repeatDone && ` · повторов выполнено: ${task.repeatDone}`}
-          {!!task.focusMinutes && ` · фокус: ${task.focusMinutes} мин`}
+          {t('Создано {date}', { date: stamp(task.createdAt) })}
+          {task.completedAt && t(' · выполнено {date}', { date: stamp(task.completedAt) })}
+          {!!task.repeatDone && t(' · повторов выполнено: {n}', { n: task.repeatDone })}
+          {!!task.focusMinutes && t(' · фокус: {n} мин', { n: task.focusMinutes })}
         </div>
       </div>
 
@@ -426,6 +427,8 @@ function TaskDetail({ task, onClose }: { task: TaskItem; onClose: () => void }) 
     </div>
   );
 }
+
+const stamp = (ms: number) => new Date(ms).toLocaleString(LOCALE, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 function ChecklistRow({
   item,
@@ -447,14 +450,14 @@ function ChecklistRow({
   return (
     <div className={`td-ck${item.done ? ' done' : ''}`}>
       <GripVertical size={14} className="td-grip" />
-      <button className={`td-ck-box${item.done ? ' on' : ''}`} onClick={() => onChange({ done: !item.done })} aria-label="Готово">
+      <button className={`td-ck-box${item.done ? ' on' : ''}`} onClick={() => onChange({ done: !item.done })} aria-label={t('Готово')}>
         {item.done && '✓'}
       </button>
       <input
         data-ck={item.id}
         className="td-ck-text"
         value={text}
-        placeholder="Подзадача"
+        placeholder={t('Подзадача')}
         onChange={(e) => setText(e.target.value)}
         onBlur={() => (text.trim() ? text !== item.text && onChange({ text }) : onDelete())}
         onKeyDown={(e) => {
@@ -471,10 +474,10 @@ function ChecklistRow({
           else if (e.altKey && e.key === 'ArrowDown') onMove(1);
         }}
       />
-      <button className="td-ck-del" onClick={onPromote} aria-label="Сделать отдельной задачей" title="Сделать отдельной задачей — со своей датой и напоминанием">
+      <button className="td-ck-del" onClick={onPromote} aria-label={t('Сделать отдельной задачей')} title={t('Сделать отдельной задачей — со своей датой и напоминанием')}>
         <SquareArrowOutUpRight size={14} />
       </button>
-      <button className="td-ck-del" onClick={onDelete} aria-label="Удалить подзадачу">
+      <button className="td-ck-del" onClick={onDelete} aria-label={t('Удалить подзадачу')}>
         <X size={14} />
       </button>
     </div>
