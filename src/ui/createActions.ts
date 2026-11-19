@@ -1,7 +1,7 @@
 /** «Создать»: меню при удержании микрофона — задача, заметка, карта, привычка, цель, трата */
 import { useApp } from '../store/appStore';
 
-export type CreateKind = 'task' | 'note' | 'map' | 'habit' | 'goal' | 'expense';
+export type CreateKind = 'task' | 'note' | 'map' | 'habit' | 'goal' | 'expense' | 'photoText';
 
 /** Раздел «Привычки» откроет окно новой привычки, когда смонтируется */
 export const NEW_HABIT_EVENT = 'sm-new-habit';
@@ -21,6 +21,11 @@ export async function createThing(kind: CreateKind) {
       if (!m) return;
       await openNote(m.id);
       await nav('notes');
+      return;
+    }
+    case 'photoText': {
+      const { openPhotoText } = await import('../notes/photoText');
+      await openPhotoText();
       return;
     }
     case 'map': {

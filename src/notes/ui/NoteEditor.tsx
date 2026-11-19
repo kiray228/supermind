@@ -20,6 +20,7 @@ import {
   Pin,
   PinOff,
   Plus,
+  ScanText,
   Share2,
   Sparkles,
   Square,
@@ -448,6 +449,19 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
         toast(e instanceof Error ? e.message : 'Не удалось добавить изображение');
       }
     });
+  }
+
+  /** «Вставить текст с фото»: распознанный текст — после блока, где стоял курсор (или в конец, если заметку сменили) */
+  function photoText(after: ID | null) {
+    const noteId = openId;
+    void import('../photoText').then((m) =>
+      m.openPhotoText({
+        onInsert: (list) => {
+          if (noteId && useNotes.getState().openId !== noteId) void appendBlocksToNote(noteId, list);
+          else insertBlocks(after, list);
+        },
+      }),
+    );
   }
 
   function transcriptToText(id: ID) {
@@ -1164,6 +1178,7 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
             onPick={(t) => pickType(t, menu.blockId, menu.replace)}
             onEmbed={() => startEmbed(menu.blockId, menu.replace)}
             onTemplate={() => pickTemplate(menu.blockId, menu.replace)}
+            onPhotoText={() => photoText(menu.blockId ?? anchorId() ?? null)}
           />
         </NtMenu>
       )}
@@ -1208,6 +1223,7 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
           <MenuItem icon={<Share2 size={17} />} label={t('Поделиться')} onClick={() => void share()} />
           <MenuItem icon={<Copy size={17} />} label={t('Копировать текст')} onClick={() => void copyText()} />
           <MenuItem icon={<Download size={17} />} label={t('Экспорт в Markdown')} onClick={exportMd} />
+          <MenuItem icon={<ScanText size={17} />} label={t('Вставить текст с фото')} onClick={() => photoText(anchorId() ?? null)} />
           <MenuSep />
           {(Object.keys(NOTE_AI_LABELS) as NoteAIKind[]).map((k) => (
             <MenuItem key={k} icon={<Sparkles size={17} />} label={NOTE_AI_LABELS[k]} onClick={() => void runAI(k)} />

@@ -25,6 +25,8 @@
   background: var(--lg-sheet, var(--surface)); color: var(--text); font-size: 13px; font-weight: 500; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
 }
 .vc-create-item:active { transform: scale(.94); }
+/* одинокий пункт последнего ряда — по центру */
+.vc-create-item:last-child:nth-child(3n + 1) { grid-column: 2; }
 .vc-create-hint { margin: 0; color: #fff; font-size: 13px; text-align: center; padding: 0 24px; }
 @keyframes vc-pop { from { opacity: 0; transform: translateY(14px) scale(.96); } }
 @media (prefers-reduced-motion: reduce) { .vc-create, .vc-create-layer { animation: none; } }

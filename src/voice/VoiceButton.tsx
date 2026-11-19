@@ -27,6 +27,7 @@ const CREATE: { kind: CreateKind; label: string; section: SectionId }[] = [
   { kind: 'habit', label: t('Привычка'), section: 'habits' },
   { kind: 'goal', label: t('Цель'), section: 'goals' },
   { kind: 'expense', label: t('Трата'), section: 'finance' },
+  { kind: 'photoText', label: t('Текст с фото'), section: 'notes' },
 ];
 
 /** Сколько держать микрофон, чтобы открылось меню «создать» */

@@ -127,3 +127,127 @@ export function parseAiJson(s: string): unknown {
     return null;
   }
 }
+
+// ---------- «Текст с фото»: распознавание текста на снимке ----------
+
+export interface OcrImage {
+  /** image/jpeg, image/png или image/webp */
+  mime: string;
+  /** base64 без префикса data: */
+  data: string;
+}
+
+/** Модель с картинками: инструкция + снимок → текст */
+export type Vision = (prompt: string, image: OcrImage) => Promise<string>;
+
+/** Ответ модели, когда на снимке нет текста */
+export const OCR_NONE = '[[NO_TEXT]]';
+
+/** Инструкция для распознавания: текст как есть, без пересказа и перевода */
+export function ocrPrompt(lang?: string): string {
+  const ui = lang === 'en' ? 'английский' : lang === 'kk' ? 'казахский' : 'русский';
+  return [
+    'Распознай весь текст на изображении (страница, доска, чек, скриншот, вывеска, рукописная записка) и верни ТОЛЬКО этот текст — без вступления, пояснений и markdown-ограждений ```.',
+    'Текст может быть на русском, казахском (буквы ә ғ қ ң ө ұ ү һ і), английском или смешанный. Сохраняй язык и написание оригинала: не переводи, не пересказывай, не исправляй слова и цифры.',
+    'Строки одного абзаца, разорванные переносом, соединяй в одну строку (перенос слова с дефисом — убери дефис). Абзацы разделяй пустой строкой.',
+    'Списки, пункты и строки таблиц или чека оставляй отдельными строками; пункты списка начинай с «- », нумерованные — как в оригинале. Колонки строки чека или таблицы разделяй пробелами, например «Хлеб 2 × 150 300».',
+    'Неразборчивое слово замени на «…». Порядок — как читает человек: сверху вниз, слева направо, колонки по очереди.',
+    `Если текста на изображении нет — ответь ровно ${OCR_NONE}. Язык интерфейса пользователя — ${ui} (это не повод переводить текст).`,
+  ].join('\n');
+}
+
+/** Ответ модели → текст: убрать ограждения ``` и пустые края; «нет текста» → '' */
+export function parseOcrText(s: string): string {
+  let t = (s ?? '').replace(/\r\n?/g, '\n').trim();
+  const fenced = t.match(/^```[a-zA-Z]*\n([\s\S]*?)\n?```$/);
+  if (fenced) t = fenced[1].trim();
+  if (!t || (t.includes(OCR_NONE) && t.replace(OCR_NONE, '').trim().length < 3)) return '';
+  return t.replace(/\n{3,}/g, '\n\n');
+}
+
+/** Тело запроса к Gemini: картинка частью сообщения (inline_data) */
+export function geminiVisionBody(prompt: string, image: OcrImage) {
+  return {
+    contents: [{ role: 'user', parts: [{ inline_data: { mime_type: image.mime, data: image.data } }, { text: prompt }] }],
+    generationConfig: { temperature: 0, maxOutputTokens: 8192 },
+  };
+}
+
+/** Тело запроса к Groq (формат OpenAI): картинка — data URL */
+export function groqVisionBody(model: string, prompt: string, image: OcrImage) {
+  return {
+    model,
+    temperature: 0,
+    max_tokens: 8192,
+    messages: [{ role: 'user', content: [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: `data:${image.mime};base64,${image.data}` } }] }],
+  };
+}
+
+export function envVision(env: Record<string, string | undefined> = process.env): Vision | null {
+  if (env.GEMINI_API_KEY) {
+    const key = env.GEMINI_API_KEY;
+    const first = env.GEMINI_VISION_MODEL || env.GEMINI_MODEL;
+    const models = first ? [first, ...GEMINI_MODELS] : GEMINI_MODELS;
+    return async (prompt, image) => {
+      let last = '';
+      for (const model of models) {
+        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+          method: 'POST',
+          headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' },
+          body: JSON.stringify(geminiVisionBody(prompt, image)),
+        });
+        // как в envAi: нет модели, перегружена или кончилась её квота — пробуем следующую
+        if (r.status === 404 || r.status === 429 || r.status >= 500) {
+          last = `Gemini ${r.status} (${model}): ${(await r.text()).slice(0, 160)}`;
+          continue;
+        }
+        if (!r.ok) throw new Error(`Gemini ${r.status}: ${(await r.text()).slice(0, 200)}`);
+        const d = (await r.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+        return d.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('') ?? '';
+      }
+      throw new Error(last);
+    };
+  }
+  if (env.GROQ_API_KEY) {
+    const key = env.GROQ_API_KEY;
+    const model = env.GROQ_VISION_MODEL || 'meta-llama/llama-4-scout-17b-16e-instruct';
+    return async (prompt, image) => {
+      const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(groqVisionBody(model, prompt, image)),
+      });
+      if (!r.ok) throw new Error(`Groq ${r.status}: ${(await r.text()).slice(0, 200)}`);
+      const d = (await r.json()) as { choices?: { message?: { content?: string } }[] };
+      return d.choices?.[0]?.message?.content ?? '';
+    };
+  }
+  return null;
+}
+
+/** Самое большое фото после сжатия на устройстве (байт) */
+export const OCR_MAX_BYTES = 4 * 1024 * 1024;
+const OCR_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+/**
+ * Проверить снимок из запроса: формат, base64, размер. Принимает и data URL.
+ * Ошибка — строка для ответа 400/413, иначе картинка.
+ */
+export function readOcrImage(image: unknown, mime: unknown): OcrImage | { error: string; status: 400 | 413 } {
+  let data = typeof image === 'string' ? image.trim() : '';
+  let type = typeof mime === 'string' ? mime.trim().toLowerCase() : '';
+  const m = data.match(/^data:([\w/+.-]+);base64,/);
+  if (m) {
+    type ||= m[1].toLowerCase();
+    data = data.slice(m[0].length);
+  }
+  type ||= 'image/jpeg';
+  if (type === 'image/jpg') type = 'image/jpeg';
+  if (!data) return { error: 'Нет фото', status: 400 };
+  if (!OCR_MIMES.has(type)) return { error: 'Формат фото не поддерживается — нужен JPEG, PNG или WebP', status: 400 };
+  // размер до проверки содержимого: большая строка не гоняется через регулярку
+  const bytes = Math.floor((data.length * 3) / 4) - (data.endsWith('==') ? 2 : data.endsWith('=') ? 1 : 0);
+  if (bytes > OCR_MAX_BYTES) return { error: 'Фото слишком большое', status: 413 };
+  if (data.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(data)) return { error: 'Фото повреждено', status: 400 };
+  return { mime: type, data };
+}

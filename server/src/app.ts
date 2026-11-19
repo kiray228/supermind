@@ -10,6 +10,7 @@
  *   GET /admin/errors · PATCH /admin/errors/:id
  *     — входящие поддержки для владельца (ADMIN_EMAILS)
  *   POST /ai/command — голосовая команда → действия · POST /ai/chat — текстовый ответ без своего ключа Claude
+ *   POST /ai/ocr — «Текст с фото»: снимок → распознанный текст
  *     (бесплатная модель Gemini/Groq, общий лимит запросов в день на пользователя)
  *   GET /sync?since=N · POST /sync
  *   GET /snapshots · GET /snapshots/:id · POST /snapshots — облачные копии данных (каждый час при изменениях — сами)
@@ -21,7 +22,7 @@ import { ensureSchema, type Row, type Sql } from './sql.ts';
 import { generateVapidKeys, sendPush, type PushResult, type PushSubscription, type VapidKeys } from './webpush.ts';
 import type { NextDueMark, NextDueStore } from './objectStore.ts';
 import { doneMail, envMailer, feedbackMail, replyMail, resetMail, type Mailer } from './mail.ts';
-import { commandPrompt, envAi, parseAiJson, type Ai } from './ai.ts';
+import { commandPrompt, envAi, envVision, ocrPrompt, parseAiJson, parseOcrText, readOcrImage, type Ai, type Vision } from './ai.ts';
 import { fetchPublicPage, isPublicIp, WebError, type FetchPage } from './web.ts';
 import { HELP_DOC } from './helpdoc.ts';
 import { randomInt } from 'node:crypto';
@@ -41,6 +42,8 @@ export interface Deps {
   adminEmails?: string[];
   /** бесплатная модель для голосовых команд; null — не настроена */
   ai?: Ai | null;
+  /** модель с картинками для «Текст с фото» (POST /ai/ocr); null — не настроена */
+  vision?: Vision | null;
   /** страница по ссылке («Сохранить статью»); в тестах — заглушка */
   fetchPage?: FetchPage;
   /** запросов к модели в день на пользователя (AI_DAILY_LIMIT, по умолчанию 100) */
@@ -119,6 +122,7 @@ export function createApp(deps: Deps) {
   const supportTo = deps.supportEmail ?? process.env.SUPPORT_EMAIL ?? process.env.MAIL_FROM ?? '';
   const admins = new Set((deps.adminEmails ?? (process.env.ADMIN_EMAILS ?? '').split(',')).map((x) => x.trim().toLowerCase()).filter(Boolean));
   const ai = deps.ai === undefined ? envAi() : deps.ai;
+  const vision = deps.vision === undefined ? envVision() : deps.vision;
   const aiDailyLimit = deps.aiDailyLimit ?? (Number(process.env.AI_DAILY_LIMIT) || 100);
   const fetchPage = deps.fetchPage ?? ((url: string) => fetchPublicPage(url));
   const aiGlobalLimit = deps.aiGlobalLimit ?? (Number(process.env.AI_GLOBAL_DAILY) || 3000);
@@ -405,6 +409,24 @@ ${HELP_DOC}`;
       console.error('ai chat', e);
       throw new HttpError(502, 'ИИ сейчас недоступен — попробуйте через минуту');
     }
+  }
+
+  /** «Текст с фото»: снимок (base64, сжат на устройстве) → распознанный текст. Снимок нигде не сохраняется */
+  async function aiOcr(request: Request) {
+    const user = await userOf(request);
+    if (!vision) throw new HttpError(503, 'ИИ на сервере не подключён');
+    const b = await body<{ image?: unknown; mime?: unknown; lang?: unknown }>(request);
+    const img = readOcrImage(b.image, b.mime);
+    if ('error' in img) throw new HttpError(img.status, img.error);
+    await spendAi(user.id);
+    let out: string;
+    try {
+      out = await vision(ocrPrompt(str(b.lang)), img);
+    } catch (e) {
+      console.error('ai ocr', e);
+      throw new HttpError(502, 'ИИ сейчас недоступен — попробуйте через минуту');
+    }
+    return json({ text: parseOcrText(out) });
   }
 
 
@@ -1144,6 +1166,7 @@ ${HELP_DOC}`;
     if (own && m === 'POST') return userFeedbackMessage(request, own[1]);
     if (m === 'POST' && path === '/ai/command') return aiCommand(request);
     if (m === 'POST' && path === '/ai/chat') return aiChat(request);
+    if (m === 'POST' && path === '/ai/ocr') return aiOcr(request);
     if (m === 'POST' && path === '/web/page') return webPage(request);
     if (m === 'POST' && path === '/auth/reset') return reset(request);
     if (m === 'POST' && path === '/auth/password') return changePassword(request);
