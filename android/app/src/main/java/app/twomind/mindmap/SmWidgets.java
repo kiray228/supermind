@@ -10,6 +10,7 @@ import android.os.Bundle;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.text.DateFormatSymbols;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Locale;
@@ -58,8 +59,33 @@ final class SmWidgets {
 
     /** Дата на языке приложения: свой шаблон для русского (и казахского) и английского (по-английски месяц впереди: «Mon, Nov 3») */
     static String fmt(Context ctx, String ruPattern, String enPattern, Calendar c) {
-        boolean en = Lang.en(ctx);
-        return new SimpleDateFormat(en ? enPattern : ruPattern, Lang.locale(ctx)).format(c.getTime()).replace(".", "");
+        return fmt(ctx, ruPattern, enPattern, ruPattern, c);
+    }
+
+    /** То же со своим шаблоном для казахского (по-казахски день недели в конце: «19 қараша, сәрсенбі») */
+    static String fmt(Context ctx, String ruPattern, String enPattern, String kkPattern, Calendar c) {
+        String lang = Lang.code(ctx);
+        if ("kk".equals(lang)) {
+            // названия — свои: в данных ICU на части устройств казахского нет; L (отдельный месяц) — как M
+            return new SimpleDateFormat(kkPattern.replace('L', 'M'), kkSymbols()).format(c.getTime()).replace(".", "");
+        }
+        return new SimpleDateFormat("en".equals(lang) ? enPattern : ruPattern, Lang.locale(ctx)).format(c.getTime()).replace(".", "");
+    }
+
+    private static volatile DateFormatSymbols kkSymbols;
+
+    /** Казахские названия месяцев и дней недели */
+    static DateFormatSymbols kkSymbols() {
+        DateFormatSymbols s = kkSymbols;
+        if (s != null) return s;
+        s = new DateFormatSymbols(Lang.KZ);
+        s.setMonths(new String[] {"қаңтар", "ақпан", "наурыз", "сәуір", "мамыр", "маусым", "шілде", "тамыз", "қыркүйек", "қазан", "қараша", "желтоқсан", ""});
+        s.setShortMonths(new String[] {"қаң", "ақп", "нау", "сәу", "мам", "мау", "шіл", "там", "қыр", "қаз", "қар", "жел", ""});
+        // индекс 1 — воскресенье (Calendar.SUNDAY)
+        s.setWeekdays(new String[] {"", "жексенбі", "дүйсенбі", "сейсенбі", "сәрсенбі", "бейсенбі", "жұма", "сенбі"});
+        s.setShortWeekdays(new String[] {"", "жс", "дс", "сс", "ср", "бс", "жм", "сб"});
+        kkSymbols = s;
+        return s;
     }
 
     static int minutesOf(String hhmm) {

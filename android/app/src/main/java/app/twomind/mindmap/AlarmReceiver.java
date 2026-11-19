@@ -44,7 +44,7 @@ public class AlarmReceiver extends BroadcastReceiver {
     static void ring(Context c, JSONObject alarm) {
         Intent s = new Intent(c, AlarmService.class)
             .setAction(AlarmService.ACTION_RING)
-            .putExtra("title", alarm.optString("title", Lang.t(c, "Задача", "Task")))
+            .putExtra("title", alarm.optString("title", Lang.t(c, "Задача", "Task", "Тапсырма")))
             .putExtra("body", alarm.optString("body", ""))
             .putExtra("taskId", alarm.optString("taskId", ""))
             .putExtra("date", alarm.optString("date", ""));
@@ -72,7 +72,7 @@ public class AlarmReceiver extends BroadcastReceiver {
                 c, 0, open == null ? new Intent() : open, android.app.PendingIntent.FLAG_UPDATE_CURRENT | android.app.PendingIntent.FLAG_IMMUTABLE);
             androidx.core.app.NotificationCompat.Builder b = new androidx.core.app.NotificationCompat.Builder(c, channel)
                 .setSmallIcon(c.getApplicationInfo().icon)
-                .setContentTitle("⏰ " + alarm.optString("title", Lang.t(c, "Задача", "Task")))
+                .setContentTitle("⏰ " + alarm.optString("title", Lang.t(c, "Задача", "Task", "Тапсырма")))
                 .setContentText(alarm.optString("body", ""))
                 .setPriority(androidx.core.app.NotificationCompat.PRIORITY_MAX)
                 .setCategory(androidx.core.app.NotificationCompat.CATEGORY_ALARM)
@@ -85,7 +85,7 @@ public class AlarmReceiver extends BroadcastReceiver {
 
     /** Кнопка будильника (в уведомлении или на экране будильника) */
     static void act(Context c, String action, Bundle ex) {
-        String title = ex == null ? Lang.t(c, "Задача", "Task") : ex.getString("title", Lang.t(c, "Задача", "Task"));
+        String title = ex == null ? Lang.t(c, "Задача", "Task", "Тапсырма") : ex.getString("title", Lang.t(c, "Задача", "Task", "Тапсырма"));
         String taskId = ex == null ? "" : ex.getString("taskId", "");
         String date = ex == null ? "" : ex.getString("date", "");
         try {
@@ -96,7 +96,7 @@ public class AlarmReceiver extends BroadcastReceiver {
                 JSONObject o = new JSONObject()
                     .put("at", at)
                     .put("title", title)
-                    .put("body", Lang.t(c, "Отложено на 10 минут", "Snoozed for 10 minutes"))
+                    .put("body", Lang.t(c, "Отложено на 10 минут", "Snoozed for 10 minutes", "10 минутқа кейінге қалдырылды"))
                     .put("taskId", taskId)
                     .put("date", date)
                     .put("snooze", 1);

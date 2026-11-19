@@ -103,8 +103,8 @@ public class AlarmService extends Service {
         if (Build.VERSION.SDK_INT < 26) return;
         NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null) return;
-        String name = Lang.t(c, "Будильники", "Alarms");
-        String desc = Lang.t(c, "Напоминания-будильники: звонят, пока не выключите", "Alarm reminders: they ring until you stop them");
+        String name = Lang.t(c, "Будильники", "Alarms", "Оятқыштар");
+        String desc = Lang.t(c, "Напоминания-будильники: звонят, пока не выключите", "Alarm reminders: they ring until you stop them", "Оятқыш-ескертулер: өшіргенше шырылдайды");
         NotificationChannel old = nm.getNotificationChannel(CHANNEL);
         if (old != null) {
             // язык сменили — переименовать канал (звук и важность у существующего канала не меняются)
@@ -137,8 +137,8 @@ public class AlarmService extends Service {
         NotificationCompat.Builder b = new NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_supermind)
             .setColor(0xFF007AFF)
-            .setContentTitle("⏰ " + ex.getString("title", Lang.t(this, "Задача", "Task")))
-            .setContentText(body.isEmpty() ? Lang.t(this, "Будильник SuperMind", "SuperMind alarm") : body)
+            .setContentTitle("⏰ " + ex.getString("title", Lang.t(this, "Задача", "Task", "Тапсырма")))
+            .setContentText(body.isEmpty() ? Lang.t(this, "Будильник SuperMind", "SuperMind alarm", "SuperMind оятқышы") : body)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -146,9 +146,9 @@ public class AlarmService extends Service {
             .setAutoCancel(false)
             .setContentIntent(fullPi)
             .setFullScreenIntent(fullPi, true)
-            .addAction(0, Lang.t(this, "Выключить", "Stop"), action(AlarmReceiver.ACTION_STOP, ex, 11))
-            .addAction(0, Lang.t(this, "Отложить 10 мин", "Snooze 10 min"), action(AlarmReceiver.ACTION_SNOOZE, ex, 12));
-        if (!ex.getString("taskId", "").isEmpty()) b.addAction(0, Lang.t(this, "✓ Готово", "✓ Done"), action(AlarmReceiver.ACTION_DONE, ex, 13));
+            .addAction(0, Lang.t(this, "Выключить", "Stop", "Өшіру"), action(AlarmReceiver.ACTION_STOP, ex, 11))
+            .addAction(0, Lang.t(this, "Отложить 10 мин", "Snooze 10 min", "10 мин кейін"), action(AlarmReceiver.ACTION_SNOOZE, ex, 12));
+        if (!ex.getString("taskId", "").isEmpty()) b.addAction(0, Lang.t(this, "✓ Готово", "✓ Done", "✓ Дайын"), action(AlarmReceiver.ACTION_DONE, ex, 13));
         return b.build();
     }
 

@@ -106,11 +106,17 @@ final class Lang {
 
     /**
      * Число со словом: по-русски — три формы (1 день, 2 дня, 5 дней), по-английски — две (1 day, 2 days).
-     * Возвращает только слово, без числа.
+     * Возвращает только слово, без числа. Для казахского — русские формы; с аргументом kk — казахское слово.
      */
     static String plural(Context ctx, int n, String one, String few, String many, String enOne, String enMany) {
         if (en(ctx)) return Math.abs(n) == 1 ? enOne : enMany;
         return ruPlural(n, one, few, many);
+    }
+
+    /** То же с казахским: после числа слово по-казахски не меняется (5 күн, 3 тапсырма) — одна форма */
+    static String plural(Context ctx, int n, String one, String few, String many, String enOne, String enMany, String kk) {
+        if (kk(ctx)) return kk;
+        return plural(ctx, n, one, few, many, enOne, enMany);
     }
 
     static String ruPlural(int n, String one, String few, String many) {
