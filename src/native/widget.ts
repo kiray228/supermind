@@ -1,5 +1,5 @@
 /**
- * Виджеты Android («Сегодня», «Календарь», «Привычки», «Карта»), ярлыки значка приложения
+ * Виджеты Android («Сегодня», «Календарь», «Привычки», «Карта») и iPhone («Сегодня», «Привычки»), ярлыки значка приложения
  * и «Поделиться → SuperMind» (Android и PWA share_target).
  * Приложение отдаёт виджетам задачи, повестку на 2 недели, привычки по дням и наброски карт —
  * виджет сам выбирает «сегодня», поэтому остаётся верным после полуночи. Действия из виджетов
@@ -21,8 +21,9 @@ import { loadPlanner } from '../store/db';
 import { ensureGoals, openGoal } from '../goals/store';
 import { buildAgenda, buildHabits, buildMaps, invalidatePhoneEvents, subscribeGoals } from './widgetData';
 import { joinShared, type SharedImage, type SharedText } from './share';
+import { actionFromUrl } from './widgetUrl';
 
-type PendingAction =
+export type PendingAction =
   | { type: 'complete'; id: string; date?: string }
   | { type: 'open_task'; id: string }
   | { type: 'quick_add' }
@@ -174,8 +175,10 @@ async function applyPending() {
   again = false;
   try {
     await ensureTasks();
-    const { actions } = await WidgetBridge.consumePending();
-    if (!actions?.length) return;
+    const { actions: fromWidget } = await WidgetBridge.consumePending().catch(() => ({ actions: [] as PendingAction[] }));
+    // ссылки supermind://… из виджетов iPhone — перед очередью нажатий
+    const actions = [...urlQueue.splice(0), ...(fromWidget ?? [])];
+    if (!actions.length) return;
     let completed = 0;
     for (const a of actions) {
       // переход из виджета/ярлыка — открытый поиск не должен его заслонять
@@ -264,13 +267,25 @@ function handleWebShare() {
   if (shared) void ensureTasks().then(() => openShare(shared));
 }
 
+/** Переходы из виджетов iPhone: supermind://open_task?id=…, supermind://quick_add, supermind://open_view?view=… */
+const urlQueue: PendingAction[] = [];
+
+
+function queueUrl(url: string | undefined) {
+  const a = url ? actionFromUrl(url) : null;
+  if (!a) return;
+  urlQueue.push(a);
+  void applyPending();
+}
+
 let started = false;
 
 export function initWidget() {
   if (started) return;
   started = true;
   handleWebShare();
-  if (!isNative() || Capacitor.getPlatform() !== 'android') return;
+  const platform = Capacitor.getPlatform();
+  if (!isNative() || (platform !== 'android' && platform !== 'ios')) return;
   // любые изменения задач и привычек → обновить виджет
   useTasks.subscribe((s, prev) => {
     if (s.data !== prev.data) pushSoon();
@@ -278,8 +293,12 @@ export function initWidget() {
   window.addEventListener('sm-planner-changed', () => pushSoon());
   subscribeGoals(() => pushSoon());
   onDirty(() => pushSoon(1500));
-  void WidgetBridge.addListener('pending', () => void applyPending()).catch(() => {});
+  if (platform === 'android') void WidgetBridge.addListener('pending', () => void applyPending()).catch(() => {});
   void import('@capacitor/app').then(({ App }) => {
+    if (platform === 'ios') {
+      void App.addListener('appUrlOpen', (e) => queueUrl(e.url));
+      void App.getLaunchUrl().then((l) => queueUrl(l?.url)).catch(() => {});
+    }
     void App.addListener('resume', () => {
       invalidatePhoneEvents();
       void applyPending();

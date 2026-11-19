@@ -4,4 +4,6 @@
     <string name="title_activity_main">SuperMind</string>
     <string name="package_name">app.twomind.mindmap</string>
     <string name="custom_url_scheme">app.twomind.mindmap</string>
+    <!-- политика конфиденциальности в окне разрешений Health Connect -->
+    <string name="health_connect_privacy_policy_url">https://supermind.kz/privacy.html</string>
 </resources>

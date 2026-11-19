@@ -36,6 +36,10 @@ jobs:
         env:
           VITE_SELFTEST: '1'
       - run: npx cap sync ios
+      - name: Цели проекта (виджеты, права)
+        run: |
+          gem list -i xcodeproj >/dev/null || sudo gem install xcodeproj --no-document
+          ruby ios/scripts/setup-targets.rb
       - name: Сборка для симулятора
         run: |
           set -o pipefail

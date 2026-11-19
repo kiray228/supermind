@@ -18,6 +18,9 @@ import { IconTile } from '../ui/icons';
 import { ListRow, ListSection } from '../ui/list';
 import { ensureFinance, useFinance } from '../finance/store';
 import { accountMap, fmtMoney, txMain } from '../finance/model';
+import { linkHealth, openHealthSettings, unlinkHealth, useHealth, type HealthSource } from '../health/connect';
+import { fmtSleep } from '../health/healthCore';
+import { confirmDialog } from '../ui/dialogs';
 import './health.css';
 
 const existedOn = (h: Habit, ymd: string) => !h.createdAt || toYmd(new Date(h.createdAt)) <= ymd;
@@ -51,6 +54,72 @@ async function addPreset(p: HabitPreset) {
   window.dispatchEvent(new Event('sm-planner-changed'));
   syncSoon(300);
   toast(`Добавлено: ${p.name}`);
+}
+
+const SOURCE_NAME: Record<HealthSource, string> = { apple: 'Apple «Здоровье»', connect: 'Health Connect' };
+const fmtSteps = (n: number) => n.toLocaleString('ru-RU');
+
+/** Шаги и сон из «Здоровья» телефона: подключение, сегодня, неделя шагов */
+function HealthLink() {
+  const { source, linked, data } = useHealth();
+  const [busy, setBusy] = useState(false);
+  if (!source) return null;
+  const name = SOURCE_NAME[source];
+  const today = todayYmd();
+  const connect = async () => {
+    if (busy) return;
+    setBusy(true);
+    const r = await linkHealth().finally(() => setBusy(false));
+    if (r === 'install') toast('Установите Health Connect из Google Play и попробуйте снова');
+    else if (r === 'denied') toast(source === 'connect' ? 'Доступ не дан — его можно включить в Health Connect' : 'Доступ не дан — включите его в «Здоровье» → Доступ');
+    else if (r === 'unavailable') toast(`${name} недоступно на этом устройстве`);
+  };
+  if (!linked) {
+    return (
+      <ListSection
+        header="Шаги и сон"
+        footer={`Шаги и сон читаются из ${name} только на этом телефоне и никуда не отправляются. Привычки вроде «10 000 шагов», «Сон 8 часов» и «Лечь спать до 23:00» будут отмечаться сами.`}
+      >
+        <ListRow icon={<span className="hl-ico">👣</span>} title={`Подключить ${name}`} subtitle="Шаги за день и сон за ночь" chevron onClick={() => void connect()} />
+      </ListSection>
+    );
+  }
+  const week = Array.from({ length: 7 }, (_, i) => addDaysYmd(today, i - 6));
+  const stepsOf = (d: string) => data?.steps[d] ?? 0;
+  const max = Math.max(10_000, ...week.map(stepsOf));
+  const sleep = data?.sleep[today];
+  const disconnect = async () => {
+    const ok = await confirmDialog(
+      'Отключить «Здоровье»?',
+      source === 'connect' ? 'SuperMind перестанет читать шаги и сон. Доступ можно отозвать и в Health Connect.' : 'SuperMind перестанет показывать шаги и сон. Доступ можно отозвать в «Здоровье» → Доступ.',
+      { okText: 'Отключить' },
+    );
+    if (ok) unlinkHealth();
+  };
+  return (
+    <ListSection header="Шаги и сон" footer={`Из ${name}, только на этом телефоне.`}>
+      <div className="hl-link">
+        <div className="hl-link-stat">
+          <span className="hl-link-label">👣 Шаги сегодня</span>
+          <b>{fmtSteps(stepsOf(today))}</b>
+          <div className="hl-steps-week" aria-label="Шаги за неделю">
+            {week.map((d) => (
+              <span key={d} className={`hl-steps-bar${d === today ? ' cur' : ''}`} title={`${d}: ${fmtSteps(stepsOf(d))}`}>
+                <i style={{ height: `${Math.max(6, Math.round((stepsOf(d) / max) * 100))}%` }} />
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className="hl-link-stat">
+          <span className="hl-link-label">😴 Сон за ночь</span>
+          <b>{sleep ? fmtSleep(sleep) : '—'}</b>
+          <span className="hl-link-sub">{sleep ? `по данным ${name}` : 'нет данных за эту ночь'}</span>
+        </div>
+      </div>
+      {source === 'connect' && <ListRow title="Доступ в Health Connect" chevron onClick={() => void openHealthSettings()} />}
+      <ListRow title="Отключить" onClick={() => void disconnect()} />
+    </ListSection>
+  );
 }
 
 export default function Health() {
@@ -114,6 +183,8 @@ export default function Health() {
               <div className="hl-hero-sub">За 7 дней: {weekDone} из {weekDue}</div>
             </div>
           </div>
+
+          <HealthLink />
 
           {data && due.length > 0 && (
             <ListSection header="Сегодня">

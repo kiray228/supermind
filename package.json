@@ -1,7 +1,7 @@
 {
   "name": "supermind",
   "private": true,
-  "version": "1.52.0",
+  "version": "1.53.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -23,6 +23,7 @@
     "@capacitor/local-notifications": "^8.3.1",
     "@capacitor/share": "^8.0.3",
     "@capacitor/splash-screen": "^8.0.2",
+    "@capgo/capacitor-health": "8.13.0",
     "@phosphor-icons/react": "^2.1.10",
     "idb-keyval": "^6.3.0",
     "jspdf": "^4.2.1",

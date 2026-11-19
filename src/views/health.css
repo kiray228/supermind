@@ -98,3 +98,62 @@
   background: #e0174f;
   flex: none;
 }
+
+/* Шаги и сон из «Здоровья» телефона */
+.hl-link {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 14px 16px;
+}
+.hl-link-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.hl-link-label {
+  font-size: 13px;
+  color: var(--text-2);
+}
+.hl-link-stat b {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.hl-link-sub {
+  font-size: 12px;
+  color: var(--text-3);
+}
+.hl-steps-week {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 34px;
+  margin-top: 6px;
+}
+.hl-steps-bar {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  border-radius: 3px;
+  background: var(--fill, rgba(120, 120, 128, 0.12));
+}
+.hl-steps-bar i {
+  display: block;
+  width: 100%;
+  border-radius: 3px;
+  background: #e0174f;
+  opacity: 0.45;
+}
+.hl-steps-bar.cur i {
+  opacity: 1;
+}
+@media (max-width: 340px) {
+  .hl-link {
+    grid-template-columns: 1fr;
+  }
+}

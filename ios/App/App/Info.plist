@@ -64,6 +64,19 @@
 	<string>Распознавание речи превращает вашу диктовку в текст заметок и задач.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Чтобы сохранять картинки карт и заметок в «Фото».</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>SuperMind показывает ваши шаги и сон в разделе «Здоровье и спорт» и сам отмечает привычки «шаги» и «сон». Данные остаются на телефоне.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>app.twomind.mindmap</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>supermind</string>
+			</array>
+		</dict>
+	</array>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

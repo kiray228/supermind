@@ -40,6 +40,11 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npx cap sync ios
+      # свои Swift-файлы, права (App Group, HealthKit) и расширение виджетов — в проект Xcode
+      - name: Цели проекта (виджеты, права)
+        run: |
+          gem list -i xcodeproj >/dev/null || sudo gem install xcodeproj --no-document
+          ruby ios/scripts/setup-targets.rb
 
       - name: Проверочная сборка (симулятор, без подписи)
         if: ${{ !inputs.upload }}
@@ -78,23 +83,52 @@ jobs:
             DEVELOPMENT_TEAM="$TEAM_ID" CODE_SIGN_STYLE=Automatic CODE_SIGNING_ALLOWED=NO \
             MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD" | tail -n 80
 
-          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          # Права (App Group, HealthKit) попадают в подпись только при подписи. Архив без подписи —
+          # поэтому подписываем его «на месте» (ad-hoc) с файлами прав: экспорт ниже переподпишет
+          # облачным сертификатом и возьмёт права из этой подписи.
+          APP="$RUNNER_TEMP/App.xcarchive/Products/Applications/App.app"
+          for f in "$APP"/Frameworks/* "$APP"/PlugIns/*/Frameworks/*; do
+            [ -e "$f" ] && codesign --force --sign - "$f"
+          done
+          for x in "$APP"/PlugIns/*.appex; do
+            [ -e "$x" ] && codesign --force --sign - --entitlements ios/App/SuperMindWidget/SuperMindWidget.entitlements "$x"
+          done
+          codesign --force --sign - --entitlements ios/App/App/App.entitlements "$APP"
+
+          # сначала экспорт в файл — проверить права в подписанной сборке, затем такой же экспорт с выгрузкой
+          for DEST in export upload; do
+          cat > "$RUNNER_TEMP/ExportOptions-$DEST.plist" <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
             <key>method</key><string>app-store-connect</string>
-            <key>destination</key><string>upload</string>
+            <key>destination</key><string>$DEST</string>
             <key>teamID</key><string>$TEAM_ID</string>
             <key>signingStyle</key><string>automatic</string>
             <key>manageAppVersionAndBuildNumber</key><false/>
           </dict>
           </plist>
           EOF
+          done
 
           xcodebuild -exportArchive \
             -archivePath "$RUNNER_TEMP/App.xcarchive" \
-            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions-export.plist" \
+            -exportPath "$RUNNER_TEMP/ipa" \
+            "${AUTH[@]}" | tail -n 40
+          ( cd "$RUNNER_TEMP/ipa" && unzip -q -o ./*.ipa )
+          echo "--- права приложения"
+          codesign -d --entitlements - "$RUNNER_TEMP/ipa/Payload/App.app" 2>/dev/null | tee "$RUNNER_TEMP/ent-app.txt"
+          echo "--- права виджета"
+          codesign -d --entitlements - "$RUNNER_TEMP/ipa/Payload/App.app/PlugIns/SuperMindWidget.appex" 2>/dev/null | tee "$RUNNER_TEMP/ent-widget.txt"
+          grep -q group.app.twomind.mindmap "$RUNNER_TEMP/ent-app.txt" || { echo "::error::В подписи приложения нет App Group"; exit 1; }
+          grep -q com.apple.developer.healthkit "$RUNNER_TEMP/ent-app.txt" || { echo "::error::В подписи приложения нет HealthKit"; exit 1; }
+          grep -q group.app.twomind.mindmap "$RUNNER_TEMP/ent-widget.txt" || { echo "::error::В подписи виджета нет App Group"; exit 1; }
+
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions-upload.plist" \
             -exportPath "$RUNNER_TEMP/export" \
             "${AUTH[@]}" | tail -n 40
           rm -f "$KEY_PATH"
