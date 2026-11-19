@@ -15,6 +15,27 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         SceneDelegateProxy.shared.scene(scene, willConnectTo: session, options: connectionOptions)
         // запуск касанием результата Spotlight
         for activity in connectionOptions.userActivities { SpotlightPlugin.handle(activity) }
+        // запуск быстрым действием с иконки (удержание значка)
+        if let item = connectionOptions.shortcutItem { Self.quickAction(item) }
+    }
+
+    /// Быстрое действие с иконки, когда приложение уже запущено
+    func windowScene(_ windowScene: UIWindowScene, performActionFor shortcutItem: UIApplicationShortcutItem, completionHandler: @escaping (Bool) -> Void) {
+        completionHandler(Self.quickAction(shortcutItem))
+    }
+
+    /// Тип из Info.plist (app.twomind.mindmap.quick_add …) → действие в очереди приложения (как у виджетов и Siri)
+    @discardableResult
+    static func quickAction(_ item: UIApplicationShortcutItem) -> Bool {
+        let name = item.type.components(separatedBy: ".").last ?? ""
+        switch name {
+        case "quick_add": SmPending.push(["type": "quick_add"])
+        case "voice": SmPending.push(["type": "voice"])
+        case "focus": SmPending.push(["type": "open_view", "view": "focus"])
+        case "new_map": SmPending.push(["type": "new_map"])
+        default: return false
+        }
+        return true
     }
 
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
