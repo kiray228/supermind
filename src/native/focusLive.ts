@@ -5,7 +5,7 @@
  */
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { isNative } from '../platform';
-import { resume, stop, useFocus } from '../tasks/focusTimer';
+import { resume, start, stop, useFocus } from '../tasks/focusTimer';
 import { liveState, type LiveState } from './focusLiveCore';
 import { useTasks } from '../tasks/store';
 
@@ -58,6 +58,8 @@ export async function applyFocusAction(action: string, at = Date.now()) {
       await LocalNotifications.cancel({ notifications: [{ id: 777001 }] }).catch(() => {});
     }
   } else if (action === 'resume') resume();
+  // Siri «Начни фокус»: запустить (или продолжить начатый)
+  else if (action === 'start') start();
   else if (action === 'stop') {
     freezeAt(when);
     stop();

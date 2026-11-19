@@ -39,8 +39,13 @@ export type PendingAction =
   | { type: 'voice' }
   /** ярлык «Новая карта» */
   | { type: 'new_map' }
-  /** кнопка таймера фокуса на экране блокировки: at — когда нажали */
-  | { type: 'focus'; action: string; at?: number };
+  /** кнопка таймера фокуса на экране блокировки: at — когда нажали; 'start' — Siri «Начни фокус» */
+  | { type: 'focus'; action: string; at?: number }
+  /** Siri и «Быстрые команды» iPhone: задача и заметка без открытия приложения */
+  | { type: 'add_task'; title: string }
+  | { type: 'add_note'; text: string }
+  /** результат Spotlight */
+  | { type: 'open_note'; id: string };
 
 interface WidgetBridgePlugin {
   update(o: { json: string }): Promise<void>;
@@ -142,7 +147,7 @@ function pushSoon(ms = 800) {
 let applying = false;
 let again = false;
 
-const VIEWS: View[] = ['home', 'tasks', 'calendar', 'planner', 'habits', 'notes', 'goals', 'finance', 'assistant', 'progress', 'focus', 'board', 'settings'];
+const VIEWS: View[] = ['today', 'home', 'tasks', 'calendar', 'planner', 'habits', 'notes', 'goals', 'finance', 'assistant', 'progress', 'focus', 'board', 'settings'];
 
 /** Перейти в раздел (из редактора карты — с сохранением) */
 async function goView(view: Exclude<View, 'editor'>) {
@@ -188,7 +193,7 @@ async function applyPending() {
     let completed = 0;
     for (const a of actions) {
       // переход из виджета/ярлыка — открытый поиск не должен его заслонять
-      if (a.type !== 'search' && a.type !== 'complete' && a.type !== 'habit' && a.type !== 'focus') {
+      if (a.type !== 'search' && a.type !== 'complete' && a.type !== 'habit' && a.type !== 'focus' && a.type !== 'add_task' && a.type !== 'add_note') {
         const { closeSearch } = await import('../search/state');
         closeSearch();
       }
@@ -233,7 +238,15 @@ async function applyPending() {
         }
         case 'focus': {
           const { applyFocusAction } = await import('./focusLive');
+          if (a.action === 'start') await goView('focus');
           await applyFocusAction(a.action, a.at);
+          break;
+        }
+        case 'add_task':
+        case 'add_note':
+        case 'open_note': {
+          const { applySystemAction } = await import('./systemActions');
+          await applySystemAction(a);
           break;
         }
         case 'new_map': {
@@ -311,6 +324,9 @@ export function initWidget() {
   onDirty(() => pushSoon(1500));
   // таймер фокуса — на экран блокировки
   void import('./focusLive').then((m) => m.initFocusLive());
+  // iPhone: Siri, Spotlight и Пункт управления при открытом приложении; поиск телефона по картам, заметкам и задачам
+  if (platform === 'ios') void import('./system').then((m) => m.onSystemPending(() => void applyPending()));
+  if (platform === 'ios') void import('./spotlight').then((m) => m.initSpotlight());
   if (platform === 'android') void WidgetBridge.addListener('pending', () => void applyPending()).catch(() => {});
   void import('@capacitor/app').then(({ App }) => {
     if (platform === 'ios') {

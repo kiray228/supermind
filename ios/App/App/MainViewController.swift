@@ -7,5 +7,7 @@ class MainViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(SpeechRecognitionPlugin())
         bridge?.registerPluginInstance(WidgetBridgePlugin())
         bridge?.registerPluginInstance(FocusLivePlugin())
+        bridge?.registerPluginInstance(SmSystemPlugin())
+        bridge?.registerPluginInstance(SpotlightPlugin())
     }
 }

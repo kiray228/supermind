@@ -4,3 +4,4 @@
 "NSPhotoLibraryAddUsageDescription" = "Чтобы сохранять картинки карт и заметок в «Фото».";
 "NSHealthShareUsageDescription" = "SuperMind показывает ваши шаги и сон в разделе «Здоровье и спорт» и сам отмечает привычки «шаги» и «сон». Данные остаются на телефоне.";
 "NSHealthUpdateUsageDescription" = "SuperMind ничего не записывает в «Здоровье»: он только читает шаги и сон, чтобы показать их и отметить ваши привычки.";
+"NSFaceIDUsageDescription" = "Face ID открывает SuperMind вместо кода-пароля.";

@@ -1,0 +1,17 @@
+/* Siri және «Жылдам командалар»: әрекет атаулары, параметрлер мен сұрақтар (SiriShortcuts.swift) */
+"Add Task" = "Тапсырма қосу";
+"Adds a task to SuperMind." = "SuperMind-қа тапсырма қосады.";
+"Task" = "Тапсырма";
+"What's the task?" = "Қандай тапсырма қосу керек?";
+"Add Note" = "Жазба қосу";
+"Saves a note to SuperMind." = "SuperMind-қа жазба сақтайды.";
+"Note" = "Жазба";
+"What should I write down?" = "Не жазайын?";
+"Start Focus" = "Фокусты бастау";
+"Opens SuperMind and starts the focus timer." = "SuperMind-ты ашып, фокус таймерін іске қосады.";
+"Open Today" = "«Бүгін» бөлімін ашу";
+"Opens today's tasks and habits in SuperMind." = "SuperMind-та бүгінгі тапсырмалар мен әдеттерді ашады.";
+"Today's Agenda" = "Бүгін не бар";
+"Tells you what's due today in SuperMind." = "SuperMind-та бүгінге не жоспарланғанын айтады.";
+"Open SuperMind" = "SuperMind-ты ашу";
+"Action" = "Әрекет";

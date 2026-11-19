@@ -502,5 +502,10 @@ const d: Record<string, string> = {
   'Цель не найдена': 'Goal not found',
   'Этап добавлен, шагов: {n}': 'Stage added, steps: {n}',
   'Этап добавлен': 'Stage added',
+  'Вход по Face ID': 'Unlock with Face ID',
+  'Вход по Touch ID': 'Unlock with Touch ID',
+  'Вход по Optic ID': 'Unlock with Optic ID',
+  'Задача из Siri: {title}': 'Task from Siri: {title}',
+  'Заметка из Siri сохранена': 'Note from Siri saved',
 };
 export default d;

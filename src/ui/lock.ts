@@ -4,6 +4,7 @@
  */
 import { create } from 'zustand';
 import { t } from '../i18n/index';
+import type { BioKind } from '../native/system';
 
 const KEY = 'sm-lock';
 const FAILS = 'sm-lock-fails';
@@ -126,12 +127,27 @@ export function setBiometric(on: boolean) {
   }
 }
 
-/** Есть ли на устройстве отпечаток или распознавание лица (только Android-приложение) */
+/** Есть ли на устройстве отпечаток или распознавание лица (Android — отпечаток, iPhone — Face ID / Touch ID) */
 export async function biometricAvailable(): Promise<boolean> {
   const { isNative } = await import('../platform');
   if (!isNative()) return false;
-  const { nativeBiometricAvailable } = await import('../native/widget');
+  const { nativeBiometricAvailable } = await import('../native/system');
   return nativeBiometricAvailable();
+}
+
+/** Что стоит на телефоне — для подписей (известно после biometricAvailable) */
+export async function biometricKind(): Promise<BioKind> {
+  const { nativeBiometricKind, nativeBiometricKnown } = await import('../native/system');
+  if (!nativeBiometricKnown()) await biometricAvailable();
+  return nativeBiometricKind();
+}
+
+/** Подписи входа по биометрии: строка в настройках и кнопка на экране замка */
+export function biometricLabels(kind: BioKind): { setting: string; button: string } {
+  if (kind === 'face') return { setting: t('Вход по Face ID'), button: 'Face ID' };
+  if (kind === 'touch') return { setting: t('Вход по Touch ID'), button: 'Touch ID' };
+  if (kind === 'optic') return { setting: t('Вход по Optic ID'), button: 'Optic ID' };
+  return { setting: t('Вход по отпечатку'), button: t('Отпечаток') };
 }
 
 /** идёт проверка отпечатка: системное окно может «свернуть» приложение — это не уход в фон */
@@ -143,7 +159,7 @@ export async function unlockWithBiometric(): Promise<boolean> {
   if (bioActive || !lockConfig() || !biometricOn() || !(await biometricAvailable())) return false;
   bioActive = true;
   try {
-    const { nativeBiometricVerify } = await import('../native/widget');
+    const { nativeBiometricVerify } = await import('../native/system');
     // окно отпечатка могло не открыться (приложение уходило в фон) — тогда ответа не будет вовсе;
     // без предела ожидания отметка «идёт проверка» осталась бы навсегда и замок больше не включался бы
     const ok = await Promise.race([

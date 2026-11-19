@@ -1,0 +1,17 @@
+/* Siri и «Быстрые команды»: названия действий, параметры и вопросы (SiriShortcuts.swift) */
+"Add Task" = "Добавить задачу";
+"Adds a task to SuperMind." = "Добавляет задачу в SuperMind.";
+"Task" = "Задача";
+"What's the task?" = "Какую задачу добавить?";
+"Add Note" = "Добавить заметку";
+"Saves a note to SuperMind." = "Сохраняет заметку в SuperMind.";
+"Note" = "Заметка";
+"What should I write down?" = "Что записать?";
+"Start Focus" = "Начать фокус";
+"Opens SuperMind and starts the focus timer." = "Открывает SuperMind и запускает таймер фокуса.";
+"Open Today" = "Открыть «Сегодня»";
+"Opens today's tasks and habits in SuperMind." = "Открывает задачи и привычки на сегодня в SuperMind.";
+"Today's Agenda" = "Что сегодня";
+"Tells you what's due today in SuperMind." = "Рассказывает, что запланировано на сегодня в SuperMind.";
+"Open SuperMind" = "Открыть SuperMind";
+"Action" = "Действие";

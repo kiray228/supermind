@@ -1,0 +1,17 @@
+/* Siri & Shortcuts: action titles, parameters and questions (SiriShortcuts.swift) */
+"Add Task" = "Add Task";
+"Adds a task to SuperMind." = "Adds a task to SuperMind.";
+"Task" = "Task";
+"What's the task?" = "What's the task?";
+"Add Note" = "Add Note";
+"Saves a note to SuperMind." = "Saves a note to SuperMind.";
+"Note" = "Note";
+"What should I write down?" = "What should I write down?";
+"Start Focus" = "Start Focus";
+"Opens SuperMind and starts the focus timer." = "Opens SuperMind and starts the focus timer.";
+"Open Today" = "Open Today";
+"Opens today's tasks and habits in SuperMind." = "Opens today's tasks and habits in SuperMind.";
+"Today's Agenda" = "Today's Agenda";
+"Tells you what's due today in SuperMind." = "Tells you what's due today in SuperMind.";
+"Open SuperMind" = "Open SuperMind";
+"Action" = "Action";
