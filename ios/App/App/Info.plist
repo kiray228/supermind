@@ -10,6 +10,7 @@
 	<array>
 		<string>ru</string>
 		<string>en</string>
+		<string>kk</string>
 	</array>
 	<key>CFBundleDisplayName</key>
         <string>SuperMind</string>

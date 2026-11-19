@@ -9,20 +9,33 @@ class ShareViewController: SLComposeServiceViewController {
     static let group = "group.app.twomind.mindmap"
     static let pendingKey = "widget-pending"
 
-    private var en: Bool {
-        if let lang = UserDefaults(suiteName: Self.group)?.string(forKey: "widget-json").flatMap({ raw -> String? in
+    /// Язык приложения ('ru' | 'en' | 'kk') — из данных виджетов; до первого запуска — по языкам системы
+    private var lang: String {
+        if let l = UserDefaults(suiteName: Self.group)?.string(forKey: "widget-json").flatMap({ raw -> String? in
             guard let o = (try? JSONSerialization.jsonObject(with: Data(raw.utf8))) as? [String: Any] else { return nil }
             return o["lang"] as? String
-        }) { return lang == "en" }
-        let ruLike: Set<String> = ["ru", "kk", "uk", "be", "uz", "ky", "tg", "hy", "az", "ka", "tk", "mn"]
-        return !Locale.preferredLanguages.contains { ruLike.contains(String($0.prefix(2)).lowercased()) }
+        }) { return l }
+        let ruLike: Set<String> = ["ru", "uk", "be", "uz", "ky", "tg", "hy", "az", "ka", "tk", "mn"]
+        for code in Locale.preferredLanguages.map({ String($0.prefix(2)).lowercased() }) {
+            if code == "kk" { return "kk" }
+            if ruLike.contains(code) { return "ru" }
+        }
+        return "en"
+    }
+
+    private func L(_ ru: String, _ en: String, _ kk: String) -> String {
+        switch lang {
+        case "en": return en
+        case "kk": return kk
+        default: return ru
+        }
     }
 
     override func viewDidLoad() {
         super.viewDidLoad()
         title = "SuperMind"
-        placeholder = en ? "Comment (optional)" : "Комментарий (необязательно)"
-        navigationController?.navigationBar.topItem?.rightBarButtonItem?.title = en ? "Save" : "Сохранить"
+        placeholder = L("Комментарий (необязательно)", "Comment (optional)", "Түсініктеме (міндетті емес)")
+        navigationController?.navigationBar.topItem?.rightBarButtonItem?.title = L("Сохранить", "Save", "Сақтау")
     }
 
     override func isContentValid() -> Bool { true }
@@ -63,7 +76,7 @@ class ShareViewController: SLComposeServiceViewController {
 
     override func configurationItems() -> [Any]! {
         let item = SLComposeSheetConfigurationItem()
-        item?.title = en ? "Choose where to save when you open SuperMind" : "Куда сохранить — выберете в SuperMind"
+        item?.title = L("Куда сохранить — выберете в SuperMind", "Choose where to save when you open SuperMind", "Қайда сақтауды SuperMind-та таңдайсыз")
         return item.map { [$0] } ?? []
     }
 

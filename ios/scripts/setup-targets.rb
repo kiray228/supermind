@@ -25,10 +25,10 @@ end
 app.build_configurations.each { |c| c.build_settings['CODE_SIGN_ENTITLEMENTS'] = 'App/App.entitlements' }
 app.add_system_framework('HealthKit') unless app.frameworks_build_phase.files_references.any? { |r| r && r.path.to_s.end_with?('HealthKit.framework') }
 
-# 2б. Переводы системных текстов (разрешения, быстрые действия): App/en.lproj, App/ru.lproj
+# 2б. Переводы системных текстов (разрешения, быстрые действия): App/en.lproj, App/ru.lproj, App/kk.lproj
 strings = app_group.children.find { |c| c.isa == 'PBXVariantGroup' && c.name == 'InfoPlist.strings' } ||
           app_group.new_variant_group('InfoPlist.strings')
-%w[en ru].each do |l|
+%w[en ru kk].each do |l|
   path = "#{l}.lproj/InfoPlist.strings"
   next if strings.children.any? { |f| f.path == path }
   ref = strings.new_reference(path)
@@ -36,7 +36,7 @@ strings = app_group.children.find { |c| c.isa == 'PBXVariantGroup' && c.name == 
 end
 app.resources_build_phase.add_file_reference(strings, true)
 regions = project.root_object.known_regions
-%w[en ru Base].each { |r| regions << r unless regions.include?(r) }
+%w[en ru kk Base].each { |r| regions << r unless regions.include?(r) }
 
 # 3. Расширение виджетов
 widget = project.targets.find { |t| t.name == 'SuperMindWidget' }
