@@ -1,4 +1,5 @@
 import { uid } from '../../utils/tree';
+import { t } from '../../i18n/index';
 import { type Block, type BlockType, isTextBlock, LIST_TYPES } from '../model';
 
 /** Быстрые сокращения в начале пустого абзаца: «# », «- », «[] »… */
@@ -58,14 +59,14 @@ export function wrapSelection(text: string, start: number, end: number, open: st
     return { text: text.slice(0, start - open.length) + sel + text.slice(end + close.length), start: start - open.length, end: end - open.length };
   }
   if (open === '[') {
-    const label = sel || 'ссылка';
+    const label = sel || t('ссылка');
     const url = 'https://';
-    const t = text.slice(0, start) + `[${label}](${url})` + text.slice(end);
+    const out = text.slice(0, start) + `[${label}](${url})` + text.slice(end);
     const p = start + label.length + 3;
-    return { text: t, start: p, end: p + url.length };
+    return { text: out, start: p, end: p + url.length };
   }
-  const t = text.slice(0, start) + open + sel + close + text.slice(end);
-  return { text: t, start: start + open.length, end: start + open.length + sel.length };
+  const out = text.slice(0, start) + open + sel + close + text.slice(end);
+  return { text: out, start: start + open.length, end: start + open.length + sel.length };
 }
 
 export function cloneBlocks(blocks: Block[]): Block[] {

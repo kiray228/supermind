@@ -3,6 +3,7 @@
  * со ссылками на источники; конспект можно сохранить заметкой. Запрос и перевод в заметку — digestPrompt.ts.
  */
 import { create } from 'zustand';
+import { LOCALE, t } from '../i18n/index';
 import { streamText } from '../ai/claude';
 import { bestPassages, clusterGraph, clusterTopics, keywordsOf, queryTerms } from './links';
 import { type AskSource } from './askPrompt';
@@ -54,7 +55,7 @@ export async function brainTopics(min = 3): Promise<BrainTopic[]> {
     .sort((a, b) => b[1].length - a[1].length || a[0] - b[0])
     .map(([c, list]) => ({
       c,
-      name: capitalize(names.get(c) ?? 'Тема ' + (c + 1)),
+      name: capitalize(names.get(c) ?? t('Тема {n}', { n: c + 1 })),
       ids: list.sort((x, y) => (weight.get(y) ?? 0) - (weight.get(x) ?? 0)),
     }));
 }
@@ -125,7 +126,7 @@ export async function runDigest(): Promise<void> {
   patch({ state: 'collect', text: '', error: undefined, savedId: undefined });
   try {
     const sources = await digestSources(topic, ids);
-    if (!sources.length) return void patch({ state: 'error', error: 'В записях темы пока нет текста — конспектировать нечего.' });
+    if (!sources.length) return void patch({ state: 'error', error: t('В записях темы пока нет текста — конспектировать нечего.') });
     patch({ sources, state: 'write' });
     const text = await streamText({
       system: DIGEST_SYSTEM,
@@ -136,7 +137,7 @@ export async function runDigest(): Promise<void> {
     });
     patch({ text, state: 'done' });
   } catch (e) {
-    patch({ state: 'error', error: ac.signal.aborted ? 'Остановлено' : e instanceof Error ? e.message : 'Не удалось составить конспект' });
+    patch({ state: 'error', error: ac.signal.aborted ? t('Остановлено') : e instanceof Error ? e.message : t('Не удалось составить конспект') });
   } finally {
     if (current === ac) current = null;
   }
@@ -144,13 +145,13 @@ export async function runDigest(): Promise<void> {
 
 /** Название заметки-конспекта: «Конспект: Тема», а если такое уже есть — с датой */
 export function digestTitle(topic: string, now = new Date()): string {
-  const base = `Конспект: ${topic}`;
+  const base = t('Конспект: {topic}', { topic });
   const taken = (t: string) => (useNotes.getState().data?.notes ?? []).some((n) => !n.trashed && n.title.trim().toLowerCase() === t.toLowerCase());
   if (!taken(base)) return base;
-  const date = now.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
-  let t = `${base} (${date})`;
-  for (let i = 2; taken(t); i++) t = `${base} (${date}, ${i})`;
-  return t;
+  const date = now.toLocaleDateString(LOCALE, { day: 'numeric', month: 'long' });
+  let title = `${base} (${date})`;
+  for (let i = 2; taken(title); i++) title = `${base} (${date}, ${i})`;
+  return title;
 }
 
 /**

@@ -1,4 +1,5 @@
 import { memo, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent } from 'react';
+import { t } from '../../i18n/index';
 import { Image as ImageIcon, Mic, MoreHorizontal, Pin, RotateCcw, SquareCheck, Trash2 } from 'lucide-react';
 import type { ID } from '../../types';
 import { confirmDialog } from '../../ui/dialogs';
@@ -64,7 +65,7 @@ export const NoteCard = memo(function NoteCard({
   const g = mergeHandlers(lp.handlers, swipe.bind);
   return (
     <div ref={swipe.wrap} className={`nt-swipe ${swipe.wrapClass}`}>
-      <SwipeBg dx={swipe.dx} armed={swipe.armed} onDelete={swipe.confirmDelete} rightLabel="Вернуть" rightIcon={<RotateCcw size={21} strokeWidth={2.4} />} />
+      <SwipeBg dx={swipe.dx} armed={swipe.armed} onDelete={swipe.confirmDelete} rightLabel={t('Вернуть')} rightIcon={<RotateCcw size={21} strokeWidth={2.4} />} />
       <div
         className={`nt-card sw-row${n.trashed ? ' is-trashed' : ''}`}
         style={swipe.style}
@@ -79,7 +80,7 @@ export const NoteCard = memo(function NoteCard({
         onKeyDown={(e) => e.key === 'Enter' && onOpen(n.id)}
       >
         <div className="nt-card-top">
-          <div className={`nt-card-title${n.title ? '' : ' is-empty'}`}>{n.title || 'Без названия'}</div>
+          <div className={`nt-card-title${n.title ? '' : ' is-empty'}`}>{n.title || t('Без названия')}</div>
           {n.pinned && !n.trashed && <Pin size={14} className="nt-card-pin" />}
           <button
             className="nt-card-more"
@@ -88,7 +89,7 @@ export const NoteCard = memo(function NoteCard({
               e.stopPropagation();
               onMenu(n.id, e.currentTarget);
             }}
-            aria-label="Действия"
+            aria-label={t('Действия')}
           >
             <MoreHorizontal size={16} />
           </button>
@@ -103,8 +104,8 @@ export const NoteCard = memo(function NoteCard({
             </span>
           )}
           <span className="grow" />
-          {n.hasAudio && <Mic size={14} aria-label="Есть голосовая запись" />}
-          {n.hasImage && <ImageIcon size={14} aria-label="Есть изображения" />}
+          {n.hasAudio && <Mic size={14} aria-label={t('Есть голосовая запись')} />}
+          {n.hasImage && <ImageIcon size={14} aria-label={t('Есть изображения')} />}
           {!!n.todoTotal && (
             <span className={`nt-card-todo${n.todoDone === n.todoTotal ? ' done' : ''}`}>
               <SquareCheck size={14} /> {n.todoDone ?? 0}/{n.todoTotal}
@@ -138,17 +139,17 @@ export function FolderDialog({ folder, count, onClose, onSaved }: { folder?: Fol
   return (
     <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal nt-folder-modal">
-        <h2>{folder ? 'Папка' : 'Новая папка'}</h2>
-        <label className="label">Название</label>
+        <h2>{folder ? t('Папка') : t('Новая папка')}</h2>
+        <label className="label">{t('Название')}</label>
         <div className="nt-folder-name">
           <span className="nt-fdot big" style={{ background: color }}>
             {emoji}
           </span>
-          <input className="input" autoFocus={!folder} value={name} placeholder="Например, Идеи" onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && save()} />
+          <input className="input" autoFocus={!folder} value={name} placeholder={t('Например, Идеи')} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && save()} />
         </div>
-        <label className="label">Значок</label>
+        <label className="label">{t('Значок')}</label>
         <div className="nt-emojis">
-          <button className={`nt-emoji${!emoji ? ' active' : ''}`} onClick={() => setEmoji('')} aria-label="Без значка">
+          <button className={`nt-emoji${!emoji ? ' active' : ''}`} onClick={() => setEmoji('')} aria-label={t('Без значка')}>
             <span className="nt-fdot" style={{ background: color }} />
           </button>
           {FOLDER_EMOJIS.map((em) => (
@@ -157,7 +158,7 @@ export function FolderDialog({ folder, count, onClose, onSaved }: { folder?: Fol
             </button>
           ))}
         </div>
-        <label className="label">Цвет</label>
+        <label className="label">{t('Цвет')}</label>
         <div className="nt-colors">
           {FOLDER_COLORS.map((c) => (
             <button key={c} className={`nt-swatch${color === c ? ' active' : ''}`} style={{ background: c }} onClick={() => setColor(c)} aria-label={c} />
@@ -169,20 +170,20 @@ export function FolderDialog({ folder, count, onClose, onSaved }: { folder?: Fol
               className="btn btn-ghost btn-danger"
               style={{ marginRight: 'auto' }}
               onClick={async () => {
-                const ok = await confirmDialog(`Удалить папку «${folder.name}»?`, count ? `Заметки (${count}) останутся во «Всех заметках».` : undefined, { danger: true, okText: 'Удалить' });
+                const ok = await confirmDialog(t('Удалить папку «{name}»?', { name: folder.name }), count ? t('Заметки ({n}) останутся во «Всех заметках».', { n: count }) : undefined, { danger: true, okText: t('Удалить') });
                 if (!ok) return;
                 deleteFolder(folder.id);
                 onClose();
               }}
             >
-              <Trash2 size={16} /> Удалить
+              <Trash2 size={16} /> {t('Удалить')}
             </button>
           )}
           <button className="btn" onClick={onClose}>
-            Отмена
+            {t('Отмена')}
           </button>
           <button className="btn btn-primary" onClick={save} disabled={!name.trim()}>
-            {folder ? 'Сохранить' : 'Создать'}
+            {folder ? t('Сохранить') : t('Создать')}
           </button>
         </div>
       </div>

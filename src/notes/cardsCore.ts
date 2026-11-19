@@ -3,11 +3,12 @@
  * запрос к ИИ «сделай карточки из заметки» и разбор ответа. Модуль чистый — тесты гоняют его в Node.
  */
 import type { StudyCard } from './model';
+import { t } from '../i18n/index';
 
 /** Оценка ответа: 0 — не вспомнил, 1 — с трудом, 2 — вспомнил, 3 — легко */
 export type Grade = 0 | 1 | 2 | 3;
 
-export const GRADE_LABEL: Record<Grade, string> = { 0: 'Снова', 1: 'Трудно', 2: 'Хорошо', 3: 'Легко' };
+export const GRADE_LABEL: Record<Grade, string> = { 0: t('Снова'), 1: t('Трудно'), 2: t('Хорошо'), 3: t('Легко') };
 
 const MIN_EASE = 1.3;
 const MAX_EASE = 3;
@@ -50,11 +51,11 @@ export function schedule(c: StudyCard, g: Grade, today: string, now = Date.now()
 
 /** Подпись интервала: «сейчас», «1 д», «3 нед», «2 мес» */
 export function intervalLabel(days: number): string {
-  if (days <= 0) return 'сейчас';
-  if (days < 14) return `${days} д`;
-  if (days < 60) return `${Math.round(days / 7)} нед`;
-  if (days < 365) return `${Math.round(days / 30)} мес`;
-  return `${Math.round(days / 365)} г`;
+  if (days <= 0) return t('сейчас');
+  if (days < 14) return t('{n} д', { n: days });
+  if (days < 60) return t('{n} нед', { n: Math.round(days / 7) });
+  if (days < 365) return t('{n} мес', { n: Math.round(days / 30) });
+  return t('{n} г', { n: Math.round(days / 365) });
 }
 
 /** Карточки на сегодня: сначала просроченные (давние первыми), потом новые — не больше limitNew новых */

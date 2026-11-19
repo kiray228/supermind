@@ -4,6 +4,7 @@
  * связи и поиск считают слова группы одним словом. Чистая логика — в synonymsCore.ts.
  */
 import { streamText } from '../ai/claude';
+import { t } from '../i18n/index';
 import { uid } from '../utils/tree';
 import { termKey, vocabulary } from './links';
 import type { NotesData, SynonymGroup } from './model';
@@ -32,7 +33,7 @@ function reject(d: NotesData, pairs: string[], now: number) {
 export async function findSynonyms(signal?: AbortSignal): Promise<number> {
   const ix = await ensureLinkIndex();
   const words = vocabulary(ix, DICT).map((v) => v.form);
-  if (words.length < MIN_WORDS) throw new SynonymError('В записях пока мало слов — синонимы искать не из чего.');
+  if (words.length < MIN_WORDS) throw new SynonymError(t('В записях пока мало слов — синонимы искать не из чего.'));
   const answer = await streamText({ system: SYN_SYSTEM, messages: [{ role: 'user', content: buildSynonymPrompt(words) }], signal, effort: 'low' });
   const found = parseSynonymGroups(answer, words, termKey);
   const rejected = new Set((useNotes.getState().data?.synNo ?? []).map((r) => r.id));

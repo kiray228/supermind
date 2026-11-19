@@ -4,6 +4,7 @@
  * Если прямых совпадений мало, ИИ сначала подсказывает синонимы («бег» → «пробежка», «тренировка»).
  */
 import { create } from 'zustand';
+import { t } from '../i18n/index';
 import { streamText } from '../ai/claude';
 import { bestPassages, queryTerms, searchIndex, type SearchHit } from './links';
 import { ASK_SYSTEM, type AskSource, type AskTurn, buildAskMessages, EXPAND_SYSTEM, parseExpansion } from './askPrompt';
@@ -103,8 +104,8 @@ export async function ask(question: string): Promise<void> {
   useAsk.setState((s) => ({ entries: [...s.entries, { id, q, a: '', sources: [], state: 'search' }], draft: '' }));
   try {
     const { sources } = await findSources(q, history, ac.signal);
-    if (ac.signal.aborted) return patch({ state: 'error', error: 'Остановлено' });
-    if (!sources.length) return patch({ state: 'done', sources, a: 'В ваших записях об этом ничего не нашлось. Попробуйте спросить другими словами или назвать тему точнее.' });
+    if (ac.signal.aborted) return patch({ state: 'error', error: t('Остановлено') });
+    if (!sources.length) return patch({ state: 'done', sources, a: t('В ваших записях об этом ничего не нашлось. Попробуйте спросить другими словами или назвать тему точнее.') });
     patch({ sources, state: 'answer' });
     const answer = await streamText({
       system: ASK_SYSTEM,
@@ -115,7 +116,7 @@ export async function ask(question: string): Promise<void> {
     });
     patch({ a: answer, state: 'done' });
   } catch (e) {
-    patch({ state: 'error', error: ac.signal.aborted ? 'Остановлено' : e instanceof Error ? e.message : 'Не удалось получить ответ' });
+    patch({ state: 'error', error: ac.signal.aborted ? t('Остановлено') : e instanceof Error ? e.message : t('Не удалось получить ответ') });
   } finally {
     if (current === ac) current = null;
   }

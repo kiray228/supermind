@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { t } from '../../i18n/index';
 import { GraduationCap, Loader2, PartyPopper, Plus, Sparkles, Trash2, Undo2, X } from 'lucide-react';
 import { onBack } from '../../ui/dialogs';
 import { toast } from '../../store/appStore';
@@ -85,28 +86,28 @@ function CardsReview() {
 
   return (
     <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && closeCards()}>
-      <div className="modal nt-dups nt-cards" role="dialog" aria-label="Повторение карточек">
+      <div className="modal nt-dups nt-cards" role="dialog" aria-label={t('Повторение карточек')}>
         <div className="nt-ask-head">
           <GraduationCap size={19} className="nt-ask-logo" />
-          <h2 className="grow">Повторение</h2>
+          <h2 className="grow">{t('Повторение')}</h2>
           {card && (
             <span className="nt-cards-count">
-              {done + 1} из {Math.max(total, done + queue.length)}
+              {t('{n} из {total}', { n: done + 1, total: Math.max(total, done + queue.length) })}
             </span>
           )}
-          <button className="icon-btn" onClick={closeCards} aria-label="Закрыть">
+          <button className="icon-btn" onClick={closeCards} aria-label={t('Закрыть')}>
             <X size={20} />
           </button>
         </div>
         {!card ? (
           <div className="nt-cards-done">
             <PartyPopper size={36} />
-            <b>{done ? 'На сегодня всё!' : 'Карточек на сегодня нет'}</b>
-            <span>{done ? `Повторено: ${done}.` : 'Сделайте карточки из заметки: «⋯» в заметке → «Карточки для повторения».'}</span>
-            {tomorrow > 0 && <span>Завтра: {tomorrow}.</span>}
+            <b>{done ? t('На сегодня всё!') : t('Карточек на сегодня нет')}</b>
+            <span>{done ? t('Повторено: {n}.', { n: done }) : t('Сделайте карточки из заметки: «⋯» в заметке → «Карточки для повторения».')}</span>
+            {tomorrow > 0 && <span>{t('Завтра: {n}.', { n: tomorrow })}</span>}
             {last && (
               <button className="nt-ai-undo" onClick={undo}>
-                <Undo2 size={14} /> Отменить последний ответ
+                <Undo2 size={14} /> {t('Отменить последний ответ')}
               </button>
             )}
           </div>
@@ -120,7 +121,7 @@ function CardsReview() {
                   void openNote(note.id);
                 }}
               >
-                {note.title || 'Без названия'}
+                {note.title || t('Без названия')}
               </button>
             )}
             <div className="nt-cards-q">{renderInline(card.q)}</div>
@@ -138,12 +139,12 @@ function CardsReview() {
               </>
             ) : (
               <button className="btn btn-primary nt-cards-show" onClick={() => setShown(true)}>
-                Показать ответ
+                {t('Показать ответ')}
               </button>
             )}
             {last && (
               <button className="nt-ai-undo nt-cards-undo" onClick={undo}>
-                <Undo2 size={14} /> Отменить
+                <Undo2 size={14} /> {t('Отменить')}
               </button>
             )}
           </div>
@@ -179,37 +180,37 @@ function NoteCards({ noteId }: { noteId: string }) {
     setBusy(true);
     try {
       const n = await makeCards(noteId, c.signal);
-      toast(n ? `Карточек добавлено: ${n}` : 'Новых карточек не получилось — всё главное уже есть');
+      toast(n ? t('Карточек добавлено: {n}', { n }) : t('Новых карточек не получилось — всё главное уже есть'));
     } catch (e) {
-      if (!c.signal.aborted) toast(e instanceof Error ? e.message : 'Не удалось сделать карточки');
+      if (!c.signal.aborted) toast(e instanceof Error ? e.message : t('Не удалось сделать карточки'));
     } finally {
       setBusy(false);
     }
   };
 
   const add = () => {
-    if (!addCard(noteId, q, a)) return toast('Нужны и вопрос, и ответ');
+    if (!addCard(noteId, q, a)) return toast(t('Нужны и вопрос, и ответ'));
     setQ('');
     setA('');
   };
 
-  const when = (c: StudyCard) => (c.due <= today ? 'сегодня' : `через ${intervalLabel(Math.round((new Date(c.due).getTime() - new Date(today).getTime()) / 86400000))}`);
+  const when = (c: StudyCard) => (c.due <= today ? t('сегодня') : t('через {interval}', { interval: intervalLabel(Math.round((new Date(c.due).getTime() - new Date(today).getTime()) / 86400000)) }));
 
   return (
     <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && closeCards()}>
-      <div className="modal nt-dups nt-cards" role="dialog" aria-label="Карточки заметки">
+      <div className="modal nt-dups nt-cards" role="dialog" aria-label={t('Карточки заметки')}>
         <div className="nt-ask-head">
           <GraduationCap size={19} className="nt-ask-logo" />
-          <h2 className="grow ellipsis">Карточки: {meta?.title || 'Без названия'}</h2>
-          <button className="icon-btn" onClick={closeCards} aria-label="Закрыть">
+          <h2 className="grow ellipsis">{t('Карточки: {title}', { title: meta?.title || t('Без названия') })}</h2>
+          <button className="icon-btn" onClick={closeCards} aria-label={t('Закрыть')}>
             <X size={20} />
           </button>
         </div>
-        <p className="nt-dups-hint">Вопросы и ответы по заметке. Приложение покажет их снова, когда вы начнёте забывать: сначала через день, потом через неделю, месяц…</p>
+        <p className="nt-dups-hint">{t('Вопросы и ответы по заметке. Приложение покажет их снова, когда вы начнёте забывать: сначала через день, потом через неделю, месяц…')}</p>
         <div className="nt-syn-actions">
           <button className="nt-ai-btn" onClick={() => void make()}>
             {busy ? <Loader2 size={15} className="spin" /> : <Sparkles size={15} />}
-            {busy ? 'Делаю… (нажмите, чтобы остановить)' : cards.length ? 'Ещё карточки ИИ' : 'Сделать карточки ИИ'}
+            {busy ? t('Делаю… (нажмите, чтобы остановить)') : cards.length ? t('Ещё карточки ИИ') : t('Сделать карточки ИИ')}
           </button>
         </div>
         <div className="nt-dups-list">
@@ -218,12 +219,12 @@ function NoteCards({ noteId }: { noteId: string }) {
               <CardEdit key={c.id} card={c} onDone={() => setEdit(null)} />
             ) : (
               <div key={c.id} className="nt-card-row">
-                <button className="nt-card-text" onClick={() => setEdit(c.id)} title="Исправить">
+                <button className="nt-card-text" onClick={() => setEdit(c.id)} title={t('Исправить')}>
                   <b>{c.q}</b>
                   <span>{c.a}</span>
                   <i>{when(c)}</i>
                 </button>
-                <button className="icon-btn nt-syn-del" onClick={() => deleteCard(c.id)} aria-label="Удалить карточку">
+                <button className="icon-btn nt-syn-del" onClick={() => deleteCard(c.id)} aria-label={t('Удалить карточку')}>
                   <Trash2 size={16} />
                 </button>
               </div>
@@ -236,9 +237,9 @@ function NoteCards({ noteId }: { noteId: string }) {
               add();
             }}
           >
-            <input className="nt-syn-input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Свой вопрос" aria-label="Вопрос" />
-            <input className="nt-syn-input" value={a} onChange={(e) => setA(e.target.value)} placeholder="Ответ" aria-label="Ответ" />
-            <button className="nt-syn-add" type="submit" disabled={!q.trim() || !a.trim()} aria-label="Добавить карточку">
+            <input className="nt-syn-input" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('Свой вопрос')} aria-label={t('Вопрос')} />
+            <input className="nt-syn-input" value={a} onChange={(e) => setA(e.target.value)} placeholder={t('Ответ')} aria-label={t('Ответ')} />
+            <button className="nt-syn-add" type="submit" disabled={!q.trim() || !a.trim()} aria-label={t('Добавить карточку')}>
               <Plus size={18} />
             </button>
           </form>
@@ -260,10 +261,10 @@ function CardEdit({ card, onDone }: { card: StudyCard; onDone: () => void }) {
         onDone();
       }}
     >
-      <input className="nt-syn-input" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Вопрос" autoFocus />
-      <input className="nt-syn-input" value={a} onChange={(e) => setA(e.target.value)} aria-label="Ответ" />
+      <input className="nt-syn-input" value={q} onChange={(e) => setQ(e.target.value)} aria-label={t('Вопрос')} autoFocus />
+      <input className="nt-syn-input" value={a} onChange={(e) => setA(e.target.value)} aria-label={t('Ответ')} />
       <button className="nt-ai-btn" type="submit">
-        Готово
+        {t('Готово')}
       </button>
     </form>
   );

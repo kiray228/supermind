@@ -4,6 +4,7 @@
  * Модуль без браузерных зависимостей — тесты гоняют его в Node.
  */
 import type { Goal } from '../goals/model';
+import { t } from '../i18n/index';
 import type { TaskItem } from '../tasks/model';
 import type { MindDoc, Topic } from '../types';
 import type { NoteDoc } from './links';
@@ -20,19 +21,19 @@ export function parseItemId(id: string): { kind: BrainKind; raw: string } {
   return m ? { kind: m[1] as BrainKind, raw: m[2] } : { kind: 'note', raw: id };
 }
 
-export const KIND_LABEL: Record<BrainKind, string> = { note: 'Заметка', map: 'Карта', task: 'Задача', goal: 'Цель' };
+export const KIND_LABEL: Record<BrainKind, string> = { note: t('Заметка'), map: t('Карта'), task: t('Задача'), goal: t('Цель') };
 
 /**
  * Заметка: заголовки блоков отдельно (весят больше), код не учитывается.
  * Текст — как написан: разметку уберёт разбор, а [[ссылки]] нужны ему целыми.
  */
 /** Заголовки шаблона заметки дня и строка «Четверг · прошлая запись: [[…]]» — общие у всех дней, связей по ним нет */
-const DAILY_HEAD = new Set(['задачи на день', 'мысли', 'итоги дня']);
-const DAILY_LINE = /^(понедельник|вторник|среда|четверг|пятница|суббота|воскресенье)( · прошлая запись: \[\[[^\]]*\]\])?$/i;
+const DAILY_HEAD = new Set(['задачи на день', 'мысли', 'итоги дня', 'tasks for the day', 'thoughts', 'day summary']);
+const DAILY_LINE = /^(понедельник|вторник|среда|четверг|пятница|суббота|воскресенье|monday|tuesday|wednesday|thursday|friday|saturday|sunday)( · (прошлая запись|previous entry): \[\[[^\]]*\]\])?$/i;
 
 /** Заголовки шаблона сохранённой статьи и строка «Источник: …» — общие у всех статей */
-const ARTICLE_HEAD = new Set(['главные мысли', 'цифры и факты', 'что применить', 'начало статьи']);
-const ARTICLE_LINE = /^Источник: \[[^\]]*\]\([^)]*\)$/;
+const ARTICLE_HEAD = new Set(['главные мысли', 'цифры и факты', 'что применить', 'начало статьи', 'key ideas', 'numbers and facts', 'what to apply', 'beginning of the article']);
+const ARTICLE_LINE = /^(Источник|Source): \[[^\]]*\]\([^)]*\)$/;
 
 /** Какая заметка: обычная, заметка дня или сохранённая статья (у двух последних — свой шаблон) */
 export type NoteKind = 'plain' | 'daily' | 'article';

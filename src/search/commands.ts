@@ -1,5 +1,6 @@
 /** Команды поиска: создать, перейти, тема, синхронизация, копия данных */
 import { useApp, toast, type View } from '../store/appStore';
+import { t } from '../i18n/index';
 import { createAndOpen } from '../actions';
 import { docFromTemplate, TEMPLATES } from '../templates';
 import { openQuickAdd } from '../tasks/store';
@@ -12,19 +13,19 @@ import { useSearchUi } from './state';
 import { entry, nav, whenShown, type Entry } from './sources';
 
 const GO: { view: Exclude<View, 'editor'>; label: string; emoji: string; alias: string }[] = [
-  { view: 'today', label: 'Сегодня', emoji: '☀️', alias: 'день главная план привычки деньги' },
-  { view: 'home', label: 'Карты', emoji: '🧠', alias: 'интеллект карты mind map' },
-  { view: 'tasks', label: 'Задачи', emoji: '✅', alias: 'дела todo список' },
-  { view: 'calendar', label: 'Календарь', emoji: '📅', alias: 'расписание неделя месяц' },
-  { view: 'habits', label: 'Привычки', emoji: '🔥', alias: 'привычки дневник день журнал настроение ежедневник' },
-  { view: 'assistant', label: 'Ассистент', emoji: '🤖', alias: 'ии ai чат брифинг' },
-  { view: 'notes', label: 'Заметки', emoji: '📝', alias: 'записи' },
-  { view: 'goals', label: 'Цели', emoji: '🎯', alias: 'колесо баланса сферы' },
-  { view: 'finance', label: 'Финансы', emoji: '💰', alias: 'деньги бюджет расходы доходы счета' },
-  { view: 'progress', label: 'Прогресс', emoji: '🏆', alias: 'уровень достижения опыт' },
-  { view: 'focus', label: 'Фокус', emoji: '⏱️', alias: 'помодоро таймер' },
-  { view: 'board', label: 'Доска', emoji: '🗂️', alias: 'канбан kanban' },
-  { view: 'settings', label: 'Настройки', emoji: '⚙️', alias: 'параметры аккаунт оформление' },
+  { view: 'today', label: t('Сегодня'), emoji: '☀️', alias: 'день главная план привычки деньги' },
+  { view: 'home', label: t('Карты'), emoji: '🧠', alias: 'интеллект карты mind map' },
+  { view: 'tasks', label: t('Задачи'), emoji: '✅', alias: 'дела todo список' },
+  { view: 'calendar', label: t('Календарь'), emoji: '📅', alias: 'расписание неделя месяц' },
+  { view: 'habits', label: t('Привычки'), emoji: '🔥', alias: 'привычки дневник день журнал настроение ежедневник' },
+  { view: 'assistant', label: t('Ассистент'), emoji: '🤖', alias: 'ии ai чат брифинг' },
+  { view: 'notes', label: t('Заметки'), emoji: '📝', alias: 'записи' },
+  { view: 'goals', label: t('Цели'), emoji: '🎯', alias: 'колесо баланса сферы' },
+  { view: 'finance', label: t('Финансы'), emoji: '💰', alias: 'деньги бюджет расходы доходы счета' },
+  { view: 'progress', label: t('Прогресс'), emoji: '🏆', alias: 'уровень достижения опыт' },
+  { view: 'focus', label: t('Фокус'), emoji: '⏱️', alias: 'помодоро таймер' },
+  { view: 'board', label: t('Доска'), emoji: '🗂️', alias: 'канбан kanban' },
+  { view: 'settings', label: t('Настройки'), emoji: '⚙️', alias: 'параметры аккаунт оформление' },
 ];
 
 function isDark(): boolean {
@@ -38,7 +39,7 @@ export function buildCommands(): Entry[] {
     entry({
       key: 'c:new-map',
       kind: 'cmd',
-      title: 'Новая карта',
+      title: t('Новая карта'),
       emoji: '🧠',
       body: 'создать добавить интеллект карту mind map',
       run: () => createAndOpen(docFromTemplate(TEMPLATES[0])),
@@ -46,7 +47,7 @@ export function buildCommands(): Entry[] {
     entry({
       key: 'c:new-task',
       kind: 'cmd',
-      title: 'Новая задача',
+      title: t('Новая задача'),
       emoji: '✅',
       body: 'создать добавить задачу дело',
       run: () => openQuickAdd(),
@@ -54,7 +55,7 @@ export function buildCommands(): Entry[] {
     entry({
       key: 'c:new-note',
       kind: 'cmd',
-      title: 'Новая заметка',
+      title: t('Новая заметка'),
       emoji: '📝',
       body: 'создать добавить заметку запись',
       run: async () => {
@@ -68,7 +69,7 @@ export function buildCommands(): Entry[] {
     entry({
       key: 'c:ask-brain',
       kind: 'cmd',
-      title: 'Спросить у мозга',
+      title: t('Спросить у мозга'),
       emoji: '🧠',
       body: 'вопрос ответ по заметкам ии найти что я писал второй мозг',
       run: async () => {
@@ -79,7 +80,7 @@ export function buildCommands(): Entry[] {
     entry({
       key: 'c:brain-hub',
       kind: 'cmd',
-      title: 'Второй мозг: что умеет',
+      title: t('Второй мозг: что умеет'),
       emoji: '🧠',
       body: 'второй мозг возможности функции связи граф конспект карточки дневник обзор справка помощь',
       run: async () => {
@@ -90,7 +91,7 @@ export function buildCommands(): Entry[] {
     entry({
       key: 'c:save-article',
       kind: 'cmd',
-      title: 'Сохранить статью по ссылке',
+      title: t('Сохранить статью по ссылке'),
       emoji: '📰',
       body: 'статья ссылка сайт url прочитать позже пересказ главное сохранить страницу',
       run: async () => {
@@ -100,7 +101,7 @@ export function buildCommands(): Entry[] {
     entry({
       key: 'c:cards-review',
       kind: 'cmd',
-      title: 'Повторение карточек',
+      title: t('Повторение карточек'),
       emoji: '🎓',
       body: 'карточки повторить вспомнить выучить запомнить anki флешкарты',
       run: async () => {
@@ -111,7 +112,7 @@ export function buildCommands(): Entry[] {
     entry({
       key: 'c:daily-note',
       kind: 'cmd',
-      title: 'Заметка дня',
+      title: t('Заметка дня'),
       emoji: '📔',
       body: 'дневник сегодня запись дня ежедневная заметка итоги дня мысли',
       run: async () => {
@@ -121,7 +122,7 @@ export function buildCommands(): Entry[] {
     entry({
       key: 'c:note-template',
       kind: 'cmd',
-      title: 'Заметка по шаблону',
+      title: t('Заметка по шаблону'),
       emoji: '🧩',
       body: 'шаблон шаблоны заготовка встреча книга проект новая заметка template',
       run: async () => {
@@ -133,7 +134,7 @@ export function buildCommands(): Entry[] {
     entry({
       key: 'c:new-goal',
       kind: 'cmd',
-      title: 'Новая цель',
+      title: t('Новая цель'),
       emoji: '🎯',
       body: 'создать добавить цель',
       run: async () => {
@@ -145,7 +146,7 @@ export function buildCommands(): Entry[] {
     entry({
       key: 'c:new-tx',
       kind: 'cmd',
-      title: 'Новая операция',
+      title: t('Новая операция'),
       emoji: '💸',
       body: 'расход доход финансы добавить трата покупка',
       run: async () => {
@@ -157,46 +158,46 @@ export function buildCommands(): Entry[] {
       entry({
         key: 'c:go-' + g.view,
         kind: 'cmd',
-        title: 'Перейти: ' + g.label,
+        title: t('Перейти: {name}', { name: g.label }),
         emoji: g.emoji,
         body: 'открыть раздел ' + g.alias,
         run: () => nav(g.view),
       }),
     ),
     isDark()
-      ? entry({ key: 'c:light', kind: 'cmd', title: 'Светлая тема', emoji: '☀️', body: 'оформление день светлый режим', run: () => set({ theme: 'light' }) })
-      : entry({ key: 'c:dark', kind: 'cmd', title: 'Тёмная тема', emoji: '🌙', body: 'оформление ночь тёмный режим', run: () => set({ theme: 'dark' }) }),
+      ? entry({ key: 'c:light', kind: 'cmd', title: t('Светлая тема'), emoji: '☀️', body: 'оформление день светлый режим', run: () => set({ theme: 'light' }) })
+      : entry({ key: 'c:dark', kind: 'cmd', title: t('Тёмная тема'), emoji: '🌙', body: 'оформление ночь тёмный режим', run: () => set({ theme: 'dark' }) }),
     ...(theme !== 'system'
-      ? [entry({ key: 'c:system', kind: 'cmd', title: 'Тема как в системе', emoji: '🖥️', body: 'оформление авто автоматически', run: () => set({ theme: 'system' }) })]
+      ? [entry({ key: 'c:system', kind: 'cmd', title: t('Тема как в системе'), emoji: '🖥️', body: 'оформление авто автоматически', run: () => set({ theme: 'system' }) })]
       : []),
     entry({
       key: 'c:sync',
       kind: 'cmd',
-      title: 'Синхронизировать',
+      title: t('Синхронизировать'),
       emoji: '🔄',
       body: 'облако аккаунт обновить синхронизация',
       run: async () => {
         if (!useCloud.getState().account) {
-          toast('Войдите в аккаунт — Настройки → Аккаунт');
+          toast(t('Войдите в аккаунт — Настройки → Аккаунт'));
           return;
         }
-        toast('Синхронизация…');
+        toast(t('Синхронизация…'));
         try {
           await syncNow();
           const st = useCloud.getState().status;
-          toast(st === 'offline' ? 'Нет связи — синхронизация позже' : st === 'error' ? 'Не удалось синхронизировать' : 'Синхронизировано');
+          toast(st === 'offline' ? t('Нет связи — синхронизация позже') : st === 'error' ? t('Не удалось синхронизировать') : t('Синхронизировано'));
         } catch {
-          toast('Не удалось синхронизировать');
+          toast(t('Не удалось синхронизировать'));
         }
       },
     }),
     entry({
       key: 'c:snapshot',
       kind: 'cmd',
-      title: 'Сделать копию данных',
+      title: t('Сделать копию данных'),
       emoji: '💾',
       body: 'резервная копия бэкап backup сохранить',
-      run: async () => toast((await takeSnapshot('manual')) ? 'Копия сохранена на устройстве' : 'Пока нечего копировать'),
+      run: async () => toast((await takeSnapshot('manual')) ? t('Копия сохранена на устройстве') : t('Пока нечего копировать')),
     }),
   ];
   // команды без даты изменения — небольшая прибавка, чтобы точное совпадение было сверху

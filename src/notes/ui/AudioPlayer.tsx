@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { t } from '../../i18n/index';
 import { Pause, Play } from 'lucide-react';
 import { fmtDuration } from '../model';
 import { dataUrlToBlob } from '../media';
@@ -43,7 +44,7 @@ export function AudioPlayer({ src, duration }: { src: string; duration?: number 
 
   return (
     <div className="nt-player">
-      <button className={`nt-play${playing ? ' on' : ''}`} onClick={toggle} aria-label={playing ? 'Пауза' : 'Слушать'}>
+      <button className={`nt-play${playing ? ' on' : ''}`} onClick={toggle} aria-label={playing ? t('Пауза') : t('Слушать')}>
         {playing ? <Pause size={18} /> : <Play size={18} />}
       </button>
       <input
@@ -59,7 +60,7 @@ export function AudioPlayer({ src, duration }: { src: string; duration?: number 
           a.currentTime = (Number(e.target.value) / 1000) * total;
           setTime(a.currentTime);
         }}
-        aria-label="Позиция"
+        aria-label={t('Позиция')}
       />
       <span className="nt-ptime">{fmtDuration(playing || time ? time : total)}</span>
       <button className="nt-speed" onClick={() => setSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length])}>

@@ -3,6 +3,7 @@
  * Каждая единица — с версией (updatedAt): важные слова пересчитываются только у изменённых.
  */
 import { listDocs, loadDoc } from '../store/db';
+import { t, tn } from '../i18n/index';
 import { ensureGoals } from '../goals/store';
 import { ensureTasks } from '../tasks/store';
 import { type BrainKind, goalDoc, itemId, mapDoc, noteDoc, parseItemId, taskDoc } from './brainDocs';
@@ -35,7 +36,7 @@ export async function collectItems(): Promise<BrainItem[]> {
     if (!n.trashed && !isTemplateNote(n, tplFolders)) out.push({ id: n.id, kind: 'note', title: n.title, at: n.updatedAt, preview: n.preview, ...(n.folderId ? { folderId: n.folderId } : {}) });
   // остальные разделы — по возможности: не загрузился один, связи остальных всё равно работают
   const [maps, tasks, goals] = await Promise.all([listDocs().catch(() => []), ensureTasks().catch(() => null), ensureGoals().catch(() => null)]);
-  for (const m of maps) if (!m.trashed && !m.locked) out.push({ id: itemId('map', m.id), kind: 'map', title: m.title || 'Без названия', at: m.updatedAt, preview: m.topicCount ? `Карта · ${m.topicCount} тем` : 'Карта' });
+  for (const m of maps) if (!m.trashed && !m.locked) out.push({ id: itemId('map', m.id), kind: 'map', title: m.title || t('Без названия'), at: m.updatedAt, preview: m.topicCount ? `${t('Карта')} · ${m.topicCount} ${tn(m.topicCount, 'тема', 'темы', 'тем')}` : t('Карта') });
   for (const t of tasks?.tasks ?? []) {
     if (t.deleted || !t.title?.trim()) continue;
     out.push({ id: itemId('task', t.id), kind: 'task', title: t.title.trim(), at: t.updatedAt, preview: (t.notes ?? '').replace(/\s+/g, ' ').trim().slice(0, 160), done: t.done || !!t.wontDo });

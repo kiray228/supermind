@@ -1,4 +1,5 @@
 import type { ID } from '../types';
+import { LOCALE, t } from '../i18n/index';
 import { uid } from '../utils/tree';
 
 // ---------- Типы ----------
@@ -149,19 +150,19 @@ export const LIST_TYPES: BlockType[] = ['bullet', 'number', 'todo'];
 export const isTextBlock = (b: Block) => TEXT_TYPES.includes(b.type);
 
 export const BLOCK_LABELS: Record<BlockType, string> = {
-  p: 'Текст',
-  h1: 'Заголовок 1',
-  h2: 'Заголовок 2',
-  h3: 'Заголовок 3',
-  bullet: 'Маркированный список',
-  number: 'Нумерованный список',
-  todo: 'Чек-лист',
-  quote: 'Цитата',
-  code: 'Код',
-  callout: 'Выноска',
-  divider: 'Разделитель',
-  image: 'Изображение',
-  audio: 'Голосовая запись',
+  p: t('Текст'),
+  h1: t('Заголовок 1'),
+  h2: t('Заголовок 2'),
+  h3: t('Заголовок 3'),
+  bullet: t('Маркированный список'),
+  number: t('Нумерованный список'),
+  todo: t('Чек-лист'),
+  quote: t('Цитата'),
+  code: t('Код'),
+  callout: t('Выноска'),
+  divider: t('Разделитель'),
+  image: t('Изображение'),
+  audio: t('Голосовая запись'),
 };
 
 export const MAX_AUDIO_SEC = 300;
@@ -269,11 +270,11 @@ export function noteDate(ms: number): string {
   const now = new Date();
   const day = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
   const diff = Math.round((day(now) - day(d)) / 86400000);
-  const time = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  const time = d.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
   if (diff === 0) return time;
-  if (diff === 1) return 'Вчера';
-  if (diff > 1 && diff < 7) return d.toLocaleDateString('ru-RU', { weekday: 'long' });
-  return d.toLocaleDateString('ru-RU', d.getFullYear() === now.getFullYear() ? { day: 'numeric', month: 'short' } : { day: 'numeric', month: 'short', year: 'numeric' });
+  if (diff === 1) return t('Вчера');
+  if (diff > 1 && diff < 7) return d.toLocaleDateString(LOCALE, { weekday: 'long' });
+  return d.toLocaleDateString(LOCALE, d.getFullYear() === now.getFullYear() ? { day: 'numeric', month: 'short' } : { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 // ---------- Markdown ----------
@@ -286,51 +287,51 @@ export function noteToMarkdown(body: NoteBody, opts: { media?: boolean; noTitle?
   let n = 0;
   let prevList = false;
   for (const b of body.blocks) {
-    const t = b.text ?? '';
+    const txt = b.text ?? '';
     const isList = LIST_TYPES.includes(b.type);
     if (prevList && !isList) out.push('');
     n = b.type === 'number' ? n + 1 : 0;
     switch (b.type) {
       case 'h1':
-        out.push(`${h}# ${t}`, '');
+        out.push(`${h}# ${txt}`, '');
         break;
       case 'h2':
-        out.push(`${h}## ${t}`, '');
+        out.push(`${h}## ${txt}`, '');
         break;
       case 'h3':
-        out.push(`${h}### ${t}`, '');
+        out.push(`${h}### ${txt}`, '');
         break;
       case 'bullet':
-        out.push(`- ${t}`);
+        out.push(`- ${txt}`);
         break;
       case 'number':
-        out.push(`${n}. ${t}`);
+        out.push(`${n}. ${txt}`);
         break;
       case 'todo':
-        out.push(`- [${b.checked ? 'x' : ' '}] ${t}`);
+        out.push(`- [${b.checked ? 'x' : ' '}] ${txt}`);
         break;
       case 'quote':
-        out.push(...t.split('\n').map((l) => `> ${l}`), '');
+        out.push(...txt.split('\n').map((l) => `> ${l}`), '');
         break;
       case 'callout':
-        out.push(...t.split('\n').map((l, i) => `> ${i ? '' : '💡 '}${l}`), '');
+        out.push(...txt.split('\n').map((l, i) => `> ${i ? '' : '💡 '}${l}`), '');
         break;
       case 'code':
-        out.push('```', t, '```', '');
+        out.push('```', txt, '```', '');
         break;
       case 'divider':
         out.push('---', '');
         break;
       case 'image':
-        out.push(opts.media && b.src ? `![${b.caption ?? ''}](${b.src})` : `*[Изображение${b.caption ? ': ' + b.caption : ''}]*`, '');
+        out.push(opts.media && b.src ? `![${b.caption ?? ''}](${b.src})` : b.caption ? t('*[Изображение: {name}]*', { name: b.caption }) : t('*[Изображение]*'), '');
         break;
       case 'audio':
-        out.push(`*[Голосовая запись ${fmtDuration(b.duration ?? 0)}]*`);
+        out.push(t('*[Голосовая запись {duration}]*', { duration: fmtDuration(b.duration ?? 0) }));
         if (b.transcript?.trim()) out.push(`> ${b.transcript.trim()}`);
         out.push('');
         break;
       default:
-        out.push(t, '');
+        out.push(txt, '');
     }
     prevList = isList;
   }

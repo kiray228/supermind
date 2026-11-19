@@ -1,12 +1,13 @@
 import { streamText } from '../ai/claude';
+import { t } from '../i18n/index';
 import { type Block, markdownToBlocks, newBlock, type NoteBody, noteToMarkdown } from './model';
 
 export type NoteAIKind = 'summary' | 'improve' | 'plan';
 
 export const NOTE_AI_LABELS: Record<NoteAIKind, string> = {
-  summary: 'ИИ: кратко',
-  improve: 'ИИ: улучшить текст',
-  plan: 'ИИ: план из заметки',
+  summary: t('ИИ: кратко'),
+  improve: t('ИИ: улучшить текст'),
+  plan: t('ИИ: план из заметки'),
 };
 
 const LIMIT = 60000;
@@ -30,7 +31,7 @@ export async function runNoteAI(kind: NoteAIKind, body: NoteBody, onText?: (s: s
   const src = kind === 'improve' ? { ...body, blocks: body.blocks.filter((b) => b.type !== 'image' && b.type !== 'audio') } : body;
   let md = noteToMarkdown(src, { noTitle: true });
   if (kind === 'improve' && md.length > IMPROVE_LIMIT)
-    throw new Error('заметка слишком длинная, чтобы улучшить её целиком — разделите её на части (конец иначе мог бы пропасть)');
+    throw new Error(t('заметка слишком длинная, чтобы улучшить её целиком — разделите её на части (конец иначе мог бы пропасть)'));
   if (md.length > LIMIT) md = md.slice(0, LIMIT) + '\n…';
   const answer = await streamText({
     system: PROMPTS[kind],
@@ -41,7 +42,7 @@ export async function runNoteAI(kind: NoteAIKind, body: NoteBody, onText?: (s: s
   });
   // улучшенный текст заметно короче исходного — ответ оборвался: не заменяем им заметку
   if (kind === 'improve' && answer.trim().length < md.trim().length * 0.6)
-    throw new Error('ИИ вернул неполный текст — заметка не изменена');
+    throw new Error(t('ИИ вернул неполный текст — заметка не изменена'));
   return answer;
 }
 
@@ -49,8 +50,8 @@ export async function runNoteAI(kind: NoteAIKind, body: NoteBody, onText?: (s: s
 export function applyNoteAI(kind: NoteAIKind, blocks: Block[], answer: string): Block[] {
   const parsed = markdownToBlocks(answer);
   if (!parsed.length) return blocks;
-  if (kind === 'summary') return [newBlock('h3', { text: 'Кратко' }), ...parsed, newBlock('divider'), ...blocks];
-  if (kind === 'plan') return [...blocks, newBlock('h2', { text: 'План' }), ...parsed.map((b) => (b.type === 'todo' ? b : newBlock('todo', { text: b.text ?? '' })))];
+  if (kind === 'summary') return [newBlock('h3', { text: t('Кратко') }), ...parsed, newBlock('divider'), ...blocks];
+  if (kind === 'plan') return [...blocks, newBlock('h2', { text: t('План') }), ...parsed.map((b) => (b.type === 'todo' ? b : newBlock('todo', { text: b.text ?? '' })))];
   // улучшение: текст заменяется, фото и записи остаются в конце в прежнем порядке
   const media = blocks.filter((b) => b.type === 'image' || b.type === 'audio');
   return [...parsed, ...media];

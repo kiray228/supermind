@@ -4,9 +4,10 @@
  * Вопросы выбираются заранее на неделю (план): утреннее уведомление спрашивает то же, что и приложение.
  */
 import { create } from 'zustand';
+import { LOCALE, t } from '../i18n/index';
 import type { ID } from '../types';
 import { addDaysYmd, todayYmd } from '../utils/mapTasks';
-import { buildQuestionPrompt, fillQuestionPlan, parseQuestion, pickQuestionNote, type PlannedQuestion, type QNote, QUESTION_SYSTEM, type QuestionPlan } from './questionCore';
+import { buildQuestionPrompt, fallbackQuestion, fillQuestionPlan, parseQuestion, pickQuestionNote, type PlannedQuestion, type QNote, QUESTION_SYSTEM, type QuestionPlan } from './questionCore';
 import { bodyPlainText, type NotesData, newBlock } from './model';
 
 export interface DayQuestion {
@@ -113,7 +114,7 @@ export async function ensureQuestion(want?: number, now = Date.now()): Promise<D
       }
     } else {
       const note = pickQuestionNote(await questionNotes(d), day, now, load<Record<string, number>>(ASKED_KEY, {}), skip);
-      if (note) q = { day, noteId: note.id, title: note.title, question: (await aiQuestion(note.id, note.title, note.updatedAt, now)) ?? `«${note.title}» — это всё ещё так? Что изменилось с тех пор?`, skip, state: 'open' };
+      if (note) q = { day, noteId: note.id, title: note.title, question: (await aiQuestion(note.id, note.title, note.updatedAt, now)) ?? fallbackQuestion(note.title), skip, state: 'open' };
     }
     if (!q) {
       if (cur?.day !== day) set(null);
@@ -181,8 +182,8 @@ async function answer(q: Pick<DayQuestion, 'noteId' | 'question'>, text: string,
   const r = await appendToDaily(`❓ ${q.question} — ${a}`, 'thoughts');
   if (!r) return false;
   if (toNote) {
-    const date = new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
-    await appendToNote(q.noteId, [newBlock('p', { text: `**Обновление ${date}:** ${a}` })]);
+    const date = new Date().toLocaleDateString(LOCALE, { day: 'numeric', month: 'long', year: 'numeric' });
+    await appendToNote(q.noteId, [newBlock('p', { text: t('**Обновление {date}:** {text}', { date, text: a }) })]);
   }
   const asked = load<Record<string, number>>(ASKED_KEY, {});
   asked[q.noteId] = Date.now();

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { t } from '../../i18n/index';
 import { CalendarDays, LayoutTemplate, Loader2, Pencil, Plus, Sparkles, X } from 'lucide-react';
 import { onBack } from '../../ui/dialogs';
 import { toast } from '../../store/appStore';
@@ -56,7 +57,7 @@ function TemplatesSheet() {
     setBusy('presets');
     try {
       const n = await addPresetTemplates();
-      toast(n ? `Добавлено шаблонов: ${n}` : 'Готовые шаблоны уже есть');
+      toast(n ? t('Добавлено шаблонов: {n}', { n }) : t('Готовые шаблоны уже есть'));
     } finally {
       setBusy(null);
     }
@@ -64,17 +65,17 @@ function TemplatesSheet() {
 
   return (
     <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && closeTemplates()}>
-      <div className="modal nt-dups nt-tpl" role="dialog" aria-label="Шаблоны">
+      <div className="modal nt-dups nt-tpl" role="dialog" aria-label={t('Шаблоны')}>
         <div className="nt-ask-head">
           <LayoutTemplate size={19} className="nt-ask-logo" />
-          <h2 className="grow">{insert ? 'Вставить шаблон' : 'Новая заметка по шаблону'}</h2>
-          <button className="icon-btn" onClick={closeTemplates} aria-label="Закрыть">
+          <h2 className="grow">{insert ? t('Вставить шаблон') : t('Новая заметка по шаблону')}</h2>
+          <button className="icon-btn" onClick={closeTemplates} aria-label={t('Закрыть')}>
             <X size={20} />
           </button>
         </div>
         {list.length === 0 ? (
           <p className="nt-dups-empty">
-            Шаблонов пока нет. Шаблон — обычная заметка в папке «Шаблоны»: напишите её один раз, и новые заметки будут начинаться с неё. Начните с готовых — их можно поменять под себя.
+            {t('Шаблонов пока нет. Шаблон — обычная заметка в папке «Шаблоны»: напишите её один раз, и новые заметки будут начинаться с неё. Начните с готовых — их можно поменять под себя.')}
           </p>
         ) : (
           <div className="nt-dups-list nt-tpl-list">
@@ -87,10 +88,10 @@ function TemplatesSheet() {
                     <span className="nt-hub-ic">{busy === n.id ? <Loader2 size={18} className="spin" /> : isDaily ? <CalendarDays size={18} /> : <LayoutTemplate size={18} />}</span>
                     <span className="grow nt-hub-text">
                       <b>{name}</b>
-                      <span>{isDaily ? 'Так оформляется заметка дня' : n.preview || 'Пустой шаблон'}</span>
+                      <span>{isDaily ? t('Так оформляется заметка дня') : n.preview || t('Пустой шаблон')}</span>
                     </span>
                   </button>
-                  <button className="icon-btn" onClick={() => edit(n.id)} aria-label={`Изменить шаблон «${name}»`} title="Изменить шаблон">
+                  <button className="icon-btn" onClick={() => edit(n.id)} aria-label={t('Изменить шаблон «{name}»', { name })} title={t('Изменить шаблон')}>
                     <Pencil size={16} />
                   </button>
                 </div>
@@ -102,7 +103,7 @@ function TemplatesSheet() {
           {missing.length > 0 && (
             <button className="nt-ai-btn" disabled={!!busy} onClick={() => void presets()}>
               {busy === 'presets' ? <Loader2 size={15} className="spin" /> : <Sparkles size={15} />}
-              Готовые: {missing.map((p) => templateName(p.title)).join(', ')}
+              {t('Готовые: {list}', { list: missing.map((p) => templateName(p.title)).join(', ') })}
             </button>
           )}
           <button
@@ -112,17 +113,17 @@ function TemplatesSheet() {
               void newTemplate();
             }}
           >
-            <Plus size={14} /> Свой шаблон
+            <Plus size={14} /> {t('Свой шаблон')}
           </button>
         </div>
         <p className="nt-rv-hint nt-tpl-vars">
-          В шаблоне можно писать: {TEMPLATE_VARS.map((v, i) => (
+          {t('В шаблоне можно писать:')} {TEMPLATE_VARS.map((v, i) => (
             <span key={v.name} title={v.hint}>
               {i ? ', ' : ''}
               <code>{`{{${v.name}}}`}</code>
             </span>
           ))}{' '}
-          — подставятся сами. Шаблон «{DAILY_TEMPLATE}» оформляет заметку дня.
+          {t('— подставятся сами. Шаблон «{name}» оформляет заметку дня.', { name: DAILY_TEMPLATE })}
         </p>
       </div>
     </div>

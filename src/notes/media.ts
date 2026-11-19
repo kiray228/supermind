@@ -1,5 +1,6 @@
 /** Фото, голосовые записи и распознавание речи для заметок */
 import { MAX_AUDIO_SEC } from './model';
+import { t } from '../i18n/index';
 
 // ---------- Изображения ----------
 
@@ -7,7 +8,7 @@ function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error('Не удалось открыть изображение'));
+    img.onerror = () => reject(new Error(t('Не удалось открыть изображение')));
     img.src = url;
   });
 }
@@ -19,7 +20,7 @@ export async function imageFileToDataUrl(file: Blob, max = 1600, quality = 0.82)
     const img = await loadImage(url);
     const w0 = img.naturalWidth || img.width;
     const h0 = img.naturalHeight || img.height;
-    if (!w0 || !h0) throw new Error('Пустое изображение');
+    if (!w0 || !h0) throw new Error(t('Пустое изображение'));
     const k = Math.min(1, max / Math.max(w0, h0));
     const w = Math.max(1, Math.round(w0 * k));
     const h = Math.max(1, Math.round(h0 * k));
@@ -27,7 +28,7 @@ export async function imageFileToDataUrl(file: Blob, max = 1600, quality = 0.82)
     canvas.width = w;
     canvas.height = h;
     const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Canvas недоступен');
+    if (!ctx) throw new Error(t('Canvas недоступен'));
     // прозрачный фон PNG в JPEG стал бы чёрным
     ctx.fillStyle = '#fff';
     ctx.fillRect(0, 0, w, h);
@@ -87,7 +88,7 @@ export async function startRecording(opts: { onTick?: (sec: number) => void; onL
     stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
   } catch (e) {
     const name = e instanceof DOMException ? e.name : '';
-    throw new Error(name === 'NotAllowedError' ? 'Нет доступа к микрофону. Разрешите его в настройках браузера.' : name === 'NotFoundError' ? 'Микрофон не найден.' : 'Не удалось включить микрофон.');
+    throw new Error(name === 'NotAllowedError' ? t('Нет доступа к микрофону. Разрешите его в настройках браузера.') : name === 'NotFoundError' ? t('Микрофон не найден.') : t('Не удалось включить микрофон.'));
   }
   const mimeType = pickAudioMime();
   const rec = new MediaRecorder(stream, { ...(mimeType ? { mimeType } : {}), audioBitsPerSecond: 64000 });
@@ -116,7 +117,7 @@ export async function startRecording(opts: { onTick?: (sec: number) => void; onL
           release();
           try {
             const blob = new Blob(chunks, { type: rec.mimeType || mimeType || 'audio/webm' });
-            if (!blob.size) throw new Error('Запись пустая');
+            if (!blob.size) throw new Error(t('Запись пустая'));
             resolve({ src: await blobToDataUrl(blob), duration });
           } catch (e) {
             reject(e);
@@ -192,7 +193,7 @@ export function startRecognition(opts: { onText: (final: string, interim: string
   };
   r.onerror = (e) => {
     if (e.error === 'no-speech' || e.error === 'aborted') return;
-    opts.onError?.(e.error === 'not-allowed' || e.error === 'service-not-allowed' ? 'Нет доступа к распознаванию речи' : e.error === 'network' ? 'Распознаванию речи нужен интернет' : 'Ошибка распознавания: ' + e.error);
+    opts.onError?.(e.error === 'not-allowed' || e.error === 'service-not-allowed' ? t('Нет доступа к распознаванию речи') : e.error === 'network' ? t('Распознаванию речи нужен интернет') : t('Ошибка распознавания: {error}', { error: e.error }));
   };
   r.onend = () => opts.onEnd?.();
   try {

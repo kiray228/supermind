@@ -4,6 +4,7 @@
  * Модуль без браузерных зависимостей — тесты гоняют его в Node; запуск из приложения — obsidianExport.ts.
  */
 import { safeFilename } from '../io/download';
+import { t } from '../i18n/index';
 import { normTitle, parseWiki } from './links';
 import { type Block, type NoteBody, noteToMarkdown } from './model';
 
@@ -62,7 +63,7 @@ export function buildVault(notes: VaultNote[], opts: VaultOpts = {}): VaultFile[
   const nameOf = new Map<string, string>();
   const used = new Set<string>();
   for (const n of notes) {
-    const base = safeFilename(n.title.trim() || 'Без названия').replace(/[#^[\]]/g, ' ').replace(/\s+/g, ' ').trim() || 'Без названия';
+    const base = safeFilename(n.title.trim() || t('Без названия')).replace(/[#^[\]]/g, ' ').replace(/\s+/g, ' ').trim() || t('Без названия');
     let name = base;
     for (let i = 2; used.has(name.toLowerCase()); i++) name = `${base} (${i})`;
     used.add(name.toLowerCase());
@@ -85,7 +86,7 @@ export function buildVault(notes: VaultNote[], opts: VaultOpts = {}): VaultFile[
     const blocks: Block[] = n.body.blocks.map((b) => {
       if (b.type !== 'image' || !b.src) return b;
       const pic = dataUrlImage(b.src);
-      if (!pic) return { ...b, type: 'p', text: b.caption ? `*[Изображение: ${b.caption}]*` : '*[Изображение]*' } as Block;
+      if (!pic) return { ...b, type: 'p', text: b.caption ? t('*[Изображение: {name}]*', { name: b.caption }) : t('*[Изображение]*') } as Block;
       const file = `attachments/${name} ${++img}.${pic.ext}`;
       files.push({ path: file, base64: pic.base64 });
       return { id: b.id, type: 'p', text: `![[${file}]]` + (b.caption ? `\n*${b.caption}*` : '') } as Block;
@@ -103,14 +104,14 @@ export function buildVault(notes: VaultNote[], opts: VaultOpts = {}): VaultFile[
     });
 
     const tags = [...new Set((opts.keywords?.get(n.id) ?? []).map(obsidianTag).filter((t): t is string => !!t))];
-    const front = ['---', `title: ${yamlStr(n.title || 'Без названия')}`];
+    const front = ['---', `title: ${yamlStr(n.title || t('Без названия'))}`];
     if (iso(n.createdAt)) front.push(`created: ${iso(n.createdAt)}`);
     if (iso(n.updatedAt)) front.push(`updated: ${iso(n.updatedAt)}`);
     if (tags.length) front.push('tags:', ...tags.map((t) => `  - ${t}`));
     front.push('---', '');
 
     const rel = (opts.related?.get(n.id) ?? []).filter((id) => nameOf.has(id) && id !== n.id);
-    const relMd = rel.length ? '\n## Связанные заметки\n\n' + rel.map((id) => `- ${link(nameOf.get(id)!, notes.find((x) => x.id === id)!.title || nameOf.get(id)!)}`).join('\n') + '\n' : '';
+    const relMd = rel.length ? `\n## ${t('Связанные заметки')}\n\n` + rel.map((id) => `- ${link(nameOf.get(id)!, notes.find((x) => x.id === id)!.title || nameOf.get(id)!)}`).join('\n') + '\n' : '';
     files.push({ path: `${dir}${name}.md`, text: front.join('\n') + md.trimEnd() + '\n' + relMd });
   }
   return files;

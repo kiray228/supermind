@@ -1,3 +1,4 @@
+import { t } from '../i18n/index';
 /**
  * Статья по ссылке: разбор страницы (название, сайт, описание, текст статьи без меню и рекламы),
  * запрос к ИИ «главные мысли» и текст заметки. Модуль чистый — тесты гоняют его в Node.
@@ -182,7 +183,7 @@ export function buildArticlePrompt(a: Article): string {
 
 /** Текст заметки: источник, пересказ (или, без ИИ, — описание и начало статьи) */
 export function articleMarkdown(a: Article, summary?: string): string {
-  const src = `Источник: [${a.site}](${a.url})`;
+  const src = t('Источник: [{site}]({url})', { site: a.site, url: a.url });
   if (summary?.trim()) return `${src}\n\n${summary.trim()}\n`;
   const parts = [src];
   if (a.description) parts.push(a.description);
@@ -191,6 +192,6 @@ export function articleMarkdown(a: Article, summary?: string): string {
     .filter((l) => !l.startsWith('## '))
     .slice(0, 3)
     .join('\n\n');
-  if (start) parts.push('## Начало статьи', start);
+  if (start) parts.push(`## ${t('Начало статьи')}`, start);
   return parts.join('\n\n') + '\n';
 }

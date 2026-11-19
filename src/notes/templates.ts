@@ -3,6 +3,7 @@
  * вставка шаблона в открытую заметку, готовые шаблоны, шаблон заметки дня. Правила подстановок — templatesCore.ts.
  */
 import { create } from 'zustand';
+import { LOCALE, t } from '../i18n/index';
 import type { ID } from '../types';
 import { todayYmd } from '../utils/mapTasks';
 import { type Block, type Folder, type NoteMeta, type NotesData } from './model';
@@ -23,7 +24,7 @@ export function isTemplateNote(n: Pick<NoteMeta, 'folderId'>, folders: Set<ID> =
 /** Шаблоны по названию */
 export function listTemplates(d: NotesData | null = useNotes.getState().data): NoteMeta[] {
   const folders = templateFolderIds(d);
-  return (d?.notes ?? []).filter((n) => !n.trashed && isTemplateNote(n, folders)).sort((a, b) => templateName(a.title).localeCompare(templateName(b.title), 'ru'));
+  return (d?.notes ?? []).filter((n) => !n.trashed && isTemplateNote(n, folders)).sort((a, b) => templateName(a.title).localeCompare(templateName(b.title), LOCALE));
 }
 
 /** Шаблон заметки дня — шаблон с названием «Заметка дня» */
@@ -67,7 +68,7 @@ async function ensureTemplateFolder(): Promise<Folder | null> {
 export async function newTemplate(): Promise<void> {
   const f = await ensureTemplateFolder();
   if (!f) return;
-  const m = createNote({ title: 'Новый шаблон', folderId: f.id });
+  const m = createNote({ title: t('Новый шаблон'), folderId: f.id });
   if (m) await openNote(m.id);
 }
 

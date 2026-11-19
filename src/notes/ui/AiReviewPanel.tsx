@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { t } from '../../i18n/index';
 import { Check, Loader2, Sparkles, Undo2, X } from 'lucide-react';
 import type { ID } from '../../types';
 import { toast } from '../../store/appStore';
@@ -21,7 +22,7 @@ export function AiReviewPanel({ id }: { id: ID }) {
 
   const titleOf = (x: ID) => {
     const m = notes?.find((n) => n.id === x);
-    return m ? m.title || m.preview.slice(0, 40) || 'Без названия' : 'Заметка удалена';
+    return m ? m.title || m.preview.slice(0, 40) || t('Без названия') : t('Заметка удалена');
   };
 
   const run = async () => {
@@ -35,7 +36,7 @@ export function AiReviewPanel({ id }: { id: ID }) {
       const r = await reviewNote(id, ac.signal);
       if (!ac.signal.aborted) setResult(r);
     } catch (e) {
-      if (!ac.signal.aborted) toast(e instanceof Error ? e.message : 'Не удалось проверить');
+      if (!ac.signal.aborted) toast(e instanceof Error ? e.message : t('Не удалось проверить'));
     } finally {
       if (abort.current === ac) {
         abort.current = null;
@@ -56,19 +57,19 @@ export function AiReviewPanel({ id }: { id: ID }) {
       {running ? (
         <div className="nt-ai-bar">
           <Loader2 size={15} className="spin" />
-          <span className="grow">ИИ проверяет слова и связи…</span>
+          <span className="grow">{t('ИИ проверяет слова и связи…')}</span>
           <button className="nt-ai-btn" onClick={() => abort.current?.abort()}>
-            Стоп
+            {t('Стоп')}
           </button>
         </div>
       ) : (
         <div className="nt-ai-bar">
           <Sparkles size={15} className="nt-ai-ic" />
           <span className="grow nt-ai-status">
-            {!st ? 'ИИ проверит, верно ли выбраны темы и связи' : st.stale ? 'Заметка изменилась после проверки ИИ' : `Проверено ИИ · ${noteDate(st.review.checkedAt)}`}
+            {!st ? t('ИИ проверит, верно ли выбраны темы и связи') : st.stale ? t('Заметка изменилась после проверки ИИ') : t('Проверено ИИ · {date}', { date: noteDate(st.review.checkedAt) })}
           </span>
           <button className="nt-ai-btn" onClick={() => void run()}>
-            {st ? 'Проверить снова' : 'Проверить'}
+            {st ? t('Проверить снова') : t('Проверить')}
           </button>
         </div>
       )}
@@ -77,29 +78,29 @@ export function AiReviewPanel({ id }: { id: ID }) {
         <div className="nt-ai-result" role="status">
           <div className="nt-ai-result-head">
             <Sparkles size={15} />
-            <span className="grow">{nothing ? 'Всё верно — темы и связи подобраны правильно' : 'ИИ поправил связи'}</span>
-            <button className="icon-btn" onClick={() => setResult(null)} aria-label="Закрыть итог">
+            <span className="grow">{nothing ? t('Всё верно — темы и связи подобраны правильно') : t('ИИ поправил связи')}</span>
+            <button className="icon-btn" onClick={() => setResult(null)} aria-label={t('Закрыть итог')}>
               <X size={16} />
             </button>
           </div>
           {result.dropped.length > 0 && (
             <div className="nt-ai-line">
-              <b>Неважные слова убраны:</b> {result.dropped.join(', ')}
+              <b>{t('Неважные слова убраны:')}</b> {result.dropped.join(', ')}
             </div>
           )}
           {result.added.length > 0 && (
             <div className="nt-ai-line">
-              <b>Добавлены темы:</b> {result.added.join(', ')}
+              <b>{t('Добавлены темы:')}</b> {result.added.join(', ')}
             </div>
           )}
           {result.confirmed.length > 0 && (
             <div className="nt-ai-line">
-              <b>Подтверждены связи:</b> {result.confirmed.map((c) => titleOf(c.id)).join(', ')}
+              <b>{t('Подтверждены связи:')}</b> {result.confirmed.map((c) => titleOf(c.id)).join(', ')}
             </div>
           )}
           {result.rejected.length > 0 && (
             <div className="nt-ai-group">
-              <b>Случайные связи убраны:</b>
+              <b>{t('Случайные связи убраны:')}</b>
               {result.rejected.map((c) => (
                 <LinkRow key={c.id} title={titleOf(c.id)} why={c.why} ok={overridden[c.id] ?? false} onToggle={(ok) => toggle(c.id, ok)} onOpen={() => openLinkedNote(c.id)} />
               ))}
@@ -107,7 +108,7 @@ export function AiReviewPanel({ id }: { id: ID }) {
           )}
           {result.found.length > 0 && (
             <div className="nt-ai-group">
-              <b>Найдены новые связи:</b>
+              <b>{t('Найдены новые связи:')}</b>
               {result.found.map((c) => (
                 <LinkRow key={c.id} title={titleOf(c.id)} why={c.why} ok={overridden[c.id] ?? true} onToggle={(ok) => toggle(c.id, ok)} onOpen={() => openLinkedNote(c.id)} />
               ))}
@@ -119,10 +120,10 @@ export function AiReviewPanel({ id }: { id: ID }) {
               onClick={() => {
                 result.undo();
                 setResult(null);
-                toast('Проверка ИИ отменена');
+                toast(t('Проверка ИИ отменена'));
               }}
             >
-              <Undo2 size={14} /> Отменить проверку
+              <Undo2 size={14} /> {t('Отменить проверку')}
             </button>
           )}
         </div>
@@ -138,12 +139,12 @@ function LinkRow({ title, why, ok, onToggle, onOpen }: { title: string; why?: st
         <span className="nt-ai-link-title">{title}</span>
         {why && <span className="nt-ai-link-why">{why}</span>}
       </button>
-      <button className="nt-ai-btn" onClick={() => onToggle(!ok)} aria-label={ok ? 'Убрать связь' : 'Вернуть связь'}>
+      <button className="nt-ai-btn" onClick={() => onToggle(!ok)} aria-label={ok ? t('Убрать связь') : t('Вернуть связь')}>
         {ok ? (
-          'Убрать'
+          t('Убрать')
         ) : (
           <>
-            <Check size={13} /> Вернуть
+            <Check size={13} /> {t('Вернуть')}
           </>
         )}
       </button>

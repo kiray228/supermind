@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { t } from '../../i18n/index';
 import { ArrowUp, Brain, Loader2, Square, Trash2, X } from 'lucide-react';
 import { onBack } from '../../ui/dialogs';
 import { CitedText } from './CitedText';
@@ -26,13 +27,13 @@ function Entry({ entry }: { entry: AskEntry }) {
       <div className="nt-ask-q">{entry.q}</div>
       {entry.state === 'search' && (
         <div className="nt-ask-status">
-          <Loader2 size={15} className="spin" /> Ищу в заметках, картах и задачах…
+          <Loader2 size={15} className="spin" /> {t('Ищу в заметках, картах и задачах…')}
         </div>
       )}
       {entry.sources.length > 0 && (
         <div className="nt-ask-sources">
           <button className="nt-ask-src-toggle" onClick={() => setSrcOpen(!srcOpen)} aria-expanded={srcOpen}>
-            Источники: {entry.sources.length}
+            {t('Источники: {n}', { n: entry.sources.length })}
           </button>
           {(srcOpen ? entry.sources : entry.sources.slice(0, 3)).map((s) => {
             const Icon = KIND_ICON[parseItemId(s.id).kind];
@@ -40,13 +41,13 @@ function Entry({ entry }: { entry: AskEntry }) {
               <button key={s.n} className="nt-ask-src" onClick={() => openSource(s.id)} title={`${s.kind} «${s.title}»`}>
                 <span className="nt-ask-src-n">{s.n}</span>
                 <Icon size={13} />
-                <span className="ellipsis">{s.title || 'Без названия'}</span>
+                <span className="ellipsis">{s.title || t('Без названия')}</span>
               </button>
             );
           })}
           {!srcOpen && entry.sources.length > 3 && (
             <button className="nt-ask-src-more" onClick={() => setSrcOpen(true)}>
-              ещё {entry.sources.length - 3}
+              {t('ещё {n}', { n: entry.sources.length - 3 })}
             </button>
           )}
         </div>
@@ -55,7 +56,7 @@ function Entry({ entry }: { entry: AskEntry }) {
       {entry.state === 'done' && entry.sources.length > 0 && <ReportAI text={entry.a} where="Спросить мозг" />}
       {entry.state === 'answer' && !entry.a && (
         <div className="nt-ask-status">
-          <Loader2 size={15} className="spin" /> Думаю…
+          <Loader2 size={15} className="spin" /> {t('Думаю…')}
         </div>
       )}
       {entry.state === 'error' && <div className="nt-ask-error">{entry.error}</div>}
@@ -93,7 +94,7 @@ export function BrainAsk() {
       .sort((a, b) => b.at - a.at)
       .slice(0, 3)
       .map((i) => i.title.trim());
-    return [...titles.map((t) => `Что у меня есть про «${t}»?`), 'Какие планы я записывал на этот месяц?'].slice(0, 4);
+    return [...titles.map((title) => t('Что у меня есть про «{title}»?', { title })), t('Какие планы я записывал на этот месяц?')].slice(0, 4);
   }, []);
 
   const send = (text = q) => {
@@ -104,16 +105,16 @@ export function BrainAsk() {
 
   return (
     <div className="modal-backdrop nt-ask-backdrop" onPointerDown={(e) => e.target === e.currentTarget && closeAsk()}>
-      <div className="modal nt-ask" role="dialog" aria-label="Спросить у мозга">
+      <div className="modal nt-ask" role="dialog" aria-label={t('Спросить у мозга')}>
         <div className="nt-ask-head">
           <Brain size={20} className="nt-ask-logo" />
-          <h2 className="grow">Спросить у мозга</h2>
+          <h2 className="grow">{t('Спросить у мозга')}</h2>
           {entries.length > 0 && !busy && (
-            <button className="icon-btn" onClick={clearAsk} aria-label="Начать заново" title="Начать заново">
+            <button className="icon-btn" onClick={clearAsk} aria-label={t('Начать заново')} title={t('Начать заново')}>
               <Trash2 size={18} />
             </button>
           )}
-          <button className="icon-btn" onClick={closeAsk} aria-label="Закрыть">
+          <button className="icon-btn" onClick={closeAsk} aria-label={t('Закрыть')}>
             <X size={20} />
           </button>
         </div>
@@ -121,7 +122,7 @@ export function BrainAsk() {
         <div className="nt-ask-body" ref={scroll}>
           {entries.length === 0 ? (
             <div className="nt-ask-intro">
-              <p>Спросите своими словами — ответ соберётся из ваших заметок, карт, задач и целей, со ссылками на них.</p>
+              <p>{t('Спросите своими словами — ответ соберётся из ваших заметок, карт, задач и целей, со ссылками на них.')}</p>
               <div className="nt-ask-examples">
                 {examples.map((e) => (
                   <button key={e} className="nt-rel-chip nt-ask-example" onClick={() => send(e)}>
@@ -147,7 +148,7 @@ export function BrainAsk() {
             className="nt-ask-input"
             value={q}
             rows={1}
-            placeholder={entries.length ? 'Уточните или спросите ещё…' : 'Например: сколько я решил откладывать в подушку?'}
+            placeholder={entries.length ? t('Уточните или спросите ещё…') : t('Например: сколько я решил откладывать в подушку?')}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -157,11 +158,11 @@ export function BrainAsk() {
             }}
           />
           {busy ? (
-            <button type="button" className="nt-ask-send is-stop" onClick={stopAsk} aria-label="Остановить">
+            <button type="button" className="nt-ask-send is-stop" onClick={stopAsk} aria-label={t('Остановить')}>
               <Square size={14} fill="currentColor" />
             </button>
           ) : (
-            <button type="submit" className="nt-ask-send" disabled={!q.trim()} aria-label="Спросить">
+            <button type="submit" className="nt-ask-send" disabled={!q.trim()} aria-label={t('Спросить')}>
               <ArrowUp size={18} />
             </button>
           )}

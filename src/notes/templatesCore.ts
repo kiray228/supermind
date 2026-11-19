@@ -4,18 +4,23 @@
  * Шаблон «Заметка дня» оформляет заметку дня. Модуль чистый — тесты гоняют его в Node; хранение и окна — templates.ts.
  */
 import { type Block, newBlock, stripInline } from './model';
+import { LOCALE, isEn, t } from '../i18n/index';
 import { uid } from '../utils/tree';
 
-export const TEMPLATE_FOLDER = 'Шаблоны';
+export const TEMPLATE_FOLDER = t('Шаблоны');
 /** так папку с шаблонами называет Obsidian — тоже подходит */
 const FOLDER_NAMES = new Set(['шаблоны', 'templates', 'template', 'шаблон']);
 export const isTemplateFolderName = (name: string) => FOLDER_NAMES.has(name.trim().toLowerCase());
 
 /** шаблон с таким названием оформляет заметку дня */
-export const DAILY_TEMPLATE = 'Заметка дня';
+export const DAILY_TEMPLATE = t('Заметка дня');
 
 const MONTHS_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
 const WEEKDAYS = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
+const monthName = (d: Date) => (isEn ? d.toLocaleDateString(LOCALE, { month: 'long' }) : MONTHS_GEN[d.getMonth()]);
+const weekdayName = (d: Date) => (isEn ? d.toLocaleDateString(LOCALE, { weekday: 'long' }) : WEEKDAYS[d.getDay()]);
+/** {{дата}} без формата: «16 октября 2026», по-английски — «October 16, 2026» */
+const DATE_FMT = isEn ? 'MMMM D, YYYY' : 'D MMMM YYYY';
 
 export interface TemplateVars {
   /** день заметки (YYYY-MM-DD) */
@@ -37,13 +42,13 @@ export const hasVars = (s: string) => /\{\{\s*[^{}\n]{1,40}?\s*\}\}/.test(s);
 
 /** Подстановки, которые понимает шаблон (для подсказки) */
 export const TEMPLATE_VARS: { name: string; hint: string }[] = [
-  { name: 'дата', hint: '16 октября 2026' },
-  { name: 'время', hint: '14:05' },
-  { name: 'день недели', hint: 'Пятница' },
-  { name: 'название', hint: 'название новой заметки' },
-  { name: 'задачи', hint: 'задачи на день — списком' },
-  { name: 'цели', hint: 'сроки целей в этот день' },
-  { name: 'вчера', hint: 'ссылка на прошлую заметку дня' },
+  { name: isEn ? 'date' : 'дата', hint: t('16 октября 2026') },
+  { name: isEn ? 'time' : 'время', hint: '14:05' },
+  { name: isEn ? 'weekday' : 'день недели', hint: t('Пятница') },
+  { name: isEn ? 'title' : 'название', hint: t('название новой заметки') },
+  { name: isEn ? 'tasks' : 'задачи', hint: t('задачи на день — списком') },
+  { name: isEn ? 'goals' : 'цели', hint: t('сроки целей в этот день') },
+  { name: isEn ? 'yesterday' : 'вчера', hint: t('ссылка на прошлую заметку дня') },
 ];
 
 const parse = (ymd: string) => {
@@ -63,13 +68,13 @@ export function formatDate(ymd: string, fmt: string): string {
       case 'YY':
         return String(d.getFullYear()).slice(2);
       case 'MMMM':
-        return MONTHS_GEN[d.getMonth()];
+        return monthName(d);
       case 'MM':
         return pad(d.getMonth() + 1);
       case 'M':
         return String(d.getMonth() + 1);
       case 'dddd':
-        return WEEKDAYS[d.getDay()];
+        return weekdayName(d);
       case 'DD':
         return pad(d.getDate());
       default:
@@ -80,7 +85,7 @@ export function formatDate(ymd: string, fmt: string): string {
 
 /** Задача или цель — [[ссылкой]], если название её не сломает */
 const asLink = (t: string) => (/[[\]|\n]/.test(t) || !t.trim() ? t.replace(/\n/g, ' ').trim() : `[[${t.trim()}]]`);
-const goalLine = (g: string) => `🎯 срок: ${asLink(g)}`;
+const goalLine = (g: string) => t('🎯 срок: {goal}', { goal: asLink(g) });
 
 type VarKind = 'date' | 'time' | 'weekday' | 'title' | 'tasks' | 'goals' | 'prev';
 const ALIASES: Record<string, VarKind> = {
@@ -117,11 +122,11 @@ function varOf(raw: string): { kind: VarKind; fmt?: string } | null {
 function valueOf(v: { kind: VarKind; fmt?: string }, vars: TemplateVars): string {
   switch (v.kind) {
     case 'date':
-      return v.fmt ? formatDate(vars.ymd, v.fmt) : formatDate(vars.ymd, 'D MMMM YYYY');
+      return formatDate(vars.ymd, v.fmt || DATE_FMT);
     case 'time':
       return vars.time ?? '';
     case 'weekday':
-      return cap(WEEKDAYS[parse(vars.ymd).getDay()]);
+      return cap(weekdayName(parse(vars.ymd)));
     case 'title':
       return vars.title ?? '';
     case 'tasks':
@@ -164,7 +169,7 @@ export const templateName = (title: string) =>
     .replace(/\s+/g, ' ')
     .replace(/[\s·—–:,-]+$/, '')
     .replace(/^[\s·—–:,-]+/, '')
-    .trim() || 'Без названия';
+    .trim() || t('Без названия');
 
 /** Абзац целиком из списка: «{{задачи}}» или «{{цели}}» */
 function listVar(text: string | undefined): 'tasks' | 'goals' | null {
@@ -206,23 +211,35 @@ export interface TemplatePreset {
 
 const h2 = (text: string) => newBlock('h2', { text });
 const p = (text = '') => newBlock('p', { text });
+/** Подстановка в готовом шаблоне — по-русски или по-английски, как интерфейс */
+const V = (ru: string, en: string) => `{{${isEn ? en : ru}}}`;
+const date = V('дата', 'date');
 
 export const TEMPLATE_PRESETS: TemplatePreset[] = [
   {
-    title: 'Встреча {{дата}}',
-    blocks: () => [p('{{время}} · Участники: '), h2('Повестка'), newBlock('bullet'), h2('Решения'), newBlock('bullet'), h2('Следующие шаги'), newBlock('todo')],
+    title: t('Встреча {date}', { date }),
+    blocks: () => [p(t('{time} · Участники: ', { time: V('время', 'time') })), h2(t('Повестка')), newBlock('bullet'), h2(t('Решения')), newBlock('bullet'), h2(t('Следующие шаги')), newBlock('todo')],
   },
   {
-    title: 'Книга',
-    blocks: () => [p('Автор: '), p('Прочитано: {{дата}}'), h2('Главные мысли'), newBlock('bullet'), h2('Цитаты'), newBlock('quote'), h2('Что применить'), newBlock('todo')],
+    title: t('Книга'),
+    blocks: () => [p(t('Автор: ')), p(t('Прочитано: {date}', { date })), h2(t('Главные мысли')), newBlock('bullet'), h2(t('Цитаты')), newBlock('quote'), h2(t('Что применить')), newBlock('todo')],
   },
   {
-    title: 'Проект',
-    blocks: () => [p('Статус: идея · Начат: {{дата}}'), h2('Зачем'), p(), h2('Шаги'), newBlock('todo'), h2('Материалы'), newBlock('bullet')],
+    title: t('Проект'),
+    blocks: () => [p(t('Статус: идея · Начат: {date}', { date })), h2(t('Зачем')), p(), h2(t('Шаги')), newBlock('todo'), h2(t('Материалы')), newBlock('bullet')],
   },
   {
     title: DAILY_TEMPLATE,
-    blocks: () => [p('{{день недели}} · прошлая запись: {{вчера}}'), h2('Задачи на день'), p('{{задачи}}'), p('{{цели}}'), h2('Мысли'), p(), h2('Итоги дня'), p()],
+    blocks: () => [
+      p(t('{weekday} · прошлая запись: {prev}', { weekday: V('день недели', 'weekday'), prev: V('вчера', 'yesterday') })),
+      h2(t('Задачи на день')),
+      p(V('задачи', 'tasks')),
+      p(V('цели', 'goals')),
+      h2(t('Мысли')),
+      p(),
+      h2(t('Итоги дня')),
+      p(),
+    ],
   },
 ];
 
@@ -241,7 +258,7 @@ function varPattern(raw: string): string {
   if (!v) return esc(`{{${raw}}}`);
   switch (v.kind) {
     case 'date':
-      return (v.fmt ?? 'D MMMM YYYY')
+      return (v.fmt || DATE_FMT)
         .split(/(YYYY|YY|MMMM|MM|M|dddd|DD|D)/)
         .map((t) => (t === 'YYYY' ? String.raw`\d{4}` : t === 'YY' ? String.raw`\d{2}` : t === 'MMMM' || t === 'dddd' ? String.raw`\p{L}+` : /^(MM|M|DD|D)$/.test(t) ? String.raw`\d{1,2}` : esc(t)))
         .join('');

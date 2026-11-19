@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { t } from '../../i18n/index';
 import { Check, ChevronRight, Link2, Sparkles, Waypoints } from 'lucide-react';
 import type { ID } from '../../types';
 import { pairKey } from '../links';
@@ -13,7 +14,7 @@ import './related.css';
 
 /** Сила связи: 1–3 деления */
 const level = (score: number) => (score >= 0.3 ? 3 : score >= 0.16 ? 2 : 1);
-const LEVEL_LABEL = ['', 'слабая связь', 'заметная связь', 'сильная связь'];
+const LEVEL_LABEL = ['', t('слабая связь'), t('заметная связь'), t('сильная связь')];
 
 /**
  * Связанное с единицей мозга: заметки, карты, задачи и цели — связи находятся сами (по общим важным словам,
@@ -47,18 +48,18 @@ export function RelatedNotes({ id, compact = false }: { id: ID; compact?: boolea
   // у пустой заметки своих связей нет, но на неё могут ссылаться другие — только «Упоминается в»
   if (empty && !keywords.length)
     return (
-      <section ref={ref} className="nt-rel is-quiet" aria-label="Упоминается в">
+      <section ref={ref} className="nt-rel is-quiet" aria-label={t('Упоминается в')}>
         <Backlinks id={id} />
       </section>
     );
   return (
-    <section ref={ref} className={`nt-rel${compact ? ' is-compact' : ''}${empty && !keywords.length ? ' is-blank' : ''}`} aria-label="Связи">
+    <section ref={ref} className={`nt-rel${compact ? ' is-compact' : ''}${empty && !keywords.length ? ' is-blank' : ''}`} aria-label={t('Связи')}>
       {!compact && isNote && <DuplicateBanner id={id} />}
       {!compact && keywords.length > 0 && (
-        <div className="nt-rel-kw" title="Важные слова — по ним находятся связи">
-          <span className="nt-rel-kw-label">Темы</span>
+        <div className="nt-rel-kw" title={t('Важные слова — по ним находятся связи')}>
+          <span className="nt-rel-kw-label">{t('Темы')}</span>
           {keywords.map((k) => (
-            <span key={k} className={`nt-rel-chip${isAdded(k) ? ' is-ai' : ''}`} title={isAdded(k) ? 'Тему добавил ИИ' : undefined}>
+            <span key={k} className={`nt-rel-chip${isAdded(k) ? ' is-ai' : ''}`} title={isAdded(k) ? t('Тему добавил ИИ') : undefined}>
               {isAdded(k) && <Sparkles size={11} />}
               {k}
             </span>
@@ -67,12 +68,12 @@ export function RelatedNotes({ id, compact = false }: { id: ID; compact?: boolea
       )}
       <div className="nt-rel-head">
         <Waypoints size={16} />
-        <span>Связи</span>
+        <span>{t('Связи')}</span>
         {list.length > 0 && <span className="nt-rel-count">{list.length}</span>}
         <div className="grow" />
         {list.length > 0 && !compact && (
           <button className="nt-rel-graph" onClick={() => showInGraph(id)}>
-            На графе
+            {t('На графе')}
           </button>
         )}
       </div>
@@ -82,7 +83,7 @@ export function RelatedNotes({ id, compact = false }: { id: ID; compact?: boolea
             <span style={{ width: `${Math.round((progress.done / Math.max(1, progress.total)) * 100)}%` }} />
           </div>
           <span className="faint tiny">
-            Анализирую заметки… {progress.done} из {progress.total}
+            {t('Анализирую заметки… {n} из {total}', { n: progress.done, total: progress.total })}
           </span>
         </div>
       )}
@@ -104,7 +105,7 @@ export function RelatedNotes({ id, compact = false }: { id: ID; compact?: boolea
                 onClick={() => void openItem(r.id, { fromNote: isNote })}
                 style={f ? ({ '--fc': f.color } as CSSProperties) : undefined}
               >
-                <span className="nt-rel-str" data-l={wiki ? 3 : lv} title={wiki ? 'Явная ссылка' : LEVEL_LABEL[lv]} aria-label={wiki ? 'Явная ссылка' : LEVEL_LABEL[lv]}>
+                <span className="nt-rel-str" data-l={wiki ? 3 : lv} title={wiki ? t('Явная ссылка') : LEVEL_LABEL[lv]} aria-label={wiki ? t('Явная ссылка') : LEVEL_LABEL[lv]}>
                   <i />
                   <i />
                   <i />
@@ -112,22 +113,22 @@ export function RelatedNotes({ id, compact = false }: { id: ID; compact?: boolea
                 <span className="nt-rel-body">
                   <span className={`nt-rel-title${m.title ? '' : ' is-empty'}`}>
                     {m.kind !== 'note' && <Icon size={14} className="nt-rel-kind" aria-label={KIND_LABEL[m.kind]} />}
-                    {m.title || m.preview || 'Без названия'}
+                    {m.title || m.preview || t('Без названия')}
                   </span>
                   <span className="nt-rel-why">
                     {wiki && (
-                      <span className="nt-rel-wiki" title="Связаны [[ссылкой]]">
+                      <span className="nt-rel-wiki" title={t('Связаны [[ссылкой]]')}>
                         <Link2 size={11} />
-                        ссылка
+                        {t('ссылка')}
                       </span>
                     )}
                     {r.confirmed && !wiki && (
-                      <span className="nt-rel-ok" title={v?.by === 'user' ? 'Связь подтвердили вы' : 'Связь подтвердил ИИ'}>
+                      <span className="nt-rel-ok" title={v?.by === 'user' ? t('Связь подтвердили вы') : t('Связь подтвердил ИИ')}>
                         <Check size={11} />
-                        {v?.by === 'user' ? 'вы' : 'ИИ'}
+                        {v?.by === 'user' ? t('вы') : t('ИИ')}
                       </span>
                     )}
-                    {r.mention && !wiki && <span className="nt-rel-mention">упоминание</span>}
+                    {r.mention && !wiki && <span className="nt-rel-mention">{t('упоминание')}</span>}
                     {v?.why || r.terms.join(' · ') || KIND_LABEL[m.kind]}
                   </span>
                 </span>
@@ -138,7 +139,7 @@ export function RelatedNotes({ id, compact = false }: { id: ID; compact?: boolea
           })}
         </div>
       )}
-      {!compact && empty && keywords.length > 0 && <div className="nt-rel-empty">Связей пока нет. Они появятся сами, когда эти темы встретятся в другой заметке, карте или задаче.</div>}
+      {!compact && empty && keywords.length > 0 && <div className="nt-rel-empty">{t('Связей пока нет. Они появятся сами, когда эти темы встретятся в другой заметке, карте или задаче.')}</div>}
       {!compact && <Backlinks id={id} />}
       {!compact && isNote && keywords.length > 0 && <AiReviewPanel id={id} />}
     </section>

@@ -3,6 +3,7 @@
  * дубли, длинные заметки (разбить по разделам) и темы для конспекта. Правила — reviewCore.ts.
  */
 import type { ID } from '../types';
+import { t } from '../i18n/index';
 import { normTitle } from './links';
 import { newBlock, type Block } from './model';
 import { type Forgotten, LONG_WORDS, linkableTitle, RECENT_DAYS, reviewFindings, splitByHeadings } from './reviewCore';
@@ -36,9 +37,9 @@ export interface BrainReview {
 
 /** Собрать обзор */
 export async function collectReview(now = Date.now()): Promise<BrainReview> {
-  const t = perfStart();
+  const perf = perfStart();
   const r = await review(now);
-  t('review', useNotes.getState().data?.notes.length ?? 0);
+  perf('review', useNotes.getState().data?.notes.length ?? 0);
   return r;
 }
 
@@ -130,14 +131,14 @@ export async function splitNote(id: ID): Promise<number> {
   const links: string[] = [];
   for (const p of split.parts) {
     // название раздела занято другой заметкой — уточнить названием исходной
-    let title = linkableTitle(p.title) || 'Раздел';
+    let title = linkableTitle(p.title) || t('Раздел');
     if (taken.has(normTitle(title))) title = linkableTitle(`${title} (${body.title || meta.title})`);
     for (let i = 2; taken.has(normTitle(title)); i++) title = linkableTitle(`${p.title} ${i}`);
     taken.add(normTitle(title));
     const blocks: Block[] = p.blocks.map((b) => ({ ...newBlock(b.type), ...b, id: newBlock().id }));
     if (createNote({ title, blocks: blocks.length ? blocks : undefined, folderId: meta.folderId })) links.push(title);
   }
-  const blocks: Block[] = [...split.intro, newBlock('h2', { text: 'Разделы' }), ...links.map((t) => newBlock('bullet', { text: `[[${t}]]` }))];
+  const blocks: Block[] = [...split.intro, newBlock('h2', { text: t('Разделы') }), ...links.map((t) => newBlock('bullet', { text: `[[${t}]]` }))];
   if (open) editOpenBody((bd) => void (bd.blocks = blocks));
   else saveNoteBody(id, { ...body, blocks });
   await flushNotes();

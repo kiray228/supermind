@@ -1,5 +1,6 @@
 /** Окно «Поиск по всему»: мгновенные результаты по группам, команды, недавние запросы */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { t } from '../i18n/index';
 import { ChevronDown, CornerDownLeft, History, Search, X } from 'lucide-react';
 import { toast } from '../store/appStore';
 import { highlightRanges, matchToken, norm, snippet, tokenize, type Token } from './match';
@@ -135,7 +136,7 @@ export default function Palette() {
     if (raw.startsWith('>')) {
       const toks = tokenize(raw.slice(1));
       const list = toks.length ? rank(commands, toks, norm(raw.slice(1).trim())) : commands.map((e) => ({ e, s: 0, inBody: false }));
-      sections.push({ id: 'cmd', label: 'Команды', icon: 'cmd', count: list.length, rows: list.map((r) => ({ t: 'item', r })) });
+      sections.push({ id: 'cmd', label: t('Команды'), icon: 'cmd', count: list.length, rows: list.map((r) => ({ t: 'item', r })) });
       return { sections, toks };
     }
     if (!raw) {
@@ -165,8 +166,8 @@ export default function Palette() {
   const shown: Section[] = useMemo(() => {
     if (dq.trim()) return sections;
     const out: Section[] = [];
-    if (recent.length) out.push({ id: 'recent', label: 'Недавние запросы', rows: recent.map((text) => ({ t: 'recent', text })) });
-    out.push({ id: 'cmd', label: 'Команды', icon: 'cmd', rows: commands.map((e) => ({ t: 'item', r: { e, s: 0, inBody: false } })) });
+    if (recent.length) out.push({ id: 'recent', label: t('Недавние запросы'), rows: recent.map((text) => ({ t: 'recent', text })) });
+    out.push({ id: 'cmd', label: t('Команды'), icon: 'cmd', rows: commands.map((e) => ({ t: 'item', r: { e, s: 0, inBody: false } })) });
     return out;
   }, [dq, sections, recent, commands]);
 
@@ -197,9 +198,9 @@ export default function Palette() {
     closeSearch();
     // синхронно, в обработчике нажатия (на iPhone так открывается клавиатура в новом окне)
     try {
-      void Promise.resolve(row.r.e.run()).catch(() => toast('Не удалось открыть'));
+      void Promise.resolve(row.r.e.run()).catch(() => toast(t('Не удалось открыть')));
     } catch {
-      toast('Не удалось открыть');
+      toast(t('Не удалось открыть'));
     }
   };
 
@@ -239,7 +240,7 @@ export default function Palette() {
 
   return (
     <div className="modal-backdrop sr-backdrop" onPointerDown={(e) => e.target === e.currentTarget && closeSearch()}>
-      <div className="sr-panel" role="dialog" aria-modal="true" aria-label="Поиск по всему">
+      <div className="sr-panel" role="dialog" aria-modal="true" aria-label={t('Поиск по всему')}>
         <div className="sr-head">
           <Search className="sr-head-ico" size={19} />
           <input
@@ -251,7 +252,7 @@ export default function Palette() {
             autoCorrect="off"
             autoCapitalize="off"
             spellCheck={false}
-            placeholder="Поиск по картам, задачам, заметкам…"
+            placeholder={t('Поиск по картам, задачам, заметкам…')}
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={onKeyDown}
@@ -261,12 +262,12 @@ export default function Palette() {
             aria-activedescendant={flat.length ? `sr-opt-${active}` : undefined}
           />
           {q && (
-            <button className="sr-clear" onClick={() => setQuery('')} aria-label="Очистить">
+            <button className="sr-clear" onClick={() => setQuery('')} aria-label={t('Очистить')}>
               <X size={16} />
             </button>
           )}
           <button className="sr-cancel" onClick={closeSearch}>
-            Отмена
+            {t('Отмена')}
           </button>
           <kbd className="sr-kbd sr-esc">Esc</kbd>
         </div>
@@ -288,7 +289,7 @@ export default function Palette() {
                         writeRecent([]);
                       }}
                     >
-                      Очистить
+                      {t('Очистить')}
                     </button>
                   )}
                 </div>
@@ -316,7 +317,7 @@ export default function Palette() {
                         </span>
                         <button
                           className="sr-x"
-                          aria-label="Убрать из недавних"
+                          aria-label={t('Убрать из недавних')}
                           onClick={(e) => {
                             e.stopPropagation();
                             removeRecent(row.text);
@@ -333,7 +334,7 @@ export default function Palette() {
                           <ChevronDown size={17} />
                         </span>
                         <span className="sr-text">
-                          <span className="sr-title">Показать ещё {row.n}</span>
+                          <span className="sr-title">{t('Показать ещё {n}', { n: row.n })}</span>
                         </span>
                       </div>
                     );
@@ -346,9 +347,9 @@ export default function Palette() {
             (ready ? (
               <div className="sr-empty">
                 <Search size={28} />
-                <div>Ничего не найдено</div>
+                <div>{t('Ничего не найдено')}</div>
                 <div className="sr-empty-hint">
-                  Попробуйте другое слово или начните с <b>&gt;</b> — команды
+                  {t('Попробуйте другое слово или начните с')} <b>&gt;</b> {t('— команды')}
                 </div>
               </div>
             ) : (
@@ -361,17 +362,17 @@ export default function Palette() {
         <div className="sr-foot">
           {!ready ? (
             <span className="sr-busy">
-              <span className="sr-dot" /> Читаю карты и заметки…
+              <span className="sr-dot" /> {t('Читаю карты и заметки…')}
             </span>
           ) : (
             <span className="sr-tip">
-              Начните с <b>&gt;</b> — команды
+              {t('Начните с')} <b>&gt;</b> {t('— команды')}
             </span>
           )}
           <span className="grow" />
           <span className="sr-keys">
             <kbd className="sr-kbd">↑</kbd>
-            <kbd className="sr-kbd">↓</kbd> выбрать <kbd className="sr-kbd">↵</kbd> открыть <kbd className="sr-kbd">Esc</kbd> закрыть
+            <kbd className="sr-kbd">↓</kbd> {t('выбрать')} <kbd className="sr-kbd">↵</kbd> {t('открыть')} <kbd className="sr-kbd">Esc</kbd> {t('закрыть')}
           </span>
         </div>
       </div>
@@ -419,7 +420,7 @@ function ItemRow({ r, toks, on, common, onClick }: { r: Ranked; toks: Token[]; o
           </span>
         ) : null}
       </span>
-      {e.kind === 'topic' && <span className="sr-tag">тема</span>}
+      {e.kind === 'topic' && <span className="sr-tag">{t('тема')}</span>}
       {on && <CornerDownLeft className="sr-enter" size={15} />}
     </div>
   );

@@ -4,6 +4,7 @@
  * Правила — cardsCore.ts.
  */
 import { create } from 'zustand';
+import { t } from '../i18n/index';
 import { streamText } from '../ai/claude';
 import type { ID } from '../types';
 import { todayYmd } from '../utils/mapTasks';
@@ -40,10 +41,10 @@ export function todaysCards(today = todayYmd()): StudyCard[] {
 export async function makeCards(noteId: ID, signal?: AbortSignal): Promise<number> {
   await flushNotes();
   const meta = useNotes.getState().data?.notes.find((n) => n.id === noteId);
-  if (!meta) throw new CardsError('Заметка не найдена');
+  if (!meta) throw new CardsError(t('Заметка не найдена'));
   const body = await loadNoteBody(noteId);
   const text = bodyPlainText(body).trim();
-  if (text.split(/\s+/).length < MIN_WORDS) throw new CardsError('В заметке мало текста — запоминать пока нечего.');
+  if (text.split(/\s+/).length < MIN_WORDS) throw new CardsError(t('В заметке мало текста — запоминать пока нечего.'));
   const existing = cardsOf(noteId).map((c) => c.q);
   const answer = await streamText({ system: CARDS_SYSTEM, messages: [{ role: 'user', content: buildCardsPrompt(body.title || meta.title, text, existing) }], signal, effort: 'low' });
   const found = parseCards(answer, existing);

@@ -3,6 +3,7 @@
  * Само окно и индекс загружаются отдельно, при первом открытии.
  */
 import { lazy, Suspense, useEffect } from 'react';
+import { t } from '../i18n/index';
 import { Search } from 'lucide-react';
 import { useApp } from '../store/appStore';
 import { hasOverlay } from '../ui/dialogs';
@@ -76,7 +77,7 @@ function Shell() {
             type="search"
             autoFocus
             defaultValue={useSearchUi.getState().initial}
-            placeholder="Поиск по картам, задачам, заметкам…"
+            placeholder={t('Поиск по картам, задачам, заметкам…')}
             onChange={(e) => useSearchUi.setState({ initial: e.target.value })}
           />
         </div>
@@ -88,11 +89,11 @@ function Shell() {
 /** Пункт «Поиск» в боковой панели (компьютер) */
 export function SearchNavButton() {
   return (
-    <button className="nav-item nav-desk sr-nav" onClick={() => openSearch()} title={`Поиск по всему (${SEARCH_KBD})`}>
+    <button className="nav-item nav-desk sr-nav" onClick={() => openSearch()} title={t('Поиск по всему ({kbd})', { kbd: SEARCH_KBD })}>
       <span className="nav-ico">
         <Search size={20} />
       </span>
-      <span>Поиск</span>
+      <span>{t('Поиск')}</span>
       <kbd className="sr-nav-kbd">{SEARCH_KBD}</kbd>
     </button>
   );
@@ -109,7 +110,7 @@ export function SearchSheetButton({ onPick }: { onPick: () => void }) {
       }}
     >
       <Search size={19} />
-      <span>Поиск по всему</span>
+      <span>{t('Поиск по всему')}</span>
     </button>
   );
 }
