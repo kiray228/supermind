@@ -1,6 +1,7 @@
 import type { Sheet, Topic } from '../types';
 import { useApp } from '../store/appStore';
 import { sheetToMarkdown } from '../io/markdown';
+import { isEn } from '../i18n/index';
 
 export const AI_MODELS = [
   { id: 'claude-opus-5-5', name: 'Claude Opus 5.5 — самый умный' },
@@ -58,8 +59,13 @@ async function serverText({ system, messages, onText, signal }: StreamOpts): Pro
   }
 }
 
+/** Английский интерфейс: подсказки ИИ написаны по-русски, поэтому язык ответа задаётся отдельным правилом в конце */
+export const EN_RULE =
+  "\n\nIMPORTANT: the user's app is in English. Write all human-readable text of your answer (titles, steps, explanations, headings) in English, unless the user explicitly writes in another language. Keep the requested output format exactly: JSON keys, field names, line prefixes and markers must stay character-for-character as specified above, even if they are in Russian.";
+
 /** Потоковый запрос к Claude, возвращает итоговый текст */
 export async function streamText(opts: StreamOpts): Promise<string> {
+  if (isEn) opts = { ...opts, system: opts.system + EN_RULE };
   if (!hasOwnKey()) return serverText(opts);
   const { system, messages, onText, signal, effort = 'medium' } = opts;
   const { c, Anthropic } = await client();

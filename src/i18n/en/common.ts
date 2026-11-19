@@ -20,5 +20,16 @@ const d: Record<string, string> = {
   'Перерыв окончен': 'Break is over',
   'Время отдохнуть': 'Time for a break',
   'Пора вернуться к фокусу': 'Time to get back to focus',
+  'Английский язык, экран блокировки и «Поделиться» на iPhone': 'English, Lock Screen and Share on iPhone',
+  'Английский язык': 'English',
+  'Если телефон на английском, SuperMind тоже говорит по-английски. Сменить язык: Настройки → Оформление → «Язык».': 'If your phone is set to English, SuperMind speaks English too. To change the language: Settings → Appearance → Language.',
+  'Таймер фокуса на экране блокировки': 'Focus timer on the Lock Screen',
+  'Помодоро и секундомер видны на экране блокировки и в Dynamic Island на iPhone, а на Android — в уведомлении. Пауза и стоп — прямо там, без открытия приложения.': 'Pomodoro and stopwatch show on the Lock Screen and in the Dynamic Island on iPhone, and in a notification on Android. Pause and stop right there, without opening the app.',
+  'Виджеты на экране блокировки': 'Lock Screen widgets',
+  'На iPhone: «Сегодня», «Привычки», «Новая задача» и «Голосом». Удерживайте экран блокировки → «Настроить» → «Добавить виджеты».': 'On iPhone: Today, Habits, New task and Voice. Touch and hold the Lock Screen → Customize → Add Widgets.',
+  'Быстрые действия с иконки': 'Quick actions from the app icon',
+  'Удерживайте значок SuperMind: новая задача, голосом, фокус или новая карта — сразу, без лишних касаний.': 'Touch and hold the SuperMind icon: new task, voice, focus or new map — in one tap.',
+  '«Поделиться» на iPhone': 'Share on iPhone',
+  'В Safari, «Фото» и других приложениях: «Поделиться» → SuperMind. Текст, ссылка и до 5 фото сохраняются в задачи, заметки или карту при открытии приложения.': 'In Safari, Photos and other apps: Share → SuperMind. Text, a link and up to 5 photos are saved to tasks, notes or a map when you open the app.',
 };
 export default d;

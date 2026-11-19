@@ -1,5 +1,5 @@
 /** «Что нового»: главное в каждой версии. Новые версии — сверху. */
-import { Heart, Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge, MessageCircleQuestion, CloudOff, LayoutTemplate, SquareArrowOutUpRight, BellRing, Target, Timer, Lock, Crosshair, Move, GitMerge, EyeOff, CalendarRange, Fingerprint, ArrowUpDown, Banknote, MonitorSmartphone, Coins, ListChecks, FileInput, Split, CornerDownRight, KeyRound, Keyboard, LifeBuoy, Zap, FileSpreadsheet, Gauge as GaugeIcon, MessagesSquare, Accessibility, Focus, Save, Flag, RefreshCw, Footprints, Kanban, Smartphone } from 'lucide-react';
+import { Heart, Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge, MessageCircleQuestion, CloudOff, LayoutTemplate, SquareArrowOutUpRight, BellRing, Target, Timer, Lock, Crosshair, Move, GitMerge, EyeOff, CalendarRange, Fingerprint, ArrowUpDown, Banknote, MonitorSmartphone, Coins, ListChecks, FileInput, Split, CornerDownRight, KeyRound, Keyboard, LifeBuoy, Zap, FileSpreadsheet, Gauge as GaugeIcon, MessagesSquare, Accessibility, Focus, Save, Flag, RefreshCw, Footprints, Kanban, Smartphone, Languages } from 'lucide-react';
 import { t } from '../i18n/index';
 
 export interface ChangeItem {
@@ -19,8 +19,13 @@ export const CHANGELOG: ChangelogEntry[] = [
   // 1.50 и новее — с переводом (t), старые записи остаются по-русски
   {
     version: '1.53',
-    title: t('Виджеты на iPhone, шаги и сон, доска в телефоне'),
+    title: t('Английский язык, экран блокировки и «Поделиться» на iPhone'),
     items: [
+      { icon: Languages, title: t('Английский язык'), text: t('Если телефон на английском, SuperMind тоже говорит по-английски. Сменить язык: Настройки → Оформление → «Язык».') },
+      { icon: Timer, title: t('Таймер фокуса на экране блокировки'), text: t('Помодоро и секундомер видны на экране блокировки и в Dynamic Island на iPhone, а на Android — в уведомлении. Пауза и стоп — прямо там, без открытия приложения.') },
+      { icon: Lock, title: t('Виджеты на экране блокировки'), text: t('На iPhone: «Сегодня», «Привычки», «Новая задача» и «Голосом». Удерживайте экран блокировки → «Настроить» → «Добавить виджеты».') },
+      { icon: Zap, title: t('Быстрые действия с иконки'), text: t('Удерживайте значок SuperMind: новая задача, голосом, фокус или новая карта — сразу, без лишних касаний.') },
+      { icon: Share, title: t('«Поделиться» на iPhone'), text: t('В Safari, «Фото» и других приложениях: «Поделиться» → SuperMind. Текст, ссылка и до 5 фото сохраняются в задачи, заметки или карту при открытии приложения.') },
       { icon: LayoutGrid, title: t('Виджеты на iPhone'), text: t('Виджеты «Сегодня» и «Привычки» на экране «Домой»: задачи и привычки дня, отметка касанием прямо в виджете. Удерживайте экран «Домой» → «+» → SuperMind. Нужна iOS 17 или новее.') },
       { icon: Footprints, title: t('Шаги и сон из «Здоровья»'), text: t('В «Здоровье и спорт» → «Подключить Apple «Здоровье»» (на Android — Health Connect): шаги за неделю и сон за ночь. Привычки «10 000 шагов», «Сон 8 часов», «Лечь спать до 23:00» отмечаются сами. Данные остаются на телефоне.') },
       { icon: Kanban, title: t('Доска в телефоне'), text: t('Канбан-доска теперь и на телефоне: Ещё → «Доска». Колонки листаются свайпом, карточку можно перенести пальцем или через меню «Переместить в…».') },

@@ -14,7 +14,7 @@ function walk(dir: string, out: string[] = []): string[] {
   }
   return out;
 }
-const LIT = String.raw`('(?:\.|[^'\])*'|"(?:\.|[^"\])*"|\`(?:\.|[^\`\$])*\`)`;
+const LIT = String.raw`('(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|\`(?:\\.|[^\`\\$])*\`)`;
 const lit = (s: string) => Function(`return ${s}`)() as string;
 const files = walk('src').filter((f) => !f.includes(join('src', 'i18n')));
 
@@ -29,7 +29,8 @@ function keys() {
 }
 
 test('у каждой строки интерфейса есть английский перевод', () => {
-  const missing = [...keys()].filter(([k]) => !(k in en)).map(([k, f]) => `${f}: ${k}`);
+  assert.ok(keys().size > 1000, 'проверка находит строки t(…)');
+  const missing = [...keys()].filter(([k]) => /[А-Яа-яЁё]/.test(k) && !(k in en)).map(([k, f]) => `${f}: ${k}`);
   assert.deepEqual(missing, [], `нет перевода (${missing.length}):\n${missing.slice(0, 40).join('\n')}`);
 });
 
