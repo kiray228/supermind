@@ -265,6 +265,9 @@ public class TodayWidget extends AppWidgetProvider {
             if (view != null) o.put("view", view);
             String date = intent.getStringExtra("sm_date");
             if (date != null) o.put("date", date);
+            // виджет «Фокус»: «Начать» → {type:'focus', action:'start'}
+            String focus = intent.getStringExtra("sm_focus");
+            if (focus != null) o.put("action", focus);
             queue(ctx, o);
             intent.removeExtra(EXTRA_ACTION);
         } catch (JSONException | RuntimeException ignored) {

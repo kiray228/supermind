@@ -47,4 +47,19 @@
     <string name="pv_run_sub">🔥 12 days</string>
     <string name="pv_map">My ideas</string>
     <string name="pv_map_sub">4 branches · edited today</string>
+    <string name="widget_finance_label">SuperMind — Finance</string>
+    <string name="widget_finance_description">Today\'s and this month\'s spending, your budget and a quick new expense</string>
+    <string name="widget_focus_label">SuperMind — Focus</string>
+    <string name="widget_focus_description">Focus timer: start, pause and stop from the home screen</string>
+    <string name="w_fin_title">Finance</string>
+    <string name="w_add_expense">Expense</string>
+    <string name="w_focus_title">Focus</string>
+    <string name="w_focus_start">Start</string>
+    <string name="w_focus_pause">Pause</string>
+    <string name="w_focus_resume">Resume</string>
+    <string name="w_focus_stop">Stop</string>
+    <string name="pv_fin_today">$45</string>
+    <string name="pv_fin_month">This month: $862</string>
+    <string name="pv_fin_left">$338 left</string>
+    <string name="pv_focus_sub">Focus 25 min</string>
 </resources>

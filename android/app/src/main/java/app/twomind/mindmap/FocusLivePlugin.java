@@ -28,8 +28,8 @@ import org.json.JSONObject;
 public class FocusLivePlugin extends Plugin {
     static final String CHANNEL = "sm-focus";
     static final int NID = 777002;
-    private static final String PREFS = "sm_focus_live";
-    private static final String KEY = "state";
+    static final String PREFS = "sm_focus_live";
+    static final String KEY = "state";
 
     @PluginMethod
     public void update(PluginCall call) {
@@ -37,6 +37,7 @@ public class FocusLivePlugin extends Plugin {
         Context ctx = getContext();
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY, s.toString()).apply();
         show(ctx, s);
+        FocusWidget.refreshAll(ctx);
         call.resolve();
     }
 
@@ -50,6 +51,7 @@ public class FocusLivePlugin extends Plugin {
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(KEY).apply();
         NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm != null) nm.cancel(NID);
+        FocusWidget.refreshAll(ctx);
     }
 
     private static void channel(Context ctx, NotificationManager nm, String name) {
@@ -162,6 +164,7 @@ public class FocusLivePlugin extends Plugin {
                     }
                     p.edit().putString(KEY, s.toString()).apply();
                     show(ctx, s);
+                    FocusWidget.refreshAll(ctx);
                 } catch (JSONException ignored) {
                     // нет сохранённого состояния — уведомление обновит приложение
                 }

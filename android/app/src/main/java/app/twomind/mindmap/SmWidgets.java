@@ -56,10 +56,10 @@ final class SmWidgets {
         return s.isEmpty() ? s : s.substring(0, 1).toUpperCase(RU) + s.substring(1);
     }
 
-    /** Дата на языке приложения: свой шаблон для русского и английского (по-английски месяц впереди: «Mon, Nov 3») */
+    /** Дата на языке приложения: свой шаблон для русского (и казахского) и английского (по-английски месяц впереди: «Mon, Nov 3») */
     static String fmt(Context ctx, String ruPattern, String enPattern, Calendar c) {
         boolean en = Lang.en(ctx);
-        return new SimpleDateFormat(en ? enPattern : ruPattern, en ? Lang.EN : RU).format(c.getTime()).replace(".", "");
+        return new SimpleDateFormat(en ? enPattern : ruPattern, Lang.locale(ctx)).format(c.getTime()).replace(".", "");
     }
 
     static int minutesOf(String hhmm) {
@@ -118,6 +118,8 @@ final class SmWidgets {
         CalendarWidget.refreshAll(ctx);
         HabitsWidget.refreshAll(ctx);
         MapWidget.refreshAll(ctx);
+        FinanceWidget.refreshAll(ctx);
+        FocusWidget.refreshAll(ctx);
         scheduleMidnight(ctx);
     }
 

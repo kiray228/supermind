@@ -643,5 +643,7 @@ struct SuperMindWidgets: WidgetBundle {
         QuickAddWidget()
         VoiceWidget()
         FocusLiveWidget()
+        FinanceWidget()
+        FocusWidget()
     }
 }

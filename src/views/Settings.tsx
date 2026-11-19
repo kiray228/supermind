@@ -36,6 +36,7 @@ import { InboxHost, openInbox, useSupportAdmin } from '../ui/SupportInbox';
 import { ArrowClockwise, Bug, Flag, Lightbulb, Question, ShieldCheck, SlidersHorizontal, Translate, Tray, Warning } from '@phosphor-icons/react';
 import { langPref, setLangPref, t, type LangPref } from '../i18n/index';
 import { TabsEditor } from '../ui/TabsEditor';
+import { AppIconPicker } from '../ui/AppIconPicker';
 import { openExternal, PRIVACY_URL } from '../ui/links';
 import { applyUpdate, checkForUpdate, updatesSupported, useAppUpdate } from '../ui/appUpdate';
 import { errorReportsOn, setErrorReports } from '../ui/errorReport';
@@ -245,6 +246,7 @@ export default function Settings() {
                 if (v) celebrate();
               }}
             />
+            <AppIconPicker />
           </ListSection>
 
           <ListSection header={t('Цвет акцента')} footer={t('Цвет кнопок, выбранных вкладок и отметок во всём приложении.')}>

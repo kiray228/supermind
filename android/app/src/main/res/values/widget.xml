@@ -48,6 +48,22 @@
     <string name="pv_run_sub">🔥 12 дней</string>
     <string name="pv_map">Мои идеи</string>
     <string name="pv_map_sub">4 ветви · изменена сегодня</string>
+    <!-- Виджеты «Финансы» и «Фокус» -->
+    <string name="widget_finance_label">SuperMind — Финансы</string>
+    <string name="widget_finance_description">Траты за сегодня и месяц, бюджет и быстрая новая трата</string>
+    <string name="widget_focus_label">SuperMind — Фокус</string>
+    <string name="widget_focus_description">Таймер фокуса: старт, пауза и стоп с главного экрана</string>
+    <string name="w_fin_title">Финансы</string>
+    <string name="w_add_expense">Трата</string>
+    <string name="w_focus_title">Фокус</string>
+    <string name="w_focus_start">Начать</string>
+    <string name="w_focus_pause">Пауза</string>
+    <string name="w_focus_resume">Дальше</string>
+    <string name="w_focus_stop">Стоп</string>
+    <string name="pv_fin_today">4 500 ₸</string>
+    <string name="pv_fin_month">Этот месяц: 86 200 ₸</string>
+    <string name="pv_fin_left">Осталось 33 800 ₸</string>
+    <string name="pv_focus_sub">Фокус 25 мин</string>
     <dimen name="widget_radius">24dp</dimen>
     <dimen name="widget_inner_radius">14dp</dimen>
     <color name="widget_bg">#F7FFFFFF</color>

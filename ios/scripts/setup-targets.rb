@@ -23,6 +23,11 @@ unless app_group.files.any? { |f| f.path == 'App.entitlements' }
   app_group.new_reference('App.entitlements')
 end
 app.build_configurations.each { |c| c.build_settings['CODE_SIGN_ENTITLEMENTS'] = 'App/App.entitlements' }
+# 2а. Альтернативные иконки (Настройки → Оформление → «Иконка приложения»; наборы делает scripts/app-icons.mjs)
+app.build_configurations.each do |c|
+  c.build_settings['ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES'] = 'AppIcon-Dark AppIcon-Light AppIcon-Green AppIcon-Sunset AppIcon-Purple'
+  c.build_settings['ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS'] = 'YES'
+end
 app.add_system_framework('HealthKit') unless app.frameworks_build_phase.files_references.any? { |r| r && r.path.to_s.end_with?('HealthKit.framework') }
 
 # 2б. Переводы системных текстов (разрешения, быстрые действия): App/en.lproj, App/ru.lproj, App/kk.lproj
