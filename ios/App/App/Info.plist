@@ -68,6 +68,43 @@
 	<string>SuperMind показывает ваши шаги и сон в разделе «Здоровье и спорт» и сам отмечает привычки «шаги» и «сон». Данные остаются на телефоне.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>SuperMind ничего не записывает в «Здоровье»: он только читает шаги и сон, чтобы показать их и отметить ваши привычки.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+	<key>UIApplicationShortcutItems</key>
+	<array>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>app.twomind.mindmap.quick_add</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Новая задача</string>
+			<key>UIApplicationShortcutItemIconSymbolName</key>
+			<string>plus.circle</string>
+		</dict>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>app.twomind.mindmap.voice</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Голосом</string>
+			<key>UIApplicationShortcutItemIconSymbolName</key>
+			<string>mic</string>
+		</dict>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>app.twomind.mindmap.focus</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Фокус</string>
+			<key>UIApplicationShortcutItemIconSymbolName</key>
+			<string>timer</string>
+		</dict>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>app.twomind.mindmap.new_map</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Новая карта</string>
+			<key>UIApplicationShortcutItemIconSymbolName</key>
+			<string>point.3.connected.trianglepath.dotted</string>
+		</dict>
+	</array>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

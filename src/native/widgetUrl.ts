@@ -1,4 +1,4 @@
-/** Ссылки из виджетов iPhone (supermind://…) → действие из очереди виджета (без зависимостей — проверяется тестами) */
+/** Ссылки из виджетов и быстрых действий iPhone (supermind://…) → действие из очереди виджета (без зависимостей — проверяется тестами) */
 import type { PendingAction } from './widget';
 
 export function actionFromUrl(raw: string): PendingAction | null {
@@ -16,6 +16,10 @@ export function actionFromUrl(raw: string): PendingAction | null {
     case 'open_task':
       return q.get('id') ? { type, id: q.get('id')! } : null;
     case 'quick_add':
+    case 'voice':
+    case 'new_note':
+    case 'new_map':
+    case 'search':
       return { type };
     case 'open_view':
       return q.get('view') ? { type, view: q.get('view')! } : null;

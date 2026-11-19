@@ -37,6 +37,23 @@ public class WidgetBridgePlugin: CAPPlugin, CAPBridgedPlugin {
         let raw = d.string(forKey: Self.pendingKey) ?? "[]"
         d.removeObject(forKey: Self.pendingKey)
         let list = (try? JSONSerialization.jsonObject(with: Data(raw.utf8))) as? [Any] ?? []
-        call.resolve(["actions": list])
+        call.resolve(["actions": list.map(Self.takeSharedImages)])
+    }
+
+    /// «Поделиться» из расширения: картинки лежат в папке группы — перенести в папку приложения (Directory.Data),
+    /// где их читает src/native/share.ts. Путь shared/… остаётся тем же.
+    static func takeSharedImages(_ action: Any) -> Any {
+        guard var a = action as? [String: Any], a["group"] as? Bool == true, let images = a["images"] as? [[String: Any]],
+              let from = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: group),
+              let to = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return action }
+        try? FileManager.default.createDirectory(at: to.appendingPathComponent("shared", isDirectory: true), withIntermediateDirectories: true)
+        a["images"] = images.filter { im in
+            guard let path = im["path"] as? String, path.hasPrefix("shared/"), !path.contains("..") else { return false }
+            let dst = to.appendingPathComponent(path)
+            try? FileManager.default.removeItem(at: dst)
+            return (try? FileManager.default.moveItem(at: from.appendingPathComponent(path), to: dst)) != nil
+        }
+        a.removeValue(forKey: "group")
+        return a
     }
 }

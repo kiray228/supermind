@@ -16,6 +16,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(SmCalendarPlugin.class);
         registerPlugin(WidgetBridgePlugin.class);
         registerPlugin(SmAlarmPlugin.class);
+        registerPlugin(FocusLivePlugin.class);
         restored = savedInstanceState != null;
         // от края до края и на Android 14 и старше — как в Android 15+ (рекомендация Google Play):
         // приложение само рисует фон под панелями, отступы берёт из safe-area. После super: окно AppCompat уже создано

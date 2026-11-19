@@ -22,6 +22,7 @@ import { ensureGoals, openGoal } from '../goals/store';
 import { buildAgenda, buildHabits, buildMaps, invalidatePhoneEvents, subscribeGoals } from './widgetData';
 import { joinShared, type SharedImage, type SharedText } from './share';
 import { actionFromUrl } from './widgetUrl';
+import { lang } from '../i18n';
 
 export type PendingAction =
   | { type: 'complete'; id: string; date?: string }
@@ -35,7 +36,11 @@ export type PendingAction =
   | { type: 'open_goal'; id: string }
   | { type: 'search' }
   | { type: 'new_note' }
-  | { type: 'voice' };
+  | { type: 'voice' }
+  /** ярлык «Новая карта» */
+  | { type: 'new_map' }
+  /** кнопка таймера фокуса на экране блокировки: at — когда нажали */
+  | { type: 'focus'; action: string; at?: number };
 
 interface WidgetBridgePlugin {
   update(o: { json: string }): Promise<void>;
@@ -108,7 +113,8 @@ async function buildPayload(): Promise<string> {
     buildHabits(today).catch(() => ({ list: [], days: {} })),
     buildMaps().catch(() => []),
   ]);
-  return JSON.stringify({ v: 2, at: Date.now(), tasks, habits, agenda, hab, maps });
+  // lang — язык подписей виджетов, как в приложении
+  return JSON.stringify({ v: 2, at: Date.now(), lang, tasks, habits, agenda, hab, maps });
 }
 
 let lastSent = '';
@@ -182,7 +188,7 @@ async function applyPending() {
     let completed = 0;
     for (const a of actions) {
       // переход из виджета/ярлыка — открытый поиск не должен его заслонять
-      if (a.type !== 'search' && a.type !== 'complete' && a.type !== 'habit') {
+      if (a.type !== 'search' && a.type !== 'complete' && a.type !== 'habit' && a.type !== 'focus') {
         const { closeSearch } = await import('../search/state');
         closeSearch();
       }
@@ -223,6 +229,16 @@ async function applyPending() {
         case 'voice': {
           const { openVoice } = await import('../voice/state');
           setTimeout(() => openVoice(), 150);
+          break;
+        }
+        case 'focus': {
+          const { applyFocusAction } = await import('./focusLive');
+          await applyFocusAction(a.action, a.at);
+          break;
+        }
+        case 'new_map': {
+          const [{ createAndOpen }, { docFromTemplate, TEMPLATES }] = await Promise.all([import('../actions'), import('../templates')]);
+          await createAndOpen(docFromTemplate(TEMPLATES[0]));
           break;
         }
         case 'share':
@@ -293,11 +309,25 @@ export function initWidget() {
   window.addEventListener('sm-planner-changed', () => pushSoon());
   subscribeGoals(() => pushSoon());
   onDirty(() => pushSoon(1500));
+  // таймер фокуса — на экран блокировки
+  void import('./focusLive').then((m) => m.initFocusLive());
   if (platform === 'android') void WidgetBridge.addListener('pending', () => void applyPending()).catch(() => {});
   void import('@capacitor/app').then(({ App }) => {
     if (platform === 'ios') {
       void App.addListener('appUrlOpen', (e) => queueUrl(e.url));
-      void App.getLaunchUrl().then((l) => queueUrl(l?.url)).catch(() => {});
+      // ссылка запуска остаётся прежней и после перезагрузки страницы (смена языка) — не выполнять её второй раз
+      void App.getLaunchUrl()
+        .then((l) => {
+          if (!l?.url) return;
+          try {
+            if (sessionStorage.getItem('sm-launch-url') === l.url) return;
+            sessionStorage.setItem('sm-launch-url', l.url);
+          } catch {
+            /* без хранилища — просто выполнить */
+          }
+          queueUrl(l.url);
+        })
+        .catch(() => {});
     }
     void App.addListener('resume', () => {
       invalidatePhoneEvents();

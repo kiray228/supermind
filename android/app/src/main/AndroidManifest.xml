@@ -72,6 +72,11 @@
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_today_info" />
         </receiver>
 
+        <!-- Кнопки «Пауза/Стоп» в уведомлении таймера фокуса -->
+        <receiver
+            android:name=".FocusLivePlugin$Receiver"
+            android:exported="false" />
+
         <!-- Виджет «SuperMind — Календарь» -->
         <receiver
             android:name=".CalendarWidget"

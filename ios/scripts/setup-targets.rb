@@ -1,5 +1,6 @@
 # Дополняет проект Xcode тем, что нельзя удобно править вручную на Windows:
-# свои Swift-файлы в цели App, права (App Group, HealthKit) и расширение виджетов SuperMindWidget.
+# свои Swift-файлы в цели App, права (App Group, HealthKit), расширение виджетов SuperMindWidget
+# и общие с ним файлы (Shared/: таймер фокуса на экране блокировки).
 # Запускается в CI на Mac перед сборкой (gem xcodeproj стоит вместе с CocoaPods). Повторный запуск ничего не меняет.
 require 'xcodeproj'
 
@@ -47,6 +48,41 @@ unless widget
   puts 'SuperMindWidget: цель создана'
 end
 
+# 4. Расширение «Поделиться» (текст, ссылки, картинки → очередь App Group → окно «Сохранить в SuperMind»)
+share = project.targets.find { |t| t.name == 'ShareExtension' }
+unless share
+  share = project.new_target(:app_extension, 'ShareExtension', :ios, '16.4', nil, :swift)
+  group = project.main_group.find_subpath('ShareExtension', true)
+  group.set_source_tree('<group>')
+  group.set_path('ShareExtension')
+  swift = group.new_reference('ShareViewController.swift')
+  group.new_reference('Info.plist')
+  group.new_reference('ShareExtension.entitlements')
+  share.add_file_references([swift])
+  %w[Social UniformTypeIdentifiers].each { |f| share.add_system_framework(f) }
+  app.add_dependency(share)
+  embed = app.copy_files_build_phases.find { |p| p.name == 'Embed Foundation Extensions' } ||
+          app.new_copy_files_build_phase('Embed Foundation Extensions')
+  embed.symbol_dst_subfolder_spec = :plug_ins
+  bf = embed.add_file_reference(share.product_reference, true)
+  bf.settings = { 'ATTRIBUTES' => ['RemoveHeadersOnCopy'] }
+  puts 'ShareExtension: цель создана'
+end
+
+# 5. Общие файлы приложения и расширения (таймер фокуса на экране блокировки: Live Activity и её кнопки)
+shared = project.main_group.find_subpath('Shared', true)
+shared.set_source_tree('<group>')
+shared.set_path('Shared')
+Dir[File.join(ROOT, 'Shared', '*.swift')].sort.each do |path|
+  name = File.basename(path)
+  ref = shared.files.find { |f| f.path == name } || shared.new_reference(name)
+  [app, widget].each do |t|
+    next if t.source_build_phase.files_references.include?(ref)
+    t.add_file_references([ref])
+    puts "#{t.name}: + Shared/#{name}"
+  end
+end
+
 app_settings = app.build_configurations.first.build_settings
 widget.build_configurations.each do |c|
   s = c.build_settings
@@ -64,6 +100,24 @@ widget.build_configurations.each do |c|
   s['MARKETING_VERSION'] = app_settings['MARKETING_VERSION'] || '1.0'
   s['CURRENT_PROJECT_VERSION'] = app_settings['CURRENT_PROJECT_VERSION'] || '1'
   s['ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME'] = ''
+end
+
+share.build_configurations.each do |c|
+  s = c.build_settings
+  s['PRODUCT_BUNDLE_IDENTIFIER'] = 'app.twomind.mindmap.share'
+  s['PRODUCT_NAME'] = '$(TARGET_NAME)'
+  s['INFOPLIST_FILE'] = 'ShareExtension/Info.plist'
+  s['CODE_SIGN_ENTITLEMENTS'] = 'ShareExtension/ShareExtension.entitlements'
+  s['CODE_SIGN_STYLE'] = 'Automatic'
+  s['IPHONEOS_DEPLOYMENT_TARGET'] = '16.4'
+  s['TARGETED_DEVICE_FAMILY'] = '1,2'
+  s['SWIFT_VERSION'] = '5.0'
+  s['SKIP_INSTALL'] = 'YES'
+  s['GENERATE_INFOPLIST_FILE'] = 'NO'
+  s['APPLICATION_EXTENSION_API_ONLY'] = 'YES'
+  s['LD_RUNPATH_SEARCH_PATHS'] = ['$(inherited)', '@executable_path/Frameworks', '@executable_path/../../Frameworks']
+  s['MARKETING_VERSION'] = app_settings['MARKETING_VERSION'] || '1.0'
+  s['CURRENT_PROJECT_VERSION'] = app_settings['CURRENT_PROJECT_VERSION'] || '1'
 end
 
 project.save
