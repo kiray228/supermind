@@ -22,7 +22,7 @@ import { ensureGoals, openGoal } from '../goals/store';
 import { buildAgenda, buildHabits, buildMaps, invalidatePhoneEvents, subscribeGoals } from './widgetData';
 import { joinShared, type SharedImage, type SharedText } from './share';
 import { actionFromUrl } from './widgetUrl';
-import { lang } from '../i18n';
+import { lang } from '../i18n/index';
 
 export type PendingAction =
   | { type: 'complete'; id: string; date?: string }

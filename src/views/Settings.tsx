@@ -34,7 +34,7 @@ import { openSupport } from '../ui/Support';
 import { reportAI } from '../ui/ReportAI';
 import { InboxHost, openInbox, useSupportAdmin } from '../ui/SupportInbox';
 import { ArrowClockwise, Bug, Flag, Lightbulb, Question, ShieldCheck, SlidersHorizontal, Translate, Tray, Warning } from '@phosphor-icons/react';
-import { langPref, setLangPref, t, type LangPref } from '../i18n';
+import { langPref, setLangPref, t, type LangPref } from '../i18n/index';
 import { TabsEditor } from '../ui/TabsEditor';
 import { openExternal, PRIVACY_URL } from '../ui/links';
 import { applyUpdate, checkForUpdate, updatesSupported, useAppUpdate } from '../ui/appUpdate';
