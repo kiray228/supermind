@@ -69,14 +69,14 @@ final class MapPreview {
     }
 
     /** w, h — в dp; scale — пикселей на dp */
-    static Bitmap draw(JSONObject map, float w, float h, float scale, boolean en) {
+    static Bitmap draw(JSONObject map, float w, float h, float scale, String lang) {
         int pw = Math.max(1, Math.round(w * scale)), ph = Math.max(1, Math.round(h * scale));
         Bitmap bmp = Bitmap.createBitmap(pw, ph, Bitmap.Config.ARGB_8888);
         Canvas cv = new Canvas(bmp);
         cv.scale(scale, scale);
 
         int rootColor = SmWidgets.parseColor(map.optString("rc"), 0xFF6366F1);
-        String rootText = map.optString("r", en ? "Map" : "Карта");
+        String rootText = map.optString("r", "en".equals(lang) ? "Map" : "Карта");
         List<Branch> all = new ArrayList<>();
         JSONArray b = map.optJSONArray("b");
         if (b != null) {
@@ -157,7 +157,7 @@ final class MapPreview {
 
         if (all.isEmpty()) {
             smallPaint.setColor(rootColor);
-            String hint = en ? "No branches yet" : "Пока без ветвей";
+            String hint = "en".equals(lang) ? "No branches yet" : "kk".equals(lang) ? "Әзірге тармақ жоқ" : "Пока без ветвей";
             cv.drawText(hint, cx - smallPaint.measureText(hint) / 2, cy + rootH / 2 + 16, smallPaint);
         }
         return bmp;

@@ -354,7 +354,7 @@ public class TodayWidget extends AppWidgetProvider {
         String yesterday = ymd(y);
         int nowMin = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE);
 
-        rv.setTextViewText(R.id.w_date, SmWidgets.cap(SmWidgets.fmt(ctx, "EEEE, d MMMM", "EEEE, MMMM d", now)));
+        rv.setTextViewText(R.id.w_date, SmWidgets.cap(SmWidgets.fmt(ctx, "EEEE, d MMMM", "EEEE, MMMM d", "d MMMM, EEEE", now)));
         rv.setTextViewText(R.id.w_title, Lang.str(ctx, R.string.w_today_title));
         rv.setContentDescription(R.id.w_mic, Lang.str(ctx, R.string.sc_voice_long));
         rv.setContentDescription(R.id.w_add, Lang.str(ctx, R.string.w_add_task));
@@ -414,7 +414,7 @@ public class TodayWidget extends AppWidgetProvider {
         boolean showHabits = hTotal > 0;
         rv.setViewVisibility(R.id.w_habits, showHabits ? View.VISIBLE : View.GONE);
         if (showHabits) {
-            rv.setTextViewText(R.id.w_habits_text, Lang.t(ctx, "Привычки ", "Habits ") + hDone + "/" + hTotal);
+            rv.setTextViewText(R.id.w_habits_text, Lang.t(ctx, "Привычки ", "Habits ", "Әдеттер ") + hDone + "/" + hTotal);
             rv.setProgressBar(R.id.w_habits_bar, hTotal, Math.min(hDone, hTotal), false);
         }
 
@@ -433,7 +433,7 @@ public class TodayWidget extends AppWidgetProvider {
             row.setTextViewText(R.id.w_row_title, r.title);
             String label;
             if (r.date.compareTo(today) < 0) {
-                label = r.date.equals(yesterday) ? Lang.t(ctx, "Вчера", "Yesterday") : shortDate(ctx, r.date);
+                label = r.date.equals(yesterday) ? Lang.t(ctx, "Вчера", "Yesterday", "Кеше") : shortDate(ctx, r.date);
             } else label = r.time;
             row.setTextViewText(R.id.w_row_time, label);
             row.setViewVisibility(R.id.w_row_time, label.isEmpty() ? View.GONE : View.VISIBLE);
@@ -444,17 +444,17 @@ public class TodayWidget extends AppWidgetProvider {
             }
             row.setOnClickPendingIntent(R.id.w_row, activityIntent(ctx, 1000 + wid * 16 + i, "open_task", r.id, null));
             row.setOnClickPendingIntent(R.id.w_row_check, completeIntent(ctx, r.id, r.date));
-            row.setContentDescription(R.id.w_row_check, Lang.t(ctx, "Выполнить: ", "Complete: ") + r.title);
+            row.setContentDescription(R.id.w_row_check, Lang.t(ctx, "Выполнить: ", "Complete: ", "Орындау: ") + r.title);
             rv.addView(R.id.w_list, row);
         }
 
         boolean empty = rows.isEmpty();
         rv.setViewVisibility(R.id.w_empty, empty ? View.VISIBLE : View.GONE);
-        if (empty) rv.setTextViewText(R.id.w_empty, data == null ? Lang.t(ctx, "Откройте SuperMind, чтобы увидеть задачи", "Open SuperMind to see your tasks")
+        if (empty) rv.setTextViewText(R.id.w_empty, data == null ? Lang.t(ctx, "Откройте SuperMind, чтобы увидеть задачи", "Open SuperMind to see your tasks", "Тапсырмаларды көру үшін SuperMind-ты ашыңыз")
             : Lang.str(ctx, R.string.w_all_done));
         int more = rows.size() - shown;
         rv.setViewVisibility(R.id.w_more, more > 0 ? View.VISIBLE : View.GONE);
-        if (more > 0) rv.setTextViewText(R.id.w_more, Lang.t(ctx, "Ещё ", "") + more + Lang.t(ctx, " →", " more →"));
+        if (more > 0) rv.setTextViewText(R.id.w_more, Lang.t(ctx, "Ещё ", "", "Тағы ") + more + Lang.t(ctx, " →", " more →", " →"));
         rv.setTextViewText(R.id.w_count, rows.isEmpty() ? "" : String.valueOf(rows.size()));
         rv.setViewVisibility(R.id.w_count, rows.isEmpty() ? View.GONE : View.VISIBLE);
 

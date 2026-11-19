@@ -68,7 +68,7 @@ public class HabitsWidget extends AppWidgetProvider {
             if (h == null) continue;
             Row r = new Row();
             r.id = a.optString(0);
-            r.name = h.optString("n", Lang.t(ctx, "Привычка", "Habit"));
+            r.name = h.optString("n", Lang.t(ctx, "Привычка", "Habit", "Әдет"));
             r.emoji = h.optString("e", "");
             r.unit = h.optString("u", "");
             r.color = SmWidgets.parseColor(h.optString("c"), 0xFF22C55E);
@@ -145,16 +145,16 @@ public class HabitsWidget extends AppWidgetProvider {
     private static String subtitle(Context ctx, Row r) {
         StringBuilder sb = new StringBuilder();
         if (r.target > 1) {
-            sb.append(Math.min(r.count, 999)).append(Lang.t(ctx, " из ", " of ")).append(r.target);
+            sb.append(Math.min(r.count, 999)).append(Lang.t(ctx, " из ", " of ", " / ")).append(r.target);
             if (!r.unit.isEmpty()) sb.append(' ').append(r.unit);
         }
         if (r.streak > 0) {
             if (sb.length() > 0) sb.append("  ·  ");
             sb.append("🔥 ").append(r.streak).append(' ');
-            sb.append(r.weeks ? Lang.plural(ctx, r.streak, "неделя", "недели", "недель", "week", "weeks")
-                : Lang.plural(ctx, r.streak, "день", "дня", "дней", "day", "days"));
+            sb.append(r.weeks ? Lang.plural(ctx, r.streak, "неделя", "недели", "недель", "week", "weeks", "апта")
+                : Lang.plural(ctx, r.streak, "день", "дня", "дней", "day", "days", "күн"));
         }
-        if (sb.length() == 0) sb.append(r.done() ? Lang.t(ctx, "Выполнено", "Done") : Lang.t(ctx, "Отметьте сегодня", "Check off today"));
+        if (sb.length() == 0) sb.append(r.done() ? Lang.t(ctx, "Выполнено", "Done", "Орындалды") : Lang.t(ctx, "Отметьте сегодня", "Check off today", "Бүгін белгілеңіз"));
         return sb.toString();
     }
 
@@ -169,13 +169,13 @@ public class HabitsWidget extends AppWidgetProvider {
         int done = 0, total = rows != null ? rows.size() : 0;
         if (rows != null) for (Row r : rows) if (r.done()) done++;
 
-        rv.setTextViewText(R.id.w_hb_date, total > 0 && done == total ? Lang.t(ctx, "Всё выполнено 🎉", "All done 🎉")
-            : SmWidgets.cap(SmWidgets.fmt(ctx, "EEEE, d MMMM", "EEEE, MMMM d", now)));
+        rv.setTextViewText(R.id.w_hb_date, total > 0 && done == total ? Lang.t(ctx, "Всё выполнено 🎉", "All done 🎉", "Бәрі орындалды 🎉")
+            : SmWidgets.cap(SmWidgets.fmt(ctx, "EEEE, d MMMM", "EEEE, MMMM d", "d MMMM, EEEE", now)));
         rv.setTextViewText(R.id.w_hb_title, Lang.str(ctx, R.string.w_habits_title));
         rv.setViewVisibility(R.id.w_hb_count, total > 0 ? View.VISIBLE : View.GONE);
         rv.setViewVisibility(R.id.w_hb_ring, total > 0 ? View.VISIBLE : View.GONE);
         if (total > 0) {
-            rv.setTextViewText(R.id.w_hb_count, done + Lang.t(ctx, " из ", " of ") + total);
+            rv.setTextViewText(R.id.w_hb_count, done + Lang.t(ctx, " из ", " of ", " / ") + total);
             rv.setProgressBar(R.id.w_hb_ring, total, done, false);
         }
 
@@ -206,13 +206,13 @@ public class HabitsWidget extends AppWidgetProvider {
         boolean empty = n == 0;
         rv.setViewVisibility(R.id.w_hb_empty, empty ? View.VISIBLE : View.GONE);
         if (empty) {
-            rv.setTextViewText(R.id.w_hb_empty, data == null ? Lang.t(ctx, "Откройте SuperMind, чтобы увидеть привычки", "Open SuperMind to see your habits")
-                : rows == null ? Lang.t(ctx, "Откройте SuperMind, чтобы обновить привычки", "Open SuperMind to update your habits")
-                : Lang.t(ctx, "На сегодня привычек нет.\nНажмите, чтобы добавить", "No habits for today.\nTap to add one"));
+            rv.setTextViewText(R.id.w_hb_empty, data == null ? Lang.t(ctx, "Откройте SuperMind, чтобы увидеть привычки", "Open SuperMind to see your habits", "Әдеттерді көру үшін SuperMind-ты ашыңыз")
+                : rows == null ? Lang.t(ctx, "Откройте SuperMind, чтобы обновить привычки", "Open SuperMind to update your habits", "Әдеттерді жаңарту үшін SuperMind-ты ашыңыз")
+                : Lang.t(ctx, "На сегодня привычек нет.\nНажмите, чтобы добавить", "No habits for today.\nTap to add one", "Бүгінге әдет жоқ.\nҚосу үшін басыңыз"));
         }
         int more = n - shown;
         rv.setViewVisibility(R.id.w_hb_more, more > 0 ? View.VISIBLE : View.GONE);
-        if (more > 0) rv.setTextViewText(R.id.w_hb_more, Lang.t(ctx, "Ещё ", "") + more + Lang.t(ctx, " →", " more →"));
+        if (more > 0) rv.setTextViewText(R.id.w_hb_more, Lang.t(ctx, "Ещё ", "", "Тағы ") + more + Lang.t(ctx, " →", " more →", " →"));
 
         PendingIntent open = SmWidgets.activityIntent(ctx, 30, "open_view", null, "habits");
         rv.setOnClickPendingIntent(R.id.w_hb_header, open);
@@ -250,8 +250,8 @@ public class HabitsWidget extends AppWidgetProvider {
         }
         int next = counter ? (done ? 0 : r.count + 1) : (done ? 0 : 1);
         chip.setOnClickPendingIntent(R.id.w_hb_btn, toggleIntent(ctx, r.id, today, next));
-        chip.setContentDescription(R.id.w_hb_btn, (done ? Lang.t(ctx, "Снять отметку: ", "Uncheck: ")
-            : counter ? Lang.t(ctx, "Плюс один: ", "Plus one: ") : Lang.t(ctx, "Отметить: ", "Check off: ")) + r.name);
+        chip.setContentDescription(R.id.w_hb_btn, (done ? Lang.t(ctx, "Снять отметку: ", "Uncheck: ", "Белгіні алу: ")
+            : counter ? Lang.t(ctx, "Плюс один: ", "Plus one: ", "Плюс бір: ") : Lang.t(ctx, "Отметить: ", "Check off: ", "Белгілеу: ")) + r.name);
         chip.setOnClickPendingIntent(R.id.w_hb_chip, SmWidgets.activityIntent(ctx, 31, "open_view", null, "habits"));
     }
 

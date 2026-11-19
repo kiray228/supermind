@@ -114,21 +114,21 @@ public class CalendarWidget extends AppWidgetProvider {
         h.type = 0;
         h.day = day;
         Calendar c = SmWidgets.parseYmd(day);
-        String shortDay = SmWidgets.fmt(ctx, "EE, d MMM", "EEE, MMM d", c);
-        if (day.equals(today)) h.title = Lang.t(ctx, "Сегодня · ", "Today · ") + shortDay;
-        else if (day.equals(SmWidgets.addDays(today, 1))) h.title = Lang.t(ctx, "Завтра · ", "Tomorrow · ") + shortDay;
-        else h.title = SmWidgets.cap(SmWidgets.fmt(ctx, "EEEE, d MMM", "EEEE, MMM d", c));
+        String shortDay = SmWidgets.fmt(ctx, "EE, d MMM", "EEE, MMM d", "d MMM, EE", c);
+        if (day.equals(today)) h.title = Lang.t(ctx, "Сегодня · ", "Today · ", "Бүгін · ") + shortDay;
+        else if (day.equals(SmWidgets.addDays(today, 1))) h.title = Lang.t(ctx, "Завтра · ", "Tomorrow · ", "Ертең · ") + shortDay;
+        else h.title = SmWidgets.cap(SmWidgets.fmt(ctx, "EEEE, d MMM", "EEEE, MMM d", "d MMM, EEEE", c));
         return h;
     }
 
     private static Item free(Context ctx) {
         Item f = new Item();
         f.type = 2;
-        f.title = Lang.t(ctx, "Ничего не запланировано", "Nothing planned");
+        f.title = Lang.t(ctx, "Ничего не запланировано", "Nothing planned", "Жоспар жоқ");
         return f;
     }
 
-    /** День недели в полосе: «ПН» / «MO» */
+    /** День недели в полосе: «ПН» / «MO» / «ДС» */
     private static String weekday(Context ctx, Calendar c) {
         if (Lang.en(ctx)) {
             String s = SmWidgets.fmt(ctx, "EE", "EEE", c);
@@ -176,9 +176,10 @@ public class CalendarWidget extends AppWidgetProvider {
             busy.add(it.day);
             if (it.day.equals(today)) todayCount++;
         }
-        rv.setTextViewText(R.id.w_cal_sub, data == null ? SmWidgets.cap(SmWidgets.fmt(ctx, "EEEE, d MMMM", "EEEE, MMMM d", now))
-            : todayCount == 0 ? Lang.t(ctx, "Сегодня свободно", "Free today")
+        rv.setTextViewText(R.id.w_cal_sub, data == null ? SmWidgets.cap(SmWidgets.fmt(ctx, "EEEE, d MMMM", "EEEE, MMMM d", "d MMMM, EEEE", now))
+            : todayCount == 0 ? Lang.t(ctx, "Сегодня свободно", "Free today", "Бүгін бос")
             : Lang.en(ctx) ? todayCount + " " + (todayCount == 1 ? "item" : "items") + " today"
+            : Lang.kk(ctx) ? "Бүгін " + todayCount + " іс"
             : "Сегодня " + todayCount + " " + Lang.ruPlural(todayCount, "дело", "дела", "дел"));
 
         // полоса недели (с понедельника); на низком виджете — скрыта
@@ -218,7 +219,7 @@ public class CalendarWidget extends AppWidgetProvider {
         svc.setData(Uri.parse("supermind-widget://calendar/" + wid));
         rv.setRemoteAdapter(R.id.w_cal_list, svc);
         rv.setEmptyView(R.id.w_cal_list, R.id.w_cal_empty);
-        rv.setTextViewText(R.id.w_cal_empty, Lang.t(ctx, "Откройте SuperMind, чтобы увидеть планы", "Open SuperMind to see your plans"));
+        rv.setTextViewText(R.id.w_cal_empty, Lang.t(ctx, "Откройте SuperMind, чтобы увидеть планы", "Open SuperMind to see your plans", "Жоспарларды көру үшін SuperMind-ты ашыңыз"));
         rv.setContentDescription(R.id.w_cal_add, Lang.str(ctx, R.string.w_add_task));
 
         Intent tpl = new Intent(ctx, MainActivity.class);
@@ -262,11 +263,11 @@ public class CalendarWidget extends AppWidgetProvider {
             v.setTextViewText(R.id.w_ci_end, it.end);
             v.setViewVisibility(R.id.w_ci_end, it.end.isEmpty() ? View.GONE : View.VISIBLE);
         } else {
-            v.setTextViewText(R.id.w_ci_time, Lang.t(ctx, "Весь", "All"));
-            v.setTextViewText(R.id.w_ci_end, Lang.t(ctx, "день", "day"));
+            v.setTextViewText(R.id.w_ci_time, Lang.t(ctx, "Весь", "All", "Барлық"));
+            v.setTextViewText(R.id.w_ci_end, Lang.t(ctx, "день", "day", "күн"));
             v.setViewVisibility(R.id.w_ci_end, View.VISIBLE);
         }
-        String sub = "g".equals(it.kind) ? Lang.t(ctx, "Срок цели", "Goal deadline") : "e".equals(it.kind) ? Lang.t(ctx, "Календарь телефона", "Phone calendar") : "";
+        String sub = "g".equals(it.kind) ? Lang.t(ctx, "Срок цели", "Goal deadline", "Мақсат мерзімі") : "e".equals(it.kind) ? Lang.t(ctx, "Календарь телефона", "Phone calendar", "Телефон күнтізбесі") : "";
         v.setTextViewText(R.id.w_ci_sub, sub);
         v.setViewVisibility(R.id.w_ci_sub, sub.isEmpty() ? View.GONE : View.VISIBLE);
         if ("t".equals(it.kind) && it.id != null) {

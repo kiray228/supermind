@@ -74,7 +74,7 @@ public class AlarmActivity extends Activity {
     private void show(Intent intent) {
         ex = intent != null && intent.getExtras() != null ? intent.getExtras() : AlarmService.ringing;
         if (ex == null) ex = new Bundle();
-        title.setText(ex.getString("title", Lang.t(this, "Задача", "Task")));
+        title.setText(ex.getString("title", Lang.t(this, "Задача", "Task", "Тапсырма")));
         String b = ex.getString("body", "");
         body.setText(b);
         body.setVisibility(b.isEmpty() ? View.GONE : View.VISIBLE);
@@ -127,7 +127,7 @@ public class AlarmActivity extends Activity {
         int pad = (int) dp(28);
         root.setPadding(pad, pad, pad, pad);
 
-        TextView label = text(Lang.t(this, "⏰ Будильник SuperMind", "⏰ SuperMind alarm"), 16, 0xFF8E8E93, false);
+        TextView label = text(Lang.t(this, "⏰ Будильник SuperMind", "⏰ SuperMind alarm", "⏰ SuperMind оятқышы"), 16, 0xFF8E8E93, false);
         TextView clock = text(new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date()), 72, Color.WHITE, true);
         title = text("", 26, Color.WHITE, true);
         title.setPadding(0, (int) dp(16), 0, (int) dp(6));
@@ -139,9 +139,9 @@ public class AlarmActivity extends Activity {
         boolean task = AlarmService.ringing != null && !AlarmService.ringing.getString("taskId", "").isEmpty();
         Bundle in = getIntent() != null ? getIntent().getExtras() : null;
         if (in != null && !in.getString("taskId", "").isEmpty()) task = true;
-        if (task) buttons.addView(button(Lang.t(this, "✓ Готово", "✓ Done"), 0xFF007AFF, Color.WHITE, AlarmReceiver.ACTION_DONE));
-        buttons.addView(button(Lang.t(this, "Отложить 10 минут", "Snooze 10 minutes"), 0xFF2C2C2E, Color.WHITE, AlarmReceiver.ACTION_SNOOZE));
-        buttons.addView(button(Lang.t(this, "Выключить", "Stop"), 0xFF2C2C2E, 0xFFFF453A, AlarmReceiver.ACTION_STOP));
+        if (task) buttons.addView(button(Lang.t(this, "✓ Готово", "✓ Done", "✓ Дайын"), 0xFF007AFF, Color.WHITE, AlarmReceiver.ACTION_DONE));
+        buttons.addView(button(Lang.t(this, "Отложить 10 минут", "Snooze 10 minutes", "10 минутқа кейінге қалдыру"), 0xFF2C2C2E, Color.WHITE, AlarmReceiver.ACTION_SNOOZE));
+        buttons.addView(button(Lang.t(this, "Выключить", "Stop", "Өшіру"), 0xFF2C2C2E, 0xFFFF453A, AlarmReceiver.ACTION_STOP));
 
         root.addView(label);
         root.addView(clock);
