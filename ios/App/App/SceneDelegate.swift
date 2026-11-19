@@ -14,7 +14,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
         SceneDelegateProxy.shared.scene(scene, willConnectTo: session, options: connectionOptions)
         // запуск касанием результата Spotlight
-        connectionOptions.userActivities.forEach { SpotlightPlugin.handle($0) }
+        for activity in connectionOptions.userActivities { SpotlightPlugin.handle(activity) }
     }
 
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
