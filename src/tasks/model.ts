@@ -1,4 +1,5 @@
 import type { ID } from '../types';
+import { isEn, LOCALE, t, tn } from '../i18n/index';
 import { addDaysYmd, fromYmd, todayYmd, toYmd } from '../utils/mapTasks';
 
 // ================= Модель задач (как в TickTick) =================
@@ -227,9 +228,9 @@ export function emptyTasksData(): TasksData {
     version: 1,
     tasks: [],
     lists: [
-      { id: INBOX, name: 'Входящие', color: '#3b82f6', emoji: '📥', order: 0 },
-      { id: 'personal', name: 'Личное', color: '#22c55e', emoji: '🏡', order: 1 },
-      { id: 'work', name: 'Работа', color: '#f97316', emoji: '💼', order: 2 },
+      { id: INBOX, name: t('Входящие'), color: '#3b82f6', emoji: '📥', order: 0 },
+      { id: 'personal', name: t('Личное'), color: '#22c55e', emoji: '🏡', order: 1 },
+      { id: 'work', name: t('Работа'), color: '#f97316', emoji: '💼', order: 2 },
     ],
     filters: [],
     tagColors: {},
@@ -480,24 +481,24 @@ export function reminderFires(tasks: TaskItem[], fromMs: number, toMs: number): 
 }
 
 export const TIMED_REMINDER_OPTIONS: { v: number; label: string }[] = [
-  { v: 0, label: 'В момент начала' },
-  { v: -5, label: 'За 5 минут' },
-  { v: -10, label: 'За 10 минут' },
-  { v: -15, label: 'За 15 минут' },
-  { v: -30, label: 'За 30 минут' },
-  { v: -60, label: 'За 1 час' },
-  { v: -120, label: 'За 2 часа' },
-  { v: -1440, label: 'За 1 день' },
-  { v: -2880, label: 'За 2 дня' },
-  { v: -10080, label: 'За неделю' },
+  { v: 0, label: t('В момент начала') },
+  { v: -5, label: t('За 5 минут') },
+  { v: -10, label: t('За 10 минут') },
+  { v: -15, label: t('За 15 минут') },
+  { v: -30, label: t('За 30 минут') },
+  { v: -60, label: t('За 1 час') },
+  { v: -120, label: t('За 2 часа') },
+  { v: -1440, label: t('За 1 день') },
+  { v: -2880, label: t('За 2 дня') },
+  { v: -10080, label: t('За неделю') },
 ];
 
 export const ALLDAY_REMINDER_OPTIONS: { v: number; label: string }[] = [
-  { v: 540, label: 'В день срока (09:00)' },
-  { v: -900, label: 'За 1 день (09:00)' },
-  { v: -2340, label: 'За 2 дня (09:00)' },
-  { v: -3780, label: 'За 3 дня (09:00)' },
-  { v: -9540, label: 'За неделю (09:00)' },
+  { v: 540, label: t('В день срока (09:00)') },
+  { v: -900, label: t('За 1 день (09:00)') },
+  { v: -2340, label: t('За 2 дня (09:00)') },
+  { v: -3780, label: t('За 3 дня (09:00)') },
+  { v: -9540, label: t('За неделю (09:00)') },
 ];
 
 function plural(n: number, one: string, few: string, many: string) {
@@ -516,15 +517,15 @@ export function reminderLabel(off: number, timed: boolean): string {
   if (known) return known.label;
   if (timed) {
     const m = -off;
-    if (m === 0) return 'В момент начала';
-    if (m < 0) return `Через ${-m} мин после начала`;
-    if (m % 1440 === 0) return `За ${m / 1440} ${plural(m / 1440, 'день', 'дня', 'дней')}`;
-    if (m % 60 === 0) return `За ${m / 60} ${plural(m / 60, 'час', 'часа', 'часов')}`;
-    return `За ${m} мин`;
+    if (m === 0) return t('В момент начала');
+    if (m < 0) return t('Через {n} мин после начала', { n: -m });
+    if (m % 1440 === 0) return t('За {n} {unit}', { n: m / 1440, unit: tn(m / 1440, 'день', 'дня', 'дней') });
+    if (m % 60 === 0) return t('За {n} {unit}', { n: m / 60, unit: tn(m / 60, 'час', 'часа', 'часов') });
+    return t('За {n} мин', { n: m });
   }
   const days = Math.ceil(-off / 1440);
-  const t = timeOf(off + days * 1440);
-  return days <= 0 ? `В день срока (${t})` : `За ${days} ${plural(days, 'день', 'дня', 'дней')} (${t})`;
+  const time = timeOf(off + days * 1440);
+  return days <= 0 ? t('В день срока ({time})', { time }) : t('За {n} {unit} ({time})', { n: days, unit: tn(days, 'день', 'дня', 'дней'), time });
 }
 
 /** «напомнить за N …» из текста: для задачи без времени — за нужное число дней в 09:00 */
@@ -540,25 +541,25 @@ export function allDayOffset(daysBefore: number, time: string): number {
 
 // ================= Повторы: подписи =================
 
-const EVERY_WD = ['Каждое воскресенье', 'Каждый понедельник', 'Каждый вторник', 'Каждую среду', 'Каждый четверг', 'Каждую пятницу', 'Каждую субботу'];
-export const WD_SHORT = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
-const NTH = { 1: 'первый', 2: 'второй', 3: 'третий', 4: 'четвёртый', [-1]: 'последний' } as Record<number, string>;
+const EVERY_WD = [t('Каждое воскресенье'), t('Каждый понедельник'), t('Каждый вторник'), t('Каждую среду'), t('Каждый четверг'), t('Каждую пятницу'), t('Каждую субботу')];
+export const WD_SHORT = [t('Вс'), t('Пн'), t('Вт'), t('Ср'), t('Чт'), t('Пт'), t('Сб')];
+const NTH = { 1: t('первый'), 2: t('второй'), 3: t('третий'), 4: t('четвёртый'), [-1]: t('последний') } as Record<number, string>;
 
 export function repeatLabel(r: RepeatRule): string {
   const iv = r.interval || 1;
   let s: string;
   switch (r.freq) {
     case 'daily':
-      s = iv === 1 ? 'Каждый день' : `Каждые ${iv} ${plural(iv, 'день', 'дня', 'дней')}`;
+      s = iv === 1 ? t('Каждый день') : t('Каждые {n} {unit}', { n: iv, unit: tn(iv, 'день', 'дня', 'дней') });
       break;
     case 'weekly': {
       const wd = [...(r.weekdays ?? [])].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7));
       const isWork = wd.length === 5 && [1, 2, 3, 4, 5].every((x) => wd.includes(x));
       const isWeekend = wd.length === 2 && wd.includes(0) && wd.includes(6);
-      if (iv === 1 && isWork) s = 'По будням';
-      else if (iv === 1 && isWeekend) s = 'По выходным';
+      if (iv === 1 && isWork) s = t('По будням');
+      else if (iv === 1 && isWeekend) s = t('По выходным');
       else {
-        s = iv === 1 ? 'Каждую неделю' : `Каждые ${iv} ${plural(iv, 'неделю', 'недели', 'недель')}`;
+        s = iv === 1 ? t('Каждую неделю') : t('Каждые {n} {unit}', { n: iv, unit: tn(iv, 'неделю', 'недели', 'недель') });
         // «от даты выполнения» с одним днём недели — просто через N недель, день не закреплён
         if (r.fromCompletion && wd.length === 1) break;
         if (wd.length === 1) s = iv === 1 ? EVERY_WD[wd[0]] : `${s}: ${WD_SHORT[wd[0]]}`;
@@ -567,46 +568,59 @@ export function repeatLabel(r: RepeatRule): string {
       break;
     }
     case 'monthly':
-      s = iv === 1 ? 'Каждый месяц' : `Каждые ${iv} ${plural(iv, 'месяц', 'месяца', 'месяцев')}`;
-      if (r.monthWeek) s += ` (${NTH[r.monthWeek.n] ?? ''} ${WD_SHORT[r.monthWeek.wd].toLowerCase()})`;
-      else if (r.lastDay) s += ' (последний день)';
+      s = iv === 1 ? t('Каждый месяц') : t('Каждые {n} {unit}', { n: iv, unit: tn(iv, 'месяц', 'месяца', 'месяцев') });
+      if (r.monthWeek) s += ` (${NTH[r.monthWeek.n] ?? ''} ${isEn ? WD_SHORT[r.monthWeek.wd] : WD_SHORT[r.monthWeek.wd].toLowerCase()})`;
+      else if (r.lastDay) s += t(' (последний день)');
       break;
     case 'yearly':
-      s = iv === 1 ? 'Каждый год' : `Каждые ${iv} ${plural(iv, 'год', 'года', 'лет')}`;
+      s = iv === 1 ? t('Каждый год') : t('Каждые {n} {unit}', { n: iv, unit: tn(iv, 'год', 'года', 'лет') });
       break;
   }
-  if (r.fromCompletion) s += ', от даты выполнения';
-  if (r.until) s += `, до ${fromYmd(r.until).toLocaleDateString('ru-RU')}`;
-  if (r.count) s += `, ${r.count} ${plural(r.count, 'раз', 'раза', 'раз')}`;
+  if (r.fromCompletion) s += t(', от даты выполнения');
+  if (r.until) s += t(', до {date}', { date: fromYmd(r.until).toLocaleDateString(LOCALE) });
+  if (r.count) s += `, ${r.count} ${tn(r.count, 'раз', 'раза', 'раз')}`;
   return s;
 }
 
 // ================= Подписи дат =================
 
 const MONTHS_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
-export const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
-export const WEEKDAYS = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
+export const MONTHS = [t('Январь'), t('Февраль'), t('Март'), t('Апрель'), t('Май'), t('Июнь'), t('Июль'), t('Август'), t('Сентябрь'), t('Октябрь'), t('Ноябрь'), t('Декабрь')];
+export const WEEKDAYS = [t('Воскресенье'), t('Понедельник'), t('Вторник'), t('Среда'), t('Четверг'), t('Пятница'), t('Суббота')];
+
+/** «5 марта» / «March 5» (с годом, если задан) */
+function dayMonth(d: Date, withYear = false, short = false): string {
+  if (isEn) return d.toLocaleDateString(LOCALE, { month: short ? 'short' : 'long', day: 'numeric', ...(withYear ? { year: 'numeric' } : {}) });
+  const m = MONTHS_GEN[d.getMonth()];
+  return `${d.getDate()} ${short ? m.slice(0, 3) : m}${withYear ? ` ${d.getFullYear()}` : ''}`;
+}
 
 export function dayLabel(date: string, today = todayYmd()): string {
   const diff = daysBetween(today, date);
-  if (diff === 0) return 'Сегодня';
-  if (diff === 1) return 'Завтра';
-  if (diff === -1) return 'Вчера';
-  if (diff === 2) return 'Послезавтра';
+  if (diff === 0) return t('Сегодня');
+  if (diff === 1) return t('Завтра');
+  if (diff === -1) return t('Вчера');
+  if (diff === 2) return t('Послезавтра');
   const d = fromYmd(date);
   if (diff > 2 && diff < 7) return WEEKDAYS[d.getDay()];
-  const y = d.getFullYear() !== fromYmd(today).getFullYear() ? ` ${d.getFullYear()}` : '';
-  return `${d.getDate()} ${MONTHS_GEN[d.getMonth()]}${y}`;
+  return dayMonth(d, d.getFullYear() !== fromYmd(today).getFullYear());
+}
+
+/** dayLabel внутри фразы: «… завтра» / «… tomorrow», но «… Monday», «… March 5» (в английском названия дней и месяцев — с заглавной) */
+export function dayLabelInline(date: string, today = todayYmd()): string {
+  const s = dayLabel(date, today);
+  if (!isEn) return s.toLowerCase();
+  const diff = daysBetween(today, date);
+  return diff >= -1 && diff <= 2 ? s.toLowerCase() : s;
 }
 
 export function longDate(date: string): string {
   const d = fromYmd(date);
-  return `${WEEKDAYS[d.getDay()]}, ${d.getDate()} ${MONTHS_GEN[d.getMonth()]}`;
+  return `${WEEKDAYS[d.getDay()]}, ${dayMonth(d)}`;
 }
 
 export function shortDate(date: string): string {
-  const d = fromYmd(date);
-  return `${d.getDate()} ${MONTHS_GEN[d.getMonth()].slice(0, 3)}`;
+  return dayMonth(fromYmd(date), false, true);
 }
 
 /** «Сегодня, 18:30–19:00» */
@@ -621,10 +635,10 @@ export function whenLabel(t: Pick<TaskItem, 'date' | 'time' | 'duration'>, today
 }
 
 export function durationLabel(min: number): string {
-  if (min < 60) return `${min} мин`;
+  if (min < 60) return t('{n} мин', { n: min });
   const h = Math.floor(min / 60);
   const m = min % 60;
-  return m ? `${h} ч ${m} мин` : `${h} ч`;
+  return m ? t('{h} ч {m} мин', { h, m }) : t('{h} ч', { h });
 }
 
 // ================= Отбор и сортировка =================
@@ -670,7 +684,7 @@ export function compareTasks(a: TaskItem, b: TaskItem, by: TaskPrefs['sortBy']):
     case 'priority':
       return pr(a.priority) - pr(b.priority) || dateKey(a).localeCompare(dateKey(b)) || a.order - b.order;
     case 'title':
-      return a.title.localeCompare(b.title, 'ru');
+      return a.title.localeCompare(b.title, LOCALE);
     case 'created':
       return b.createdAt - a.createdAt;
     default:
@@ -684,8 +698,8 @@ export function quadrantOf(t: TaskItem): 1 | 2 | 3 | 4 {
 }
 
 export const QUADRANTS: { q: 1 | 2 | 3 | 4; title: string; hint: string; color: string; priority: Priority }[] = [
-  { q: 1, title: 'Срочно и важно', hint: 'Сделать сейчас', color: '#ef4444', priority: 1 },
-  { q: 2, title: 'Важно, не срочно', hint: 'Запланировать', color: '#f97316', priority: 2 },
-  { q: 3, title: 'Срочно, не важно', hint: 'Делегировать', color: '#3b82f6', priority: 3 },
-  { q: 4, title: 'Не срочно и не важно', hint: 'Отложить или удалить', color: '#64748b', priority: 0 },
+  { q: 1, title: t('Срочно и важно'), hint: t('Сделать сейчас'), color: '#ef4444', priority: 1 },
+  { q: 2, title: t('Важно, не срочно'), hint: t('Запланировать'), color: '#f97316', priority: 2 },
+  { q: 3, title: t('Срочно, не важно'), hint: t('Делегировать'), color: '#3b82f6', priority: 3 },
+  { q: 4, title: t('Не срочно и не важно'), hint: t('Отложить или удалить'), color: '#64748b', priority: 0 },
 ];

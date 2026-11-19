@@ -7,11 +7,27 @@ import { pushActive, uploadSchedule } from '../store/push';
 import { useApp, toast } from '../store/appStore';
 import { todayYmd, toYmd, addDaysYmd, fromYmd } from '../utils/mapTasks';
 import { isIOS, downloadText } from '../io/download';
-import { dayLabel, isActive, minutesOf, reminderFires, startAt, timeOf, whenLabel, type TaskItem } from './model';
+import { LOCALE, t, tn } from '../i18n/index';
+import { dayLabelInline, isActive, minutesOf, reminderFires, startAt, timeOf, whenLabel, type TaskItem } from './model';
 import { buildIcs, taskDescription, toRRule, utcStamp } from './ics';
 import { primeAlarmAudio, ringWeb, SmAlarm, stopWeb, type NativeAlarm } from './alarm';
 import { completeOccurrence, getTask, openTask, tasksData, useTasks } from './store';
 import * as hm from '../habits/model';
+
+// тексты, нужные внутри функций, где `t` — это задача
+const MSG = {
+  task: () => t('Задача'),
+  taskFile: () => t('задача'),
+  alreadyDone: () => t('Эта задача уже выполнена'),
+  snoozed: (info: string) => t('Отложено · {info}', { info }),
+  snoozedReminder: (info: string) => t('Отложенное напоминание · {info}', { info }),
+  noDate: () => t('Сначала укажите дату задачи'),
+  inPhoneCalendar: () => t('Задача уже в календаре телефона'),
+  calendarFailed: () => t('Не удалось открыть календарь'),
+  habitDone: () => t('Привычка отмечена'),
+};
+const MSG_SNOOZE_HOUR = () => t('Напомню через час');
+const MSG_SNOOZE_MIN = (n: number) => t('Напомню через {n} мин', { n });
 
 // ================= Нативные модули Android =================
 
@@ -141,7 +157,7 @@ export async function askNotifyIfNeeded() {
   if (!d?.prefs.notify) return;
   if ((await notifyPermission()) === 'prompt') {
     const r = await requestNotifyPermission();
-    if (r === 'denied') toast('Уведомления запрещены — напоминания будут видны только в приложении');
+    if (r === 'denied') toast(t('Уведомления запрещены — напоминания будут видны только в приложении'));
   }
 }
 
@@ -189,7 +205,7 @@ const isActiveTask = (id: string) => {
 /** Отложенные напоминания веб-версии — тоже уходят на push-сервер */
 export function pendingWebSnoozes(): { at: number; taskId: string; title: string }[] {
   // задачу уже выполнили — отложенное напоминание не нужно
-  return webSnoozes.filter((s) => s.at > Date.now() && isActiveTask(s.taskId)).map((s) => ({ ...s, title: getTask(s.taskId)?.title ?? 'Задача' }));
+  return webSnoozes.filter((s) => s.at > Date.now() && isActiveTask(s.taskId)).map((s) => ({ ...s, title: getTask(s.taskId)?.title ?? t('Задача') }));
 }
 
 async function plan(fromMs: number, toMs: number): Promise<Planned[]> {
@@ -202,12 +218,12 @@ async function plan(fromMs: number, toMs: number): Promise<Planned[]> {
   for (const f of reminderFires(d.tasks, fromMs - back, toMs)) {
     const base = { taskId: f.task.id, date: f.date, sm: 1, ...(f.task.alarm ? { alarm: 1 } : {}) };
     if (f.at >= fromMs)
-      out.push({ id: hash(`${f.task.id}|${f.date}|${f.offset}`), at: f.at, title: (f.task.alarm ? '⏰ ' : '') + (f.task.title || 'Задача'), body: reminderBody(f.task, f.date, f.at), extra: base });
+      out.push({ id: hash(`${f.task.id}|${f.date}|${f.offset}`), at: f.at, title: (f.task.alarm ? '⏰ ' : '') + (f.task.title || t('Задача')), body: reminderBody(f.task, f.date, f.at), extra: base });
     // «настойчивое» напоминание — ещё 3 раза, пока задача не выполнена (будильник звенит и так)
     if (d.prefs.nag > 0 && !f.task.alarm && f.offset === Math.max(...f.task.reminders) && !nagSnoozed(f.task.id, f.date))
       for (let k = 1; k <= 3; k++) {
         const at = f.at + k * d.prefs.nag * 60000;
-        if (at >= fromMs && at <= toMs) out.push({ id: hash(`${f.task.id}|${f.date}|nag${k}`), at, title: '⏰ ' + (f.task.title || 'Задача'), body: 'Ещё не выполнено · ' + reminderBody(f.task, f.date, at), extra: base });
+        if (at >= fromMs && at <= toMs) out.push({ id: hash(`${f.task.id}|${f.date}|nag${k}`), at, title: '⏰ ' + (f.task.title || t('Задача')), body: t('Ещё не выполнено · {info}', { info: reminderBody(f.task, f.date, at) }), extra: base });
       }
   }
   // платежи по подпискам (раздел «Финансы»): напоминание в 09:00 за указанное число дней
@@ -222,12 +238,13 @@ async function plan(fromMs: number, toMs: number): Promise<Planned[]> {
       const day = addDaysYmd(pay.date, -pay.remindDays);
       const at = fromYmd(day).getTime() + 9 * 3600000;
       if (at < fromMs || at > toMs) continue;
-      const amount = new Intl.NumberFormat('ru-RU', { style: 'currency', currency: pay.currency, maximumFractionDigits: 2 }).format(pay.amount);
+      const amount = new Intl.NumberFormat(LOCALE, { style: 'currency', currency: pay.currency, maximumFractionDigits: 2 }).format(pay.amount);
+      const when = pay.remindDays === 0 ? t('сегодня') : dayLabelInline(pay.date, day);
       out.push({
         id: hash(`pay|${pay.id}`),
         at,
         title: `${pay.income ? '💰' : '💳'} ${pay.title}`,
-        body: `${pay.income ? 'Поступление' : 'Платёж'} ${pay.remindDays === 0 ? 'сегодня' : dayLabel(pay.date, day).toLowerCase()} · ${pay.income ? '+' : ''}${amount}`,
+        body: `${pay.income ? t('Поступление {when}', { when }) : t('Платёж {when}', { when })} · ${pay.income ? '+' : ''}${amount}`,
         extra: { payId: pay.id, date: pay.date, sm: 1 },
       });
     }
@@ -240,12 +257,12 @@ async function plan(fromMs: number, toMs: number): Promise<Planned[]> {
     const paid = (x.payments ?? []).reduce((a, q) => a + q.amount, 0);
     const left = Math.max(0, x.amount - paid);
     if (!(left > 0)) continue;
-    const amount = new Intl.NumberFormat('ru-RU', { style: 'currency', currency: x.currency, maximumFractionDigits: 2 }).format(left);
+    const amount = new Intl.NumberFormat(LOCALE, { style: 'currency', currency: x.currency, maximumFractionDigits: 2 }).format(left);
     out.push({
       id: hash(`debt|${x.id}|${x.dueDate}`),
       at,
-      title: x.kind === 'owe' ? `🤝 Вернуть долг: ${x.person}` : `🤝 ${x.person}: пора вернуть долг`,
-      body: x.kind === 'owe' ? `Сегодня срок — верните ${amount}` : `Сегодня срок — вам должны вернуть ${amount}`,
+      title: x.kind === 'owe' ? t('🤝 Вернуть долг: {person}', { person: x.person }) : t('🤝 {person}: пора вернуть долг', { person: x.person }),
+      body: x.kind === 'owe' ? t('Сегодня срок — верните {amount}', { amount }) : t('Сегодня срок — вам должны вернуть {amount}', { amount }),
       extra: { payId: `debt:${x.id}`, date: x.dueDate, sm: 1 },
     });
   }
@@ -300,19 +317,20 @@ async function plan(fromMs: number, toMs: number): Promise<Planned[]> {
               id: hash(k ? `habit|${h.id}|${day}|${k}` : `habit|${h.id}|${day}`),
               at,
               title: `${h.icon ?? '💊'} ${h.name}`,
-              body: `${k + 1}-й раз из ${slots} сегодня (${time}) — отметьте, когда сделаете`,
+              body: t('{n}-й раз из {total} сегодня ({time}) — отметьте, когда сделаете', { n: k + 1, total: slots, time }),
               extra: { habitId: h.id, date: day, sm: 1 },
             });
             return;
           }
-          const t = hm.targetOf(h);
+          const target = hm.targetOf(h);
           const left = hm.freqOf(h) === 'weekly' ? hm.weekGoal(pdays, h, day) - hm.weekCount(pdays, h, day, day) : 0;
+          const dur = h.duration ? ` · ${hm.durationLabel(h.duration)}` : '';
           const body =
-            t > 1
-              ? `Цель на сегодня: ${h.unit ? `${h.unit} ` : ''}×${t}${h.duration ? ` · ${hm.durationLabel(h.duration)}` : ''}`
+            target > 1
+              ? t('Цель на сегодня: {goal}', { goal: `${h.unit ? `${h.unit} ` : ''}×${target}${dur}` })
               : left > 0
-                ? `Ещё ${left} ${hm.plural(left, ['раз', 'раза', 'раз'])} на этой неделе — отметьте выполнение`
-                : `Привычка на сегодня${h.duration ? ` · ${hm.durationLabel(h.duration)}` : ''} — отметьте выполнение`;
+                ? t('Ещё {n} {times} на этой неделе — отметьте выполнение', { n: left, times: tn(left, 'раз', 'раза', 'раз') })
+                : t('Привычка на сегодня{dur} — отметьте выполнение', { dur });
           out.push({ id: hash(`habit|${h.id}|${day}`), at, title: `${h.icon ?? '🔥'} ${h.name}`, body, extra: { habitId: h.id, date: day, sm: 1 } });
         });
       }
@@ -354,12 +372,12 @@ async function planStreakSaver(pref: string | undefined, p: PlannerData | undefi
     if ((day === today) === activeToday) continue;
     const pdays = p?.days ?? {};
     const h = hm.activeHabits(p?.habits).find((x) => hm.dueOn(pdays, x, day) && !hm.doneOn(pdays, x, day));
-    const n = `${streak} ${hm.plural(streak, ['день', 'дня', 'дней'])}`;
+    const n = `${streak} ${tn(streak, 'день', 'дня', 'дней')}`;
     out.push({
       id: hash(`saver|${day}`),
       at: fromYmd(day).getTime() + minutesOf(time) * 60000,
-      title: '🔥 Сохраните серию',
-      body: h ? `Серия ${n} 🔥 — отметьте «${h.name}», это 10 секунд` : `Серия ${n} 🔥 — отметьте одну привычку или задачу, это 10 секунд`,
+      title: t('🔥 Сохраните серию'),
+      body: h ? t('Серия {n} 🔥 — отметьте «{name}», это 10 секунд', { n, name: h.name }) : t('Серия {n} 🔥 — отметьте одну привычку или задачу, это 10 секунд', { n }),
       extra: h ? { habitId: h.id, saver: 1, date: day, sm: 1 } : { saver: 1, date: day, sm: 1 },
     });
   }
@@ -374,18 +392,19 @@ export function briefingFor(tasks: TaskItem[], p: PlannerData | undefined, day: 
   const due = p ? hm.activeHabits(p.habits ?? []).filter((h) => hm.dueOn(p.days ?? {}, h, day)) : [];
   const habits = due.filter((h) => !hm.doneOn(p?.days ?? {}, h, day)).length;
   const parts: string[] = [];
-  parts.push(today.length ? `Задач на сегодня: ${today.length}` : 'Задач на сегодня нет');
-  if (overdue) parts.push(`просрочено: ${overdue}`);
-  if (habits) parts.push(habits < due.length ? `привычки: осталось ${habits} из ${due.length}` : `привычек: ${habits}`);
+  parts.push(today.length ? t('Задач на сегодня: {n}', { n: today.length }) : t('Задач на сегодня нет'));
+  if (overdue) parts.push(t('просрочено: {n}', { n: overdue }));
+  if (habits) parts.push(habits < due.length ? t('привычки: осталось {n} из {total}', { n: habits, total: due.length }) : t('привычек: {n}', { n: habits }));
   if (brain.part) parts.push(brain.part);
   let body = parts.join(' · ');
   if (today[0]) {
-    const t = today[0].time;
-    body += `. Главное: ${today[0].title || 'Задача'}${t ? ` в ${t}` : ''}`;
+    const time = today[0].time;
+    const title = today[0].title || t('Задача');
+    body += time ? t('. Главное: {title} в {time}', { title, time }) : t('. Главное: {title}', { title });
   }
   // «Перечитать» — только если влезает целиком
   if (brain.tail && body.length + brain.tail.length + 2 <= 180) body += `. ${brain.tail}`;
-  return { title: '☀️ Доброе утро! План на день', body: body.length > 180 ? body.slice(0, 177) + '…' : body };
+  return { title: t('☀️ Доброе утро! План на день'), body: body.length > 180 ? body.slice(0, 177) + '…' : body };
 }
 
 let nativeReady: Promise<void> | null = null;
@@ -397,8 +416,8 @@ function setupNative(): Promise<void> {
     // каналы уведомлений есть только на Android (iPhone отвечает «not implemented»)
     if (isAndroidApp()) await LN.createChannel({
       id: 'sm-reminders',
-      name: 'Напоминания о задачах',
-      description: 'Сроки задач, повторы и привычки',
+      name: t('Напоминания о задачах'),
+      description: t('Сроки задач, повторы и привычки'),
       importance: 5,
       visibility: 1,
       vibration: true,
@@ -410,12 +429,12 @@ function setupNative(): Promise<void> {
         {
           id: 'sm-task',
           actions: [
-            { id: 'done', title: '✓ Выполнено' },
-            { id: 'snooze10', title: 'Отложить 10 мин' },
-            { id: 'snooze60', title: 'Через час' },
+            { id: 'done', title: t('✓ Выполнено') },
+            { id: 'snooze10', title: t('Отложить 10 мин') },
+            { id: 'snooze60', title: t('Через час') },
           ],
         },
-        { id: 'sm-habit', actions: [{ id: 'habit-done', title: '✓ Отметить' }] },
+        { id: 'sm-habit', actions: [{ id: 'habit-done', title: t('✓ Отметить') }] },
         ...(await import('../notes/brainNotify').then((m) => m.BRAIN_ACTION_TYPES).catch(() => [])),
       ],
     }).catch(() => {});
@@ -452,7 +471,7 @@ async function handleAction(action: string, ex: Record<string, string>, input?: 
         window.dispatchEvent(new Event('sm-planner-changed'));
         // отмечена — оставшиеся напоминания о ней сегодня и «серия под угрозой» не нужны
         syncSoon(500);
-        toast('Привычка отмечена');
+        toast(MSG.habitDone());
       }
     } else useApp.getState().go('planner');
     return;
@@ -485,7 +504,7 @@ async function handleAction(action: string, ex: Record<string, string>, input?: 
   const t = ex.taskId ? getTask(ex.taskId) : undefined;
   if (!t) return;
   if (action === 'done') {
-    if (!completeOccurrence(t.id, ex.date || undefined)) toast('Эта задача уже выполнена');
+    if (!completeOccurrence(t.id, ex.date || undefined)) toast(MSG.alreadyDone());
   } else if (action === 'snooze10' || action === 'snooze60' || action === 'snooze') {
     await snoozeOne(t, action === 'snooze60' ? 60 : 10, ex.date || undefined);
   } else {
@@ -538,8 +557,8 @@ async function snoozeOne(t: TaskItem, minutes: number, forDate?: string) {
         {
           // 1..700000: не пересекается с напоминаниями (от 1 000 000) и таймером фокуса (777001)
           id: Math.floor(Math.random() * 700_000) + 1,
-          title: t.title || 'Задача',
-          body: 'Отложено · ' + reminderBody(t, date ?? todayYmd()),
+          title: t.title || MSG.task(),
+          body: MSG.snoozed(reminderBody(t, date ?? todayYmd())),
           schedule: { at: new Date(at), allowWhileIdle: true },
           isExactNotification: exact,
           channelId: 'sm-reminders',
@@ -553,7 +572,7 @@ async function snoozeOne(t: TaskItem, minutes: number, forDate?: string) {
     saveWebSnoozes();
     void uploadSchedule(true);
   }
-  toast(`Напомню через ${minutes === 60 ? 'час' : minutes + ' мин'}`);
+  toast(minutes === 60 ? MSG_SNOOZE_HOUR() : MSG_SNOOZE_MIN(minutes));
 }
 
 async function syncNative() {
@@ -652,7 +671,7 @@ async function takeAlarmActions() {
     await ensureTasks();
     let n = 0;
     for (const a of actions) if (a.action === 'done' && a.taskId && completeOccurrence(a.taskId, a.date || undefined)) n++;
-    if (n) toast(n === 1 ? 'Задача отмечена с будильника' : `Отмечено с будильника: ${n}`);
+    if (n) toast(n === 1 ? t('Задача отмечена с будильника') : t('Отмечено с будильника: {n}', { n }));
   } catch {
     /* старая сборка без будильников */
   }
@@ -714,8 +733,8 @@ async function showWeb(title: string, body: string, data: Record<string, string>
     ...(alarm ? { vibrate: [800, 400, 800, 400, 800, 400, 800], renotify: true } : {}),
     actions: data.taskId
       ? [
-          { action: 'done', title: '✓ Выполнено' },
-          { action: 'snooze', title: 'Отложить 10 мин' },
+          { action: 'done', title: t('✓ Выполнено') },
+          { action: 'snooze', title: t('Отложить 10 мин') },
         ]
       : [],
   };
@@ -760,7 +779,7 @@ async function webTick() {
     saveWebSnoozes();
     for (const s of fire) {
       const t = getTask(s.taskId);
-      if (t && !t.done) await showWeb((t.alarm ? '⏰ ' : '') + t.title, 'Отложенное напоминание · ' + reminderBody(t, t.date ?? todayYmd()), { taskId: t.id, date: t.date ?? '', ...(t.alarm ? { alarm: '1' } : {}) });
+      if (t && !t.done) await showWeb((t.alarm ? '⏰ ' : '') + t.title, MSG.snoozedReminder(reminderBody(t, t.date ?? todayYmd())), { taskId: t.id, date: t.date ?? '', ...(t.alarm ? { alarm: '1' } : {}) });
     }
   }
 }
@@ -823,7 +842,7 @@ function eventFor(t: TaskItem) {
   // пропущенные и перенесённые повторы — исключения серии (иначе в календаре телефона они остаются, а перенесённый — дважды)
   const skip = rrule ? (t.repeat?.skip ?? []).filter((d) => d >= date) : [];
   const exdate = skip.length ? skip.map((d) => (allDay ? d.replace(/-/g, '') + 'T000000Z' : utcStamp(startAt(t, d).getTime()))).join(',') : undefined;
-  return { title: (t.done ? '✓ ' : '') + (t.title || 'Задача'), description: taskDescription(t), start, end, allDay, rrule, ...(exdate ? { exdate } : {}) };
+  return { title: (t.done ? '✓ ' : '') + (t.title || MSG.task()), description: taskDescription(t), start, end, allDay, rrule, ...(exdate ? { exdate } : {}) };
 }
 
 let calRunning = false;
@@ -886,7 +905,7 @@ export async function syncCalendar(): Promise<void> {
 export async function enableCalendarSync(): Promise<boolean> {
   const r = await SmCalendar.requestAccess().catch(() => ({ granted: false }));
   if (!r.granted) {
-    toast('Нет доступа к календарю — разрешите его в настройках телефона');
+    toast(t('Нет доступа к календарю — разрешите его в настройках телефона'));
     return false;
   }
   const { setPrefs } = await import('./store');
@@ -918,27 +937,27 @@ export async function phoneEvents(fromMs: number, toMs: number): Promise<PhoneEv
 /** Добавить одну задачу в календарь телефона */
 export async function addTaskToCalendar(t: TaskItem) {
   if (!t.date) {
-    toast('Сначала укажите дату задачи');
+    toast(MSG.noDate());
     return;
   }
   if (isAndroidApp()) {
     const d = tasksData();
     if (d?.prefs.calendarSync) {
       await syncCalendar();
-      toast('Задача уже в календаре телефона');
+      toast(MSG.inPhoneCalendar());
       return;
     }
-    await SmCalendar.insertWithPrompt(eventFor(t)).catch(() => toast('Не удалось открыть календарь'));
+    await SmCalendar.insertWithPrompt(eventFor(t)).catch(() => toast(MSG.calendarFailed()));
     return;
   }
-  await openIcs(buildIcs([t], t.title), `${t.title.slice(0, 40) || 'задача'}.ics`);
+  await openIcs(buildIcs([t], t.title), `${t.title.slice(0, 40) || MSG.taskFile()}.ics`);
 }
 
 /** Экспорт задач в файл календаря */
 export async function exportTasksIcs(tasks: TaskItem[]) {
   const list = tasks.filter((t) => t.date && !t.deleted && !t.wontDo);
   if (!list.length) {
-    toast('Нет задач с датой для экспорта');
+    toast(t('Нет задач с датой для экспорта'));
     return;
   }
   await openIcs(buildIcs(list), 'supermind-tasks.ics');
@@ -1074,7 +1093,7 @@ export function reminderAction(r: InAppReminder, action: 'done' | 'snooze' | 'op
   const t = getTask(r.taskId);
   if (!t) return;
   if (action === 'done') {
-    if (!completeOccurrence(t.id, r.date)) toast('Эта задача уже выполнена');
+    if (!completeOccurrence(t.id, r.date)) toast(MSG.alreadyDone());
   }
   else if (action === 'snooze') void snoozeOne(t, 10, r.date);
   else {

@@ -14,7 +14,7 @@ import {
   type ChecklistItem,
   type CompletionLog,
   DEFAULT_PREFS,
-  dayLabel,
+  dayLabelInline,
   emptyTasksData,
   INBOX,
   LIST_COLORS,
@@ -26,8 +26,25 @@ import {
   type TaskPrefs,
   type TasksData,
 } from './model';
+import { t } from '../i18n/index';
 
 const KEY = 'tasks';
+
+// тексты подсказок (здесь, а не в функциях: там `t` — это задача)
+const MSG = {
+  undo: () => t('Отменить'),
+  restore: () => t('Вернуть'),
+  doneNext: (next: string) => t('Готово! Следующий — {day}', { day: dayLabelInline(next) }),
+  done: () => t('Задача выполнена'),
+  doneOccurrence: (date: string) => t('Готово: повтор {day}', { day: dayLabelInline(date) }),
+  skippedOccurrence: (date: string) => t('Пропущен повтор {day}', { day: dayLabelInline(date) }),
+  skippedNext: (next: string) => t('Пропущено. Следующий — {day}', { day: dayLabelInline(next) }),
+  lastDeleted: () => t('Это был последний повтор — задача удалена'),
+  moved: (to: string) => t('Повтор перенесён на {day}', { day: dayLabelInline(to) }),
+  wontDo: () => t('Отмечено «Не буду делать»'),
+  copy: (title: string) => t('{title} (копия)', { title }),
+  saveFailed: () => t('Не удалось сохранить задачи'),
+};
 
 interface TasksState {
   data: TasksData | null;
@@ -129,7 +146,7 @@ const store = blobSync<TasksData>({
   read: () => useTasks.getState().data,
   write: (data) => useTasks.setState({ data }),
   normalize: (raw) => normalize(raw),
-  onError: () => toast('Не удалось сохранить задачи'),
+  onError: () => toast(MSG.saveFailed()),
 });
 
 export function flushTasks(): Promise<void> {
@@ -292,13 +309,13 @@ export function toggleDone(id: ID) {
     x.updatedAt = Date.now();
   });
   const undo = {
-    label: 'Отменить',
+    label: MSG.undo(),
     run: () => {
       restoreSnapshot(id, snap);
       if (t.source && !next) void updateMapTask(t.source.docId, t.source.topicId, { status: 'todo' }).catch(() => {});
     },
   };
-  toast(next ? `Готово! Следующий — ${dayLabel(next).toLowerCase()}` : 'Задача выполнена', undo);
+  toast(next ? MSG.doneNext(next) : MSG.done(), undo);
   if (t.source && !next) void updateMapTask(t.source.docId, t.source.topicId, { status: 'done', progress: 100 }).catch(() => {});
 }
 
@@ -318,7 +335,7 @@ export function completeOccurrence(id: ID, date?: string): boolean {
       x.repeat = { ...x.repeat!, skip: [...new Set([...(x.repeat!.skip ?? []), date])].sort() };
       x.updatedAt = Date.now();
     });
-    toast(`Готово: повтор ${dayLabel(date).toLowerCase()}`, { label: 'Отменить', run: () => restoreSnapshot(id, snap) });
+    toast(MSG.doneOccurrence(date), { label: MSG.undo(), run: () => restoreSnapshot(id, snap) });
     return true;
   }
   toggleDone(id);
@@ -339,7 +356,7 @@ export function skipOccurrence(id: ID, date: string): boolean {
       x.repeat = { ...x.repeat, skip: [...new Set([...(x.repeat.skip ?? []), date])].sort() };
       x.updatedAt = Date.now();
     });
-    toast(`Пропущен повтор ${dayLabel(date).toLowerCase()}`, { label: 'Вернуть', run: () => restoreSnapshot(id, snap) });
+    toast(MSG.skippedOccurrence(date), { label: MSG.restore(), run: () => restoreSnapshot(id, snap) });
     return true;
   }
   // текущий повтор: дальше, к следующему (после него — без ожидания сегодняшнего дня)
@@ -354,7 +371,7 @@ export function skipOccurrence(id: ID, date: string): boolean {
     } else x.deleted = Date.now();
     x.updatedAt = Date.now();
   });
-  toast(next ? `Пропущено. Следующий — ${dayLabel(next).toLowerCase()}` : 'Это был последний повтор — задача удалена', { label: 'Вернуть', run: () => (next ? restoreSnapshot(id, snap) : restoreTask(id)) });
+  toast(next ? MSG.skippedNext(next) : MSG.lastDeleted(), { label: MSG.restore(), run: () => (next ? restoreSnapshot(id, snap) : restoreTask(id)) });
   return true;
 }
 
@@ -384,8 +401,8 @@ export function moveOccurrence(id: ID, from: string, to: string): TaskItem | nul
     x.repeat = { ...x.repeat, skip: [...new Set([...(x.repeat.skip ?? []), from])].sort() };
     x.updatedAt = Date.now();
   });
-  toast(`Повтор перенесён на ${dayLabel(to).toLowerCase()}`, {
-    label: 'Отменить',
+  toast(MSG.moved(to), {
+    label: MSG.undo(),
     run: () => {
       restoreSnapshot(id, snap);
       if (copy) purgeTask(copy.id);
@@ -412,7 +429,7 @@ export function setWontDo(id: ID) {
     }
     x.updatedAt = Date.now();
   });
-  toast(next ? `Пропущено. Следующий — ${dayLabel(next).toLowerCase()}` : 'Отмечено «Не буду делать»', { label: 'Отменить', run: () => restoreSnapshot(id, snap) });
+  toast(next ? MSG.skippedNext(next) : MSG.wontDo(), { label: MSG.undo(), run: () => restoreSnapshot(id, snap) });
 }
 
 /** Изменить подзадачи по самому свежему состоянию задачи (правки подряд не перетирают друг друга) */
@@ -537,7 +554,7 @@ export const childTasks = (d: TasksData, id: ID) => d.tasks.filter((t) => t.pare
 export function duplicateTask(id: ID): TaskItem | null {
   const t = getTask(id);
   if (!t) return null;
-  const copy: Partial<TaskItem> = { ...structuredClone(t), title: t.title + ' (копия)', done: false };
+  const copy: Partial<TaskItem> = { ...structuredClone(t), title: MSG.copy(t.title), done: false };
   // копия — новая задача: без отметок выполнения, истории повторов, фокуса и корзины
   for (const k of ['id', 'cal', 'completedAt', 'wontDo', 'repeatDone', 'focusMinutes', 'deleted', 'createdAt', 'updatedAt', 'order'] as const) delete copy[k];
   copy.checklist = (copy.checklist ?? []).map((c) => ({ ...c, id: uid() }));

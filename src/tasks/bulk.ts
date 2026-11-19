@@ -6,6 +6,7 @@ import { create } from 'zustand';
 import type { ID } from '../types';
 import type { TaskItem } from './model';
 import { toast } from '../store/appStore';
+import { t, tn } from '../i18n/index';
 import { updateMapTask } from '../utils/mapTasks';
 import { getTask, mutateTasks, restoreSnapshot, snapshotOf, toggleDone, updateTask } from './store';
 
@@ -34,12 +35,7 @@ export function endSelect() {
   useBulk.setState({ ids: null });
 }
 
-const plural = (n: number, one: string, few: string, many: string) => {
-  const m10 = n % 10;
-  const m100 = n % 100;
-  return m10 === 1 && m100 !== 11 ? one : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? few : many;
-};
-export const tasksWord = (n: number) => `${n} ${plural(n, 'задача', 'задачи', 'задач')}`;
+export const tasksWord = (n: number) => `${n} ${tn(n, 'задача', 'задачи', 'задач')}`;
 
 /** Существующие (не удалённые навсегда) задачи из списка */
 const alive = (ids: ID[]) => ids.map(getTask).filter((t): t is TaskItem => !!t);
@@ -49,7 +45,7 @@ function undoable(list: TaskItem[], run: () => void, msg: string) {
   const before = list.map((t) => structuredClone(t));
   run();
   toast(msg, {
-    label: 'Отменить',
+    label: t('Отменить'),
     run: () =>
       mutateTasks((d) => {
         const now = Date.now();
@@ -67,8 +63,8 @@ export function bulkComplete(ids: ID[]): number {
   if (!list.length) return 0;
   const snaps = list.map((t) => [t.id, snapshotOf(t, true)] as const);
   for (const t of list) toggleDone(t.id);
-  toast(`Выполнено: ${tasksWord(list.length)}`, {
-    label: 'Отменить',
+  toast(t('Выполнено: {n}', { n: tasksWord(list.length) }), {
+    label: t('Отменить'),
     run: () => {
       for (const [id, s] of snaps) restoreSnapshot(id, s);
       // темы карт, отмеченные выполненными вместе с задачами, — обратно
@@ -97,7 +93,7 @@ export function bulkUpdate(ids: ID[], patch: Partial<TaskItem> | ((t: TaskItem) 
 
 /** Добавить тег всем выбранным */
 export const bulkTag = (ids: ID[], tag: string) =>
-  bulkUpdate(ids, (t) => (t.tags.includes(tag) ? null : { tags: [...t.tags, tag] }), `Тег #${tag}`);
+  bulkUpdate(ids, (x) => (x.tags.includes(tag) ? null : { tags: [...x.tags, tag] }), t('Тег #{tag}', { tag }));
 
 /** В корзину */
 export function bulkTrash(ids: ID[]): number {
@@ -106,6 +102,6 @@ export function bulkTrash(ids: ID[]): number {
   undoable(list, () => mutateTasks((d) => {
     const now = Date.now();
     for (const t of d.tasks) if (ids.includes(t.id) && !t.deleted) Object.assign(t, { deleted: now, updatedAt: now });
-  }), `Удалено: ${tasksWord(list.length)}`);
+  }), t('Удалено: {n}', { n: tasksWord(list.length) }));
   return list.length;
 }

@@ -7,6 +7,9 @@ import type { ID } from '../types';
 import { uid } from '../utils/tree';
 import type { Priority, TaskItem, TaskTemplate } from './model';
 import { addTask, getTask, mutateTasks, useTasks } from './store';
+import { t } from '../i18n/index';
+
+const DEFAULT_NAME = t('Шаблон');
 
 /** Шаблоны, новые сверху */
 export const listTaskTemplates = (): TaskTemplate[] => [...(useTasks.getState().data?.templates ?? [])].sort((a, b) => b.createdAt - a.createdAt);
@@ -18,7 +21,7 @@ export function saveTaskTemplate(taskId: ID, name?: string): TaskTemplate | null
   const now = Date.now();
   const tpl: TaskTemplate = {
     id: uid(),
-    name: (name ?? t.title).trim() || 'Шаблон',
+    name: (name ?? t.title).trim() || DEFAULT_NAME,
     title: t.title,
     priority: t.priority,
     tags: [...t.tags],

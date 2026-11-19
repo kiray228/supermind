@@ -3,6 +3,7 @@
  * (плагин), в браузере — Web Speech API (Chrome, Safari). Бесплатно, без ключей.
  */
 import { isNative } from '../platform';
+import { LOCALE, t } from '../i18n/index';
 
 export interface Listening {
   /** закончить и дождаться итогового текста */
@@ -50,7 +51,7 @@ function listenWeb(o: ListenOpts): Listening | null {
   const C = webCtor();
   if (!C) return null;
   const r = new C();
-  r.lang = 'ru-RU';
+  r.lang = LOCALE;
   r.continuous = false;
   r.interimResults = true;
   r.maxAlternatives = 1;
@@ -67,10 +68,10 @@ function listenWeb(o: ListenOpts): Listening | null {
     failed = true;
     o.onError(
       e.error === 'not-allowed' || e.error === 'service-not-allowed'
-        ? 'Нет доступа к микрофону — разрешите его в настройках'
+        ? t('Нет доступа к микрофону — разрешите его в настройках')
         : e.error === 'network'
-          ? 'Для распознавания речи нужен интернет'
-          : 'Не удалось распознать речь',
+          ? t('Для распознавания речи нужен интернет')
+          : t('Не удалось распознать речь'),
     );
   };
   r.onend = () => {
@@ -106,17 +107,17 @@ async function listenNative(o: ListenOpts): Promise<Listening | null> {
   try {
     const { available } = await SpeechRecognition.available();
     if (!available) {
-      o.onError('На телефоне нет распознавания речи — установите приложение Google');
+      o.onError(t('На телефоне нет распознавания речи — установите приложение Google'));
       return null;
     }
     let perm = await SpeechRecognition.checkPermissions();
     if (perm.speechRecognition !== 'granted') perm = await SpeechRecognition.requestPermissions();
     if (perm.speechRecognition !== 'granted') {
-      o.onError('Нет доступа к микрофону — разрешите его в настройках');
+      o.onError(t('Нет доступа к микрофону — разрешите его в настройках'));
       return null;
     }
   } catch (e) {
-    o.onError(e instanceof Error ? e.message : 'Распознавание речи недоступно');
+    o.onError(e instanceof Error ? e.message : t('Распознавание речи недоступно'));
     return null;
   }
 
@@ -156,10 +157,10 @@ async function listenNative(o: ListenOpts): Promise<Listening | null> {
     }),
   );
   try {
-    await SpeechRecognition.start({ language: 'ru-RU', maxResults: 1, partialResults: true, popup: false });
+    await SpeechRecognition.start({ language: LOCALE, maxResults: 1, partialResults: true, popup: false });
   } catch (e) {
     finish(false);
-    o.onError(e instanceof Error && e.message ? 'Не удалось распознать: ' + e.message : 'Не удалось начать распознавание');
+    o.onError(e instanceof Error && e.message ? t('Не удалось распознать: {error}', { error: e.message }) : t('Не удалось начать распознавание'));
     return null;
   }
   // тишина без единого слова — распознаватель молча останавливается: страховка

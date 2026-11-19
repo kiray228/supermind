@@ -8,6 +8,7 @@ import { askNotifyIfNeeded } from '../sync';
 import { DatePicker, type When } from './DatePicker';
 import { registerQuickInput } from '../../ui/keyboard';
 import { Popover } from './Popover';
+import { t } from '../../i18n/index';
 import './tasks.css';
 
 /** Окно быстрого добавления (кнопка «+» в любом разделе) */
@@ -33,7 +34,7 @@ export function QuickAddHost() {
     >
       <div className="modal qa-modal">
         <SmartInput key={round} preset={preset ?? {}} quick hidden={!open} onAdded={() => setAdded((n) => n + 1)} onCancel={close} />
-        {added > 0 && <div className="tiny muted qa-count">Добавлено: {added}. Можно ввести следующую задачу.</div>}
+        {added > 0 && <div className="tiny muted qa-count">{t('Добавлено: {n}. Можно ввести следующую задачу.', { n: added })}</div>}
       </div>
     </div>
   );
@@ -134,7 +135,7 @@ export function SmartInput({
           className="qa-input"
           value={text}
           enterKeyHint="send"
-          placeholder={compact ? 'Добавить задачу…' : 'Задача, напр. «Созвон завтра в 15:00»'}
+          placeholder={compact ? t('Добавить задачу…') : t('Задача, напр. «Созвон завтра в 15:00»')}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
@@ -145,19 +146,19 @@ export function SmartInput({
         />
         {!compact && (
           <>
-            <button ref={helpRef} className="qa-help" onPointerDown={(e) => e.preventDefault()} onClick={() => setHelpOpen(!helpOpen)} aria-label="Как писать даты и метки">
+            <button ref={helpRef} className="qa-help" onPointerDown={(e) => e.preventDefault()} onClick={() => setHelpOpen(!helpOpen)} aria-label={t('Как писать даты и метки')}>
               <HelpCircle size={15} />
             </button>
             {helpOpen && (
               <Popover anchor={helpRef} align="right" onClose={() => setHelpOpen(false)}>
                 <div className="qa-help-body">
-                  <b>Пишите прямо в тексте — SuperMind поймёт:</b>
+                  <b>{t('Пишите прямо в тексте — SuperMind поймёт:')}</b>
                   <p>📅 <i>завтра в 18:30</i>, <i>в пятницу</i>, <i>15 октября</i>, <i>через 2 часа</i>, <i>вечером</i></p>
-                  <p>⏱ <i>с 14 до 16</i> — время и длительность</p>
+                  <p>⏱ <i>с 14 до 16</i> — {t('время и длительность')}</p>
                   <p>🔁 <i>каждый день</i>, <i>по будням</i>, <i>каждый понедельник</i>, <i>каждые 2 недели</i></p>
                   <p>🔔 <i>напомнить за 15 минут</i></p>
-                  <p>🚩 <i>!1</i> высокий, <i>!2</i> средний, <i>!3</i> низкий приоритет</p>
-                  <p>🏷 <i>#дом</i> — тег, <i>~Работа</i> — список</p>
+                  <p>🚩 {t('{p1} высокий, {p2} средний, {p3} низкий приоритет', { p1: '!1', p2: '!2', p3: '!3' })}</p>
+                  <p>🏷 <i>{t('#дом')}</i> — {t('тег')}, <i>{t('~Работа')}</i> — {t('список')}</p>
                 </div>
               </Popover>
             )}
@@ -177,14 +178,14 @@ export function SmartInput({
             }}
           >
             <CalendarDays size={15} />
-            {date ? whenLabel({ date, time, duration }) : 'Дата'}
+            {date ? whenLabel({ date, time, duration }) : t('Дата')}
             {repeat && <Repeat size={13} />}
             {date && reminders.length > 0 && <Bell size={13} />}
           </button>
           <div className="qa-pop-anchor">
             <button ref={prioRef} className={`qa-chip${pc ? ' set' : ''}`} style={pc ? ({ '--qc': pc.color } as CSSProperties) : undefined} onClick={() => setPrioOpen(!prioOpen)}>
               <Flag size={15} fill={pc ? pc.color : 'none'} />
-              {pc ? pc.label : 'Приоритет'}
+              {pc ? pc.label : t('Приоритет')}
             </button>
             {prioOpen && (
               <Popover anchor={prioRef} onClose={() => setPrioOpen(false)}>
@@ -197,7 +198,7 @@ export function SmartInput({
                     }}
                   >
                     <Flag size={16} color={p ? PRIORITY_META[p].color : 'var(--text-3)'} fill={p ? PRIORITY_META[p].color : 'none'} />
-                    {p ? PRIORITY_META[p].label : 'Без приоритета'}
+                    {p ? PRIORITY_META[p].label : t('Без приоритета')}
                   </button>
                 ))}
               </Popover>
@@ -212,7 +213,7 @@ export function SmartInput({
                 </option>
               ))}
             </select>
-            <span className="ellipsis">{list?.name ?? 'Входящие'}</span>
+            <span className="ellipsis">{list?.name ?? t('Входящие')}</span>
           </label>
           {tags.map((g) => (
             <span key={g} className="qa-chip set">
@@ -227,7 +228,7 @@ export function SmartInput({
           ))}
           {repeat && <span className="qa-chip set">{repeatLabel(repeat)}</span>}
           </div>
-          <button className="qa-send" onClick={submit} disabled={!parsed.title.trim()} aria-label="Добавить">
+          <button className="qa-send" onClick={submit} disabled={!parsed.title.trim()} aria-label={t('Добавить')}>
             <ArrowUp size={18} />
           </button>
         </div>

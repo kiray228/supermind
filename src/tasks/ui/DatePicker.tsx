@@ -13,6 +13,7 @@ import {
   reminderLabel,
   TIMED_REMINDER_OPTIONS,
   WD_SHORT,
+  WEEKDAYS,
   type RepeatRule,
   type TaskItem,
 } from '../model';
@@ -22,6 +23,7 @@ import { confirmDialog } from '../../ui/dialogs';
 import { Switch } from '../../ui/list';
 import { isAndroidApp, isNative } from '../../platform';
 import { isIOS } from '../../io/download';
+import { isEn, t } from '../../i18n/index';
 
 export type When = Pick<TaskItem, 'date' | 'time' | 'duration' | 'reminders' | 'repeat' | 'alarm'>;
 
@@ -31,16 +33,16 @@ const DURATIONS = [15, 30, 45, 60, 90, 120, 180];
 /** Android 14+: точные будильники выключены по умолчанию — без них будильник может опоздать на несколько минут */
 async function askExactAlarms() {
   if (!isAndroidApp() || (await exactAlarmState()) !== 'denied') return;
-  if (await confirmDialog('Разрешить точные будильники?', 'Иначе Android может прозвенеть на несколько минут позже. Включите «Будильники и напоминания» для SuperMind.', { okText: 'Открыть настройки' })) await openExactAlarmSettings();
+  if (await confirmDialog(t('Разрешить точные будильники?'), t('Иначе Android может прозвенеть на несколько минут позже. Включите «Будильники и напоминания» для SuperMind.'), { okText: t('Открыть настройки') })) await openExactAlarmSettings();
 }
 
 const ALARM_HINT = isAndroidApp()
-  ? 'Звонит громко и по кругу, пока не выключите, — даже на заблокированном экране'
+  ? t('Звонит громко и по кругу, пока не выключите, — даже на заблокированном экране')
   : isNative()
-    ? 'На iPhone придёт уведомление со звуком — звонить по кругу, как будильник, умеет только приложение для Android'
+    ? t('На iPhone придёт уведомление со звуком — звонить по кругу, как будильник, умеет только приложение для Android')
     : isIOS()
-    ? 'Звонит, пока SuperMind открыт. Закрытое приложение на iPhone звонить не может — придёт обычное уведомление'
-    : 'Звонит громко и по кругу, пока SuperMind открыт (можно свёрнутым)';
+    ? t('Звонит, пока SuperMind открыт. Закрытое приложение на iPhone звонить не может — придёт обычное уведомление')
+    : t('Звонит громко и по кругу, пока SuperMind открыт (можно свёрнутым)');
 
 /** Выбор даты, времени, длительности, напоминаний и повтора (как в TickTick) */
 export function DatePicker({ value, onDone, onClose }: { value: When; onDone: (v: When) => void; onClose: () => void }) {
@@ -73,12 +75,12 @@ export function DatePicker({ value, onDone, onClose }: { value: When; onDone: (v
   const base = v.date ?? today;
   const wd = fromYmd(base).getDay();
   const presets: { label: string; rule: RepeatRule | undefined }[] = [
-    { label: 'Не повторять', rule: undefined },
-    { label: 'Каждый день', rule: { freq: 'daily', interval: 1 } },
-    { label: 'По будням', rule: { freq: 'weekly', interval: 1, weekdays: [1, 2, 3, 4, 5] } },
-    { label: `Каждую неделю (${WD_SHORT[wd].toLowerCase()})`, rule: { freq: 'weekly', interval: 1, weekdays: [wd] } },
-    { label: `Каждый месяц (${fromYmd(base).getDate()} число)`, rule: { freq: 'monthly', interval: 1 } },
-    { label: 'Каждый год', rule: { freq: 'yearly', interval: 1 } },
+    { label: t('Не повторять'), rule: undefined },
+    { label: t('Каждый день'), rule: { freq: 'daily', interval: 1 } },
+    { label: t('По будням'), rule: { freq: 'weekly', interval: 1, weekdays: [1, 2, 3, 4, 5] } },
+    { label: t('Каждую неделю ({wd})', { wd: isEn ? WD_SHORT[wd] : WD_SHORT[wd].toLowerCase() }), rule: { freq: 'weekly', interval: 1, weekdays: [wd] } },
+    { label: t('Каждый месяц ({n} число)', { n: fromYmd(base).getDate() }), rule: { freq: 'monthly', interval: 1 } },
+    { label: t('Каждый год'), rule: { freq: 'yearly', interval: 1 } },
   ];
   // сохранённое правило «закреплено» (число, месяц) — сравниваем закреплённые версии, порядок полей не важен
   const sig = (r: RepeatRule | undefined) => (r ? JSON.stringify(Object.entries(pinRule(r, base)).sort(([a], [b]) => a.localeCompare(b))) : 'null');
@@ -90,16 +92,16 @@ export function DatePicker({ value, onDone, onClose }: { value: When; onDone: (v
       <div className="modal dp-modal">
         <div className="dp-quick">
           <button className={`dp-q${v.date === today ? ' on' : ''}`} onClick={() => setDate(today)}>
-            <Sun /> Сегодня
+            <Sun /> {t('Сегодня')}
           </button>
           <button className={`dp-q${v.date === addDaysYmd(today, 1) ? ' on' : ''}`} onClick={() => setDate(addDaysYmd(today, 1))}>
-            <Sunrise /> Завтра
+            <Sunrise /> {t('Завтра')}
           </button>
           <button className={`dp-q${v.date === addDaysYmd(mondayOf(today), 7) ? ' on' : ''}`} onClick={() => setDate(addDaysYmd(mondayOf(today), 7))}>
-            <CalendarRange /> След. пн
+            <CalendarRange /> {t('След. пн')}
           </button>
           <button className={`dp-q${!v.date ? ' on' : ''}`} onClick={() => setDate(undefined)}>
-            <CalendarX2 /> Без даты
+            <CalendarX2 /> {t('Без даты')}
           </button>
         </div>
 
@@ -108,23 +110,23 @@ export function DatePicker({ value, onDone, onClose }: { value: When; onDone: (v
         <div className="dp-rows">
           <div className="dp-row">
             <Clock className="dp-ico" />
-            <span className="grow">Время</span>
+            <span className="grow">{t('Время')}</span>
             {v.time ? (
               <>
                 <input type="time" className="dp-time" value={v.time} onChange={(e) => setTime(e.target.value || undefined)} />
-                <button className="icon-btn dp-x" onClick={() => setTime(undefined)} aria-label="Без времени">
+                <button className="icon-btn dp-x" onClick={() => setTime(undefined)} aria-label={t('Без времени')}>
                   <X />
                 </button>
               </>
             ) : (
               <button className="btn btn-sm" onClick={() => setTime(nextHalfHour(v.date ?? today))}>
-                Весь день · указать
+                {t('Весь день · указать')}
               </button>
             )}
           </div>
           {v.time && (
             <div className="dp-chips">
-              <span className="tiny muted">Длительность:</span>
+              <span className="tiny muted">{t('Длительность:')}</span>
               {DURATIONS.map((d) => (
                 <button key={d} className={`chip${v.duration === d ? ' active' : ''}`} onClick={() => setV((x) => ({ ...x, duration: x.duration === d ? undefined : d }))}>
                   {durationLabel(d)}
@@ -135,17 +137,17 @@ export function DatePicker({ value, onDone, onClose }: { value: When; onDone: (v
 
           <div className="dp-row">
             <Bell className="dp-ico" />
-            <span className="grow">Напоминания</span>
-            <button className="icon-btn" onClick={() => setAddRem(!addRem)} aria-label="Добавить напоминание">
+            <span className="grow">{t('Напоминания')}</span>
+            <button className="icon-btn" onClick={() => setAddRem(!addRem)} aria-label={t('Добавить напоминание')}>
               <Plus />
             </button>
           </div>
           <div className="dp-chips">
-            {v.reminders.length === 0 && <span className="tiny faint">Нет напоминаний</span>}
+            {v.reminders.length === 0 && <span className="tiny faint">{t('Нет напоминаний')}</span>}
             {v.reminders.map((r) => (
               <span key={r} className="chip active">
                 {reminderLabel(r, timed)}
-                <button className="dp-chip-x" onClick={() => toggleRem(r)} aria-label="Убрать">
+                <button className="dp-chip-x" onClick={() => toggleRem(r)} aria-label={t('Убрать')}>
                   <X size={12} />
                 </button>
               </span>
@@ -155,7 +157,7 @@ export function DatePicker({ value, onDone, onClose }: { value: When; onDone: (v
             <label className="dp-row dp-alarm">
               <AlarmClock className="dp-ico" />
               <span className="grow">
-                Как будильник
+                {t('Как будильник')}
                 <small>{ALARM_HINT}</small>
               </span>
               <Switch checked={!!v.alarm} onChange={(on) => { setV((x) => ({ ...x, alarm: on || undefined })); if (on) void askExactAlarms(); }} />
@@ -174,7 +176,7 @@ export function DatePicker({ value, onDone, onClose }: { value: When; onDone: (v
 
           <div className="dp-row">
             <Repeat className="dp-ico" />
-            <span className="grow">Повтор</span>
+            <span className="grow">{t('Повтор')}</span>
             <select
               className="select dp-select"
               value={customRepeat || (presetIdx < 0 && v.repeat) ? 'custom' : String(presetIdx)}
@@ -194,7 +196,7 @@ export function DatePicker({ value, onDone, onClose }: { value: When; onDone: (v
                   {p.label}
                 </option>
               ))}
-              <option value="custom">Настроить…</option>
+              <option value="custom">{t('Настроить…')}</option>
             </select>
           </div>
           {v.repeat && (presetIdx < 0 || customRepeat) && <RepeatEditor rule={v.repeat} date={base} onChange={(repeat) => setV((x) => ({ ...x, repeat }))} />}
@@ -206,14 +208,14 @@ export function DatePicker({ value, onDone, onClose }: { value: When; onDone: (v
             className="btn btn-ghost"
             onClick={() => onDone({ date: undefined, time: undefined, duration: undefined, reminders: [], repeat: undefined })}
           >
-            Очистить
+            {t('Очистить')}
           </button>
           <div className="grow" />
           <button className="btn" onClick={onClose}>
-            Отмена
+            {t('Отмена')}
           </button>
           <button className="btn btn-primary" onClick={() => onDone(v)}>
-            Готово
+            {t('Готово')}
           </button>
         </div>
       </div>
@@ -235,27 +237,30 @@ function CustomReminder({ timed, onAdd }: { timed: boolean; onAdd: (off: number)
   const [time, setTime] = useState('09:00');
   return (
     <div className="dp-custom-rem">
-      <span className="tiny muted">Своё:</span>
-      <span className="tiny">за</span>
+      <span className="tiny muted">{t('Своё:')}</span>
+      {!isEn && <span className="tiny">за</span>}
       <input className="input dp-num" type="number" min={0} max={999} value={n} onChange={(e) => setN(Math.max(0, Number(e.target.value) || 0))} />
       {timed ? (
         <select className="select dp-unit" value={unit} onChange={(e) => setUnit(e.target.value as 'min')}>
-          <option value="min">мин</option>
-          <option value="hour">ч</option>
-          <option value="day">дн</option>
+          <option value="min">{t('мин')}</option>
+          <option value="hour">{t('ч')}</option>
+          <option value="day">{t('дн')}</option>
         </select>
       ) : (
         <>
-          <span className="tiny">дн в</span>
+          <span className="tiny">{t('дн в')}</span>
           <input className="dp-time" type="time" value={time} onChange={(e) => setTime(e.target.value || '09:00')} />
         </>
       )}
+      {isEn && timed && <span className="tiny">before</span>}
       <button className="btn btn-sm" onClick={() => onAdd(timed ? -n * (unit === 'min' ? 1 : unit === 'hour' ? 60 : 1440) : allDayOffset(n, time))}>
-        Добавить
+        {t('Добавить')}
       </button>
     </div>
   );
 }
+
+const ORDINAL = ['1st', '2nd', '3rd', '4th', '5th'];
 
 function RepeatEditor({ rule, date, onChange }: { rule: RepeatRule; date: string; onChange: (r: RepeatRule) => void }) {
   const set = (p: Partial<RepeatRule>) => {
@@ -267,10 +272,11 @@ function RepeatEditor({ rule, date, onChange }: { rule: RepeatRule; date: string
   const nth = Math.ceil(d.getDate() / 7);
   const isLastWeek = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7).getMonth() !== d.getMonth();
   const end = rule.count ? 'count' : rule.until ? 'until' : 'never';
+  const wdName = isEn ? WEEKDAYS[d.getDay()] : WD_SHORT[d.getDay()].toLowerCase();
   return (
     <div className="dp-rep card">
       <div className="row">
-        <span className="small">Каждые</span>
+        <span className="small">{t('Каждые')}</span>
         <input className="input dp-num" type="number" min={1} max={99} value={rule.interval} onChange={(e) => set({ interval: Math.max(1, Number(e.target.value) || 1) })} />
         <select
           className="select"
@@ -280,10 +286,10 @@ function RepeatEditor({ rule, date, onChange }: { rule: RepeatRule; date: string
             set({ freq, weekdays: freq === 'weekly' ? [d.getDay()] : undefined, monthWeek: undefined, lastDay: undefined });
           }}
         >
-          <option value="daily">дн.</option>
-          <option value="weekly">нед.</option>
-          <option value="monthly">мес.</option>
-          <option value="yearly">лет</option>
+          <option value="daily">{t('дн.')}</option>
+          <option value="weekly">{t('нед.')}</option>
+          <option value="monthly">{t('мес.')}</option>
+          <option value="yearly">{t('лет')}</option>
         </select>
       </div>
       {rule.freq === 'weekly' && (
@@ -317,15 +323,15 @@ function RepeatEditor({ rule, date, onChange }: { rule: RepeatRule; date: string
             else set({ lastDay: undefined, monthWeek: undefined });
           }}
         >
-          <option value="day">{d.getDate()}-го числа</option>
+          <option value="day">{t('{n}-го числа', { n: d.getDate() })}</option>
           <option value="nth">
-            {isLastWeek && nth >= 4 ? 'В последний' : `В ${nth}-й`} {WD_SHORT[d.getDay()].toLowerCase()} месяца
+            {isLastWeek && nth >= 4 ? t('В последний {wd} месяца', { wd: wdName }) : t('В {n}-й {wd} месяца', { n: isEn ? ORDINAL[nth - 1] : nth, wd: wdName })}
           </option>
-          <option value="last">В последний день месяца</option>
+          <option value="last">{t('В последний день месяца')}</option>
         </select>
       )}
       <div className="row">
-        <span className="small">Окончание</span>
+        <span className="small">{t('Окончание')}</span>
         <select
           className="select grow"
           value={end}
@@ -336,21 +342,21 @@ function RepeatEditor({ rule, date, onChange }: { rule: RepeatRule; date: string
             else set({ until: addDaysYmd(date, 30), count: undefined });
           }}
         >
-          <option value="never">Никогда</option>
-          <option value="until">До даты</option>
-          <option value="count">После N повторов</option>
+          <option value="never">{t('Никогда')}</option>
+          <option value="until">{t('До даты')}</option>
+          <option value="count">{t('После N повторов')}</option>
         </select>
       </div>
       {end === 'until' && <input className="input" type="date" value={rule.until} onChange={(e) => set({ until: e.target.value || undefined })} />}
       {end === 'count' && (
         <div className="row">
           <input className="input dp-num" type="number" min={1} max={999} value={rule.count} onChange={(e) => set({ count: Math.max(1, Number(e.target.value) || 1) })} />
-          <span className="small">раз</span>
+          <span className="small">{t('раз')}</span>
         </div>
       )}
       <label className="row small dp-check">
         <input type="checkbox" checked={!!rule.fromCompletion} onChange={(e) => set({ fromCompletion: e.target.checked || undefined })} />
-        Считать от даты выполнения
+        {t('Считать от даты выполнения')}
       </label>
     </div>
   );
@@ -378,10 +384,10 @@ export function MiniMonth({ selected, onPick, marks }: { selected?: string; onPi
         <b className="grow">
           {MONTHS[view.m]} <span className="faint">{view.y}</span>
         </b>
-        <button className="icon-btn" onClick={() => shift(-1)} aria-label="Предыдущий месяц">
+        <button className="icon-btn" onClick={() => shift(-1)} aria-label={t('Предыдущий месяц')}>
           <ChevronLeft />
         </button>
-        <button className="icon-btn" onClick={() => shift(1)} aria-label="Следующий месяц">
+        <button className="icon-btn" onClick={() => shift(1)} aria-label={t('Следующий месяц')}>
           <ChevronRight />
         </button>
       </div>

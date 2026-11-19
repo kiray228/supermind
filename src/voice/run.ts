@@ -20,6 +20,7 @@ import { todayYmd } from '../utils/mapTasks';
 import { uid } from '../utils/tree';
 import type { Habit } from '../types';
 import { useApp, type View } from '../store/appStore';
+import { t, tn } from '../i18n/index';
 
 /** Сумма в основной валюте → в валюту счёта. null — курс не задан */
 function toAccountCurrency(main: number, cur: string, prefs: FinancePrefs): number | null {
@@ -142,7 +143,7 @@ export function fromAi(raw: unknown): VoiceAction | null {
       const today = todayYmd();
       const from = ymd(raw.from) ?? today.slice(0, 8) + '01';
       const to = ymd(raw.to) ?? today;
-      const period = from === to ? (from === today ? 'сегодня' : `за ${dayLabel(from)}`) : `с ${dayLabel(from)} по ${dayLabel(to)}`;
+      const period = from === to ? (from === today ? t('сегодня') : t('за {day}', { day: dayLabel(from) })) : t('с {from} по {to}', { from: dayLabel(from), to: dayLabel(to) });
       return { type: 'ask', what: raw.what, from, to, period, ...(str(raw.category, 80) ? { category: str(raw.category, 80) } : {}) };
     }
     default:
@@ -265,7 +266,7 @@ export async function execute(a: VoiceAction): Promise<Done> {
     case 'add_task': {
       const d = await ensureTasks();
       const list = byName(d.lists, a.list);
-      const t = addTask({
+      const task = addTask({
         title: a.title,
         ...(a.date ? { date: a.date } : {}),
         ...(a.date && a.time ? { time: a.time } : {}),
@@ -274,17 +275,17 @@ export async function execute(a: VoiceAction): Promise<Done> {
         ...(a.remindAtTime && a.time ? { reminders: [0] } : {}),
         priority: a.priority ?? 0,
       });
-      if (!t) return { ok: false, label: 'Задача', title: a.title, meta: 'Не удалось добавить' };
+      if (!task) return { ok: false, label: t('Задача'), title: a.title, meta: t('Не удалось добавить') };
       syncSoon(800);
       return {
         ok: true,
-        label: a.repeat ? 'Повторяющаяся задача' : 'Задача',
-        title: t.title,
-        meta: [a.repeat ? repeatLabel(a.repeat) : a.date ? dayLabel(a.date) : 'без срока', a.time, list?.name].filter(Boolean).join(' · '),
-        undo: () => purgeTask(t.id),
+        label: a.repeat ? t('Повторяющаяся задача') : t('Задача'),
+        title: task.title,
+        meta: [a.repeat ? repeatLabel(a.repeat) : a.date ? dayLabel(a.date) : t('без срока'), a.time, list?.name].filter(Boolean).join(' · '),
+        undo: () => purgeTask(task.id),
         open: () => {
           go('tasks');
-          openTask(t.id);
+          openTask(task.id);
         },
       };
     }
@@ -295,7 +296,7 @@ export async function execute(a: VoiceAction): Promise<Done> {
       // «10 долларов» — счёт в этой валюте, если он есть
       const inCurrency = a.currency && !named ? accs.find((x) => x.currency === a.currency) : undefined;
       const account = named ?? inCurrency ?? accs.find((x) => x.id === d.prefs.lastAccountId) ?? accs[0];
-      if (!account) return { ok: false, label: a.kind === 'income' ? 'Доход' : 'Расход', title: String(a.amount), meta: 'Нет счёта — создайте его в Финансах' };
+      if (!account) return { ok: false, label: a.kind === 'income' ? t('Доход') : t('Расход'), title: String(a.amount), meta: t('Нет счёта — создайте его в Финансах') };
       // валюта фразы не совпала со счётом — пересчёт по курсу из настроек Финансов; без курса не пишем неверную сумму
       let amount = a.amount;
       let note = a.note;
@@ -303,7 +304,7 @@ export async function execute(a: VoiceAction): Promise<Done> {
         const main = toMain(a.amount, a.currency, d.prefs);
         const conv = main === null ? null : toAccountCurrency(main, account.currency, d.prefs);
         if (conv === null)
-          return { ok: false, label: a.kind === 'income' ? 'Доход' : 'Расход', title: `${a.amount} ${a.currency}`, meta: `Нет счёта в ${a.currency} и курса — добавьте курс в Финансах` };
+          return { ok: false, label: a.kind === 'income' ? t('Доход') : t('Расход'), title: `${a.amount} ${a.currency}`, meta: t('Нет счёта в {cur} и курса — добавьте курс в Финансах', { cur: a.currency }) };
         amount = Math.round(conv * 100) / 100;
         note = [a.note, `${a.amount} ${a.currency}`].filter(Boolean).join(' · ');
       }
@@ -318,12 +319,12 @@ export async function execute(a: VoiceAction): Promise<Done> {
         ...(category ? { categoryId: category.id } : {}),
         ...(note ? { note } : {}),
       });
-      if (!tx) return { ok: false, label: 'Финансы', title: String(amount), meta: 'Не удалось записать' };
+      if (!tx) return { ok: false, label: t('Финансы'), title: String(amount), meta: t('Не удалось записать') };
       return {
         ok: true,
-        label: a.kind === 'income' ? 'Доход' : 'Расход',
+        label: a.kind === 'income' ? t('Доход') : t('Расход'),
         title: `${a.kind === 'income' ? '+' : '−'}${fmtMoney(amount, account.currency)}`,
-        meta: [category ? `${category.emoji} ${category.name}` : 'без категории', note, dayLabel(date), account.name].filter(Boolean).join(' · '),
+        meta: [category ? `${category.emoji} ${category.name}` : t('без категории'), note, dayLabel(date), account.name].filter(Boolean).join(' · '),
         undo: () => deleteTransaction(tx.id, false),
         open: () => go('finance'),
       };
@@ -332,7 +333,7 @@ export async function execute(a: VoiceAction): Promise<Done> {
       const p = await loadPlanner();
       const habits = p.habits ?? [];
       const same = habits.find((h) => !h.deleted && !h.archived && lower(h.name) === lower(a.name));
-      if (same) return { ok: true, label: 'Привычка уже есть', title: `${same.icon ?? ''} ${same.name}`.trim(), open: () => go('habits') };
+      if (same) return { ok: true, label: t('Привычка уже есть'), title: `${same.icon ?? ''} ${same.name}`.trim(), open: () => go('habits') };
       const now = Date.now();
       const look = habitLook(a.name);
       const h: Habit = cleanHabit({
@@ -350,12 +351,13 @@ export async function execute(a: VoiceAction): Promise<Done> {
       await savePlanner({ ...p, days: p.days ?? {}, habits: [...habits, h] });
       window.dispatchEvent(new Event('sm-planner-changed'));
       syncSoon(300);
-      const freq = a.days?.length ? 'по дням недели' : a.perWeek ? `${a.perWeek} раза в неделю` : 'каждый день';
+      const freq = a.days?.length ? t('по дням недели') : a.perWeek ? t('{n} {times} в неделю', { n: a.perWeek, times: tn(a.perWeek, 'раз', 'раза', 'раз') }) : t('каждый день');
+      const nTimes = a.times?.length ?? 0;
       return {
         ok: true,
-        label: 'Привычка',
+        label: t('Привычка'),
         title: `${h.icon} ${h.name}`,
-        meta: [freq, a.times && a.times.length > 1 ? `${a.times.length} раза: ${a.times.join(', ')}` : a.time].filter(Boolean).join(' · '),
+        meta: [freq, a.times && nTimes > 1 ? t('{n} {times}: {list}', { n: nTimes, times: tn(nTimes, 'раз', 'раза', 'раз'), list: a.times.join(', ') }) : a.time].filter(Boolean).join(' · '),
         undo: async () => {
           const q = await loadPlanner();
           await savePlanner({ ...q, days: q.days ?? {}, habits: (q.habits ?? []).map((x) => (x.id === h.id ? { ...x, deleted: true, updatedAt: Date.now() } : x)) });
@@ -368,15 +370,15 @@ export async function execute(a: VoiceAction): Promise<Done> {
     case 'add_journal': {
       const { appendToDaily, openDailyNote, removeBlocks } = await import('../notes/daily');
       const r = await appendToDaily(a.text, a.section);
-      if (!r) return { ok: false, label: 'Дневник', title: a.text, meta: 'Не удалось записать' };
+      if (!r) return { ok: false, label: t('Дневник'), title: a.text, meta: t('Не удалось записать') };
       // длинная мысль без ИИ: разобрать на заметку и задачи, когда ИИ станет доступен
       const q = a.later ? await import('../notes/aiQueue') : null;
       if (q) q.queueDictation(a.text, r);
       return {
         ok: true,
-        label: a.section === 'results' ? 'Итоги дня' : 'Дневник',
+        label: a.section === 'results' ? t('Итоги дня') : t('Дневник'),
         title: a.text,
-        meta: a.later ? 'в заметку дня · ИИ разберёт на заметку и задачи, когда появится связь' : 'в заметку дня',
+        meta: a.later ? t('в заметку дня · ИИ разберёт на заметку и задачи, когда появится связь') : t('в заметку дня'),
         undo: async () => {
           q?.dropQueued((x) => x.kind === 'dictation' && x.journal?.noteId === r.noteId && x.journal.blockIds[0] === r.blockIds[0]);
           await removeBlocks(r.noteId, r.blockIds);
@@ -387,10 +389,10 @@ export async function execute(a: VoiceAction): Promise<Done> {
     case 'add_note': {
       await ensureNotes();
       const n = createNote({ title: a.title, blocks: a.text && a.text !== a.title ? (/\n/.test(a.text) ? markdownToBlocks(a.text) : [{ id: uid(), type: 'p', text: a.text }]) : [] });
-      if (!n) return { ok: false, label: 'Заметка', title: a.title, meta: 'Не удалось создать' };
+      if (!n) return { ok: false, label: t('Заметка'), title: a.title, meta: t('Не удалось создать') };
       return {
         ok: true,
-        label: 'Заметка',
+        label: t('Заметка'),
         title: a.title,
         meta: a.text && a.text !== a.title ? a.text.slice(0, 80) : undefined,
         undo: () => purgeNote(n.id),

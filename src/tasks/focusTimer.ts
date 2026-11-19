@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { isNative } from '../platform';
 import { DEFAULT_PREFS, type FocusSession } from './model';
+import { t } from '../i18n/index';
 import { addFocusSession, ensureTasks, useTasks } from './store';
 
 // ================= Глобальный таймер фокуса (помодоро / секундомер) =================
@@ -155,7 +156,7 @@ export function formatMs(ms: number): string {
   return h ? `${h}:${p(m)}:${p(s)}` : `${p(m)}:${p(s)}`;
 }
 
-export const PHASE_LABEL: Record<FocusPhase, string> = { work: 'Фокус', short: 'Короткий перерыв', long: 'Длинный перерыв' };
+export const PHASE_LABEL: Record<FocusPhase, string> = { work: t('Фокус'), short: t('Короткий перерыв'), long: t('Длинный перерыв') };
 
 function record(start: number, minutes: number, taskId: string | undefined, kind: FocusSession['kind']) {
   if (minutes < 1) return;
@@ -305,8 +306,8 @@ function finishPhase(s: FocusState, now: number) {
     }
     if (s.phase === 'work') cheer();
     if (!isNative()) {
-      if (s.phase === 'work') webNotify('Помодоро завершён', 'Время отдохнуть');
-      else webNotify('Перерыв окончен', 'Пора вернуться к фокусу');
+      if (s.phase === 'work') webNotify(t('Помодоро завершён'), t('Время отдохнуть'));
+      else webNotify(t('Перерыв окончен'), t('Пора вернуться к фокусу'));
     }
   }
   // после долгого отсутствия следующий этап сам не запускаем
@@ -432,8 +433,8 @@ function scheduleNative() {
       notifications: [
         {
           id: NID,
-          title: work ? 'Помодоро завершён' : 'Перерыв окончен',
-          body: work ? 'Время отдохнуть' : 'Пора вернуться к фокусу',
+          title: work ? t('Помодоро завершён') : t('Перерыв окончен'),
+          body: work ? t('Время отдохнуть') : t('Пора вернуться к фокусу'),
           schedule: { at: new Date(s.endAt), allowWhileIdle: true },
           isExactNotification: exact,
           channelId: 'sm-reminders',

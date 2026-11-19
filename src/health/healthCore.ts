@@ -3,6 +3,8 @@
  * Сырые данные остаются на телефоне — в привычки попадает только отметка «сделано».
  */
 import type { Habit } from '../types';
+// путь с .ts: файл проверяется тестами node без сборщика
+import { t } from '../i18n/index.ts';
 
 export interface SleepPiece {
   startDate: string;
@@ -31,7 +33,7 @@ function merge(spans: Span[]): Span[] {
 const clip = (spans: Span[], from: number, to: number): Span[] =>
   spans.map(([a, b]): Span => [Math.max(a, from), Math.min(b, to)]).filter(([a, b]) => b > a);
 
-const t = (s: string) => Date.parse(s);
+const ms = (s: string) => Date.parse(s);
 
 /** Промежутки сна в окне [from, to): по стадиям, если есть, иначе по состоянию; без сна — «в кровати» */
 export function sleepSpans(samples: SleepPiece[], from: number, to: number): Span[] {
@@ -39,10 +41,10 @@ export function sleepSpans(samples: SleepPiece[], from: number, to: number): Spa
   const inBed: Span[] = [];
   for (const x of samples) {
     if (x.stages?.length) {
-      for (const st of x.stages) if (SLEEP.has(st.stage)) asleep.push([t(st.startDate), t(st.endDate)]);
+      for (const st of x.stages) if (SLEEP.has(st.stage)) asleep.push([ms(st.startDate), ms(st.endDate)]);
       continue;
     }
-    const span: Span = [t(x.startDate), t(x.endDate)];
+    const span: Span = [ms(x.startDate), ms(x.endDate)];
     if (!x.sleepState || SLEEP.has(x.sleepState)) asleep.push(span);
     else if (x.sleepState === 'inBed') inBed.push(span);
   }
@@ -74,7 +76,7 @@ const lower = (h: Pick<Habit, 'name'>) => h.name.trim().toLowerCase();
 
 /** Число из названия: «10 000 шагов», «8к шагов», «Сон 7,5 часов» */
 function numberIn(name: string): number | null {
-  const m = name.replace(/(\d)[\s ](?=\d{3}\b)/g, '$1').match(/(\d+(?:[.,]\d+)?)\s*(к|k|тыс)?/i);
+  const m = name.replace(/(\d)[\s ,](?=\d{3}\b)/g, '$1').match(/(\d+(?:[.,]\d+)?)\s*(к|k|тыс)?/i);
   if (!m) return null;
   const n = parseFloat(m[1].replace(',', '.'));
   return m[2] ? n * 1000 : n;
@@ -91,7 +93,7 @@ export function stepsGoal(h: Pick<Habit, 'name'>): number | null {
 /** Привычка «спать N часов» / «высыпаться» → минут сна (по умолчанию 7 ч) */
 export function sleepGoal(h: Pick<Habit, 'name'>): number | null {
   const name = lower(h);
-  if (/лечь|ложиться|отбой/.test(name)) return null;
+  if (/лечь|ложиться|отбой|(^|[^a-z])bed([^a-z]|$)/.test(name)) return null;
   if (!/(^|[^а-яё])(сон|сна|спать|высып)|sleep/.test(name)) return null;
   if (/перед сном|без экран|без телефон/.test(name)) return null;
   const n = numberIn(name);
@@ -101,8 +103,8 @@ export function sleepGoal(h: Pick<Habit, 'name'>): number | null {
 /** Привычка «лечь спать до 23:00» → крайний срок в минутах от полуночи (после полуночи — +24 ч) */
 export function bedtimeGoal(h: Pick<Habit, 'name' | 'time'>): number | null {
   const name = lower(h);
-  if (!/(лечь|ложиться|отбой|уснуть|заснуть)/.test(name)) return null;
-  const m = name.match(/(\d{1,2})[:.](\d{2})/) ?? name.match(/до\s+(\d{1,2})(?!\d)/);
+  if (!/(лечь|ложиться|отбой|уснуть|заснуть|(^|[^a-z])bed([^a-z]|$)|asleep)/.test(name)) return null;
+  const m = name.match(/(\d{1,2})[:.](\d{2})/) ?? name.match(/(?:до|by|before)\s+(\d{1,2})(?!\d)/);
   if (!m) return null;
   const hh = +m[1];
   const mm = m[2] ? +m[2] : 0;
@@ -153,5 +155,5 @@ export function autoMarks(habits: Habit[], data: HealthDay, today: string, prevD
 export function fmtSleep(min: number): string {
   const h = Math.floor(min / 60);
   const m = min % 60;
-  return h ? (m ? `${h} ч ${m} мин` : `${h} ч`) : `${m} мин`;
+  return h ? (m ? t('{h} ч {m} мин', { h, m }) : t('{h} ч', { h })) : t('{n} мин', { n: m });
 }

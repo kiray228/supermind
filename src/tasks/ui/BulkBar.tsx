@@ -8,6 +8,7 @@ import { allTags, useTasks } from '../store';
 import { bulkComplete, bulkTag, bulkTrash, bulkUpdate, endSelect, selectAll, useBulk } from '../bulk';
 import { DatePicker } from './DatePicker';
 import { Popover } from './Popover';
+import { t } from '../../i18n/index';
 
 type Pop = 'date' | 'list' | 'prio' | 'tag' | null;
 
@@ -39,7 +40,7 @@ export function BulkBar({ visible }: { visible: string[] }) {
   }, [pop, picking]);
 
   const n = ids.length;
-  const none = () => toast('Выберите задачи');
+  const none = () => toast(t('Выберите задачи'));
   /** выполнить действие и выйти из выбора */
   const run = (fn: () => number) => {
     setPop(null);
@@ -50,47 +51,47 @@ export function BulkBar({ visible }: { visible: string[] }) {
 
   const tags = data ? allTags(data) : [];
   const addTag = (raw: string) => {
-    const t = raw.trim().replace(/^#/, '').replace(/\s+/g, '-');
-    if (!t) return;
+    const tg = raw.trim().replace(/^#/, '').replace(/\s+/g, '-');
+    if (!tg) return;
     setTag('');
-    run(() => bulkTag(ids, t));
+    run(() => bulkTag(ids, tg));
   };
 
   return createPortal(
-    <div className="tk-bulk" role="toolbar" aria-label="Действия с выбранными задачами">
+    <div className="tk-bulk" role="toolbar" aria-label={t('Действия с выбранными задачами')}>
       <div className="tk-bulk-top">
-        <button className="icon-btn" onClick={endSelect} aria-label="Закончить выбор">
+        <button className="icon-btn" onClick={endSelect} aria-label={t('Закончить выбор')}>
           <X size={18} />
         </button>
-        <span className="tk-bulk-count">{n ? `Выбрано: ${n}` : 'Выберите задачи'}</span>
+        <span className="tk-bulk-count">{n ? t('Выбрано: {n}', { n }) : t('Выберите задачи')}</span>
         <button className="tk-bulk-all" onClick={() => selectAll(visible)} disabled={!visible.length}>
-          {allOn ? 'Снять выбор' : 'Выбрать все'}
+          {allOn ? t('Снять выбор') : t('Выбрать все')}
         </button>
       </div>
       <div className="tk-bulk-acts">
         <button onClick={() => run(() => bulkComplete(ids))}>
           <CheckCheck size={20} />
-          <span>Готово</span>
+          <span>{t('Готово')}</span>
         </button>
         <button ref={dateBtn} onClick={() => (n ? setPop('date') : none())}>
           <CalendarDays size={20} />
-          <span>Дата</span>
+          <span>{t('Дата')}</span>
         </button>
         <button ref={listBtn} onClick={() => (n ? setPop('list') : none())}>
           <Folder size={20} />
-          <span>Список</span>
+          <span>{t('Список')}</span>
         </button>
         <button ref={prioBtn} onClick={() => (n ? setPop('prio') : none())}>
           <Flag size={20} />
-          <span>Приоритет</span>
+          <span>{t('Приоритет')}</span>
         </button>
         <button ref={tagBtn} onClick={() => (n ? setPop('tag') : none())}>
           <Hash size={20} />
-          <span>Тег</span>
+          <span>{t('Тег')}</span>
         </button>
         <button className="danger" onClick={() => run(() => bulkTrash(ids))}>
           <Trash2 size={20} />
-          <span>Удалить</span>
+          <span>{t('Удалить')}</span>
         </button>
       </div>
 
@@ -98,17 +99,17 @@ export function BulkBar({ visible }: { visible: string[] }) {
         <Popover anchor={dateBtn} onClose={() => setPop(null)}>
           {(
             [
-              ['Сегодня', today],
-              ['Завтра', addDaysYmd(today, 1)],
-              ['Следующая неделя', nextMonday(today)],
+              [t('Сегодня'), today, t('Перенесено на сегодня')],
+              [t('Завтра'), addDaysYmd(today, 1), t('Перенесено на завтра')],
+              [t('Следующая неделя'), nextMonday(today), t('Перенесено на следующую неделю')],
             ] as const
-          ).map(([l, d]) => (
-            <button key={l} onClick={() => run(() => bulkUpdate(ids, { date: d }, `Перенесено на ${l.toLowerCase()}`))}>
+          ).map(([l, d, msg]) => (
+            <button key={l} onClick={() => run(() => bulkUpdate(ids, { date: d }, msg))}>
               <span className="tk-sp" /> {l}
             </button>
           ))}
-          <button onClick={() => run(() => bulkUpdate(ids, { date: undefined }, 'Без даты'))}>
-            <span className="tk-sp" /> Без даты
+          <button onClick={() => run(() => bulkUpdate(ids, { date: undefined }, t('Без даты')))}>
+            <span className="tk-sp" /> {t('Без даты')}
           </button>
           <div className="sep" />
           <button
@@ -117,17 +118,17 @@ export function BulkBar({ visible }: { visible: string[] }) {
               setPicking(true);
             }}
           >
-            <CalendarDays size={16} /> Выбрать дату…
+            <CalendarDays size={16} /> {t('Выбрать дату…')}
           </button>
         </Popover>
       )}
       {pop === 'list' && data && (
         <Popover anchor={listBtn} onClose={() => setPop(null)}>
-          <div className="td-pop-label">Переместить в список</div>
+          <div className="td-pop-label">{t('Переместить в список')}</div>
           {[...data.lists]
             .sort((a, b) => a.order - b.order)
             .map((l) => (
-              <button key={l.id} onClick={() => run(() => bulkUpdate(ids, { listId: l.id }, `В список «${l.name}»`))}>
+              <button key={l.id} onClick={() => run(() => bulkUpdate(ids, { listId: l.id }, t('В список «{name}»', { name: l.name })))}>
                 {l.emoji ? <span className="tk-emoji">{l.emoji}</span> : <i className="tk-dot" style={{ background: l.color }} />} {l.name}
               </button>
             ))}
@@ -136,8 +137,8 @@ export function BulkBar({ visible }: { visible: string[] }) {
       {pop === 'prio' && (
         <Popover anchor={prioBtn} onClose={() => setPop(null)}>
           {[1, 2, 3, 0].map((p) => (
-            <button key={p} onClick={() => run(() => bulkUpdate(ids, { priority: p as 0 | 1 | 2 | 3 }, p ? `Приоритет «${PRIORITY_META[p].label.toLowerCase()}»` : 'Без приоритета'))}>
-              <Flag size={16} style={{ color: PRIORITY_META[p]?.color ?? 'var(--text-3)' } as CSSProperties} /> {p ? PRIORITY_META[p].label : 'Без приоритета'}
+            <button key={p} onClick={() => run(() => bulkUpdate(ids, { priority: p as 0 | 1 | 2 | 3 }, p ? t('Приоритет «{name}»', { name: PRIORITY_META[p].label.toLowerCase() }) : t('Без приоритета')))}>
+              <Flag size={16} style={{ color: PRIORITY_META[p]?.color ?? 'var(--text-3)' } as CSSProperties} /> {p ? PRIORITY_META[p].label : t('Без приоритета')}
             </button>
           ))}
         </Popover>
@@ -151,8 +152,8 @@ export function BulkBar({ visible }: { visible: string[] }) {
               addTag(tag);
             }}
           >
-            <input className="input" autoFocus value={tag} onChange={(e) => setTag(e.target.value)} placeholder="Новый тег" aria-label="Тег" />
-            <button type="submit" className="icon-btn" aria-label="Добавить тег" disabled={!tag.trim()}>
+            <input className="input" autoFocus value={tag} onChange={(e) => setTag(e.target.value)} placeholder={t('Новый тег')} aria-label={t('Тег')} />
+            <button type="submit" className="icon-btn" aria-label={t('Добавить тег')} disabled={!tag.trim()}>
               <Check size={16} />
             </button>
           </form>
@@ -170,7 +171,7 @@ export function BulkBar({ visible }: { visible: string[] }) {
           onDone={(v) => {
             setPicking(false);
             if (!v.date) return;
-            run(() => bulkUpdate(ids, { date: v.date, time: v.time, duration: v.duration, reminders: v.reminders, repeat: v.repeat, alarm: v.alarm }, 'Новая дата'));
+            run(() => bulkUpdate(ids, { date: v.date, time: v.time, duration: v.duration, reminders: v.reminders, repeat: v.repeat, alarm: v.alarm }, t('Новая дата')));
           }}
         />
       )}

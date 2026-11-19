@@ -5,6 +5,7 @@
  * Если фраза непонятна (confident = false) — можно уточнить у ИИ на сервере.
  */
 import { addDaysYmd, toYmd } from '../utils/mapTasks';
+import { t } from '../i18n/index';
 import { parseTask } from '../tasks/parse';
 import type { Priority, RepeatRule } from '../tasks/model';
 
@@ -455,7 +456,15 @@ function parseTaskCmd(raw: string, now: Date): { action: VoiceAction; explicit: 
 
 // ---------- Вопросы ----------
 
-const MONTH_NAMES = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'];
+/** Подписи периода для ответа (в функциях ниже `t` — это текст фразы) */
+const PERIOD = {
+  yesterday: () => t('вчера'),
+  today: () => t('сегодня'),
+  lastWeek: () => t('за прошлую неделю'),
+  thisWeek: () => t('за эту неделю'),
+  year: (year: number) => t('за {year} год', { year }),
+  month: (m: number) => t('за {month}', { month: [t('январь'), t('февраль'), t('март'), t('апрель'), t('май'), t('июнь'), t('июль'), t('август'), t('сентябрь'), t('октябрь'), t('ноябрь'), t('декабрь')][m] }),
+};
 const ymdOf = (d: Date) => toYmd(d);
 
 /** Период из фразы: «сегодня», «вчера», «за неделю», «в прошлом месяце», «за год»; по умолчанию — этот месяц */
@@ -463,20 +472,20 @@ function periodOf(t: string, now: Date): { from: string; to: string; period: str
   const today = toYmd(now);
   if (/вчера/i.test(t)) {
     const y = addDaysYmd(today, -1);
-    return { from: y, to: y, period: 'вчера' };
+    return { from: y, to: y, period: PERIOD.yesterday() };
   }
-  if (/сегодня|за\s+день/i.test(t)) return { from: today, to: today, period: 'сегодня' };
+  if (/сегодня|за\s+день/i.test(t)) return { from: today, to: today, period: PERIOD.today() };
   if (/недел/i.test(t)) {
     const past = /прошл/i.test(t);
     const wd = (now.getDay() + 6) % 7;
     const mon = addDaysYmd(today, -wd - (past ? 7 : 0));
-    return { from: mon, to: past ? addDaysYmd(mon, 6) : today, period: past ? 'за прошлую неделю' : 'за эту неделю' };
+    return { from: mon, to: past ? addDaysYmd(mon, 6) : today, period: past ? PERIOD.lastWeek() : PERIOD.thisWeek() };
   }
-  if (/(?:за|в)\s+(?:этом\s+)?год/i.test(t)) return { from: `${now.getFullYear()}-01-01`, to: today, period: `за ${now.getFullYear()} год` };
+  if (/(?:за|в)\s+(?:этом\s+)?год/i.test(t)) return { from: `${now.getFullYear()}-01-01`, to: today, period: PERIOD.year(now.getFullYear()) };
   const past = /прошл/i.test(t);
   const m = new Date(now.getFullYear(), now.getMonth() - (past ? 1 : 0), 1);
   const end = new Date(m.getFullYear(), m.getMonth() + 1, 0);
-  return { from: ymdOf(m), to: past ? ymdOf(end) : today, period: `за ${MONTH_NAMES[m.getMonth()]}` };
+  return { from: ymdOf(m), to: past ? ymdOf(end) : today, period: PERIOD.month(m.getMonth()) };
 }
 
 function parseAsk(raw: string, ctx: VoiceCtx, now: Date): VoiceAction | null {

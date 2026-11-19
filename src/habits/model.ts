@@ -16,16 +16,17 @@
  */
 import type { Habit, HabitFreq, HabitPart, HabitPause, PlannerData, PlannerDay } from '../types';
 import { addDaysYmd, fromYmd, toYmd } from '../utils/mapTasks';
+import { isEn, LOCALE, t, tn } from '../i18n/index';
 
 type Days = PlannerData['days'];
 
 // ---------- Справочники ----------
 
 export const PARTS: { id: HabitPart; label: string; icon: string }[] = [
-  { id: 'morning', label: 'Утро', icon: '🌅' },
-  { id: 'day', label: 'День', icon: '☀️' },
-  { id: 'evening', label: 'Вечер', icon: '🌙' },
-  { id: 'any', label: 'Любое время', icon: '🕐' },
+  { id: 'morning', label: t('Утро'), icon: '🌅' },
+  { id: 'day', label: t('День'), icon: '☀️' },
+  { id: 'evening', label: t('Вечер'), icon: '🌙' },
+  { id: 'any', label: t('Любое время'), icon: '🕐' },
 ];
 
 export const HABIT_COLORS = ['#22c55e', '#14b8a6', '#3b82f6', '#6366f1', '#a855f7', '#ec4899', '#ef4444', '#f97316', '#f59e0b', '#64748b'];
@@ -37,7 +38,7 @@ export const HABIT_EMOJIS = [
 
 /** Пн..Вс → номер дня недели JS (0 — воскресенье) */
 export const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
-export const WD_SHORT_BY_DAY = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+export const WD_SHORT_BY_DAY = [t('Вс'), t('Пн'), t('Вт'), t('Ср'), t('Чт'), t('Пт'), t('Сб')];
 
 // ---------- Поля привычки ----------
 
@@ -115,40 +116,36 @@ export function reminderTimesOf(h: Habit): string[] {
   return one ? [one] : [];
 }
 
+/** Форма слова для числа (с переводом, если в словаре есть «одна|две|пять») */
 export function plural(n: number, forms: [string, string, string]): string {
-  const a = Math.abs(n) % 100;
-  const b = a % 10;
-  if (a > 10 && a < 20) return forms[2];
-  if (b === 1) return forms[0];
-  if (b >= 2 && b <= 4) return forms[1];
-  return forms[2];
+  return tn(n, forms[0], forms[1], forms[2]);
 }
 
 export function freqLabel(h: Habit): string {
   const f = freqOf(h);
   if (f === 'every') {
     const n = everyDaysOf(h);
-    return n === 2 ? 'Через день' : `Раз в ${n} ${plural(n, ['день', 'дня', 'дней'])}`;
+    return n === 2 ? t('Через день') : t('Раз в {n} {unit}', { n, unit: tn(n, 'день', 'дня', 'дней') });
   }
   if (f === 'weekly') {
     const n = perWeekOf(h);
-    return `${n} ${plural(n, ['раз', 'раза', 'раз'])} в неделю`;
+    return t('{n} {times} в неделю', { n, times: tn(n, 'раз', 'раза', 'раз') });
   }
   if (f === 'weekdays') {
     const ds = [...new Set(h.days)].sort((a, b) => WEEK_ORDER.indexOf(a) - WEEK_ORDER.indexOf(b));
-    if (ds.length === 7) return 'Каждый день';
-    if (ds.length === 5 && ds.every((d) => d >= 1 && d <= 5)) return 'По будням';
-    if (ds.length === 2 && ds.includes(0) && ds.includes(6)) return 'По выходным';
+    if (ds.length === 7) return t('Каждый день');
+    if (ds.length === 5 && ds.every((d) => d >= 1 && d <= 5)) return t('По будням');
+    if (ds.length === 2 && ds.includes(0) && ds.includes(6)) return t('По выходным');
     return ds.map((d) => WD_SHORT_BY_DAY[d]).join(', ');
   }
-  return 'Каждый день';
+  return t('Каждый день');
 }
 
 export function durationLabel(min: number): string {
-  if (min < 60) return `${min} мин`;
+  if (min < 60) return t('{n} мин', { n: min });
   const h = Math.floor(min / 60);
   const m = min % 60;
-  return m ? `${h} ч ${m} мин` : `${h} ч`;
+  return m ? t('{h} ч {m} мин', { h, m }) : t('{h} ч', { h });
 }
 
 /** «07:00–07:15», «07:00» или '' */
@@ -313,10 +310,11 @@ export function pauseUntilLabel(h: Habit, ymd: string): string | null {
   const end = pauseEnd(h, ymd);
   if (!end) return null;
   const back = addDaysYmd(end, 1);
-  if (back === addDaysYmd(ymd, 1)) return 'до завтра';
+  if (back === addDaysYmd(ymd, 1)) return t('до завтра');
   const d = fromYmd(back);
-  const y = d.getFullYear() !== fromYmd(ymd).getFullYear() ? ` ${d.getFullYear()}` : '';
-  return `до ${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}${y}`;
+  const other = d.getFullYear() !== fromYmd(ymd).getFullYear();
+  if (isEn) return t('до {date}', { date: d.toLocaleDateString(LOCALE, { month: 'short', day: 'numeric', ...(other ? { year: 'numeric' } : {}) }) });
+  return t('до {date}', { date: `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}${other ? ` ${d.getFullYear()}` : ''}` });
 }
 
 // ---------- Расписание ----------
@@ -419,7 +417,7 @@ export interface Streak {
 }
 
 export const streakText = (s: Streak) =>
-  s.unit === 'week' ? `${s.n} ${plural(s.n, ['неделя', 'недели', 'недель'])}` : `${s.n} ${plural(s.n, ['день', 'дня', 'дней'])}`;
+  s.unit === 'week' ? `${s.n} ${tn(s.n, 'неделя', 'недели', 'недель')}` : `${s.n} ${tn(s.n, 'день', 'дня', 'дней')}`;
 
 /**
  * Текущая серия на дату `ymd`.
@@ -584,7 +582,7 @@ export function heatmap(days: Days, h: Habit, today: string, weeks = 12): HeatCe
 
 /** Нормализовать привычку перед сохранением: лишние поля прочь, отметка времени изменения */
 export function cleanHabit(h: Habit): Habit {
-  const out: Habit = { ...h, name: h.name.trim() || 'Привычка', updatedAt: Date.now() };
+  const out: Habit = { ...h, name: h.name.trim() || t('Привычка'), updatedAt: Date.now() };
   const f = freqOf(out);
   if (f === 'daily') {
     delete out.freq;

@@ -1,6 +1,7 @@
 /** Проговорить ответ вслух: Android — системный синтез речи (плагин), браузер и iPhone — speechSynthesis */
 import { isNative } from '../platform';
 import { shareLocal } from '../store/sharedPrefs';
+import { isEn, LOCALE } from '../i18n/index';
 
 const KEY = 'sm-voice-speak';
 
@@ -21,13 +22,12 @@ export function setSpeakEnabled(on: boolean) {
   void shareLocal(KEY);
 }
 
-/** «12 500 ₸» → «12 500 тенге»: так синтезатор читает правильно */
+/** «12 500 ₸» → «12 500 тенге»: так синтезатор читает правильно (по-английски $ и € он читает сам) */
 const forSpeech = (s: string) =>
-  s
-    .replace(/₸/g, ' тенге')
-    .replace(/₽/g, ' рублей')
-    .replace(/\$/g, ' долларов')
-    .replace(/€/g, ' евро')
+  (isEn
+    ? s.replace(/₸/g, ' tenge').replace(/₽/g, ' rubles')
+    : s.replace(/₸/g, ' тенге').replace(/₽/g, ' рублей').replace(/\$/g, ' долларов').replace(/€/g, ' евро')
+  )
     .replace(/[«»"]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
@@ -39,7 +39,7 @@ export async function speak(text: string): Promise<void> {
     try {
       const { TextToSpeech } = await import('@capacitor-community/text-to-speech');
       await TextToSpeech.stop().catch(() => {});
-      await TextToSpeech.speak({ text: t, lang: 'ru-RU', rate: 1.0 });
+      await TextToSpeech.speak({ text: t, lang: LOCALE, rate: 1.0 });
     } catch {
       /* нет голосового движка — ответ всё равно виден на экране */
     }
@@ -49,9 +49,10 @@ export async function speak(text: string): Promise<void> {
   if (!synth) return;
   synth.cancel();
   const u = new SpeechSynthesisUtterance(t);
-  u.lang = 'ru-RU';
-  const ru = synth.getVoices().find((v) => v.lang?.toLowerCase().startsWith('ru'));
-  if (ru) u.voice = ru;
+  // голос — на языке интерфейса (ответы на нём же)
+  u.lang = LOCALE;
+  const voice = synth.getVoices().find((v) => v.lang?.toLowerCase().startsWith(LOCALE.slice(0, 2)));
+  if (voice) u.voice = voice;
   synth.speak(u);
 }
 
