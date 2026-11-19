@@ -5,6 +5,7 @@ import { AREA_COLORS, sortedAreas, type GoalsData, type LifeArea } from '../mode
 import { addArea, deleteArea, moveArea, updateArea } from '../store';
 import { Sheet } from './parts';
 import { AddInput, InlineText } from './Stages';
+import { LOCALE, t } from '../../i18n/index';
 
 /** Сферы жизни: переименование, значок, цвет, порядок, удаление */
 export function AreasModal({ data, onClose }: { data: GoalsData; onClose: () => void }) {
@@ -13,13 +14,13 @@ export function AreasModal({ data, onClose }: { data: GoalsData; onClose: () => 
 
   const remove = async (a: LifeArea) => {
     const n = data.goals.filter((g) => g.areaId === a.id).length;
-    const msg = n ? `Цели этой сферы (${n}) останутся без сферы.` : 'Оценки в истории колеса сохранятся.';
-    if (await confirmDialog(`Удалить сферу «${a.name}»?`, msg, { okText: 'Удалить', danger: true })) deleteArea(a.id);
+    const msg = n ? t('Цели этой сферы ({n}) останутся без сферы.', { n }) : t('Оценки в истории колеса сохранятся.');
+    if (await confirmDialog(t('Удалить сферу «{name}»?', { name: a.name }), msg, { okText: t('Удалить'), danger: true })) deleteArea(a.id);
   };
 
   return (
-    <Sheet onClose={onClose} title="Сферы жизни" className="gl-areas">
-      <div className="small muted">Сферы помогают видеть баланс: к каждой можно привязать цели и оценивать её в колесе баланса.</div>
+    <Sheet onClose={onClose} title={t('Сферы жизни')} className="gl-areas">
+      <div className="small muted">{t('Сферы помогают видеть баланс: к каждой можно привязать цели и оценивать её в колесе баланса.')}</div>
       <div className="gl-areas-list">
         {areas.map((a, i) => (
           <div key={a.id} className="gl-area-row">
@@ -27,22 +28,22 @@ export function AreasModal({ data, onClose }: { data: GoalsData; onClose: () => 
               <input
                 className="gl-area-emoji"
                 value={a.emoji}
-                aria-label="Значок"
+                aria-label={t('Значок')}
                 onChange={(e) => {
-                  const parts = [...new Intl.Segmenter('ru', { granularity: 'grapheme' }).segment(e.target.value.trim())];
+                  const parts = [...new Intl.Segmenter(LOCALE, { granularity: 'grapheme' }).segment(e.target.value.trim())];
                   const last = parts.length ? parts[parts.length - 1].segment : '';
                   if (last) updateArea(a.id, { emoji: last });
                 }}
               />
               <InlineText className="grow gl-area-name" value={a.name} onCommit={(t) => updateArea(a.id, { name: t })} />
-              <button className="gl-color-btn" style={{ background: a.color }} onClick={() => setColorFor(colorFor === a.id ? null : a.id)} aria-label="Цвет" />
-              <button className="icon-btn gl-mini-btn" disabled={i === 0} onClick={() => moveArea(a.id, -1)} aria-label="Выше">
+              <button className="gl-color-btn" style={{ background: a.color }} onClick={() => setColorFor(colorFor === a.id ? null : a.id)} aria-label={t('Цвет')} />
+              <button className="icon-btn gl-mini-btn" disabled={i === 0} onClick={() => moveArea(a.id, -1)} aria-label={t('Выше')}>
                 <ArrowUp size={15} />
               </button>
-              <button className="icon-btn gl-mini-btn" disabled={i === areas.length - 1} onClick={() => moveArea(a.id, 1)} aria-label="Ниже">
+              <button className="icon-btn gl-mini-btn" disabled={i === areas.length - 1} onClick={() => moveArea(a.id, 1)} aria-label={t('Ниже')}>
                 <ArrowDown size={15} />
               </button>
-              <button className="icon-btn gl-mini-btn gl-danger" onClick={() => void remove(a)} aria-label="Удалить сферу">
+              <button className="icon-btn gl-mini-btn gl-danger" onClick={() => void remove(a)} aria-label={t('Удалить сферу')}>
                 <Trash size={15} />
               </button>
             </div>
@@ -65,10 +66,10 @@ export function AreasModal({ data, onClose }: { data: GoalsData; onClose: () => 
           </div>
         ))}
       </div>
-      <AddInput placeholder="Новая сфера" onAdd={(t) => addArea(t)} />
+      <AddInput placeholder={t('Новая сфера')} onAdd={(t) => addArea(t)} />
       <div className="modal-actions">
         <button className="btn btn-primary" onClick={onClose}>
-          Готово
+          {t('Готово')}
         </button>
       </div>
     </Sheet>

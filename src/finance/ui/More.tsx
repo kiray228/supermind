@@ -15,12 +15,13 @@ import { SubscriptionsSection } from './Recurring';
 import { ImportCsvSheet } from './ImportCsv';
 import { AmountInput, CurrencySelect } from './common';
 import { setFinTab, useFinUi } from './state';
+import { isEn, LOCALE, t, tn } from '../../i18n/index';
 
 const SECTIONS: Record<string, string> = {
-  accounts: 'Счета',
-  categories: 'Категории',
-  subs: 'Подписки и регулярные платежи',
-  settings: 'Валюты и курсы',
+  accounts: t('Счета'),
+  categories: t('Категории'),
+  subs: t('Подписки и регулярные платежи'),
+  settings: t('Валюты и курсы'),
 };
 
 export function More({ data }: { data: FinanceData }) {
@@ -41,7 +42,7 @@ export function More({ data }: { data: FinanceData }) {
     return (
       <div className="fn-stack">
         <div className="row fn-sub-head">
-          <button className="icon-btn" onClick={() => open('')} aria-label="Назад">
+          <button className="icon-btn" onClick={() => open('')} aria-label={t('Назад')}>
             <CaretLeft weight="bold" />
           </button>
           <h2 className="grow ellipsis">{SECTIONS[section]}</h2>
@@ -59,29 +60,34 @@ export function More({ data }: { data: FinanceData }) {
   const openDebts = data.debts.filter((d) => !d.closed).length;
 
   const exportAll = () => {
-    if (!data.transactions.length) return toast('Операций пока нет');
-    void downloadText(exportCsv(data), `Финансы ${todayYmd()}.csv`, 'text/csv').catch(() => toast('Не удалось сохранить файл'));
+    if (!data.transactions.length) return toast(t('Операций пока нет'));
+    void downloadText(exportCsv(data), t('Финансы {date}.csv', { date: todayYmd() }), 'text/csv').catch(() => toast(t('Не удалось сохранить файл')));
   };
 
   return (
     <div className="fn-stack">
       <div className="ls-group">
-        <MenuRow icon={Wallet} tone="teal" title="Счета" sub={`${data.accounts.filter((a) => !a.archived).length} активных`} onClick={() => open('accounts')} />
-        <MenuRow icon={Tag} tone="orange" title="Категории" sub={`${data.categories.length} категорий`} onClick={() => open('categories')} />
-        <MenuRow icon={Repeat} tone="indigo" title="Подписки и регулярные платежи" sub={activeSubs ? `${activeSubs} активных` : 'Netflix, аренда, кредит…'} onClick={() => open('subs')} />
+        <MenuRow icon={Wallet} tone="teal" title={t('Счета')} sub={t('{n} активных', { n: data.accounts.filter((a) => !a.archived).length })} onClick={() => open('accounts')} />
+        <MenuRow icon={Tag} tone="orange" title={t('Категории')} sub={`${data.categories.length} ${tn(data.categories.length, 'категория', 'категории', 'категорий')}`} onClick={() => open('categories')} />
+        <MenuRow icon={Repeat} tone="indigo" title={t('Подписки и регулярные платежи')} sub={activeSubs ? t('{n} активных', { n: activeSubs }) : t('Netflix, аренда, кредит…')} onClick={() => open('subs')} />
         <MenuRow
           icon={HandCoins} tone="green"
-          title="Долги"
-          sub={openDebts ? `${openDebts} открытых` + (Object.keys(dt.owe).length ? ' · я должен ' + Object.entries(dt.owe).map(([c, v]) => fmtMoney(v, c, { compact: true })).join(', ') : '') : '«Я должен» и «Мне должны»'}
+          title={t('Долги')}
+          sub={
+            openDebts
+              ? t('{n} открытых', { n: openDebts }) +
+                (Object.keys(dt.owe).length ? t(' · я должен {list}', { list: Object.entries(dt.owe).map(([c, v]) => fmtMoney(v, c, { compact: true })).join(', ') }) : '')
+              : t('«Я должен» и «Мне должны»')
+          }
           onClick={() => setFinTab('debts')}
         />
       </div>
       <div className="ls-group">
-        <MenuRow icon={FileArrowUp} tone="blue" title="Импорт из CSV" sub="Выписка из банка" onClick={() => setImporting(true)} />
-        <MenuRow icon={DownloadSimple} tone="cyan" title="Экспорт в CSV" sub="Все операции — для Excel и Google Таблиц" onClick={exportAll} />
-        <MenuRow icon={SlidersHorizontal} tone="gray" title="Валюты и курсы" sub={`Основная: ${data.prefs.mainCurrency}`} onClick={() => open('settings')} />
+        <MenuRow icon={FileArrowUp} tone="blue" title={t('Импорт из CSV')} sub={t('Выписка из банка')} onClick={() => setImporting(true)} />
+        <MenuRow icon={DownloadSimple} tone="cyan" title={t('Экспорт в CSV')} sub={t('Все операции — для Excel и Google Таблиц')} onClick={exportAll} />
+        <MenuRow icon={SlidersHorizontal} tone="gray" title={t('Валюты и курсы')} sub={t('Основная: {cur}', { cur: data.prefs.mainCurrency })} onClick={() => open('settings')} />
       </div>
-      <p className="tiny faint fn-pad">Данные финансов хранятся на устройстве и синхронизируются с вашим аккаунтом SuperMind, если он подключён.</p>
+      <p className="tiny faint fn-pad">{t('Данные финансов хранятся на устройстве и синхронизируются с вашим аккаунтом SuperMind, если он подключён.')}</p>
       {importing && <ImportCsvSheet data={data} onClose={() => setImporting(false)} />}
     </div>
   );
@@ -101,7 +107,7 @@ function SettingsSection({ data }: { data: FinanceData }) {
     setBusy(true);
     const ok = await refreshRates(true);
     setBusy(false);
-    toast(ok ? 'Курсы обновлены' : navigator.onLine === false ? 'Нет интернета — остались прежние курсы' : 'Не удалось получить курсы');
+    toast(ok ? t('Курсы обновлены') : navigator.onLine === false ? t('Нет интернета — остались прежние курсы') : t('Не удалось получить курсы'));
   };
   const setAuto = (v: boolean) => {
     setFinancePrefs({ autoRates: v });
@@ -124,40 +130,41 @@ function SettingsSection({ data }: { data: FinanceData }) {
   return (
     <div className="fn-stack">
       <div className="card fn-panel">
-        <label className="label fn-m0">Основная валюта</label>
+        <label className="label fn-m0">{t('Основная валюта')}</label>
         <CurrencySelect value={main} onChange={changeMain} />
-        <p className="tiny faint fn-m0">В ней считаются бюджеты, аналитика и общий итог. Валюта каждого счёта задаётся в его настройках.</p>
+        <p className="tiny faint fn-m0">{t('В ней считаются бюджеты, аналитика и общий итог. Валюта каждого счёта задаётся в его настройках.')}</p>
       </div>
       <ListSection
         footer={
           auto ? (
             <>
-              Раз в день, когда открываете финансы. {data.prefs.ratesAt ? `Обновлено ${ratesTime(data.prefs.ratesAt)}. ` : ''}
-              Источник —{' '}
+              {t('Раз в день, когда открываете финансы.')} {data.prefs.ratesAt ? t('Обновлено {time}.', { time: ratesTime(data.prefs.ratesAt) }) + ' ' : ''}
+              {t('Источник —')}{' '}
               <a href={RATES_SOURCE} target="_blank" rel="noreferrer">
                 ExchangeRate-API
               </a>
               .
             </>
           ) : (
-            'Курсы вводятся вручную ниже.'
+            t('Курсы вводятся вручную ниже.')
           )
         }
       >
-        <SwitchRow title="Курсы автоматически" subtitle="Из интернета, по курсу на сегодня" checked={auto} onChange={setAuto} />
-        {auto && <ListRow title={busy ? 'Обновляю…' : 'Обновить сейчас'} tone="accent" onClick={() => void update()} disabled={busy} />}
+        <SwitchRow title={t('Курсы автоматически')} subtitle={t('Из интернета, по курсу на сегодня')} checked={auto} onChange={setAuto} />
+        {auto && <ListRow title={busy ? t('Обновляю…') : t('Обновить сейчас')} tone="accent" onClick={() => void update()} disabled={busy} />}
       </ListSection>
       <div className="card fn-panel">
-        <h3 className="fn-h3">Курсы валют</h3>
+        <h3 className="fn-h3">{t('Курсы валют')}</h3>
         <p className="tiny faint fn-m0">
-          {auto ? `Сколько стоит 1 единица валюты в ${curSymbol(main)}.` : `Укажите вручную, сколько стоит 1 единица валюты в ${curSymbol(main)}.`} Без курса суммы в другой валюте в итоги не пересчитываются.
+          {auto ? t('Сколько стоит 1 единица валюты в {cur}.', { cur: curSymbol(main) }) : t('Укажите вручную, сколько стоит 1 единица валюты в {cur}.', { cur: curSymbol(main) })}{' '}
+          {t('Без курса суммы в другой валюте в итоги не пересчитываются.')}
         </p>
-        {used.length === 0 && <p className="small muted fn-m0">Все счета в основной валюте — курсы не нужны.</p>}
+        {used.length === 0 && <p className="small muted fn-m0">{t('Все счета в основной валюте — курсы не нужны.')}</p>}
         {used.map((c) =>
           auto ? (
             <div key={c + main} className="row fn-rate">
               <span className="fn-rate-label">1 {curSymbol(c)} =</span>
-              <span className="fn-rate-auto">{data.prefs.rates[c] ? String(data.prefs.rates[c]).replace('.', ',') : '—'}</span>
+              <span className="fn-rate-auto">{data.prefs.rates[c] ? (isEn ? String(data.prefs.rates[c]) : String(data.prefs.rates[c]).replace('.', ',')) : '—'}</span>
               <span className="fn-rate-label">{curSymbol(main)}</span>
             </div>
           ) : (
@@ -172,30 +179,30 @@ function SettingsSection({ data }: { data: FinanceData }) {
 /** «сегодня в 12:25», «вчера в 09:10», «12.10 в 09:10» */
 function ratesTime(at: number): string {
   const d = new Date(at);
-  const hm = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  const hm = d.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
   const day = new Date(d).setHours(0, 0, 0, 0);
   const today = new Date().setHours(0, 0, 0, 0);
-  if (day === today) return `сегодня в ${hm}`;
-  if (today - day === 86400000) return `вчера в ${hm}`;
-  return `${d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })} в ${hm}`;
+  if (day === today) return t('сегодня в {time}', { time: hm });
+  if (today - day === 86400000) return t('вчера в {time}', { time: hm });
+  return t('{date} в {time}', { date: d.toLocaleDateString(LOCALE, { day: '2-digit', month: '2-digit' }), time: hm });
 }
 
 function RateRow({ code, main, value }: { code: string; main: string; value?: number }) {
-  const [v, setV] = useState(value ? String(value).replace('.', ',') : '');
+  const [v, setV] = useState(value ? (isEn ? String(value) : String(value).replace('.', ',')) : '');
   const commit = () => {
     const n = v.trim() ? parseMoneyInput(v) : 0;
-    if (v.trim() && !(n > 0)) return toast('Проверьте курс');
+    if (v.trim() && !(n > 0)) return toast(t('Проверьте курс'));
     if ((n || undefined) === value) return;
     const rates = { ...(useFinance.getState().data?.prefs.rates ?? {}) };
     if (n > 0) rates[code] = n;
     else delete rates[code];
     setFinancePrefs({ rates });
-    toast(n > 0 ? `Курс ${code} сохранён` : `Курс ${code} удалён`);
+    toast(n > 0 ? t('Курс {code} сохранён', { code }) : t('Курс {code} удалён', { code }));
   };
   return (
     <div className="row fn-rate">
       <span className="fn-rate-label">1 {curSymbol(code)} =</span>
-      <AmountInput value={v} onChange={setV} onEnter={commit} onBlur={commit} placeholder="курс" />
+      <AmountInput value={v} onChange={setV} onEnter={commit} onBlur={commit} placeholder={t('курс')} />
       <span className="fn-rate-label">{curSymbol(main)}</span>
     </div>
   );

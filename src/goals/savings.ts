@@ -6,6 +6,7 @@
 import { addDaysYmd, todayYmd } from '../utils/mapTasks';
 import { balances, dateLong, daysBetweenYmd, fmtMoney, fmtNum, r2, toMain, type Account, type FinanceData, type FinancePrefs } from '../finance/model';
 import type { Goal, GoalSavings } from './model';
+import { t } from '../i18n/index';
 
 // ---------- Источник данных финансов ----------
 
@@ -104,12 +105,12 @@ export function savingsLine(s: SavingsInfo): string {
 
 /** Строка для карточки цели и ассистента */
 export function savingsNext(g: Pick<Goal, 'savings'>): string | null {
-  if (!g.savings) return 'Выберите счёт-копилку';
+  if (!g.savings) return t('Выберите счёт-копилку');
   const s = savingsInfo(g);
   if (s.loading) return null;
-  if (s.missing) return 'Счёт-копилка удалён';
-  if (s.reached) return `Копилка собрана: ${fmtMoney(s.saved, s.currency)} 🎉`;
-  return `${savingsLine(s)} · осталось ${fmtMoney(s.left, s.currency)}`;
+  if (s.missing) return t('Счёт-копилка удалён');
+  if (s.reached) return t('Копилка собрана: {amount} 🎉', { amount: fmtMoney(s.saved, s.currency) });
+  return t('{line} · осталось {amount}', { line: savingsLine(s), amount: fmtMoney(s.left, s.currency) });
 }
 
 // ---------- Темп и подсказки ----------
@@ -155,9 +156,9 @@ export interface SavingsHint {
  */
 export function savingsHint(s: Pick<SavingsInfo, 'left' | 'reached' | 'saved' | 'currency' | 'amount'>, deadline: string | undefined, pace30: number, today = todayYmd()): SavingsHint {
   const m = (x: number) => fmtMoney(niceUp(x), s.currency);
-  if (s.amount <= 0) return { kind: 'none', text: 'Укажите, сколько нужно накопить' };
-  if (s.reached) return { kind: 'done', text: 'Копилка собрана! 🎉', sub: `Накоплено ${fmtMoney(s.saved, s.currency)} — цель достигнута` };
-  const paceText = pace30 > 0 ? `За последние 30 дней: +${fmtMoney(pace30, s.currency)}` : pace30 < 0 ? `За последние 30 дней: −${fmtMoney(-pace30, s.currency)}` : '';
+  if (s.amount <= 0) return { kind: 'none', text: t('Укажите, сколько нужно накопить') };
+  if (s.reached) return { kind: 'done', text: t('Копилка собрана! 🎉'), sub: t('Накоплено {amount} — цель достигнута', { amount: fmtMoney(s.saved, s.currency) }) };
+  const paceText = pace30 > 0 ? t('За последние 30 дней: {amount}', { amount: '+' + fmtMoney(pace30, s.currency) }) : pace30 < 0 ? t('За последние 30 дней: {amount}', { amount: '−' + fmtMoney(-pace30, s.currency) }) : '';
   if (deadline && deadline >= today) {
     const days = daysBetweenYmd(today, deadline) + 1;
     const perMonth = s.left / (days / DAYS_IN_MONTH);
@@ -165,26 +166,26 @@ export function savingsHint(s: Pick<SavingsInfo, 'left' | 'reached' | 'saved' | 
     // до срока меньше месяца — считаем по неделям, меньше недели — по дням
     const suggest = days >= 31 ? perMonth : days >= 7 ? perWeek : s.left / days;
     let text: string;
-    if (days >= 31) text = `Чтобы успеть к ${dateLong(deadline)}, откладывайте ≈ ${m(perMonth)} в месяц (≈ ${m(perWeek)} в неделю)`;
-    else if (days >= 7) text = `Чтобы успеть к ${dateLong(deadline)}, откладывайте ≈ ${m(perWeek)} в неделю`;
-    else text = `Чтобы успеть к ${dateLong(deadline)}, откладывайте ≈ ${m(suggest)} в день`;
-    const sub = pace30 > 0 ? (pace30 >= perMonth * 0.98 ? `${paceText} — в таком темпе успеваете ✓` : `${paceText} — нужно чуть быстрее`) : paceText || undefined;
+    if (days >= 31) text = t('Чтобы успеть к {date}, откладывайте ≈ {month} в месяц (≈ {week} в неделю)', { date: dateLong(deadline), month: m(perMonth), week: m(perWeek) });
+    else if (days >= 7) text = t('Чтобы успеть к {date}, откладывайте ≈ {amount} в неделю', { date: dateLong(deadline), amount: m(perWeek) });
+    else text = t('Чтобы успеть к {date}, откладывайте ≈ {amount} в день', { date: dateLong(deadline), amount: m(suggest) });
+    const sub = pace30 > 0 ? (pace30 >= perMonth * 0.98 ? t('{pace} — в таком темпе успеваете ✓', { pace: paceText }) : t('{pace} — нужно чуть быстрее', { pace: paceText })) : paceText || undefined;
     return { kind: 'plan', text, sub, suggest: Math.min(niceUp(suggest), s.left) };
   }
   const forecast = pace30 > 0 ? Math.ceil((s.left / pace30) * 30) : 0;
-  const when = forecast > 3650 ? 'больше чем через 10 лет' : `к ${dateLong(addDaysYmd(today, forecast))}`;
+  const when = forecast > 3650 ? t('больше чем через 10 лет') : t('к {date}', { date: dateLong(addDaysYmd(today, forecast)) });
   if (deadline) {
     return {
       kind: 'late',
-      text: `Срок прошёл — осталось накопить ${fmtMoney(s.left, s.currency)}`,
-      sub: pace30 > 0 ? `При текущем темпе — ${when}` : 'Перенесите срок или пополните копилку',
+      text: t('Срок прошёл — осталось накопить {amount}', { amount: fmtMoney(s.left, s.currency) }),
+      sub: pace30 > 0 ? t('При текущем темпе — {when}', { when }) : t('Перенесите срок или пополните копилку'),
     };
   }
-  if (pace30 > 0) return { kind: 'pace', text: `При текущем темпе (последние 30 дней) — ${when}`, sub: paceText };
+  if (pace30 > 0) return { kind: 'pace', text: t('При текущем темпе (последние 30 дней) — {when}', { when }), sub: paceText };
   return {
     kind: 'idle',
-    text: pace30 < 0 ? 'За 30 дней из копилки больше сняли, чем отложили' : 'За последние 30 дней копилка не пополнялась',
-    sub: 'Задайте срок — подскажем, сколько откладывать',
+    text: pace30 < 0 ? t('За 30 дней из копилки больше сняли, чем отложили') : t('За последние 30 дней копилка не пополнялась'),
+    sub: t('Задайте срок — подскажем, сколько откладывать'),
   };
 }
 
@@ -216,7 +217,7 @@ export interface SavingsDraft {
   countExisting: boolean;
 }
 
-export const defaultSavingsName = (title: string) => (title.trim() ? `Копилка: ${title.trim()}`.slice(0, 40) : 'Копилка');
+export const defaultSavingsName = (title: string) => (title.trim() ? t('Копилка: {title}', { title: title.trim() }).slice(0, 40) : t('Копилка'));
 
 /**
  * Какой остаток счёта не засчитывать в прогресс.

@@ -14,6 +14,7 @@ import { curSymbol, dateLong, dateShort, debtLeft, debtPaid, debtTotals, fmtMone
 import { addDebtPayment, addTransaction, deleteDebt, deleteTransaction, financeData, removeDebtPayment, saveDebt } from '../store';
 import { AmountInput, CurrencySelect, CurTotals, Sheet, useToday } from './common';
 import { closeDebt, openDebt, useFinUi } from './state';
+import { LOCALE, t } from '../../i18n/index';
 
 type Kind = Debt['kind'];
 
@@ -44,16 +45,16 @@ const hasTotals = (t: Record<string, number>) => Object.values(t).some((v) => v 
 
 /** Итоги «Мне должны · Я должен» — для обзора и вкладки */
 export function DebtSummary({ data, onClick }: { data: FinanceData; onClick?: () => void }) {
-  const t = debtTotals(data);
+  const tot = debtTotals(data);
   const body = (
     <>
       <span className="fn-dsum-col">
-        <span className="fn-dsum-label">Мне должны</span>
-        {hasTotals(t.lent) ? <CurTotals totals={t.lent} className="fn-dsum-val fn-pos" /> : <span className="fn-dsum-val fn-dsum-zero">0</span>}
+        <span className="fn-dsum-label">{t('Мне должны')}</span>
+        {hasTotals(tot.lent) ? <CurTotals totals={tot.lent} className="fn-dsum-val fn-pos" /> : <span className="fn-dsum-val fn-dsum-zero">0</span>}
       </span>
       <span className="fn-dsum-col">
-        <span className="fn-dsum-label">Я должен</span>
-        {hasTotals(t.owe) ? <CurTotals totals={t.owe} className="fn-dsum-val fn-neg" /> : <span className="fn-dsum-val fn-dsum-zero">0</span>}
+        <span className="fn-dsum-label">{t('Я должен')}</span>
+        {hasTotals(tot.owe) ? <CurTotals totals={tot.owe} className="fn-dsum-val fn-neg" /> : <span className="fn-dsum-val fn-dsum-zero">0</span>}
       </span>
     </>
   );
@@ -77,20 +78,20 @@ export function DebtsTab({ data }: { data: FinanceData }) {
   const lent = open.filter((d) => d.kind === 'lent').sort(sortOpen);
   const owe = open.filter((d) => d.kind === 'owe').sort(sortOpen);
   const closed = data.debts.filter((d) => d.closed).sort((a, b) => b.updatedAt - a.updatedAt);
-  const t = debtTotals(data);
+  const tot = debtTotals(data);
 
   if (!data.debts.length)
     return (
       <div className="empty fn-debt-empty">
         <IconTile icon={HandCoins} tone="teal" size="lg" />
-        <div className="bold">Долги</div>
-        <div>Запишите, кто должен вам и кому должны вы, — с суммой, сроком и напоминанием.</div>
+        <div className="bold">{t('Долги')}</div>
+        <div>{t('Запишите, кто должен вам и кому должны вы, — с суммой, сроком и напоминанием.')}</div>
         <div className="row fn-debt-empty-actions">
           <button className="btn btn-tinted" onClick={() => openDebt({ kind: 'lent' })}>
-            <Plus size={16} weight="bold" /> Мне должны
+            <Plus size={16} weight="bold" /> {t('Мне должны')}
           </button>
           <button className="btn btn-tinted" onClick={() => openDebt({ kind: 'owe' })}>
-            <Plus size={16} weight="bold" /> Я должен
+            <Plus size={16} weight="bold" /> {t('Я должен')}
           </button>
         </div>
       </div>
@@ -98,13 +99,13 @@ export function DebtsTab({ data }: { data: FinanceData }) {
 
   return (
     <div className="fn-stack fn-debts">
-      <DebtGroup title="Мне должны" kind="lent" list={lent} totals={t.lent} />
-      <DebtGroup title="Я должен" kind="owe" list={owe} totals={t.owe} />
+      <DebtGroup title={t('Мне должны')} kind="lent" list={lent} totals={tot.lent} />
+      <DebtGroup title={t('Я должен')} kind="owe" list={owe} totals={tot.owe} />
       {closed.length > 0 && (
         <section className="fn-dgroup">
           <button className="fn-dgroup-head fn-dgroup-toggle" onClick={() => setShowClosed(!showClosed)}>
-            <h3 className="grow">Погашенные</h3>
-            <span className="fn-dgroup-total muted">{showClosed ? 'Скрыть' : `Показать (${closed.length})`}</span>
+            <h3 className="grow">{t('Погашенные')}</h3>
+            <span className="fn-dgroup-total muted">{showClosed ? t('Скрыть') : t('Показать ({n})', { n: closed.length })}</span>
           </button>
           {showClosed && (
             <div className="fn-dlist">
@@ -132,7 +133,7 @@ function DebtGroup({ title, kind, list, totals }: { title: string; kind: Kind; l
         ))}
         <button className="fn-dadd" onClick={() => openDebt({ kind })}>
           <Plus size={18} weight="bold" />
-          {kind === 'lent' ? 'Кто-то должен мне' : 'Я должен кому-то'}
+          {kind === 'lent' ? t('Кто-то должен мне') : t('Я должен кому-то')}
         </button>
       </div>
     </section>
@@ -145,8 +146,8 @@ function DebtRow({ d }: { d: Debt }) {
   const paid = debtPaid(d);
   const overdue = !d.closed && !!d.dueDate && d.dueDate < today;
   const sub: string[] = [];
-  if (d.closed) sub.push('погашен');
-  else if (d.dueDate) sub.push(overdue ? `просрочено · до ${dateShort(d.dueDate)}` : d.dueDate === today ? 'вернуть сегодня' : `до ${dateShort(d.dueDate)}`);
+  if (d.closed) sub.push(t('погашен'));
+  else if (d.dueDate) sub.push(overdue ? t('просрочено · до {date}', { date: dateShort(d.dueDate) }) : d.dueDate === today ? t('вернуть сегодня') : t('до {date}', { date: dateShort(d.dueDate) }));
   if (d.note) sub.push(d.note);
   return (
     <button className={'fn-drow' + (d.closed ? ' is-closed' : '')} onClick={() => openDebt({ id: d.id })}>
@@ -157,7 +158,7 @@ function DebtRow({ d }: { d: Debt }) {
       </span>
       <span className="fn-drow-amt">
         <span className={'fn-money ' + (d.closed ? '' : d.kind === 'lent' ? 'fn-pos' : 'fn-neg')}>{fmtMoney(d.closed ? d.amount : left, d.currency)}</span>
-        {!d.closed && paid > 0 && <span className="fn-drow-of">из {fmtMoney(d.amount, d.currency, { compact: true })}</span>}
+        {!d.closed && paid > 0 && <span className="fn-drow-of">{t('из {amount}', { amount: fmtMoney(d.amount, d.currency, { compact: true }) })}</span>}
       </span>
     </button>
   );
@@ -182,13 +183,13 @@ function DebtEditSheet({ data, debt, kind: kind0 }: { data: FinanceData; debt?: 
   const [dueDate, setDueDate] = useState(debt?.dueDate ?? '');
   const [note, setNote] = useState(debt?.note ?? '');
   const [remind, setRemind] = useState(debt?.remind ?? true);
-  const people = useMemo(() => [...new Set(data.debts.map((d) => d.person))].sort((a, b) => a.localeCompare(b, 'ru')), [data.debts]);
+  const people = useMemo(() => [...new Set(data.debts.map((d) => d.person))].sort((a, b) => a.localeCompare(b, LOCALE)), [data.debts]);
   const close = () => (debt ? openDebt({ id: debt.id }) : closeDebt());
 
   const save = () => {
     const v = parseMoneyInput(amount);
-    if (!person.trim()) return toast(kind === 'owe' ? 'Кому вы должны? Укажите имя' : 'Кто вам должен? Укажите имя');
-    if (!(v > 0)) return toast('Введите сумму');
+    if (!person.trim()) return toast(kind === 'owe' ? t('Кому вы должны? Укажите имя') : t('Кто вам должен? Укажите имя'));
+    if (!(v > 0)) return toast(t('Введите сумму'));
     const paid = debt ? debtPaid(debt) : 0;
     const id = debt?.id ?? uid();
     saveDebt({
@@ -208,39 +209,39 @@ function DebtEditSheet({ data, debt, kind: kind0 }: { data: FinanceData; debt?: 
     if (debt) openDebt({ id });
     else {
       closeDebt();
-      toast(kind === 'owe' ? `Записано: вы должны ${person.trim()}` : `Записано: ${person.trim()} должен вам`);
+      toast(kind === 'owe' ? t('Записано: вы должны {name}', { name: person.trim() }) : t('Записано: {name} должен вам', { name: person.trim() }));
     }
   };
 
   return (
     <Sheet
-      title={debt ? 'Изменить долг' : 'Новый долг'}
+      title={debt ? t('Изменить долг') : t('Новый долг')}
       onClose={close}
       className="fn-debt-sheet"
       actions={
         <>
           <button className="btn" onClick={close}>
-            Отмена
+            {t('Отмена')}
           </button>
           <button className="btn btn-primary" onClick={save}>
-            {debt ? 'Сохранить' : 'Добавить'}
+            {debt ? t('Сохранить') : t('Добавить')}
           </button>
         </>
       }
     >
       <div className="segmented fn-seg-wide fn-debt-seg">
         <button className={kind === 'lent' ? 'active' : ''} onClick={() => setKind('lent')}>
-          Мне должны
+          {t('Мне должны')}
         </button>
         <button className={kind === 'owe' ? 'active' : ''} onClick={() => setKind('owe')}>
-          Я должен
+          {t('Я должен')}
         </button>
       </div>
 
       <div className="ls-group fn-form">
         <label className="ls-field">
-          <span className="fn-form-label">{kind === 'owe' ? 'Кому' : 'Кто'}</span>
-          <input className="ls-input fn-form-person" value={person} onChange={(e) => setPerson(e.target.value)} placeholder="Имя" autoFocus={!debt} list="fn-debt-people" enterKeyHint="next" />
+          <span className="fn-form-label">{kind === 'owe' ? t('Кому') : t('Кто')}</span>
+          <input className="ls-input fn-form-person" value={person} onChange={(e) => setPerson(e.target.value)} placeholder={t('Имя')} autoFocus={!debt} list="fn-debt-people" enterKeyHint="next" />
           <datalist id="fn-debt-people">
             {people.map((p) => (
               <option key={p} value={p} />
@@ -248,7 +249,7 @@ function DebtEditSheet({ data, debt, kind: kind0 }: { data: FinanceData; debt?: 
           </datalist>
         </label>
         <label className="ls-field">
-          <span className="fn-form-label">Сумма</span>
+          <span className="fn-form-label">{t('Сумма')}</span>
           <AmountInput className="ls-input fn-form-amount" value={amount} onChange={setAmount} onEnter={save} />
           <span className="fn-form-cur">
             {curSymbol(currency)}
@@ -259,23 +260,23 @@ function DebtEditSheet({ data, debt, kind: kind0 }: { data: FinanceData; debt?: 
 
       <div className="ls-group fn-form">
         <label className="ls-field">
-          <span className="fn-form-label">Вернуть до</span>
+          <span className="fn-form-label">{t('Вернуть до')}</span>
           <input type="date" className={'ls-input fn-form-date' + (dueDate ? '' : ' is-empty')} value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
           {dueDate && (
-            <button type="button" className="icon-btn fn-form-clear" onClick={() => setDueDate('')} aria-label="Без срока">
+            <button type="button" className="icon-btn fn-form-clear" onClick={() => setDueDate('')} aria-label={t('Без срока')}>
               <X size={14} weight="bold" />
             </button>
           )}
         </label>
-        {dueDate && <SwitchRow title="Напомнить" subtitle="В 9:00 в этот день" checked={remind} onChange={setRemind} />}
+        {dueDate && <SwitchRow title={t('Напомнить')} subtitle={t('В 9:00 в этот день')} checked={remind} onChange={setRemind} />}
         {debt && (
           <label className="ls-field">
-            <span className="fn-form-label">Дата долга</span>
+            <span className="fn-form-label">{t('Дата долга')}</span>
             <input type="date" className="ls-input fn-form-date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} />
           </label>
         )}
         <label className="ls-field">
-          <input className="ls-input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Заметка — за что, где" />
+          <input className="ls-input" value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('Заметка — за что, где')} />
         </label>
       </div>
     </Sheet>
@@ -296,17 +297,17 @@ function DebtCard({ data, debt }: { data: FinanceData; debt: Debt }) {
   /** Операция на счёт: вернули мне — доход, вернул я — расход */
   const record = (v: number) => {
     if (!accId) return null;
-    return addTransaction({ type: lent ? 'income' : 'expense', amount: v, accountId: accId, date: todayYmd(), note: `Долг: ${debt.person}` }, { silent: true });
+    return addTransaction({ type: lent ? 'income' : 'expense', amount: v, accountId: accId, date: todayYmd(), note: t('Долг: {name}', { name: debt.person }) }, { silent: true });
   };
 
   const payPart = () => {
     const v = parseMoneyInput(pay ?? '');
-    if (!(v > 0)) return toast('Введите сумму');
+    if (!(v > 0)) return toast(t('Введите сумму'));
     const amt = Math.min(v, left || v);
     addDebtPayment(debt.id, amt);
     record(amt);
     setPay(null);
-    toast(amt >= left - 0.005 ? 'Долг погашен полностью' : `Возврат ${fmtMoney(amt, debt.currency)} записан`);
+    toast(amt >= left - 0.005 ? t('Долг погашен полностью') : t('Возврат {amount} записан', { amount: fmtMoney(amt, debt.currency) }));
   };
 
   const payAll = () => {
@@ -315,8 +316,8 @@ function DebtCard({ data, debt }: { data: FinanceData; debt: Debt }) {
     addDebtPayment(debt.id, left);
     const tx = record(left);
     closeDebt();
-    toast('Долг погашен', {
-      label: 'Отменить',
+    toast(t('Долг погашен'), {
+      label: t('Отменить'),
       run: () => {
         const y = financeData()?.debts.find((d) => d.id === debt.id);
         if (y) saveDebt({ ...y, payments: y.payments.filter((q) => before.has(q.id)), closed: false });
@@ -328,11 +329,11 @@ function DebtCard({ data, debt }: { data: FinanceData; debt: Debt }) {
   const reopen = () => saveDebt({ ...debt, closed: false });
 
   const remove = async () => {
-    if (!(await confirmDialog(`Удалить долг «${debt.person}»?`, 'Возвраты по нему тоже удалятся. Операции на счетах останутся.', { okText: 'Удалить', danger: true }))) return;
+    if (!(await confirmDialog(t('Удалить долг «{name}»?', { name: debt.person }), t('Возвраты по нему тоже удалятся. Операции на счетах останутся.'), { okText: t('Удалить'), danger: true }))) return;
     const copy: Debt = structuredClone(debt);
     deleteDebt(debt.id);
     closeDebt();
-    toast('Долг удалён', { label: 'Отменить', run: () => saveDebt(copy) });
+    toast(t('Долг удалён'), { label: t('Отменить'), run: () => saveDebt(copy) });
   };
 
   return (
@@ -340,10 +341,10 @@ function DebtCard({ data, debt }: { data: FinanceData; debt: Debt }) {
       <div className="fn-dcard-hero">
         <Avatar name={debt.person} size={64} />
         <div className="fn-dcard-name">{debt.person}</div>
-        <div className="fn-dcard-kind">{lent ? 'должен вам' : 'вы должны'}</div>
+        <div className="fn-dcard-kind">{lent ? t('должен вам') : t('вы должны')}</div>
         <div className={'fn-dcard-amt ' + (debt.closed ? '' : lent ? 'fn-pos' : 'fn-neg')}>{fmtMoney(debt.closed ? debt.amount : left, debt.currency)}</div>
         {debt.closed ? (
-          <div className="fn-dcard-meta">Погашен полностью</div>
+          <div className="fn-dcard-meta">{t('Погашен полностью')}</div>
         ) : (
           <>
             {paid > 0 && (
@@ -352,15 +353,14 @@ function DebtCard({ data, debt }: { data: FinanceData; debt: Debt }) {
                   <span style={{ width: `${pct}%` }} />
                 </span>
                 <span className="fn-dcard-meta">
-                  Вернули {fmtMoney(paid, debt.currency)} из {fmtMoney(debt.amount, debt.currency)}
+                  {t('Вернули {paid} из {amount}', { paid: fmtMoney(paid, debt.currency), amount: fmtMoney(debt.amount, debt.currency) })}
                 </span>
               </div>
             )}
             {debt.dueDate && (
               <div className={'fn-dcard-meta' + (overdue ? ' fn-neg' : '')}>
-                {overdue ? 'Срок прошёл — ' : 'Вернуть до '}
-                {dateLong(debt.dueDate)}
-                {debt.remind ? ' · напомню в 9:00' : ''}
+                {overdue ? t('Срок прошёл — {date}', { date: dateLong(debt.dueDate) }) : t('Вернуть до {date}', { date: dateLong(debt.dueDate) })}
+                {debt.remind ? t(' · напомню в 9:00') : ''}
               </div>
             )}
           </>
@@ -371,18 +371,18 @@ function DebtCard({ data, debt }: { data: FinanceData; debt: Debt }) {
       {!debt.closed && pay !== null && (
         <div className="ls-group fn-form fn-pay-form">
           <label className="ls-field">
-            <span className="fn-form-label">Вернули</span>
-            <AmountInput className="ls-input fn-form-amount" value={pay} onChange={setPay} onEnter={payPart} autoFocus placeholder={fmtMoney(left, debt.currency).replace(/[^\d\s,]/g, '').trim()} />
+            <span className="fn-form-label">{t('Вернули')}</span>
+            <AmountInput className="ls-input fn-form-amount" value={pay} onChange={setPay} onEnter={payPart} autoFocus placeholder={fmtMoney(left, debt.currency).replace(/[^\d\s,.]/g, '').trim()} />
             <span className="fn-form-cur">{curSymbol(debt.currency)}</span>
           </label>
           {accounts.length > 0 && (
             <label className="ls-row ls-select-row fn-acc-pick">
               <span className="ls-body">
-                <span className="ls-title">Записать на счёт</span>
+                <span className="ls-title">{t('Записать на счёт')}</span>
               </span>
-              <span className="ls-value">{accounts.find((a) => a.id === accId)?.name ?? 'Не записывать'}</span>
+              <span className="ls-value">{accounts.find((a) => a.id === accId)?.name ?? t('Не записывать')}</span>
               <select className="ls-select" value={accId} onChange={(e) => setAccId(e.target.value)}>
-                <option value="">Не записывать</option>
+                <option value="">{t('Не записывать')}</option>
                 {accounts.map((a) => (
                   <option key={a.id} value={a.id}>
                     {a.emoji} {a.name}
@@ -393,10 +393,10 @@ function DebtCard({ data, debt }: { data: FinanceData; debt: Debt }) {
           )}
           <div className="fn-pay-form-actions">
             <button className="btn" onClick={() => setPay(null)}>
-              Отмена
+              {t('Отмена')}
             </button>
             <button className="btn btn-primary" onClick={payPart}>
-              Записать возврат
+              {t('Записать возврат')}
             </button>
           </div>
         </div>
@@ -408,25 +408,25 @@ function DebtCard({ data, debt }: { data: FinanceData; debt: Debt }) {
             <span className="fn-dact-ic">
               <ArrowCounterClockwise size={22} weight="bold" />
             </span>
-            Вернули часть
+            {t('Вернули часть')}
           </button>
           <button className="fn-dact" onClick={payAll}>
             <span className="fn-dact-ic is-ok">
               <CheckCircle size={24} weight="fill" />
             </span>
-            Погашен
+            {t('Погашен')}
           </button>
           <button className="fn-dact" onClick={() => openDebt({ id: debt.id, edit: true })}>
             <span className="fn-dact-ic">
               <PencilSimple size={22} weight="bold" />
             </span>
-            Изменить
+            {t('Изменить')}
           </button>
         </div>
       )}
 
       {debt.payments.length > 0 && (
-        <ListSection header="Возвраты">
+        <ListSection header={t('Возвраты')}>
           {[...debt.payments]
             .sort((a, b) => b.date.localeCompare(a.date))
             .map((p) => (
@@ -435,7 +435,7 @@ function DebtCard({ data, debt }: { data: FinanceData; debt: Debt }) {
                 title={fmtMoney(p.amount, debt.currency)}
                 value={dateLong(p.date)}
                 trailing={
-                  <button className="icon-btn fn-icon-sm" onClick={() => removeDebtPayment(debt.id, p.id)} aria-label="Удалить возврат">
+                  <button className="icon-btn fn-icon-sm" onClick={() => removeDebtPayment(debt.id, p.id)} aria-label={t('Удалить возврат')}>
                     <Trash size={17} />
                   </button>
                 }
@@ -445,11 +445,11 @@ function DebtCard({ data, debt }: { data: FinanceData; debt: Debt }) {
       )}
 
       <ListSection>
-        {debt.closed && <ListRow title="Открыть долг снова" tone="accent" onClick={reopen} />}
-        {debt.closed && <ListRow title="Изменить" tone="accent" onClick={() => openDebt({ id: debt.id, edit: true })} />}
-        <ListRow title="Удалить долг" tone="danger" onClick={() => void remove()} />
+        {debt.closed && <ListRow title={t('Открыть долг снова')} tone="accent" onClick={reopen} />}
+        {debt.closed && <ListRow title={t('Изменить')} tone="accent" onClick={() => openDebt({ id: debt.id, edit: true })} />}
+        <ListRow title={t('Удалить долг')} tone="danger" onClick={() => void remove()} />
       </ListSection>
-      <p className="fn-dcard-foot">Записан {dateLong(debt.date)}</p>
+      <p className="fn-dcard-foot">{t('Записан {date}', { date: dateLong(debt.date) })}</p>
     </Sheet>
   );
 }

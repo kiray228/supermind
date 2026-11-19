@@ -21,6 +21,7 @@ import {
 import type { Goal, GoalSavings } from '../model';
 import { depositToSavings, setGoalStatus } from '../store';
 import { Sheet } from './parts';
+import { t } from '../../i18n/index';
 
 // ================= Карточка цели: блок копилки =================
 
@@ -41,19 +42,19 @@ export function SavingsBlock({ goal, onEdit }: { goal: Goal; onEdit: () => void 
       .slice(0, 5);
   }, [fin, goal.savings?.accountId]);
 
-  if (s.loading) return <div className="small muted">Загрузка финансов…</div>;
+  if (s.loading) return <div className="small muted">{t('Загрузка финансов…')}</div>;
   if (s.missing)
     return (
       <div className="gl-sv-missing">
         <Warning size={18} />
         <div className="grow">
-          <b>{goal.savings ? 'Счёт удалён' : 'Счёт не выбран'}</b>
+          <b>{goal.savings ? t('Счёт удалён') : t('Счёт не выбран')}</b>
           <div className="tiny muted">
-            {goal.savings ? `Накопить нужно ${fmtMoney(s.amount, s.currency)} — выберите другой счёт-копилку` : 'Выберите счёт, на котором копятся деньги'}
+            {goal.savings ? t('Накопить нужно {amount} — выберите другой счёт-копилку', { amount: fmtMoney(s.amount, s.currency) }) : t('Выберите счёт, на котором копятся деньги')}
           </div>
         </div>
         <button className="btn btn-sm" onClick={onEdit}>
-          Выбрать
+          {t('Выбрать')}
         </button>
       </div>
     );
@@ -67,32 +68,32 @@ export function SavingsBlock({ goal, onEdit }: { goal: Goal; onEdit: () => void 
         <span className="muted"> / {fmtMoney(s.amount, s.currency)}</span>
       </div>
       <div className="tiny faint gl-sv-acc">
-        {acc.emoji} {acc.name} · на счёте {fmtMoney(s.balance, s.currency)}
-        {base > 0 ? ` (${fmtMoney(base, s.currency)} лежали до цели и не считаются)` : ''}
-        {acc.archived ? ' · счёт в архиве' : ''}
+        {acc.emoji} {acc.name} · {t('на счёте {amount}', { amount: fmtMoney(s.balance, s.currency) })}
+        {base > 0 ? ' ' + t('({amount} лежали до цели и не считаются)', { amount: fmtMoney(base, s.currency) }) : ''}
+        {acc.archived ? t(' · счёт в архиве') : ''}
       </div>
       <SavingsHintBox hint={hint} />
       <div className="gl-sv-actions">
         {goal.status === 'active' && s.reached ? (
           <button className="btn btn-primary" onClick={() => setGoalStatus(goal.id, 'done')}>
-            <CheckCircle size={17} /> Завершить цель
+            <CheckCircle size={17} /> {t('Завершить цель')}
           </button>
         ) : (
           <button className="btn btn-primary" onClick={() => setDeposit(true)} disabled={goal.status !== 'active'}>
-            <Plus size={16} weight="bold" /> Пополнить
+            <Plus size={16} weight="bold" /> {t('Пополнить')}
           </button>
         )}
-        {!s.reached && <span className="tiny faint">Осталось {fmtMoney(s.left, s.currency)}</span>}
+        {!s.reached && <span className="tiny faint">{t('Осталось {amount}', { amount: fmtMoney(s.left, s.currency) })}</span>}
       </div>
       {recent.length > 0 && (
         <div className="gl-sv-ops">
-          {recent.map((t) => {
-            const into = t.toAccountId === acc.id || (t.type === 'income' && t.accountId === acc.id);
-            const v = t.toAccountId === acc.id ? (t.toAmount ?? t.amount) : t.amount;
+          {recent.map((x) => {
+            const into = x.toAccountId === acc.id || (x.type === 'income' && x.accountId === acc.id);
+            const v = x.toAccountId === acc.id ? (x.toAmount ?? x.amount) : x.amount;
             return (
-              <div key={t.id} className="gl-sv-op">
-                <span className="grow ellipsis small">{t.note || (t.type === 'transfer' ? 'Перевод' : t.type === 'income' ? 'Доход' : 'Расход')}</span>
-                <span className="tiny faint">{dateShort(t.date)}</span>
+              <div key={x.id} className="gl-sv-op">
+                <span className="grow ellipsis small">{x.note || (x.type === 'transfer' ? t('Перевод') : x.type === 'income' ? t('Доход') : t('Расход'))}</span>
+                <span className="tiny faint">{dateShort(x.date)}</span>
                 <span className={'gl-sv-op-v ' + (into ? 'is-up' : 'is-down')}>{(into ? '+' : '−') + fmtMoney(v, acc.currency)}</span>
               </div>
             );
@@ -135,7 +136,7 @@ export function SavingsCardRow({ goal }: { goal: Goal }) {
   const [deposit, setDeposit] = useState(false);
   const s = savingsInfo(goal, fin);
   if (s.loading) return null;
-  const text = s.missing ? (goal.savings ? 'Счёт-копилка удалён' : 'Выберите счёт-копилку') : s.reached ? `Собрано ${fmtMoney(s.saved, s.currency)} 🎉` : savingsLine(s);
+  const text = s.missing ? (goal.savings ? t('Счёт-копилка удалён') : t('Выберите счёт-копилку')) : s.reached ? t('Собрано {amount} 🎉', { amount: fmtMoney(s.saved, s.currency) }) : savingsLine(s);
   const canAdd = !s.missing && !s.reached && goal.status === 'active';
   return (
     <span className={'gl-card-next gl-card-sv' + (s.missing ? ' is-missing' : '')}>
@@ -150,7 +151,7 @@ export function SavingsCardRow({ goal }: { goal: Goal }) {
           }}
           onKeyDown={(e) => e.stopPropagation()}
         >
-          <Plus size={13} weight="bold" /> Пополнить
+          <Plus size={13} weight="bold" /> {t('Пополнить')}
         </button>
       )}
       {deposit && (
@@ -195,18 +196,18 @@ function DepositSheet({ goal, onClose }: { goal: Goal; onClose: () => void }) {
   const quick = [...new Set([hint.suggest ?? 0, s.left].filter((x) => x > 0))];
 
   const save = () => {
-    if (!(v > 0)) return toast('Введите сумму');
-    if (!from) return toast('Выберите, откуда перевести');
+    if (!(v > 0)) return toast(t('Введите сумму'));
+    if (!from) return toast(t('Выберите, откуда перевести'));
     let tv: number | undefined;
     if (cross) {
       tv = toAmount.trim() ? parseMoneyInput(toAmount) : est;
-      if (!(tv && tv > 0)) return toast(`Сколько зачислено в ${curSymbol(target.currency)}?`);
+      if (!(tv && tv > 0)) return toast(t('Сколько зачислено в {cur}?', { cur: curSymbol(target.currency) }));
     }
     if (depositToSavings(goal.id, from.id, v, tv)) onClose();
   };
 
   return (
-    <Sheet onClose={onClose} title="Пополнить копилку" className="gl-sv-sheet">
+    <Sheet onClose={onClose} title={t('Пополнить копилку')} className="gl-sv-sheet">
       <div className="gl-sv-to">
         <span className="gl-sv-to-emoji">{target.emoji}</span>
         <div className="grow">
@@ -219,19 +220,19 @@ function DepositSheet({ goal, onClose }: { goal: Goal; onClose: () => void }) {
         </div>
       </div>
 
-      <label className="label">Сумма, {curSymbol(from?.currency ?? target.currency)}</label>
+      <label className="label">{t('Сумма, {cur}', { cur: curSymbol(from?.currency ?? target.currency) })}</label>
       <div className="gl-sv-amount">
         <input
           className="input"
           inputMode="decimal"
           enterKeyHint="done"
-          placeholder="4 500 или 4,5к"
+          placeholder={t('4 500 или 4,5к')}
           value={amount}
           autoFocus
           onChange={(e) => setAmount(groupDigits(e.target.value))}
           onKeyDown={(e) => e.key === 'Enter' && save()}
         />
-        <button type="button" className="btn gl-sv-000" onClick={() => setAmount((a) => (a.trim() ? a.trim() + '000' : a))} aria-label="Добавить три нуля">
+        <button type="button" className="btn gl-sv-000" onClick={() => setAmount((a) => (a.trim() ? a.trim() + '000' : a))} aria-label={t('Добавить три нуля')}>
           000
         </button>
       </div>
@@ -240,15 +241,15 @@ function DepositSheet({ goal, onClose }: { goal: Goal; onClose: () => void }) {
           {quick.map((x) => (
             <button key={x} type="button" className="chip" onClick={() => setAmount(fmtNum(x))}>
               {fmtMoney(x, target.currency)}
-              {x === s.left ? ' · всё' : ' · по плану'}
+              {x === s.left ? t(' · всё') : t(' · по плану')}
             </button>
           ))}
         </div>
       )}
 
-      <label className="label">Откуда</label>
+      <label className="label">{t('Откуда')}</label>
       {sources.length === 0 ? (
-        <div className="small muted">Нет других счетов — добавьте счёт в разделе «Финансы».</div>
+        <div className="small muted">{t('Нет других счетов — добавьте счёт в разделе «Финансы».')}</div>
       ) : (
         <div className="gl-sv-list">
           {sources.map((a) => (
@@ -264,17 +265,17 @@ function DepositSheet({ goal, onClose }: { goal: Goal; onClose: () => void }) {
 
       {cross && (
         <>
-          <label className="label">Зачислено в копилку, {curSymbol(target.currency)}</label>
+          <label className="label">{t('Зачислено в копилку, {cur}', { cur: curSymbol(target.currency) })}</label>
           <input className="input" inputMode="decimal" placeholder={est ? fmtNum(est) : '0'} value={toAmount} onChange={(e) => setToAmount(groupDigits(e.target.value))} />
         </>
       )}
 
       <div className="modal-actions">
         <button className="btn btn-ghost" onClick={onClose}>
-          Отмена
+          {t('Отмена')}
         </button>
         <button className="btn btn-primary" onClick={save} disabled={!sources.length}>
-          <ArrowsLeftRight size={16} /> {v > 0 && from ? `Перевести ${fmtMoney(v, from.currency)}` : 'Пополнить'}
+          <ArrowsLeftRight size={16} /> {v > 0 && from ? t('Перевести {amount}', { amount: fmtMoney(v, from.currency) }) : t('Пополнить')}
         </button>
       </div>
     </Sheet>
@@ -287,7 +288,7 @@ function DepositSheet({ goal, onClose }: { goal: Goal; onClose: () => void }) {
 export function SavingsFields({ draft, onChange, prev, deadline, title }: { draft: SavingsDraft; onChange: (d: SavingsDraft) => void; prev?: GoalSavings; deadline: string; title: string }) {
   const fin = useFinance((s) => s.data);
   useEffect(() => void ensureFinance().catch(() => undefined), []);
-  if (!fin) return <div className="small muted">Загрузка финансов…</div>;
+  if (!fin) return <div className="small muted">{t('Загрузка финансов…')}</div>;
   const set = (p: Partial<SavingsDraft>) => onChange({ ...draft, ...p });
   const accounts = sortedAccounts(fin, true).filter((a) => !a.archived || a.id === prev?.accountId);
   const acc = fin.accounts.find((a) => a.id === draft.accountId);
@@ -307,7 +308,7 @@ export function SavingsFields({ draft, onChange, prev, deadline, title }: { draf
 
   return (
     <div className="gl-sv-fields">
-      <label className="label">Счёт-копилка</label>
+      <label className="label">{t('Счёт-копилка')}</label>
       <div className="gl-sv-list">
         {accounts.map((a) => (
           <button key={a.id} type="button" className={'gl-sv-row' + (a.id === draft.accountId ? ' active' : '')} onClick={() => set({ accountId: a.id })}>
@@ -319,18 +320,18 @@ export function SavingsFields({ draft, onChange, prev, deadline, title }: { draf
         ))}
         <button type="button" className={'gl-sv-row' + (isNew ? ' active' : '')} onClick={() => set({ accountId: NEW_SAVINGS_ACCOUNT })}>
           <span className="gl-sv-row-emoji">🐷</span>
-          <span className="grow ellipsis">Создать новый счёт-копилку</span>
+          <span className="grow ellipsis">{t('Создать новый счёт-копилку')}</span>
           {isNew && <Check size={16} weight="bold" className="gl-sv-check" />}
         </button>
       </div>
       {isNew && (
         <div className="gl-grid2">
           <div>
-            <label className="label">Название счёта</label>
+            <label className="label">{t('Название счёта')}</label>
             <input className="input" value={draft.newName} placeholder={defaultSavingsName(title)} maxLength={60} onChange={(e) => set({ newName: e.target.value })} />
           </div>
           <div>
-            <label className="label">Валюта</label>
+            <label className="label">{t('Валюта')}</label>
             <select className="select" value={draft.newCurrency || fin.prefs.mainCurrency} onChange={(e) => set({ newCurrency: e.target.value })}>
               {CURRENCIES.map((c) => (
                 <option key={c.code} value={c.code}>
@@ -341,19 +342,19 @@ export function SavingsFields({ draft, onChange, prev, deadline, title }: { draf
           </div>
         </div>
       )}
-      <label className="label">Сколько накопить, {curSymbol(cur)}</label>
-      <input className="input" inputMode="decimal" placeholder="Например, 200 000 или 200к" value={draft.amount} onChange={(e) => set({ amount: groupDigits(e.target.value) })} />
+      <label className="label">{t('Сколько накопить, {cur}', { cur: curSymbol(cur) })}</label>
+      <input className="input" inputMode="decimal" placeholder={t('Например, 200 000 или 200к')} value={draft.amount} onChange={(e) => set({ amount: groupDigits(e.target.value) })} />
       {acc && bal > 0 && (
         <label className="row gl-sv-check-row">
           <input type="checkbox" checked={draft.countExisting} onChange={(e) => set({ countExisting: e.target.checked })} />
           <span>
-            Засчитать то, что уже лежит на счёте ({fmtMoney(bal, acc.currency)})
-            {!draft.countExisting && <span className="tiny muted"> — прогресс начнётся с нуля, считаются только новые пополнения</span>}
+            {t('Засчитать то, что уже лежит на счёте ({amount})', { amount: fmtMoney(bal, acc.currency) })}
+            {!draft.countExisting && <span className="tiny muted">{t(' — прогресс начнётся с нуля, считаются только новые пополнения')}</span>}
           </span>
         </label>
       )}
       {hint && hint.kind !== 'idle' && <SavingsHintBox hint={hint} />}
-      <div className="tiny faint">Откладывайте переводом на этот счёт в «Финансах» или кнопкой «Пополнить» — прогресс посчитается сам.</div>
+      <div className="tiny faint">{t('Откладывайте переводом на этот счёт в «Финансах» или кнопкой «Пополнить» — прогресс посчитается сам.')}</div>
     </div>
   );
 }

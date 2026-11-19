@@ -2,6 +2,7 @@ import { AIError, streamText } from '../ai/claude';
 import { daysBetween } from '../tasks/model';
 import { addDaysYmd, todayYmd } from '../utils/mapTasks';
 import type { Goal, LifeArea } from './model';
+import { t } from '../i18n/index';
 
 export interface AiStage {
   title: string;
@@ -46,7 +47,7 @@ export async function aiBreakdown(goal: Goal, area: LifeArea | undefined, opts: 
     effort: 'low',
   });
   const stages = parseStages(text);
-  if (!stages.length) throw new AIError('Не удалось разобрать ответ ИИ. Попробуйте ещё раз.');
+  if (!stages.length) throw new AIError(t('Не удалось разобрать ответ ИИ. Попробуйте ещё раз.'));
   return toDrafts(goal, stages, today);
 }
 

@@ -27,9 +27,10 @@ import { SavingsBlock } from './Savings';
 import { useFinance } from '../../finance/store';
 import { RelatedNotes } from '../../notes/ui/RelatedNotes';
 import { itemId } from '../../notes/brainDocs';
+import { LOCALE, t } from '../../i18n/index';
 
 const dtFmt = (ms: number) =>
-  new Date(ms).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  new Date(ms).toLocaleString(LOCALE, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 export function GoalDetail({ data, goal, onClose, onEdit }: { data: GoalsData; goal: Goal; onClose: () => void; onEdit: () => void }) {
   const look = useTaskLookup();
@@ -80,7 +81,7 @@ export function GoalDetail({ data, goal, onClose, onEdit }: { data: GoalsData; g
           <div className="gl-why" style={{ '--c': color } as CSSProperties}>
             <Quotes size={16} />
             <div>
-              <div className="tiny faint">Зачем мне это</div>
+              <div className="tiny faint">{t('Зачем мне это')}</div>
               <div className="gl-why-text">{goal.why}</div>
             </div>
           </div>
@@ -94,8 +95,9 @@ export function GoalDetail({ data, goal, onClose, onEdit }: { data: GoalsData; g
           <ProgressBar pct={pct} color={color} />
           {elapsed !== null && (
             <div className="tiny faint gl-elapsed">
-              Прошло {elapsed}% срока{goal.deadline ? ` · до ${fullDate(goal.deadline)}` : ''}
-              {behindPace(goal, pct, today) ? ' — стоит ускориться' : ''}
+              {t('Прошло {pct}% срока', { pct: elapsed })}
+              {goal.deadline ? ' · ' + t('до {date}', { date: fullDate(goal.deadline) }) : ''}
+              {behindPace(goal, pct, today) ? t(' — стоит ускориться') : ''}
             </div>
           )}
           {goal.mode !== 'savings' && (
@@ -111,10 +113,10 @@ export function GoalDetail({ data, goal, onClose, onEdit }: { data: GoalsData; g
           {goal.mode === 'manual' && <ManualSlider goal={goal} />}
           {goal.mode === 'target' && <TargetBlock goal={goal} />}
           {goal.mode === 'stages' && (
-            <div className="small muted">{info.total ? `Выполнено ${info.done} из ${info.total} шагов` : 'Добавьте этапы и шаги ниже — прогресс посчитается сам'}</div>
+            <div className="small muted">{info.total ? t('Выполнено {done} из {total} шагов', { done: info.done, total: info.total }) : t('Добавьте этапы и шаги ниже — прогресс посчитается сам')}</div>
           )}
           {goal.mode === 'tasks' && (
-            <div className="small muted">{info.total ? `Выполнено ${info.done} из ${info.total} задач` : 'Создайте или привяжите задачи — прогресс посчитается по ним'}</div>
+            <div className="small muted">{info.total ? t('Выполнено {done} из {total} задач', { done: info.done, total: info.total }) : t('Создайте или привяжите задачи — прогресс посчитается по ним')}</div>
           )}
         </section>
 
@@ -122,24 +124,24 @@ export function GoalDetail({ data, goal, onClose, onEdit }: { data: GoalsData; g
 
         <section className="gl-sec">
           <div className="gl-sec-head">
-            <h3>Задачи</h3>
+            <h3>{t('Задачи')}</h3>
             <div className="grow" />
             <button className="btn btn-sm btn-ghost" onClick={() => setPicker(true)}>
-              <LinkSimple size={14} /> Привязать
+              <LinkSimple size={14} /> {t('Привязать')}
             </button>
           </div>
-          {goal.taskIds.length === 0 && <div className="small faint gl-sec-empty">Задачи появятся в разделе «Задачи» с тегом #цель.</div>}
+          {goal.taskIds.length === 0 && <div className="small faint gl-sec-empty">{t('Задачи появятся в разделе «Задачи» с тегом #цель.')}</div>}
           <div className="gl-steps">
             {goal.taskIds.map((id) => (
               <TaskMini key={id} goalId={goal.id} taskId={id} look={look} />
             ))}
-            <AddInput placeholder="Новая задача к цели" onAdd={(t) => void createGoalTask(goal.id, t)} />
+            <AddInput placeholder={t('Новая задача к цели')} onAdd={(t) => void createGoalTask(goal.id, t)} />
           </div>
         </section>
 
         <section className="gl-sec">
           <div className="gl-sec-head">
-            <h3>Заметки</h3>
+            <h3>{t('Заметки')}</h3>
           </div>
           <NotesField goal={goal} />
         </section>
@@ -155,33 +157,33 @@ export function GoalDetail({ data, goal, onClose, onEdit }: { data: GoalsData; g
           {goal.status === 'active' && (
             <>
               <button className="btn btn-primary gl-complete-btn" onClick={() => setGoalStatus(goal.id, 'done')}>
-                <CheckCircle size={17} /> Цель достигнута
+                <CheckCircle size={17} /> {t('Цель достигнута')}
               </button>
               <button className="btn" onClick={() => setGoalStatus(goal.id, 'paused')}>
-                <Pause size={16} /> Отложить
+                <Pause size={16} /> {t('Отложить')}
               </button>
             </>
           )}
           {goal.status === 'paused' && (
             <button className="btn btn-primary" onClick={() => setGoalStatus(goal.id, 'active')}>
-              <Play size={16} /> Возобновить
+              <Play size={16} /> {t('Возобновить')}
             </button>
           )}
           {(goal.status === 'done' || goal.status === 'archived') && (
             <button className="btn" onClick={() => setGoalStatus(goal.id, 'active')}>
-              <ArrowCounterClockwise size={16} /> Вернуть в работу
+              <ArrowCounterClockwise size={16} /> {t('Вернуть в работу')}
             </button>
           )}
           {goal.status !== 'archived' && (
             <button className="btn btn-ghost" onClick={() => setGoalStatus(goal.id, 'archived')}>
-              <Archive size={16} /> В архив
+              <Archive size={16} /> {t('В архив')}
             </button>
           )}
           <div className="grow" />
           <button className="btn btn-ghost" onClick={onEdit}>
-            <PencilSimple size={16} /> Изменить
+            <PencilSimple size={16} /> {t('Изменить')}
           </button>
-          <button className="btn btn-ghost btn-danger" onClick={remove} aria-label="Удалить цель">
+          <button className="btn btn-ghost btn-danger" onClick={remove} aria-label={t('Удалить цель')}>
             <Trash size={16} />
           </button>
         </div>
@@ -206,7 +208,7 @@ function ManualSlider({ goal }: { goal: Goal }) {
           setV(Number(e.target.value));
           setManualProgress(goal.id, Number(e.target.value));
         }}
-        aria-label="Процент выполнения"
+        aria-label={t('Процент выполнения')}
       />
       <span className="gl-manual-val">{v}%</span>
     </div>
@@ -215,9 +217,9 @@ function ManualSlider({ goal }: { goal: Goal }) {
 
 function TargetBlock({ goal }: { goal: Goal }) {
   const [amount, setAmount] = useState('');
-  const t = goal.target;
-  if (!t) return null;
-  const unit = t.unit ? ' ' + t.unit : '';
+  const tg = goal.target;
+  if (!tg) return null;
+  const unit = tg.unit ? ' ' + tg.unit : '';
   const add = (sign: 1 | -1) => {
     const n = Number(amount.replace(/\s/g, '').replace(',', '.'));
     if (!amount.trim() || !Number.isFinite(n) || n === 0) return;
@@ -228,24 +230,24 @@ function TargetBlock({ goal }: { goal: Goal }) {
   return (
     <div className="gl-target">
       <div className="gl-target-row">
-        <button className="gl-round-btn" onClick={() => bumpTarget(goal.id, -t.step)} aria-label={`Убавить ${fmtNum(t.step)}`}>
+        <button className="gl-round-btn" onClick={() => bumpTarget(goal.id, -tg.step)} aria-label={t('Убавить {n}', { n: fmtNum(tg.step) })}>
           <Minus size={20} />
         </button>
         <div className="gl-target-val">
-          <b>{fmtNum(t.current)}</b>
+          <b>{fmtNum(tg.current)}</b>
           <span className="muted">
             {' '}
-            / {fmtNum(t.target)}
+            / {fmtNum(tg.target)}
             {unit}
           </span>
-          {t.start !== 0 && <div className="tiny faint">начало: {fmtNum(t.start)}</div>}
+          {tg.start !== 0 && <div className="tiny faint">{t('начало: {n}', { n: fmtNum(tg.start) })}</div>}
         </div>
-        <button className="gl-round-btn is-plus" onClick={() => bumpTarget(goal.id, t.step)} aria-label={`Прибавить ${fmtNum(t.step)}`}>
+        <button className="gl-round-btn is-plus" onClick={() => bumpTarget(goal.id, tg.step)} aria-label={t('Прибавить {n}', { n: fmtNum(tg.step) })}>
           <Plus size={20} />
         </button>
       </div>
       <div className="gl-target-add">
-        <input className="input" inputMode="decimal" placeholder="Своё значение" value={amount} onChange={(e) => setAmount(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add(1)} />
+        <input className="input" inputMode="decimal" placeholder={t('Своё значение')} value={amount} onChange={(e) => setAmount(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add(1)} />
         <button className="btn" onClick={() => add(-1)} disabled={!amount.trim()}>
           −
         </button>
@@ -288,7 +290,7 @@ function NotesField({ goal }: { goal: Goal }) {
     },
     [],
   );
-  return <textarea className="textarea gl-notes" value={v} placeholder="Мысли, ресурсы, ссылки, выводы…" onChange={(e) => setV(e.target.value)} rows={3} />;
+  return <textarea className="textarea gl-notes" value={v} placeholder={t('Мысли, ресурсы, ссылки, выводы…')} onChange={(e) => setV(e.target.value)} rows={3} />;
 }
 
 function HistorySection({ goal }: { goal: Goal }) {
@@ -299,7 +301,7 @@ function HistorySection({ goal }: { goal: Goal }) {
   return (
     <section className="gl-sec">
       <div className="gl-sec-head">
-        <h3>История</h3>
+        <h3>{t('История')}</h3>
         <span className="tiny faint">{items.length}</span>
       </div>
       <div className="gl-history">
@@ -313,7 +315,7 @@ function HistorySection({ goal }: { goal: Goal }) {
       </div>
       {items.length > 6 && (
         <button className="btn btn-sm btn-ghost" onClick={() => setAll(!all)}>
-          {all ? 'Свернуть' : `Показать всё (${items.length})`}
+          {all ? t('Свернуть') : t('Показать всё ({n})', { n: items.length })}
         </button>
       )}
     </section>
@@ -332,13 +334,13 @@ function TaskPicker({ goal, onClose }: { goal: Goal; onClose: () => void }) {
       .slice(0, 80);
   }, [tasks, q, linked]);
   return (
-    <Sheet onClose={onClose} title="Привязать задачу" className="gl-picker">
+    <Sheet onClose={onClose} title={t('Привязать задачу')} className="gl-picker">
       <div className="gl-search">
         <MagnifyingGlass size={16} />
-        <input className="input" value={q} placeholder="Поиск задач" onChange={(e) => setQ(e.target.value)} autoFocus />
+        <input className="input" value={q} placeholder={t('Поиск задач')} onChange={(e) => setQ(e.target.value)} autoFocus />
       </div>
       <div className="gl-pick-list">
-        {list.length === 0 && <div className="empty small">Нет подходящих задач</div>}
+        {list.length === 0 && <div className="empty small">{t('Нет подходящих задач')}</div>}
         {list.map((t) => (
           <button
             key={t.id}

@@ -8,6 +8,7 @@ import type { TasksData } from '../tasks/model';
 import type { GoalsData } from '../goals/model';
 import type { FinanceData } from '../finance/model';
 import { accountMap, txMain } from '../finance/model';
+import { t } from '../i18n/index';
 import type { NotesData } from '../notes/model';
 import { bestStreak, freqOf } from '../habits/model';
 import { addDaysYmd, fromYmd, toYmd } from '../utils/mapTasks';
@@ -62,17 +63,17 @@ export function xpForLevel(n: number): number {
 }
 
 export const LEVEL_TITLES: [number, string][] = [
-  [1, 'Новичок'],
-  [3, 'Ученик'],
-  [5, 'Исследователь'],
-  [8, 'Практик'],
-  [11, 'Целеустремлённый'],
-  [15, 'Стратег'],
-  [20, 'Эксперт'],
-  [25, 'Наставник'],
-  [30, 'Мудрец'],
-  [40, 'Легенда'],
-  [50, 'Мастер жизни'],
+  [1, t('Новичок')],
+  [3, t('Ученик')],
+  [5, t('Исследователь')],
+  [8, t('Практик')],
+  [11, t('Целеустремлённый')],
+  [15, t('Стратег')],
+  [20, t('Эксперт')],
+  [25, t('Наставник')],
+  [30, t('Мудрец')],
+  [40, t('Легенда')],
+  [50, t('Мастер жизни')],
 ];
 
 export function levelTitle(level: number): string {

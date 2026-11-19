@@ -5,7 +5,8 @@
 import { useEffect } from 'react';
 import { toast, useApp } from '../store/appStore';
 import { useTasks } from '../tasks/store';
-import { daysBetween, plural } from '../tasks/model';
+import { daysBetween } from '../tasks/model';
+import { t, tn } from '../i18n/index';
 import { todayYmd } from '../utils/mapTasks';
 import { celebrate, celebrateTask } from '../ui/celebrate';
 import { achievementStates } from './achievements';
@@ -46,9 +47,9 @@ function cheer(msg: string, big = false) {
 // ---------- Уровень, достижения, вехи ----------
 
 function streakText(n: number): string {
-  if (n >= 365) return '🔥 Год без перерыва! Это невероятно';
-  if (n >= 100) return `🔥 ${n} дней подряд — вы в редкой лиге!`;
-  return `🔥 ${n} ${plural(n, 'день', 'дня', 'дней')} подряд — отличный ритм!`;
+  if (n >= 365) return t('🔥 Год без перерыва! Это невероятно');
+  if (n >= 100) return t('🔥 {n} дней подряд — вы в редкой лиге!', { n });
+  return t('🔥 {n} {days} подряд — отличный ритм!', { n, days: tn(n, 'день', 'дня', 'дней') });
 }
 
 let lastActive: { day: string; on: boolean } | null = null;
@@ -76,10 +77,10 @@ function check(p: ProgressStats) {
   const newAch = states.filter((s) => s.done && !seen.ach.includes(s.a.id));
   if (newAch.length) addFresh(newAch.map((s) => s.a.id));
   const up = p.level.level > seen.level;
-  const many = (n: number) => `${n} ${plural(n, 'новое достижение', 'новых достижения', 'новых достижений')}`;
-  if (up && newAch.length) cheer(`🎉 Уровень ${p.level.level} — «${p.level.title}»! И ${many(newAch.length)}`, true);
-  else if (up) cheer(`🎉 Новый уровень ${p.level.level} — «${p.level.title}»!`, true);
-  else if (newAch.length === 1) cheer(`🏆 Достижение получено: «${newAch[0].a.title}»`);
+  const many = (n: number) => `${n} ${tn(n, 'новое достижение', 'новых достижения', 'новых достижений')}`;
+  if (up && newAch.length) cheer(t('🎉 Уровень {n} — «{title}»! И {more}', { n: p.level.level, title: p.level.title, more: many(newAch.length) }), true);
+  else if (up) cheer(t('🎉 Новый уровень {n} — «{title}»!', { n: p.level.level, title: p.level.title }), true);
+  else if (newAch.length === 1) cheer(t('🏆 Достижение получено: «{title}»', { title: newAch[0].a.title }));
   else if (newAch.length > 1) cheer(`🏆 ${many(newAch.length)}!`);
   if (hit.length) cheer(streakText(Math.max(...hit)), true);
 }

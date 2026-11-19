@@ -4,7 +4,8 @@ import { BellSlash, ChartPieSlice, Plus, Target, Trash } from '@phosphor-icons/r
 import { IconTile } from '../../ui/icons';
 import { toast } from '../../store/appStore';
 import { confirmDialog } from '../../ui/dialogs';
-import { daysBetween, plural } from '../../tasks/model';
+import { daysBetween } from '../../tasks/model';
+import { t, tn } from '../../i18n/index';
 import { todayYmd } from '../../utils/mapTasks';
 import { fullDate, sortedAreas, weakestAreas, wheelAverage, wheelDue, wheelSorted, type GoalsData, type LifeArea, type WheelSnapshot } from '../model';
 import { deleteWheel, saveWheel, setGoalsPrefs } from '../store';
@@ -29,7 +30,7 @@ export function WheelChart({ areas, cur, prev }: { areas: LifeArea[]; cur?: Whee
   const step = (2 * Math.PI) / n;
   const a0 = (i: number) => -Math.PI / 2 + i * step;
   return (
-    <svg className="gl-wheel-svg" viewBox="-14 -14 328 328" role="img" aria-label="Колесо баланса">
+    <svg className="gl-wheel-svg" viewBox="-14 -14 328 328" role="img" aria-label={t('Колесо баланса')}>
       {[2, 4, 6, 8, 10].map((v) => (
         <circle key={v} className={'gl-wh-ring' + (v === 10 ? ' is-outer' : '')} cx={CX} cy={CX} r={(R * v) / 10} />
       ))}
@@ -85,7 +86,7 @@ export function WheelTab({ data, onNewGoal }: { data: GoalsData; onNewGoal: (are
   const lastDays = snaps[0] ? daysBetween(snaps[0].date, today) : null;
 
   const remove = async (s: WheelSnapshot) => {
-    if (!(await confirmDialog('Удалить оценку?', `Оценка от ${fullDate(s.date)} будет удалена.`, { okText: 'Удалить', danger: true }))) return;
+    if (!(await confirmDialog(t('Удалить оценку?'), t('Оценка от {date} будет удалена.', { date: fullDate(s.date) }), { okText: t('Удалить'), danger: true }))) return;
     deleteWheel(s.id);
     if (selId === s.id) setSelId(null);
   };
@@ -94,7 +95,7 @@ export function WheelTab({ data, onNewGoal }: { data: GoalsData; onNewGoal: (are
     return (
       <div className="empty">
         <IconTile icon={ChartPieSlice} tone="violet" size="lg" />
-        <div>Добавьте сферы жизни, чтобы оценить баланс</div>
+        <div>{t('Добавьте сферы жизни, чтобы оценить баланс')}</div>
       </div>
     );
 
@@ -104,17 +105,18 @@ export function WheelTab({ data, onNewGoal }: { data: GoalsData; onNewGoal: (are
         <div className="gl-banner-card">
           <IconTile icon={ChartPieSlice} tone="violet" size="md" />
           <div className="grow">
-            <div className="bold">{snaps.length ? 'Пора обновить колесо баланса' : 'Оцените баланс жизни'}</div>
+            <div className="bold">{snaps.length ? t('Пора обновить колесо баланса') : t('Оцените баланс жизни')}</div>
             <div className="tiny muted">
-              {lastDays !== null ? `Последняя оценка — ${lastDays} ${plural(lastDays, 'день', 'дня', 'дней')} назад. ` : ''}Раз в месяц оценивайте сферы от 1 до 10 и следите за изменениями.
+              {lastDays !== null ? t('Последняя оценка — {n} {days} назад.', { n: lastDays, days: tn(lastDays, 'день', 'дня', 'дней') }) + ' ' : ''}
+              {t('Раз в месяц оценивайте сферы от 1 до 10 и следите за изменениями.')}
             </div>
           </div>
           <div className="gl-banner-actions">
             <button className="btn btn-sm btn-primary" onClick={() => setRate(true)}>
-              Оценить
+              {t('Оценить')}
             </button>
             {snaps.length > 0 && (
-              <button className="icon-btn" onClick={() => setGoalsPrefs({ wheelSnooze: today.slice(0, 7) })} aria-label="Не напоминать в этом месяце" title="Не напоминать в этом месяце">
+              <button className="icon-btn" onClick={() => setGoalsPrefs({ wheelSnooze: today.slice(0, 7) })} aria-label={t('Не напоминать в этом месяце')} title={t('Не напоминать в этом месяце')}>
                 <BellSlash size={19} />
               </button>
             )}
@@ -125,14 +127,14 @@ export function WheelTab({ data, onNewGoal }: { data: GoalsData; onNewGoal: (are
       <div className="gl-wheel-card">
         <div className="gl-wheel-head">
           <div className="grow">
-            <h3>{!cur ? 'Колесо баланса' : idx === 0 ? 'Текущий баланс' : 'Оценка из истории'}</h3>
+            <h3>{!cur ? t('Колесо баланса') : idx === 0 ? t('Текущий баланс') : t('Оценка из истории')}</h3>
             <div className="tiny faint">
-              {cur ? fullDate(cur.date) : 'Ещё нет оценок'}
-              {prev ? ` · пунктир — ${fullDate(prev.date)}` : ''}
+              {cur ? fullDate(cur.date) : t('Ещё нет оценок')}
+              {prev ? t(' · пунктир — {date}', { date: fullDate(prev.date) }) : ''}
             </div>
           </div>
           <button className="btn btn-sm btn-tinted" onClick={() => setRate(true)}>
-            <Plus size={15} weight="bold" /> Оценить
+            <Plus size={15} weight="bold" /> {t('Оценить')}
           </button>
         </div>
         <div className="gl-wheel-body">
@@ -158,7 +160,7 @@ export function WheelTab({ data, onNewGoal }: { data: GoalsData; onNewGoal: (are
         {cur && (
           <div className="gl-wheel-stats">
             <div className="gl-stat">
-              <span className="tiny muted">Среднее</span>
+              <span className="tiny muted">{t('Среднее')}</span>
               <b>
                 {avg !== null ? avg.toFixed(1) : '—'}
                 {avg !== null && prevAvg !== null && Math.abs(avg - prevAvg) >= 0.05 && (
@@ -172,10 +174,10 @@ export function WheelTab({ data, onNewGoal }: { data: GoalsData; onNewGoal: (are
             </div>
             {weak.length > 0 && (
               <div className="gl-attention">
-                <span className="tiny muted">Уделите внимание:</span>
+                <span className="tiny muted">{t('Уделите внимание:')}</span>
                 <div className="gl-attention-list">
                   {weak.map((a) => (
-                    <button key={a.id} className="chip gl-area-chip active" style={{ '--c': a.color } as CSSProperties} onClick={() => onNewGoal(a.id)} title="Поставить цель в этой сфере">
+                    <button key={a.id} className="chip gl-area-chip active" style={{ '--c': a.color } as CSSProperties} onClick={() => onNewGoal(a.id)} title={t('Поставить цель в этой сфере')}>
                       {a.emoji} {a.name} <Target size={13} weight="bold" />
                     </button>
                   ))}
@@ -190,7 +192,7 @@ export function WheelTab({ data, onNewGoal }: { data: GoalsData; onNewGoal: (are
       {snaps.length > 0 && (
         <section className="gl-sec">
           <div className="gl-sec-head">
-            <h3>История оценок</h3>
+            <h3>{t('История оценок')}</h3>
             <span className="tiny faint">{snaps.length}</span>
           </div>
           <div className="gl-wheel-hist">
@@ -201,11 +203,11 @@ export function WheelTab({ data, onNewGoal }: { data: GoalsData; onNewGoal: (are
                   <button className="gl-wh-item-main" onClick={() => setSelId(i === 0 ? null : s.id)}>
                     <span className="small bold">{fullDate(s.date)}</span>
                     <span className="tiny muted ellipsis">
-                      среднее {a !== null ? a.toFixed(1) : '—'}
+                      {t('среднее {n}', { n: a !== null ? a.toFixed(1) : '—' })}
                       {s.note ? ` · ${s.note}` : ''}
                     </span>
                   </button>
-                  <button className="icon-btn gl-mini-btn" onClick={() => void remove(s)} aria-label="Удалить оценку">
+                  <button className="icon-btn gl-mini-btn" onClick={() => void remove(s)} aria-label={t('Удалить оценку')}>
                     <Trash size={17} />
                   </button>
                 </div>
@@ -235,12 +237,12 @@ function RateModal({ areas, initial, onClose, onSaved }: { areas: LifeArea[]; in
   // сегодня уже оценивали — заметка той оценки (новая оценка в тот же день заменяет прежнюю)
   const [note, setNote] = useState(() => (initial && initial.date === todayYmd() ? (initial.note ?? '') : ''));
   const save = () => {
-    if (saveWheel(scores, note.trim())) toast('Оценка сохранена');
+    if (saveWheel(scores, note.trim())) toast(t('Оценка сохранена'));
     onSaved();
   };
   return (
-    <Sheet onClose={onClose} title="Оцените сферы жизни" className="gl-rate">
-      <div className="small muted gl-rate-hint">Насколько вы довольны каждой сферой сейчас? 1 — совсем плохо, 10 — идеально.</div>
+    <Sheet onClose={onClose} title={t('Оцените сферы жизни')} className="gl-rate">
+      <div className="small muted gl-rate-hint">{t('Насколько вы довольны каждой сферой сейчас? 1 — совсем плохо, 10 — идеально.')}</div>
       <div className="gl-rate-list">
         {areas.map((a) => (
           <div key={a.id} className="gl-rate-row" style={{ '--c': a.color } as CSSProperties}>
@@ -262,14 +264,14 @@ function RateModal({ areas, initial, onClose, onSaved }: { areas: LifeArea[]; in
           </div>
         ))}
       </div>
-      <label className="label">Заметка</label>
-      <input className="input" value={note} placeholder="Что сейчас влияет на баланс?" onChange={(e) => setNote(e.target.value)} />
+      <label className="label">{t('Заметка')}</label>
+      <input className="input" value={note} placeholder={t('Что сейчас влияет на баланс?')} onChange={(e) => setNote(e.target.value)} />
       <div className="modal-actions">
         <button className="btn btn-ghost" onClick={onClose}>
-          Отмена
+          {t('Отмена')}
         </button>
         <button className="btn btn-primary" onClick={save}>
-          Сохранить
+          {t('Сохранить')}
         </button>
       </div>
     </Sheet>

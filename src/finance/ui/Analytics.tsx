@@ -28,6 +28,7 @@ import { runFinanceAi } from '../ai';
 import { IconTile } from '../../ui/icons';
 import { ReportAI } from '../../ui/ReportAI';
 import { dayTitle, Money, Sheet, Stepper, TxRow, useToday } from './common';
+import { isEn, t } from '../../i18n/index';
 import { openTxSheet, showOps } from './state';
 import { RateWarning } from './RateWarning';
 
@@ -55,7 +56,7 @@ export function Analytics({ data }: { data: FinanceData }) {
     .sort((a, b) => b[1] - a[1])
     .map(([id, v]) => {
       const c = id ? cats.get(id) : undefined;
-      return { id, v, name: c?.name ?? 'Без категории', emoji: c?.emoji ?? '❔', color: c?.color ?? '#94a3b8' };
+      return { id, v, name: c?.name ?? t('Без категории'), emoji: c?.emoji ?? '❔', color: c?.color ?? '#94a3b8' };
     });
 
   const heatMonth = kind === 'month' ? monthStart(anchor) : monthStart(range.to < today ? range.to : today);
@@ -66,10 +67,10 @@ export function Analytics({ data }: { data: FinanceData }) {
         <div className="segmented fn-seg-wide">
           {(
             [
-              ['week', 'Неделя'],
-              ['month', 'Месяц'],
-              ['year', 'Год'],
-              ['custom', 'Свой'],
+              ['week', t('Неделя')],
+              ['month', t('Месяц')],
+              ['year', t('Год')],
+              ['custom', t('Свой')],
             ] as const
           ).map(([k, l]) => (
             <button key={k} className={kind === k ? 'active' : ''} onClick={() => setKind(k)}>
@@ -79,9 +80,9 @@ export function Analytics({ data }: { data: FinanceData }) {
         </div>
         {kind === 'custom' ? (
           <div className="fn-filter-dates">
-            <input type="date" className="input" value={custom.from} onChange={(e) => e.target.value && setCustom({ ...custom, from: e.target.value })} aria-label="С" />
+            <input type="date" className="input" value={custom.from} onChange={(e) => e.target.value && setCustom({ ...custom, from: e.target.value })} aria-label={t('С')} />
             <span className="faint">—</span>
-            <input type="date" className="input" value={custom.to} onChange={(e) => e.target.value && setCustom({ ...custom, to: e.target.value })} aria-label="По" />
+            <input type="date" className="input" value={custom.to} onChange={(e) => e.target.value && setCustom({ ...custom, to: e.target.value })} aria-label={t('По')} />
           </div>
         ) : (
           <Stepper
@@ -95,12 +96,12 @@ export function Analytics({ data }: { data: FinanceData }) {
       <RateWarning data={data} range={range} />
 
       <div className="card fn-stats">
-        <Stat icon={<TrendDown size={15} weight="bold" />} label="Расходы" tone="expense" value={fmtMoney(s.expense, main, { compact: true })} />
-        <Stat icon={<TrendUp size={15} weight="bold" />} label="Доходы" tone="income" value={fmtMoney(s.income, main, { compact: true })} />
-        <Stat icon={<CalendarDots size={15} weight="bold" />} label="В среднем в день" value={fmtMoney(s.expense / days, main, { compact: true })} />
+        <Stat icon={<TrendDown size={15} weight="bold" />} label={t('Расходы')} tone="expense" value={fmtMoney(s.expense, main, { compact: true })} />
+        <Stat icon={<TrendUp size={15} weight="bold" />} label={t('Доходы')} tone="income" value={fmtMoney(s.income, main, { compact: true })} />
+        <Stat icon={<CalendarDots size={15} weight="bold" />} label={t('В среднем в день')} value={fmtMoney(s.expense / days, main, { compact: true })} />
         <Stat
           icon={<PiggyBank size={15} weight="bold" />}
-          label="Норма сбережений"
+          label={t('Норма сбережений')}
           tone={savings !== null && savings < 0 ? 'expense' : undefined}
           value={savings === null ? '—' : `${savings}%`}
         />
@@ -108,18 +109,18 @@ export function Analytics({ data }: { data: FinanceData }) {
 
       <section className="card fn-panel">
         <div className="fn-panel-head">
-          <h3>По категориям</h3>
+          <h3>{t('По категориям')}</h3>
           <div className="segmented fn-seg-sm">
             <button className={donutKind === 'expense' ? 'active' : ''} onClick={() => setDonutKind('expense')}>
-              Расходы
+              {t('Расходы')}
             </button>
             <button className={donutKind === 'income' ? 'active' : ''} onClick={() => setDonutKind('income')}>
-              Доходы
+              {t('Доходы')}
             </button>
           </div>
         </div>
         {slices.length === 0 ? (
-          <p className="small muted fn-m0">За этот период {donutKind === 'expense' ? 'расходов' : 'доходов'} нет.</p>
+          <p className="small muted fn-m0">{donutKind === 'expense' ? t('За этот период расходов нет.') : t('За этот период доходов нет.')}</p>
         ) : (
           <div className="fn-donut-wrap">
             <Donut slices={slices} total={total} cur={main} />
@@ -146,11 +147,11 @@ export function Analytics({ data }: { data: FinanceData }) {
         <div className="row">
           <IconTile icon={Sparkle} section="assistant" size="sm" />
           <span className="grow fn-ai-card-text">
-            <span className="fn-ai-card-title">ИИ-разбор месяца</span>
-            <span className="fn-ai-card-sub">Claude разберёт траты за {monthTitle(heatMonth).toLowerCase()} и подскажет, где сэкономить.</span>
+            <span className="fn-ai-card-title">{t('ИИ-разбор месяца')}</span>
+            <span className="fn-ai-card-sub">{t('Claude разберёт траты за {month} и подскажет, где сэкономить.', { month: isEn ? monthTitle(heatMonth) : monthTitle(heatMonth).toLowerCase() })}</span>
           </span>
           <button className="btn btn-sm btn-tinted" onClick={() => setAi(true)}>
-            Разобрать
+            {t('Разобрать')}
           </button>
         </div>
       </section>
@@ -179,12 +180,12 @@ function Donut({ slices, total, cur }: { slices: { id: string; v: number; color:
   // мелкие категории — в «Остальное»
   const top = slices.slice(0, 9);
   const rest = slices.slice(9).reduce((a, x) => a + x.v, 0);
-  const parts = rest > 0 ? [...top, { id: 'rest', v: rest, color: '#94a3b8', name: 'Остальное' }] : top;
+  const parts = rest > 0 ? [...top, { id: 'rest', v: rest, color: '#94a3b8', name: t('Остальное') }] : top;
   const gap = parts.length > 1 ? 2 : 0;
   let off = 0;
   return (
     <div className="fn-donut">
-      <svg viewBox="0 0 180 180" role="img" aria-label="Расходы по категориям">
+      <svg viewBox="0 0 180 180" role="img" aria-label={t('Расходы по категориям')}>
         <circle cx="90" cy="90" r={R} className="fn-donut-bg" />
         {parts.map((p) => {
           const len = (p.v / total) * C;
@@ -208,7 +209,7 @@ function Donut({ slices, total, cur }: { slices: { id: string; v: number; color:
         })}
       </svg>
       <div className="fn-donut-center">
-        <span className="tiny faint">Всего</span>
+        <span className="tiny faint">{t('Всего')}</span>
         <b>{fmtMoney(total, cur, { compact: true })}</b>
       </div>
     </div>
@@ -239,17 +240,17 @@ function MonthBars({ data, endMonth }: { data: FinanceData; endMonth: string }) 
   return (
     <section className="card fn-panel">
       <div className="fn-panel-head">
-        <h3>Доходы и расходы</h3>
+        <h3>{t('Доходы и расходы')}</h3>
         <div className="segmented fn-seg-sm">
           <button className={n === 6 ? 'active' : ''} onClick={() => setN(6)}>
-            6 мес
+            {t('6 мес')}
           </button>
           <button className={n === 12 ? 'active' : ''} onClick={() => setN(12)}>
-            12 мес
+            {t('12 мес')}
           </button>
         </div>
       </div>
-      <svg className="fn-bars" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label="Доходы и расходы по месяцам">
+      <svg className="fn-bars" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label={t('Доходы и расходы по месяцам')}>
         {[0.25, 0.5, 0.75, 1].map((f) => (
           <line key={f} x1="0" x2={W} y1={H - bottom - (H - top - bottom) * f} y2={H - bottom - (H - top - bottom) * f} className="fn-grid" />
         ))}
@@ -259,10 +260,10 @@ function MonthBars({ data, endMonth }: { data: FinanceData; endMonth: string }) 
           return (
             <g key={x.m}>
               <rect x={cx - bw - 1} y={H - bottom - h(x.inc)} width={bw} height={h(x.inc)} rx="4" ry="4" className="fn-bar-inc">
-                <title>{`${monthTitle(x.m)}: доходы ${fmtMoney(x.inc, main)}`}</title>
+                <title>{t('{month}: доходы {amount}', { month: monthTitle(x.m), amount: fmtMoney(x.inc, main) })}</title>
               </rect>
               <rect x={cx + 1} y={H - bottom - h(x.exp)} width={bw} height={h(x.exp)} rx="4" ry="4" className="fn-bar-exp">
-                <title>{`${monthTitle(x.m)}: расходы ${fmtMoney(x.exp, main)}`}</title>
+                <title>{t('{month}: расходы {amount}', { month: monthTitle(x.m), amount: fmtMoney(x.exp, main) })}</title>
               </rect>
             </g>
           );
@@ -274,10 +275,10 @@ function MonthBars({ data, endMonth }: { data: FinanceData; endMonth: string }) 
         ))}
       </div>
       <div className="row tiny muted fn-legend">
-        <span className="fn-dot fn-dot-inc" /> Доходы
-        <span className="fn-dot fn-dot-exp" /> Расходы
+        <span className="fn-dot fn-dot-inc" /> {t('Доходы')}
+        <span className="fn-dot fn-dot-exp" /> {t('Расходы')}
         <span className="grow" />
-        <span>В среднем расходы: {fmtMoney(avgExp, main, { compact: true })}/мес</span>
+        <span>{t('В среднем расходы: {amount}/мес', { amount: fmtMoney(avgExp, main, { compact: true }) })}</span>
       </div>
     </section>
   );
@@ -299,11 +300,11 @@ function Heatmap({ data, initial }: { data: FinanceData; initial: string }) {
   return (
     <section className="card fn-panel">
       <div className="fn-panel-head">
-        <h3>Календарь трат</h3>
+        <h3>{t('Календарь трат')}</h3>
         <Stepper label={monthTitle(month)} onPrev={() => setMonth(addMonthsYmd(month, -1))} onNext={() => setMonth(addMonthsYmd(month, 1))} />
       </div>
       <div className="fn-heat">
-        {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((w) => (
+        {[t('Пн'), t('Вт'), t('Ср'), t('Чт'), t('Пт'), t('Сб'), t('Вс')].map((w) => (
           <span key={w} className="fn-heat-wd">
             {w}
           </span>
@@ -318,7 +319,7 @@ function Heatmap({ data, initial }: { data: FinanceData; initial: string }) {
               className={'fn-heat-cell' + (d === today ? ' is-today' : '') + (pct > 55 ? ' is-strong' : '') + (d > today ? ' is-future' : '')}
               style={{ '--p': `${pct}%` } as CSSProperties}
               onClick={() => setDay(d)}
-              title={v ? fmtMoney(v, main) : 'Нет трат'}
+              title={v ? fmtMoney(v, main) : t('Нет трат')}
             >
               <span className="fn-heat-n">{Number(d.slice(8))}</span>
               {v > 0 && <span className="fn-heat-v">{shortNum(v)}</span>}
@@ -326,7 +327,7 @@ function Heatmap({ data, initial }: { data: FinanceData; initial: string }) {
           );
         })}
       </div>
-      <div className="tiny faint">Всего за месяц: {fmtMoney(s.expense, main)} · нажмите на день, чтобы увидеть операции</div>
+      <div className="tiny faint">{t('Всего за месяц: {amount} · нажмите на день, чтобы увидеть операции', { amount: fmtMoney(s.expense, main) })}</div>
       {day && <DaySheet data={data} day={day} onClose={() => setDay(null)} />}
     </section>
   );
@@ -334,8 +335,9 @@ function Heatmap({ data, initial }: { data: FinanceData; initial: string }) {
 
 /** Коротко для ячейки календаря: 850 / 12к / 1,2м */
 function shortNum(v: number): string {
-  if (v >= 1e6) return (Math.round(v / 1e5) / 10).toString().replace('.', ',') + 'м';
-  if (v >= 1000) return (v >= 1e4 ? Math.round(v / 1000) : Math.round(v / 100) / 10).toString().replace('.', ',') + 'к';
+  const dec = (x: number) => (isEn ? String(x) : String(x).replace('.', ','));
+  if (v >= 1e6) return t('{n}м', { n: dec(Math.round(v / 1e5) / 10) });
+  if (v >= 1000) return t('{n}к', { n: dec(v >= 1e4 ? Math.round(v / 1000) : Math.round(v / 100) / 10) });
   return String(Math.round(v));
 }
 
@@ -348,8 +350,8 @@ function DaySheet({ data, day, onClose }: { data: FinanceData; day: string; onCl
   return (
     <Sheet title={dayTitle(day)} onClose={onClose}>
       <div className="row small fn-day-sum">
-        {s.expense > 0 && <span className="fn-neg">Расходы: {fmtMoney(s.expense, main)}</span>}
-        {s.income > 0 && <span className="fn-pos">Доходы: {fmtMoney(s.income, main)}</span>}
+        {s.expense > 0 && <span className="fn-neg">{t('Расходы: {amount}', { amount: fmtMoney(s.expense, main) })}</span>}
+        {s.income > 0 && <span className="fn-pos">{t('Доходы: {amount}', { amount: fmtMoney(s.income, main) })}</span>}
       </div>
       {list.length ? (
         <div className="fn-list">
@@ -358,11 +360,11 @@ function DaySheet({ data, day, onClose }: { data: FinanceData; day: string; onCl
           ))}
         </div>
       ) : (
-        <p className="muted">В этот день операций нет.</p>
+        <p className="muted">{t('В этот день операций нет.')}</p>
       )}
       <div className="modal-actions">
         <button className="btn btn-primary" onClick={() => openTxSheet({ preset: { date: day } })}>
-          Добавить операцию
+          {t('Добавить операцию')}
         </button>
       </div>
     </Sheet>
@@ -385,7 +387,7 @@ function AiSheet({ data, month, onClose }: { data: FinanceData; month: string; o
       .catch((e) => {
         setBusy(false);
         if (c.signal.aborted) return;
-        toast(e instanceof AIError ? e.message : 'Не удалось получить ответ ИИ');
+        toast(e instanceof AIError ? e.message : t('Не удалось получить ответ ИИ'));
         onClose();
       });
     return () => c.abort();
@@ -393,22 +395,22 @@ function AiSheet({ data, month, onClose }: { data: FinanceData; month: string; o
 
   return (
     <Sheet
-      title={`ИИ-разбор: ${monthTitle(month)}`}
+      title={t('ИИ-разбор: {month}', { month: monthTitle(month) })}
       onClose={onClose}
       className="fn-ai-sheet"
       actions={
         busy ? (
           <button className="btn" onClick={() => ctl.current?.abort()}>
-            Остановить
+            {t('Остановить')}
           </button>
         ) : (
           <button className="btn btn-primary" onClick={onClose}>
-            Готово
+            {t('Готово')}
           </button>
         )
       }
     >
-      {!text && busy && <p className="muted">Claude анализирует ваши траты…</p>}
+      {!text && busy && <p className="muted">{t('Claude анализирует ваши траты…')}</p>}
       <div className="fn-ai-text">{renderMd(text)}</div>
       {!busy && text && <ReportAI text={text} where="Финансы · ИИ-разбор" />}
     </Sheet>
