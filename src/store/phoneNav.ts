@@ -5,10 +5,10 @@
 import type { View } from './appStore';
 
 /** Разделы, которые можно поставить в нижнюю панель. «Сегодня» и «Мозг» — блоки: в них сразу несколько функций */
-export type TabBlock = 'today' | 'home' | 'notes' | 'tasks' | 'calendar' | 'habits' | 'health' | 'finance' | 'goals' | 'focus' | 'assistant' | 'progress';
+export type TabBlock = 'today' | 'home' | 'notes' | 'tasks' | 'board' | 'calendar' | 'habits' | 'health' | 'finance' | 'goals' | 'focus' | 'assistant' | 'progress';
 export type PhoneTab = TabBlock | 'more';
 
-export const TAB_BLOCKS: TabBlock[] = ['today', 'home', 'notes', 'tasks', 'calendar', 'habits', 'health', 'finance', 'goals', 'focus', 'assistant', 'progress'];
+export const TAB_BLOCKS: TabBlock[] = ['today', 'home', 'notes', 'tasks', 'board', 'calendar', 'habits', 'health', 'finance', 'goals', 'focus', 'assistant', 'progress'];
 /** Сколько разделов выбирает пользователь (плюс микрофон и «Ещё») */
 export const TAB_SLOTS = 3;
 export const DEFAULT_TABS: TabBlock[] = ['today', 'home', 'notes'];
@@ -19,6 +19,7 @@ export const TAB_INFO: Record<PhoneTab, { label: string; title: string; hint: st
   home: { label: 'Карты', title: 'Карты', hint: 'Интеллект-карты' },
   notes: { label: 'Мозг', title: 'Второй мозг', hint: 'Заметки, цели, карточки, граф связей' },
   tasks: { label: 'Задачи', title: 'Задачи', hint: 'Все задачи и списки' },
+  board: { label: 'Доска', title: 'Доска', hint: 'Канбан: карточки и задачи из карт' },
   calendar: { label: 'Календарь', title: 'Календарь', hint: 'События, задачи и привычки по дням' },
   habits: { label: 'Привычки', title: 'Привычки', hint: 'Привычки, настроение и дневник' },
   health: { label: 'Здоровье', title: 'Здоровье и спорт', hint: 'Спорт, сон, вода и здоровые привычки' },

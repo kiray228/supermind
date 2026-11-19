@@ -16,6 +16,9 @@ import {
   X,
   ArrowRight,
   AlignLeft,
+  ArrowUp,
+  ArrowDown,
+  SlidersHorizontal,
 } from 'lucide-react';
 import type { BoardCard, BoardColumn, BoardData, TaskInfo, TaskStatus } from '../types';
 import { DEFAULT_BOARD, loadAllDocs, loadBoard, saveBoard } from '../store/db';
@@ -57,7 +60,13 @@ type MenuEntry =
 interface MenuState {
   anchor: DOMRect;
   entries: MenuEntry[];
+  /** заголовок листа на телефоне (название карточки или колонки) */
+  title?: string;
 }
+
+/** Телефон: колонки — листаемые страницы, меню — лист снизу */
+const PHONE_MQ = '(max-width: 760px)';
+const isPhone = () => typeof window !== 'undefined' && window.matchMedia(PHONE_MQ).matches;
 
 const COLORS = ['#64748b', '#ef4444', '#f97316', '#f59e0b', '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6', '#6366f1', '#a855f7', '#ec4899'];
 
@@ -102,6 +111,10 @@ export default function Board() {
   const [editMapKey, setEditMapKey] = useState<string | null>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [addingIn, setAddingIn] = useState<string | null>(null);
+  /** телефон: фильтры (приоритет, источник) свёрнуты под кнопку рядом с поиском */
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  /** телефон: колонка, которая сейчас на экране (подсвечена в переключателе) */
+  const [activeCol, setActiveCol] = useState(0);
 
   const [drag, setDrag] = useState<DragInfo | null>(null);
   const [drop, setDrop] = useState<DropTarget | null>(null);
@@ -349,61 +362,155 @@ export default function Board() {
 
   // ----- меню -----
 
-  const openMenu = (e: ReactMouseEvent, entries: MenuEntry[]) => {
+  const openMenu = (anchor: DOMRect, entries: MenuEntry[], title?: string) => {
+    setMenu({ anchor, entries, title });
+  };
+  /** «⋯» нажата — меню у кнопки */
+  const anchorOf = (e: ReactMouseEvent) => {
     e.stopPropagation();
-    setMenu({ anchor: (e.currentTarget as HTMLElement).getBoundingClientRect(), entries });
+    return (e.currentTarget as HTMLElement).getBoundingClientRect();
   };
 
-  const cardMenu = (e: ReactMouseEvent, card: BoardCard) => {
+  const cardMenu = (anchor: DOMRect, card: BoardCard) => {
     const cols = boardRef.current?.columns ?? [];
-    openMenu(e, [
-      { label: 'Редактировать', icon: <Pencil />, onClick: () => setEditCardId(card.id) },
-      { kind: 'header', label: 'Переместить в…' },
-      ...cols.map(
-        (c): MenuEntry => ({
-          label: c.title,
-          icon: <span className="kb-dot" style={{ background: c.color ?? 'var(--text-3)' }} />,
-          active: c.id === card.columnId,
-          onClick: () => c.id !== card.columnId && moveCard(card.id, c.id, -1),
-        }),
-      ),
-      { kind: 'sep' },
-      { label: 'Удалить', icon: <Trash2 />, danger: true, onClick: () => deleteCard(card.id) },
-    ]);
+    // «Выше / Ниже» — среди видимых карточек колонки (с учётом фильтров), как при перетаскивании
+    const visible = columnsData.find((d) => d.col.id === card.columnId)?.cards ?? [];
+    const idx = visible.findIndex((c) => c.id === card.id);
+    const order: MenuEntry[] = [];
+    if (idx > 0) order.push({ label: 'Выше', icon: <ArrowUp />, onClick: () => moveCard(card.id, card.columnId, idx - 1) });
+    if (idx >= 0 && idx < visible.length - 1) order.push({ label: 'Ниже', icon: <ArrowDown />, onClick: () => moveCard(card.id, card.columnId, idx + 1) });
+    openMenu(
+      anchor,
+      [
+        { label: 'Редактировать', icon: <Pencil />, onClick: () => setEditCardId(card.id) },
+        ...order,
+        { kind: 'header', label: 'Переместить в…' },
+        ...cols.map(
+          (c): MenuEntry => ({
+            label: c.title,
+            icon: <span className="kb-dot" style={{ background: c.color ?? 'var(--text-3)' }} />,
+            active: c.id === card.columnId,
+            onClick: () => {
+              if (c.id === card.columnId) return;
+              moveCard(card.id, c.id, -1);
+              showCol(c.id);
+            },
+          }),
+        ),
+        { kind: 'sep' },
+        { label: 'Удалить', icon: <Trash2 />, danger: true, onClick: () => deleteCard(card.id) },
+      ],
+      card.title || 'Без названия',
+    );
   };
 
-  const mapMenu = (e: ReactMouseEvent, t: MapTask) => {
+  const mapMenu = (anchor: DOMRect, t: MapTask) => {
     const cols = (boardRef.current?.columns ?? []).filter((c) => c.status);
-    openMenu(e, [
-      { label: 'Изменить задачу', icon: <Pencil />, onClick: () => setEditMapKey(mapKey(t)) },
-      { label: 'Открыть в карте', icon: <ExternalLink />, onClick: () => openDoc(t.docId, t.topicId) },
-      { kind: 'header', label: 'Переместить в…' },
-      ...cols.map(
-        (c): MenuEntry => ({
-          label: c.title,
-          icon: <span className="kb-dot" style={{ background: c.color ?? 'var(--text-3)' }} />,
-          active: c.status === t.task.status,
-          onClick: () => moveMapTo(t, c),
-        }),
-      ),
-    ]);
+    openMenu(
+      anchor,
+      [
+        { label: 'Изменить задачу', icon: <Pencil />, onClick: () => setEditMapKey(mapKey(t)) },
+        { label: 'Открыть в карте', icon: <ExternalLink />, onClick: () => openDoc(t.docId, t.topicId) },
+        { kind: 'header', label: 'Переместить в…' },
+        ...cols.map(
+          (c): MenuEntry => ({
+            label: c.title,
+            icon: <span className="kb-dot" style={{ background: c.color ?? 'var(--text-3)' }} />,
+            active: c.status === t.task.status,
+            onClick: () => {
+              if (c.status === t.task.status) return;
+              moveMapTo(t, c);
+              showCol(c.id);
+            },
+          }),
+        ),
+      ],
+      t.text || 'Без названия',
+    );
   };
 
-  const columnMenu = (e: ReactMouseEvent, col: BoardColumn) => {
-    openMenu(e, [
-      { label: 'Добавить карточку', icon: <Plus />, onClick: () => setAddingIn(col.id) },
-      { label: 'Переименовать', icon: <Pencil />, onClick: () => renameColumn(col) },
-      { kind: 'header', label: 'Цвет' },
-      { kind: 'colors', value: col.color, onPick: (c) => patchColumn(col.id, { color: c }) },
-      ...(col.status
-        ? []
-        : ([{ kind: 'sep' }, { label: 'Удалить колонку', icon: <Trash2 />, danger: true, onClick: () => deleteColumn(col) }] as MenuEntry[])),
-    ]);
+  const columnMenu = (anchor: DOMRect, col: BoardColumn) => {
+    openMenu(
+      anchor,
+      [
+        { label: 'Добавить карточку', icon: <Plus />, onClick: () => setAddingIn(col.id) },
+        { label: 'Переименовать', icon: <Pencil />, onClick: () => renameColumn(col) },
+        { kind: 'header', label: 'Цвет' },
+        { kind: 'colors', value: col.color, onPick: (c) => patchColumn(col.id, { color: c }) },
+        ...(col.status
+          ? []
+          : ([{ kind: 'sep' }, { label: 'Удалить колонку', icon: <Trash2 />, danger: true, onClick: () => deleteColumn(col) }] as MenuEntry[])),
+      ],
+      col.title,
+    );
   };
+
+  // ---------- Телефон: колонки — страницы, переключатель сверху ----------
+
+  /** Сдвиг прокрутки, при котором колонка встаёт к левому краю (с учётом scroll-padding) */
+  const colLeft = (sc: HTMLElement, el: HTMLElement) => {
+    const pad = parseFloat(getComputedStyle(sc).scrollPaddingLeft) || 0;
+    return el.getBoundingClientRect().left - sc.getBoundingClientRect().left + sc.scrollLeft - pad;
+  };
+  const scrollToCol = useCallback((i: number, smooth = true) => {
+    const sc = scrollerRef.current;
+    const el = sc?.querySelectorAll<HTMLElement>('[data-col-id]')[i];
+    if (!sc || !el) return;
+    sc.scrollTo({ left: Math.max(0, colLeft(sc, el)), behavior: smooth ? 'smooth' : 'auto' });
+  }, []);
+  /** После переноса через меню — показать колонку, куда ушла карточка (на телефоне) */
+  const showCol = (colId: string) => {
+    if (!isPhone()) return;
+    const i = boardRef.current?.columns.findIndex((c) => c.id === colId) ?? -1;
+    if (i >= 0) setTimeout(() => scrollToCol(i), 60);
+  };
+
+  // какая колонка на экране — по прокрутке (ближайшая к левому краю)
+  const scrollRaf = useRef(0);
+  const onColumnsScroll = () => {
+    if (scrollRaf.current) return;
+    scrollRaf.current = requestAnimationFrame(() => {
+      scrollRaf.current = 0;
+      const sc = scrollerRef.current;
+      if (!sc) return;
+      const cols = sc.querySelectorAll<HTMLElement>('[data-col-id]');
+      let best = 0;
+      let dist = Infinity;
+      cols.forEach((el, i) => {
+        const d = Math.abs(colLeft(sc, el) - sc.scrollLeft);
+        if (d < dist) {
+          dist = d;
+          best = i;
+        }
+      });
+      // прокрутили до конца — на экране последняя колонка (и «Новая колонка»)
+      if (cols.length && sc.scrollLeft + sc.clientWidth >= sc.scrollWidth - 2 && colLeft(sc, cols[cols.length - 1]) > sc.scrollLeft) best = cols.length - 1;
+      setActiveCol((a) => (a === best ? a : best));
+    });
+  };
+  useEffect(() => () => cancelAnimationFrame(scrollRaf.current), []);
+  // колонку добавили или удалили — пересчитать, какая на экране
+  const colCount = board?.columns.length ?? 0;
+  useEffect(() => {
+    onColumnsScroll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [colCount]);
+
+  // активная «таблетка» переключателя — всегда видна
+  const tabsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const strip = tabsRef.current;
+    const chip = strip?.children[activeCol] as HTMLElement | undefined;
+    if (!strip || !chip) return;
+    const l = chip.getBoundingClientRect().left - strip.getBoundingClientRect().left + strip.scrollLeft;
+    if (l < strip.scrollLeft + 8 || l + chip.offsetWidth > strip.scrollLeft + strip.clientWidth - 8)
+      strip.scrollTo({ left: l - 16, behavior: 'smooth' });
+  }, [activeCol]);
 
   // ---------- Перетаскивание (pointer events: мышь, касание, перо) ----------
 
-  const dragRef = useRef<{ info: DragInfo; pointerId: number } | null>(null);
+  /** mouse — мышь; moved — палец уже сдвинулся (иначе долгое нажатие на месте открывает меню) */
+  const dragRef = useRef<{ info: DragInfo; pointerId: number; mouse: boolean; moved: boolean; el: HTMLElement } | null>(null);
   const dropRef = useRef<DropTarget | null>(null);
   const pointerRef = useRef({ x: 0, y: 0 });
   const pendingRef = useRef<{
@@ -451,10 +558,10 @@ export default function Board() {
   };
 
   // только рефы и сеттеры состояния — функция стабильна, глобальные слушатели не переподписываются
-  const startDrag = useCallback((el: HTMLElement, kind: DragKind, id: string, x: number, y: number, pointerId: number) => {
+  const startDrag = useCallback((el: HTMLElement, kind: DragKind, id: string, x: number, y: number, pointerId: number, mouse: boolean) => {
     const r = el.getBoundingClientRect();
     const info: DragInfo = { kind, id, x, y, offX: x - r.left, offY: y - r.top, w: r.width };
-    dragRef.current = { info, pointerId };
+    dragRef.current = { info, pointerId, mouse, moved: false, el };
     pointerRef.current = { x, y };
     suppressClickRef.current = true;
     setDrag(info);
@@ -468,7 +575,20 @@ export default function Board() {
   }, [computeDrop]);
 
   // актуальные обработчики для глобальных слушателей
-  const latest = useRef({ finish: () => {} });
+  const latest = useRef({ finish: () => {}, hold: () => {} });
+  /** Долгое нажатие пальцем без сдвига — меню карточки («Переместить в…», «Выше/Ниже») вместо переноса */
+  latest.current.hold = () => {
+    const d = dragRef.current;
+    if (!d) return;
+    const anchor = d.el.getBoundingClientRect();
+    if (d.info.kind === 'card') {
+      const card = boardRef.current?.cards.find((c) => c.id === d.info.id);
+      if (card) cardMenu(anchor, card);
+    } else {
+      const task = mapTasks.find((m) => mapKey(m) === d.info.id);
+      if (task) mapMenu(anchor, task);
+    }
+  };
   latest.current.finish = () => {
     const d = dragRef.current;
     const t = dropRef.current;
@@ -492,7 +612,7 @@ export default function Board() {
     const el = e.currentTarget;
     if (viaHandle) {
       e.preventDefault();
-      startDrag(el, kind, id, e.clientX, e.clientY, e.pointerId);
+      startDrag(el, kind, id, e.clientX, e.clientY, e.pointerId, e.pointerType === 'mouse');
       return;
     }
     const mouse = e.pointerType === 'mouse';
@@ -502,7 +622,7 @@ export default function Board() {
       p.timer = setTimeout(() => {
         if (pendingRef.current !== p) return;
         pendingRef.current = null;
-        startDrag(el, kind, id, pointerRef.current.x, pointerRef.current.y, p.pointerId);
+        startDrag(el, kind, id, pointerRef.current.x, pointerRef.current.y, p.pointerId, false);
       }, 380);
     }
     pointerRef.current = { x: e.clientX, y: e.clientY };
@@ -516,7 +636,10 @@ export default function Board() {
       pendingRef.current = null;
     };
     const endDrag = (commitDrop: boolean) => {
-      if (commitDrop) latest.current.finish();
+      const d = dragRef.current;
+      // палец так и не сдвинулся — это не перенос, а «долгое нажатие»: открыть меню
+      if (commitDrop && d && !d.mouse && !d.moved) latest.current.hold();
+      else if (commitDrop) latest.current.finish();
       dragRef.current = null;
       dropRef.current = null;
       setDrag(null);
@@ -527,6 +650,7 @@ export default function Board() {
       const d = dragRef.current;
       if (d) {
         if (e.pointerId !== d.pointerId) return;
+        if (!d.moved && Math.hypot(e.clientX - d.info.x, e.clientY - d.info.y) > 10) d.moved = true;
         pointerRef.current = { x: e.clientX, y: e.clientY };
         positionGhost(e.clientX, e.clientY);
         computeDrop(e.clientX, e.clientY);
@@ -538,7 +662,7 @@ export default function Board() {
       const dist = Math.hypot(e.clientX - p.startX, e.clientY - p.startY);
       if (p.mouse && dist > 5) {
         clearPending();
-        startDrag(p.el, p.kind, p.id, e.clientX, e.clientY, p.pointerId);
+        startDrag(p.el, p.kind, p.id, e.clientX, e.clientY, p.pointerId, true);
       } else if (!p.mouse && dist > 8) clearPending();
     };
     const onUp = (e: PointerEvent) => {
@@ -584,7 +708,8 @@ export default function Board() {
         const edge = Math.min(48, r.width * 0.1);
         const now = performance.now();
         const col = sc.querySelector<HTMLElement>('[data-col-id]');
-        const step = col ? col.offsetWidth + 12 : r.width * 0.8;
+        const gap = parseFloat(getComputedStyle(sc).columnGap) || 12;
+        const step = col ? col.offsetWidth + gap : r.width * 0.8;
         const dir = x < r.left + edge ? -1 : x > r.right - edge ? 1 : 0;
         if (dir && now - lastStep > 900) {
           sc.scrollBy({ left: dir * step, behavior: 'smooth' });
@@ -593,6 +718,12 @@ export default function Board() {
         }
       }
       const el = document.elementFromPoint(x, y) as HTMLElement | null;
+      // телефон: карточку поднесли к названию колонки в переключателе — листаем к ней
+      const chip = el?.closest<HTMLElement>('[data-col-chip]');
+      if (chip && performance.now() - lastStep > 500) {
+        scrollToCol(Number(chip.dataset.colChip));
+        lastStep = performance.now();
+      }
       const list = el?.closest<HTMLElement>('[data-col-id]')?.querySelector<HTMLElement>('[data-col-list]');
       if (list) {
         const r = list.getBoundingClientRect();
@@ -609,7 +740,7 @@ export default function Board() {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [dragging, computeDrop]);
+  }, [dragging, computeDrop, scrollToCol]);
 
   // ---------- Рендер ----------
 
@@ -654,7 +785,7 @@ export default function Board() {
           <button className="icon-btn" title="Обновить задачи из карт" onClick={reloadMaps} disabled={loadingMaps}>
             <RefreshCw className={loadingMaps ? 'spin' : undefined} />
           </button>
-          <button className="btn btn-primary btn-sm" onClick={addColumn}>
+          <button className="btn btn-primary btn-sm" onClick={addColumn} title="Новая колонка" aria-label="Новая колонка">
             <Plus size={16} /> <span className="kb-hide-xs">Колонка</span>
           </button>
         </div>
@@ -670,30 +801,60 @@ export default function Board() {
             </button>
           )}
         </div>
-        <select className="select kb-prio-select" value={prio} onChange={(e) => setPrio(e.target.value as PrioFilter)}>
-          <option value="all">Любой приоритет</option>
-          <option value="1">Высокий</option>
-          <option value="2">Средний</option>
-          <option value="3">Низкий</option>
-          <option value="0">Без приоритета</option>
-        </select>
-        <div className="segmented">
-          {(
-            [
-              ['all', 'Все'],
-              ['board', 'Доска'],
-              ['maps', 'Из карт'],
-            ] as [SourceFilter, string][]
-          ).map(([v, l]) => (
-            <button key={v} className={source === v ? 'active' : ''} onClick={() => setSource(v)}>
-              {l}
-            </button>
-          ))}
+        {/* телефон: фильтры по кнопке, чтобы колонкам осталось место; на компьютере кнопки нет, фильтры видны всегда */}
+        <button
+          className={`icon-btn kb-filter-btn${filtersOpen ? ' on' : ''}${prio !== 'all' || source !== 'all' ? ' is-set' : ''}`}
+          onClick={() => setFiltersOpen((v) => !v)}
+          aria-label="Фильтры"
+          aria-expanded={filtersOpen}
+        >
+          <SlidersHorizontal />
+        </button>
+        <div className={`kb-filters${filtersOpen ? ' is-open' : ''}`}>
+          <select className="select kb-prio-select" value={prio} onChange={(e) => setPrio(e.target.value as PrioFilter)}>
+            <option value="all">Любой приоритет</option>
+            <option value="1">Высокий</option>
+            <option value="2">Средний</option>
+            <option value="3">Низкий</option>
+            <option value="0">Без приоритета</option>
+          </select>
+          <div className="segmented">
+            {(
+              [
+                ['all', 'Все'],
+                ['board', 'Доска'],
+                ['maps', 'Из карт'],
+              ] as [SourceFilter, string][]
+            ).map(([v, l]) => (
+              <button key={v} className={source === v ? 'active' : ''} onClick={() => setSource(v)}>
+                {l}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
+      {/* телефон: колонки по одной на экран — переключатель с названиями */}
+      <div className="kb-tabs" ref={tabsRef} role="tablist" aria-label="Колонки">
+        {columnsData.map(({ col, cards, maps }, i) => (
+          <button
+            key={col.id}
+            role="tab"
+            aria-selected={i === activeCol}
+            className={`kb-tab${i === activeCol ? ' active' : ''}${drop?.colId === col.id ? ' is-over' : ''}`}
+            data-col-chip={i}
+            style={{ ['--col' as string]: col.color ?? 'var(--text-3)' }}
+            onClick={() => scrollToCol(i)}
+          >
+            <span className="kb-dot" style={{ background: 'var(--col)' }} />
+            <span className="ellipsis">{col.title}</span>
+            <span className="kb-tab-n">{cards.length + maps.length}</span>
+          </button>
+        ))}
+      </div>
+
       <div className="page-body kb-body">
-        <div ref={scrollerRef} className={`kb-columns${drag ? ' is-dragging' : ''}`}>
+        <div ref={scrollerRef} className={`kb-columns${drag ? ' is-dragging' : ''}`} onScroll={onColumnsScroll}>
           {columnsData.map(({ col, cards, maps }) => {
             const over = drop?.colId === col.id;
             const deny = over && drag?.kind === 'map' && !col.status;
@@ -713,7 +874,7 @@ export default function Board() {
                   dragging={isDragged}
                   onPointerDown={(e) => onItemPointerDown(e, 'card', card.id)}
                   onClick={onCardClick(() => setEditCardId(card.id))}
-                  onMenu={(e) => cardMenu(e, card)}
+                  onMenu={(e) => cardMenu(anchorOf(e), card)}
                 />,
               );
             }
@@ -727,7 +888,7 @@ export default function Board() {
                   dragging={drag?.kind === 'map' && drag.id === key}
                   onPointerDown={(e) => onItemPointerDown(e, 'map', key)}
                   onClick={onCardClick(() => setEditMapKey(key))}
-                  onMenu={(e) => mapMenu(e, t)}
+                  onMenu={(e) => mapMenu(anchorOf(e), t)}
                 />,
               );
             }
@@ -746,10 +907,10 @@ export default function Board() {
                   </h2>
                   <span className="badge">{count}</span>
                   <div className="grow" />
-                  <button className="icon-btn kb-col-btn" onClick={() => setAddingIn(col.id)} title="Добавить карточку">
+                  <button className="icon-btn kb-col-btn" onClick={() => setAddingIn(col.id)} title="Добавить карточку" aria-label="Добавить карточку">
                     <Plus />
                   </button>
-                  <button className="icon-btn kb-col-btn" onClick={(e) => columnMenu(e, col)} title="Действия с колонкой">
+                  <button className="icon-btn kb-col-btn" onClick={(e) => columnMenu(anchorOf(e), col)} title="Действия с колонкой" aria-label="Действия с колонкой">
                     <Ellipsis />
                   </button>
                 </header>
@@ -1015,9 +1176,16 @@ function AddCardInput({ onAdd, onClose }: { onAdd: (t: string) => void; onClose:
 function PopMenu({ state, onClose }: { state: MenuState; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ left: -9999, top: -9999 });
+  // телефон: лист снизу на всю ширину — под большим пальцем и всегда целиком на экране
+  const [sheet] = useState(isPhone);
+  // меню открылось долгим нажатием — отпущенный палец не должен сразу нажать пункт под собой
+  const openedAt = useRef(0);
+  useEffect(() => {
+    openedAt.current = performance.now();
+  }, [state]);
   useLayoutEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    if (!el || sheet) return;
     const w = el.offsetWidth;
     const h = el.offsetHeight;
     const a = state.anchor;
@@ -1026,7 +1194,7 @@ function PopMenu({ state, onClose }: { state: MenuState; onClose: () => void }) 
     let top = a.bottom + 6;
     if (top + h > window.innerHeight - 8) top = Math.max(8, a.top - 6 - h);
     setPos({ left, top });
-  }, [state]);
+  }, [state, sheet]);
   useEffect(() => {
     const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', k);
@@ -1034,8 +1202,10 @@ function PopMenu({ state, onClose }: { state: MenuState; onClose: () => void }) 
   }, [onClose]);
   return (
     <>
-      <div className="kb-menu-backdrop" onPointerDown={onClose} />
-      <div ref={ref} className="menu kb-menu" style={pos}>
+      <div className={`kb-menu-backdrop${sheet ? ' is-sheet' : ''}`} onPointerDown={onClose} />
+      <div ref={ref} className={`menu kb-menu${sheet ? ' kb-menu-sheet' : ''}`} style={sheet ? undefined : pos} role="menu">
+        {sheet && <div className="kb-sheet-grip" />}
+        {sheet && state.title && <div className="kb-sheet-title ellipsis">{state.title}</div>}
         {state.entries.map((e, i) => {
           if (e.kind === 'sep') return <div key={i} className="sep" />;
           if (e.kind === 'header') return <div key={i} className="kb-menu-header">{e.label}</div>;
@@ -1049,6 +1219,7 @@ function PopMenu({ state, onClose }: { state: MenuState; onClose: () => void }) 
                     style={{ background: c }}
                     aria-label={c}
                     onClick={() => {
+                      if (performance.now() - openedAt.current < 250) return;
                       e.onPick(c);
                       onClose();
                     }}
@@ -1060,7 +1231,9 @@ function PopMenu({ state, onClose }: { state: MenuState; onClose: () => void }) 
             <button
               key={i}
               className={e.danger ? 'btn-danger' : undefined}
+              role="menuitem"
               onClick={() => {
+                if (performance.now() - openedAt.current < 250) return;
                 onClose();
                 e.onClick();
               }}

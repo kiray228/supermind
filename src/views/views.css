@@ -194,19 +194,94 @@
 .kb-range::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: var(--surface); border: var(--hairline) solid var(--separator); box-shadow: var(--shadow); }
 .kb-modal-actions { flex-wrap: wrap; }
 
+/* телефонные части доски: на компьютере кнопки фильтров и переключателя колонок нет, фильтры — прямо в панели */
+.kb-filter-btn, .kb-tabs { display: none; }
+.kb-filters { display: contents; }
+
+/* ---------- Телефон: колонки — листаемые страницы, сверху переключатель ---------- */
 @media (max-width: 760px) {
   .kb-toolbar { padding: 2px 16px 6px; gap: 8px; }
   .kb-search { flex: 1 1 0; min-width: 0; max-width: none; }
+  .kb-search .input { height: 40px; }
+  /* фильтры — под кнопкой рядом с поиском (подсвечена, если что-то выбрано) */
+  .kb-filter-btn {
+    position: relative; display: inline-flex; flex: 0 0 40px; width: 40px; height: 40px; border-radius: 12px;
+    background: var(--fill-3); color: var(--text-2);
+  }
+  .kb-filter-btn svg { width: 19px; height: 19px; }
+  .kb-filter-btn.on, .kb-filter-btn.is-set { color: var(--accent); }
+  .kb-filter-btn.is-set::after {
+    content: ''; position: absolute; top: 7px; right: 7px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent);
+  }
+  .kb-filters { display: none; flex: 1 1 100%; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .kb-filters.is-open { display: flex; }
   .kb-prio-select { flex: 0 1 auto; min-width: 0; max-width: 46%; height: 36px; }
-  .kb-toolbar > .segmented { flex: 1 1 100%; }
-  .kb-toolbar > .segmented > button { flex: 1 1 0; padding: 0 6px; }
-  .kb-columns { scroll-snap-type: x mandatory; padding: 10px 16px 4px; gap: 10px; scroll-padding: 0 16px; }
-  .kb-col { flex-basis: 85vw; width: 85vw; scroll-snap-align: start; }
-  .kb-new-col { flex-basis: 60vw; scroll-snap-align: start; }
-  .kb-card { padding: 11px 4px 11px 12px; }
+  /* открытые фильтры: приоритет и источник — каждый на всю ширину, подписи не обрезаются */
+  .kb-filters > .kb-prio-select { flex: 1 1 100%; max-width: none; }
+  .kb-filters > .segmented { flex: 1 1 100%; min-width: 0; display: flex; }
+  .kb-filters > .segmented > button { flex: 1 1 0; padding: 0 6px; }
+
+  /* переключатель колонок: названия «таблетками», текущая подсвечена её цветом */
+  .kb-tabs {
+    display: flex; gap: 6px; flex-shrink: 0; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
+    padding: 2px 16px 4px; -webkit-overflow-scrolling: touch;
+  }
+  .kb-tabs::-webkit-scrollbar { display: none; }
+  .kb-tab {
+    flex: 0 0 auto; max-width: 62vw; height: 36px; display: inline-flex; align-items: center; gap: 7px; padding: 0 13px 0 12px;
+    border: none; border-radius: 999px; background: var(--fill-4); color: var(--text-2);
+    font-size: 14px; font-weight: 600; letter-spacing: -0.01em; transition: background .15s, color .15s, box-shadow .15s;
+  }
+  .kb-tab .kb-dot { width: 8px; height: 8px; }
+  .kb-tab-n { color: var(--text-3); font-weight: 500; font-variant-numeric: tabular-nums; }
+  .kb-tab.active { color: var(--text); background: color-mix(in srgb, var(--col) 16%, var(--fill-4)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--col) 40%, transparent); }
+  .kb-tab.active .kb-tab-n { color: var(--text-2); }
+  /* перетаскивание: поднесли карточку к названию — колонка откроется */
+  .kb-tab.is-over { box-shadow: inset 0 0 0 1.5px var(--col); }
+  .kb-tab:active { transform: scale(.97); }
+
+  /* колонки: по одной на экран, у правого края виден краешек следующей */
+  .kb-columns {
+    align-items: stretch; scroll-snap-type: x mandatory; padding: 6px 16px 4px; gap: 10px; scroll-padding: 0 16px;
+    overscroll-behavior-x: contain; scrollbar-width: none;
+  }
+  .kb-columns::-webkit-scrollbar { display: none; }
+  .kb-col {
+    --kb-col-w: calc(100vw - var(--safe-left) - var(--safe-right) - 48px);
+    flex: 0 0 var(--kb-col-w); width: var(--kb-col-w); scroll-snap-align: start; scroll-snap-stop: always;
+  }
+  .kb-col-head { padding: 8px 4px 4px 16px; }
+  .kb-col-list { padding: 4px 8px 6px; }
+  .kb-col-empty { padding: 28px 8px; }
+  .kb-col-foot { padding: 2px 8px 8px; }
+  .kb-add-btn { height: 44px; }
+  .kb-new-col { flex: 0 0 auto; align-self: flex-start; padding: 0 22px; scroll-snap-align: end; }
+  .kb-card { padding: 11px 4px 11px 12px; min-height: 60px; }
+  .kb-card-title { font-size: 16px; }
+  /* кнопки карточки и колонки — не меньше 40px под палец */
+  .kb-card-side { gap: 0; margin: -10px -4px -10px 0; }
+  .kb-card-btn, .kb-handle, .kb-col-btn { width: 40px; height: 40px; }
+  .kb-open-map { min-height: 40px; margin-block: -10px; padding: 0 2px 0 6px; }
   .kb-hide-xs { display: none; }
   .kb-grid { grid-template-columns: 1fr; }
+  /* название в окне карточки — крупно (общее правило «16px для полей» его уменьшало) */
+  .kb-page .kb-title-input { font-size: 20px; }
   .kb-prio-seg button, .kb-status-seg button { font-size: 12.5px; padding: 0 4px; }
+
+  /* меню карточки и колонки — лист снизу */
+  .kb-menu-backdrop.is-sheet { background: rgba(0, 0, 0, .32); animation: fade .15s ease; }
+  :root[data-theme='dark'] .kb-menu-backdrop.is-sheet { background: rgba(0, 0, 0, .5); }
+  .menu.kb-menu-sheet {
+    left: 0; right: 0; bottom: 0; top: auto; width: 100%; min-width: 0; max-width: none;
+    max-height: min(80vh, calc(var(--vvh, 100vh) - var(--safe-top) - 40px)); overflow-y: auto; overscroll-behavior: contain;
+    border-radius: 28px 28px 0 0; padding: 6px calc(10px + var(--safe-right)) calc(12px + var(--safe-bottom)) calc(10px + var(--safe-left));
+    animation: sheet .28s cubic-bezier(.2, .9, .25, 1.04);
+  }
+  .kb-sheet-grip { width: 36px; height: 5px; border-radius: 3px; background: var(--fill); margin: 2px auto 8px; }
+  .kb-sheet-title { padding: 0 12px 8px; text-align: center; font-size: 13px; font-weight: 600; color: var(--text-2); }
+  .menu.kb-menu-sheet button { height: 48px; font-size: 16px; border-radius: 12px; }
+  .menu.kb-menu-sheet .kb-swatches { max-width: none; gap: 12px; padding: 8px 12px 10px; }
+  .menu.kb-menu-sheet button.kb-swatch { width: 34px; height: 34px; padding: 0; border-radius: 50%; }
 }
 @media (hover: none) {
   .kb-card:hover { box-shadow: 0 1px 2px rgba(0, 0, 0, .06), 0 0 0 0.5px rgba(0, 0, 0, .03); }
