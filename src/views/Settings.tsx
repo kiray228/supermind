@@ -33,7 +33,8 @@ import { openWhatsNew } from '../onboarding/state';
 import { openSupport } from '../ui/Support';
 import { reportAI } from '../ui/ReportAI';
 import { InboxHost, openInbox, useSupportAdmin } from '../ui/SupportInbox';
-import { ArrowClockwise, Bug, Flag, Lightbulb, Question, ShieldCheck, SlidersHorizontal, Tray, Warning } from '@phosphor-icons/react';
+import { ArrowClockwise, Bug, Flag, Lightbulb, Question, ShieldCheck, SlidersHorizontal, Translate, Tray, Warning } from '@phosphor-icons/react';
+import { langPref, setLangPref, t, type LangPref } from '../i18n';
 import { TabsEditor } from '../ui/TabsEditor';
 import { openExternal, PRIVACY_URL } from '../ui/links';
 import { applyUpdate, checkForUpdate, updatesSupported, useAppUpdate } from '../ui/appUpdate';
@@ -184,8 +185,20 @@ export default function Settings() {
 
           <TaskSettings />
 
-          <ListSection header="Оформление">
-            <ListRow icon={<IconTile icon={SlidersHorizontal} tone="accent" size="list" />} title="Нижняя панель" subtitle="Какие разделы стоят внизу на телефоне" chevron onClick={() => setEditTabs(true)} />
+          <ListSection header={t('Оформление')}>
+            <SelectRow
+              icon={<IconTile icon={Translate} tone="indigo" size="list" />}
+              title={t('Язык')}
+              subtitle="Language"
+              value={langPref()}
+              options={[
+                { value: 'auto', label: t('Как в системе') },
+                { value: 'ru', label: 'Русский' },
+                { value: 'en', label: 'English' },
+              ]}
+              onChange={(v) => setLangPref(v as LangPref)}
+            />
+            <ListRow icon={<IconTile icon={SlidersHorizontal} tone="accent" size="list" />} title={t('Нижняя панель')} subtitle={t('Какие разделы стоят внизу на телефоне')} chevron onClick={() => setEditTabs(true)} />
             <ListCell>
               <div className="segmented" role="tablist" aria-label="Тема">
                 <button className={settings.theme === 'system' ? 'active' : ''} onClick={() => setSettings({ theme: 'system' })}>
