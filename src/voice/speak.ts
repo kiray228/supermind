@@ -1,7 +1,7 @@
 /** Проговорить ответ вслух: Android — системный синтез речи (плагин), браузер и iPhone — speechSynthesis */
 import { isNative } from '../platform';
 import { shareLocal } from '../store/sharedPrefs';
-import { isEn, LOCALE } from '../i18n/index';
+import { isEn, isKk, LOCALE } from '../i18n/index';
 
 const KEY = 'sm-voice-speak';
 
@@ -26,7 +26,9 @@ export function setSpeakEnabled(on: boolean) {
 const forSpeech = (s: string) =>
   (isEn
     ? s.replace(/₸/g, ' tenge').replace(/₽/g, ' rubles')
-    : s.replace(/₸/g, ' тенге').replace(/₽/g, ' рублей').replace(/\$/g, ' долларов').replace(/€/g, ' евро')
+    : isKk
+      ? s.replace(/₸/g, ' теңге').replace(/₽/g, ' рубль').replace(/\$/g, ' доллар').replace(/€/g, ' еуро')
+      : s.replace(/₸/g, ' тенге').replace(/₽/g, ' рублей').replace(/\$/g, ' долларов').replace(/€/g, ' евро')
   )
     .replace(/[«»"]/g, '')
     .replace(/\s+/g, ' ')

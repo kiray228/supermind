@@ -3,7 +3,7 @@
  * настроение, деньги, опыт — и несколько простых наблюдений. Работает офлайн, без ИИ.
  */
 import type { Habit, PlannerData } from '../types';
-import { LOCALE, isEn, t, tn } from '../i18n/index';
+import { LOCALE, isEn, isRu, t, tn } from '../i18n/index';
 import type { TasksData } from '../tasks/model';
 import type { FinanceData } from '../finance/model';
 import { summarize } from '../finance/model';
@@ -33,9 +33,13 @@ export function moodForScore(v: number): string {
 // ---------- Подписи ----------
 
 const MONTHS_SHORT = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
-export const WD_SHORT = isEn ? ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'] : ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
+export const WD_SHORT = isEn
+  ? ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
+  : isRu
+    ? ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб']
+    : Array.from({ length: 7 }, (_, i) => new Date(2024, 0, 7 + i).toLocaleDateString(LOCALE, { weekday: 'short' }));
 const WD_ACC = ['воскресенье', 'понедельник', 'вторник', 'среду', 'четверг', 'пятницу', 'субботу'];
-const monShort = (d: Date) => (isEn ? d.toLocaleDateString(LOCALE, { month: 'short' }) : MONTHS_SHORT[d.getMonth()]);
+const monShort = (d: Date) => (!isRu ? d.toLocaleDateString(LOCALE, { month: 'short' }) : MONTHS_SHORT[d.getMonth()]);
 /** «3,5» — по-английски «3.5» */
 const dec = (v: string | number) => (isEn ? String(v) : String(v).replace('.', ','));
 
@@ -55,7 +59,7 @@ export function weekLabel(monday: string): string {
 /** «вт, 8 окт» */
 export function dayShort(ymd: string): string {
   const d = fromYmd(ymd);
-  if (isEn) return d.toLocaleDateString(LOCALE, { weekday: 'short', month: 'short', day: 'numeric' });
+  if (!isRu) return d.toLocaleDateString(LOCALE, { weekday: 'short', month: 'short', day: 'numeric' });
   return `${WD_SHORT[d.getDay()]}, ${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}`;
 }
 
@@ -245,7 +249,7 @@ function productiveWeekdayInsight(per: Map<string, number>, sunday: string): str
   // явный лидер: заметно больше среднего дня
   if (sums[wd] < (total / 7) * 1.25) return null;
   const v = avg >= 10 ? Math.round(avg) : Math.round(avg * 10) / 10;
-  const day = isEn ? new Date(2024, 0, 7 + wd).toLocaleDateString(LOCALE, { weekday: 'long' }) : WD_ACC[wd];
+  const day = !isRu ? new Date(2024, 0, 7 + wd).toLocaleDateString(LOCALE, { weekday: 'long' }) : WD_ACC[wd];
   return t('Самый продуктивный день недели — {day}: в среднем {n} {tasks}', { day, n: dec(v), tasks: tn(Math.round(v), 'задача', 'задачи', 'задач') });
 }
 

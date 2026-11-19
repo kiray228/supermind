@@ -23,7 +23,7 @@ import { confirmDialog } from '../../ui/dialogs';
 import { Switch } from '../../ui/list';
 import { isAndroidApp, isNative } from '../../platform';
 import { isIOS } from '../../io/download';
-import { isEn, t } from '../../i18n/index';
+import { isEn, isRu, t } from '../../i18n/index';
 
 export type When = Pick<TaskItem, 'date' | 'time' | 'duration' | 'reminders' | 'repeat' | 'alarm'>;
 
@@ -238,7 +238,7 @@ function CustomReminder({ timed, onAdd }: { timed: boolean; onAdd: (off: number)
   return (
     <div className="dp-custom-rem">
       <span className="tiny muted">{t('Своё:')}</span>
-      {!isEn && <span className="tiny">за</span>}
+      {isRu && <span className="tiny">за</span>}
       <input className="input dp-num" type="number" min={0} max={999} value={n} onChange={(e) => setN(Math.max(0, Number(e.target.value) || 0))} />
       {timed ? (
         <select className="select dp-unit" value={unit} onChange={(e) => setUnit(e.target.value as 'min')}>
@@ -252,7 +252,7 @@ function CustomReminder({ timed, onAdd }: { timed: boolean; onAdd: (off: number)
           <input className="dp-time" type="time" value={time} onChange={(e) => setTime(e.target.value || '09:00')} />
         </>
       )}
-      {isEn && timed && <span className="tiny">before</span>}
+      {!isRu && timed && <span className="tiny">{isEn ? 'before' : 'бұрын'}</span>}
       <button className="btn btn-sm" onClick={() => onAdd(timed ? -n * (unit === 'min' ? 1 : unit === 'hour' ? 60 : 1440) : allDayOffset(n, time))}>
         {t('Добавить')}
       </button>
@@ -272,7 +272,8 @@ function RepeatEditor({ rule, date, onChange }: { rule: RepeatRule; date: string
   const nth = Math.ceil(d.getDate() / 7);
   const isLastWeek = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7).getMonth() !== d.getMonth();
   const end = rule.count ? 'count' : rule.until ? 'until' : 'never';
-  const wdName = isEn ? WEEKDAYS[d.getDay()] : WD_SHORT[d.getDay()].toLowerCase();
+  // по-русски «во 2-й пн», по-английски и по-казахски — полное название дня
+  const wdName = isEn ? WEEKDAYS[d.getDay()] : isRu ? WD_SHORT[d.getDay()].toLowerCase() : WEEKDAYS[d.getDay()].toLowerCase();
   return (
     <div className="dp-rep card">
       <div className="row">

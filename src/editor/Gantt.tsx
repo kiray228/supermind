@@ -4,7 +4,7 @@ import type { Topic } from '../types';
 import { useDoc } from '../store/docStore';
 import { pathTo, walkSheet } from '../utils/tree';
 import { getTheme } from '../themes';
-import { isEn, LOCALE, t } from '../i18n/index';
+import { isRu, LOCALE, t } from '../i18n/index';
 
 const DAY = 86400000;
 /** Сдвиг даты на n дней без ошибок перехода на летнее время */
@@ -19,7 +19,7 @@ const toDate = (s: string) => {
   return new Date(y, m - 1, d);
 };
 const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-const MONTHS = isEn
+const MONTHS = !isRu
   ? Array.from({ length: 12 }, (_, i) => new Date(2000, i, 1).toLocaleDateString(LOCALE, { month: 'short' }))
   : ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
 

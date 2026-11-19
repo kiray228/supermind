@@ -10,7 +10,7 @@ import { findInSheet, pathTo, walk } from '../utils/tree';
 import type { Topic } from '../types';
 import { newSheet } from '../store/docStore';
 import { ReportAI } from '../ui/ReportAI';
-import { isEn, t } from '../i18n/index';
+import { isEn, isRu, t } from '../i18n/index';
 
 type Mode = 'menu' | 'run' | 'chat';
 
@@ -169,8 +169,8 @@ export function AIPanel({ onClose }: { onClose(): void }) {
             <AIAction
               icon={<Translate weight="duotone" />}
               title={t('Перевести карту')}
-              desc={t('На язык: {lang} (укажите в пожелании)', { lang: extra || (isEn ? t('русский') : t('английский')) })}
-              onClick={() => transform(t('Перевод'), (extra ? `Переведи на язык: ${extra}.` : isEn ? 'Translate into Russian.' : 'Переведи на английский язык.'), 'all')}
+              desc={t('На язык: {lang} (укажите в пожелании)', { lang: extra || (isRu ? t('английский') : t('русский')) })}
+              onClick={() => transform(t('Перевод'), (extra ? `Переведи на язык: ${extra}.` : isEn ? 'Translate into Russian.' : isRu ? 'Переведи на английский язык.' : 'Переведи на русский язык.'), 'all')}
             />
             <AIAction icon={<Scroll weight="duotone" />} title={t('Резюме карты')} desc={t('Краткий пересказ и выводы')} onClick={() => start(t('Резюме карты'), 'summary', PROMPTS.summarize(sheet))} />
             <AIAction icon={<ChatCircle weight="duotone" />} title={t('Чат с картой')} desc={t('Вопросы, идеи, обсуждение')} onClick={() => setMode('chat')} />

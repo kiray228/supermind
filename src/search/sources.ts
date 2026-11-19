@@ -4,7 +4,7 @@
  * карты и тела заметок кэшируются по времени изменения.
  */
 import type { ComponentType } from 'react';
-import { LOCALE, isEn, t, tn } from '../i18n/index';
+import { LOCALE, isRu, t, tn } from '../i18n/index';
 import { CircleDot, NotebookPen, Network, Repeat, SquareCheck, StickyNote, Target, Wallet, Zap } from 'lucide-react';
 import { useApp, toast, type View } from '../store/appStore';
 import { listDocs, loadDoc, loadPlanner } from '../store/db';
@@ -103,7 +103,7 @@ export function dateLabel(ymd: string): string {
   const [y, m, d] = ymd.split('-').map(Number);
   if (!y || !m || !d) return ymd;
   const yr = y !== new Date().getFullYear() ? ` ${y}` : '';
-  if (isEn) return new Date(y, m - 1, d).toLocaleDateString(LOCALE, { month: 'long', day: 'numeric', ...(yr ? { year: 'numeric' } : {}) });
+  if (!isRu) return new Date(y, m - 1, d).toLocaleDateString(LOCALE, { month: 'long', day: 'numeric', ...(yr ? { year: 'numeric' } : {}) });
   return `${d} ${MONTHS[m - 1]}${yr}`;
 }
 const ymdTime = (ymd: string) => {

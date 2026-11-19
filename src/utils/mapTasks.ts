@@ -1,7 +1,7 @@
 import type { ID, MindDoc, TaskInfo, Topic } from '../types';
 import { loadDoc, saveDoc } from '../store/db';
 import { findInSheet, sheetRoots } from './tree';
-import { isEn, LOCALE, t } from '../i18n/index';
+import { isRu, LOCALE, t } from '../i18n/index';
 
 const untitled = () => t('Без названия');
 
@@ -131,7 +131,7 @@ const MONTHS_GEN = ['января', 'февраля', 'марта', 'апрел�
 /** «2 окт» / «2 окт 2027» */
 export function formatShortDate(s: string): string {
   const d = fromYmd(s);
-  if (isEn) return d.toLocaleDateString(LOCALE, { month: 'short', day: 'numeric', ...(d.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}) });
+  if (!isRu) return d.toLocaleDateString(LOCALE, { month: 'short', day: 'numeric', ...(d.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}) });
   const m = MONTHS_GEN[d.getMonth()].slice(0, 3);
   const y = d.getFullYear() !== new Date().getFullYear() ? ` ${d.getFullYear()}` : '';
   return `${d.getDate()} ${m}${y}`;
