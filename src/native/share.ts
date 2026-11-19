@@ -5,6 +5,7 @@
 import { toast, useApp } from '../store/appStore';
 import type { MindDoc } from '../types';
 import { sharedBlocks, sharedNoteBlocks, sharedTitle } from './shareCore';
+import { t } from '../i18n/index';
 
 /** Присланная картинка: файл в files/shared (Android) */
 export interface SharedImage {
@@ -91,9 +92,9 @@ export async function shareToTask(s: SharedText) {
   const { ensureTasks, addTask, openTask } = await import('../tasks/store');
   await ensureTasks();
   const { head, rest } = split(s, 200);
-  const t = addTask({ title: head, ...(rest ? { notes: rest } : {}) });
-  if (!t) return toast('Не удалось добавить задачу');
-  toast('Задача добавлена во «Входящие»', { label: 'Открыть', run: () => openTask(t.id) });
+  const task = addTask({ title: head, ...(rest ? { notes: rest } : {}) });
+  if (!task) return toast(t('Не удалось добавить задачу'));
+  toast(t('Задача добавлена во «Входящие»'), { label: t('Открыть'), run: () => openTask(task.id) });
 }
 
 export async function shareToNote(s: SharedText, pics: string[] = []) {
@@ -101,18 +102,18 @@ export async function shareToNote(s: SharedText, pics: string[] = []) {
   await ensureNotes();
   const title = sharedTitle(s.text, s.title, pics.length);
   const m = createNote({ title, blocks: sharedNoteBlocks(s.text, title, pics) });
-  if (!m) return toast('Не удалось сохранить заметку');
+  if (!m) return toast(t('Не удалось сохранить заметку'));
   useApp.getState().go('notes');
   setTimeout(() => void openNote(m.id), 50);
-  toast('Заметка сохранена');
+  toast(t('Заметка сохранена'));
 }
 
 /** В заметку дня, в «Мысли» — с временем */
 export async function shareToDaily(s: SharedText, pics: string[] = []) {
   const { appendToDaily, openDailyNote } = await import('../notes/daily');
   const r = await appendToDaily(s.text.replace(/\s*\n\s*/g, ' '), 'thoughts', undefined, sharedBlocks('', pics));
-  if (!r) return toast('Не удалось записать');
-  toast('Записано в заметку дня', { label: 'Открыть', run: () => void openDailyNote() });
+  if (!r) return toast(t('Не удалось записать'));
+  toast(t('Записано в заметку дня'), { label: t('Открыть'), run: () => void openDailyNote() });
 }
 
 /** Дописать в конец существующей заметки */
@@ -120,10 +121,10 @@ export async function shareAppend(noteId: string, s: SharedText, pics: string[] 
   const { appendToNote } = await import('../notes/daily');
   const { openNote, useNotes } = await import('../notes/store');
   const ok = await appendToNote(noteId, sharedBlocks(s.text, pics));
-  if (!ok) return toast('Не удалось дописать');
-  const title = useNotes.getState().data?.notes.find((n) => n.id === noteId)?.title || 'заметку';
-  toast(`Дописано в «${title}»`, {
-    label: 'Открыть',
+  if (!ok) return toast(t('Не удалось дописать'));
+  const title = useNotes.getState().data?.notes.find((n) => n.id === noteId)?.title || t('заметку');
+  toast(t('Дописано в «{title}»', { title }), {
+    label: t('Открыть'),
     run: () => {
       useApp.getState().go('notes');
       setTimeout(() => void openNote(noteId), 50);
@@ -154,7 +155,7 @@ export async function suggestNotes(text: string, limit = 3): Promise<{ id: strin
     .map((n) => ({ id: n.id, title: n.title }));
 }
 
-const INBOX_TITLE = 'Входящие';
+const INBOX_TITLE = t('Входящие');
 
 /** Новая тема в карте «Входящие» (карта создаётся при первом использовании) */
 export async function shareToMap(s: SharedText) {
@@ -172,7 +173,7 @@ export async function shareToMap(s: SharedText) {
     const raw = await loadDoc(meta.id);
     if (raw && !('locked' in raw)) doc = raw;
   }
-  doc ??= newDoc(INBOX_TITLE, newSheet('Лист 1', INBOX_TITLE));
+  doc ??= newDoc(INBOX_TITLE, newSheet(t('Лист {n}', { n: 1 }), INBOX_TITLE));
   const sheet = doc.sheets[0];
   const { head, rest, url } = split(s, 200);
   const topic = newTopic(head);
@@ -182,6 +183,6 @@ export async function shareToMap(s: SharedText) {
   doc.updatedAt = Date.now();
   await saveDoc(doc);
   useApp.setState({ docsVersion: Date.now() });
-  toast('Добавлено в карту «Входящие»');
+  toast(t('Добавлено в карту «Входящие»'));
   await openDoc(doc.id, topic.id);
 }

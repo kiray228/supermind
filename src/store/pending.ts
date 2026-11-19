@@ -7,6 +7,7 @@ import { useEffect } from 'react';
 import { create } from 'zustand';
 import { useCloud, isLocalOnly } from './cloud';
 import { dirtyKeys, onDirty } from './kv';
+import { LOCALE, tn } from '../i18n/index';
 
 interface PendingState {
   /** сколько изменённых ключей ждёт отправки */
@@ -82,15 +83,12 @@ export function usePendingSync() {
 
 /** «5 изменений» */
 export function changesText(n: number) {
-  const m10 = n % 10;
-  const m100 = n % 100;
-  const w = m10 === 1 && m100 !== 11 ? 'изменение' : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? 'изменения' : 'изменений';
-  return `${n} ${w}`;
+  return `${n} ${tn(n, 'изменение', 'изменения', 'изменений')}`;
 }
 
 /** «14:32» сегодня, иначе «7 окт., 14:32» */
 export function clockText(ms: number) {
   const d = new Date(ms);
-  const time = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-  return d.toDateString() === new Date().toDateString() ? time : `${d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}, ${time}`;
+  const time = d.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
+  return d.toDateString() === new Date().toDateString() ? time : `${d.toLocaleDateString(LOCALE, { day: 'numeric', month: 'short' })}, ${time}`;
 }

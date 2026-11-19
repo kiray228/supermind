@@ -3,6 +3,7 @@ import { CheckSquare, Loader2, Network, Newspaper, NotebookPen, PenLine, StickyN
 import { firstUrl } from '../notes/articleCore';
 import type { ArticleStage } from '../notes/article';
 import { cleanupSharedImages, loadSharedImages, shareAppend, shareToDaily, shareToMap, shareToNote, shareToTask, suggestNotes, type SharedText } from './share';
+import { t } from '../i18n/index';
 
 /** Окно «Сохранить в SuperMind»: задача / заметка / в заметку дня / дописать в заметку / карта «Входящие» */
 export default function ShareSheet({ shared, onClose }: { shared: SharedText; onClose: () => void }) {
@@ -80,44 +81,46 @@ export default function ShareSheet({ shared, onClose }: { shared: SharedText; on
   return (
     <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal" style={{ width: 'min(480px,100%)' }}>
-        <h2>Сохранить в SuperMind</h2>
+        <h2>{t('Сохранить в SuperMind')}</h2>
         {shared.title && <p className="muted" style={{ margin: '6px 0 0' }}>{shared.title}</p>}
         {images.length > 0 && (
           <div style={{ display: 'flex', gap: 8, overflowX: 'auto', marginTop: 12 }}>
             {loading ? (
               <span className="muted" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <Loader2 size={15} className="spin" /> Фото: {images.length}
+                <Loader2 size={15} className="spin" /> {t('Фото: {n}', { n: images.length })}
               </span>
             ) : hasPics ? (
               pics!.map((p, i) => <img key={i} src={p} alt="" style={{ height: 72, borderRadius: 10, flexShrink: 0 }} />)
             ) : (
-              <span className="muted">Фото не удалось открыть</span>
+              <span className="muted">{t('Фото не удалось открыть')}</span>
             )}
           </div>
         )}
-        <textarea className="textarea" style={{ marginTop: 12 }} rows={hasPics ? 2 : 4} value={text} placeholder={images.length ? 'Подпись (необязательно)' : ''} onChange={(e) => setText(e.target.value)} />
+        <textarea className="textarea" style={{ marginTop: 12 }} rows={hasPics ? 2 : 4} value={text} placeholder={images.length ? t('Подпись (необязательно)') : ''} onChange={(e) => setText(e.target.value)} />
         {url && (
           <button className="btn btn-primary" style={{ width: '100%', marginTop: 14, gap: 8 }} disabled={busy || !!stage} onClick={() => void article()}>
             {stage ? <Loader2 size={18} className="spin" /> : <Newspaper size={18} />}
-            {stage === 'fetch' ? 'Читаю статью…' : stage === 'summary' ? 'ИИ выделяет главное…' : stage === 'save' ? 'Сохраняю…' : 'Статья: главное от ИИ'}
+            {stage === 'fetch' ? t('Читаю статью…') : stage === 'summary' ? t('ИИ выделяет главное…') : stage === 'save' ? t('Сохраняю…') : t('Статья: главное от ИИ')}
           </button>
         )}
         <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
           <button className={url ? 'btn' : 'btn btn-primary'} style={btn} disabled={off || !!stage} onClick={run(shareToNote)}>
             <StickyNote size={20} />
-            Заметка
+            {t('Заметка')}
           </button>
           <button className="btn" style={btn} disabled={off || !!stage} onClick={run(shareToDaily)}>
-            <NotebookPen size={20} />В заметку дня
+            <NotebookPen size={20} />
+            {t('В заметку дня')}
           </button>
           {!images.length && (
             <>
               <button className="btn" style={btn} disabled={off || !!stage} onClick={run((s) => shareToTask(s))}>
                 <CheckSquare size={20} />
-                Задача
+                {t('Задача')}
               </button>
               <button className="btn" style={btn} disabled={off || !!stage} onClick={run((s) => shareToMap(s))}>
-                <Network size={20} />В карту
+                <Network size={20} />
+                {t('В карту')}
               </button>
             </>
           )}
@@ -125,7 +128,7 @@ export default function ShareSheet({ shared, onClose }: { shared: SharedText; on
         {suggest.length > 0 && (
           <>
             <div className="muted small" style={{ marginTop: 14 }}>
-              Дописать в заметку
+              {t('Дописать в заметку')}
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
               {suggest.map((n) => (
@@ -145,7 +148,7 @@ export default function ShareSheet({ shared, onClose }: { shared: SharedText; on
               onClose();
             }}
           >
-            Отмена
+            {t('Отмена')}
           </button>
         </div>
       </div>

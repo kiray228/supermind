@@ -22,6 +22,7 @@ import { ensureGoals, openGoal } from '../goals/store';
 import { buildAgenda, buildHabits, buildMaps, invalidatePhoneEvents, subscribeGoals } from './widgetData';
 import { joinShared, type SharedImage, type SharedText } from './share';
 import { actionFromUrl } from './widgetUrl';
+import { t } from '../i18n/index';
 
 export type PendingAction =
   | { type: 'complete'; id: string; date?: string }
@@ -90,7 +91,7 @@ async function buildPayload(): Promise<string> {
     .filter((t) => isActive(t) && !!t.date && t.date <= last)
     .sort((a, b) => (a.date! < b.date! ? -1 : a.date! > b.date! ? 1 : (a.time ?? '99').localeCompare(b.time ?? '99')))
     .slice(0, MAX_TASKS)
-    .map((t) => ({ id: t.id, t: t.title || 'Без названия', d: t.date, ...(t.time ? { tm: t.time } : {}), ...(t.duration ? { du: t.duration } : {}), ...(t.priority ? { p: t.priority } : {}) }));
+    .map((x) => ({ id: x.id, t: x.title || t('Без названия'), d: x.date, ...(x.time ? { tm: x.time } : {}), ...(x.duration ? { du: x.duration } : {}), ...(x.priority ? { p: x.priority } : {}) }));
   const habits: Record<string, [number, number]> = {};
   const p = await get<PlannerData>('planner').catch(() => undefined);
   const list = activeHabits(p?.habits);

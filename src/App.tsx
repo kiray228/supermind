@@ -30,6 +30,7 @@ import { mark, whenIdle } from './perf';
 import { initLock } from './ui/lock';
 import { LockScreen } from './ui/LockScreen';
 import { ViewBoundary } from './ui/ViewBoundary';
+import { t } from './i18n/index';
 
 // код-пароль — до первой отрисовки: содержимое не мелькнёт перед экраном блокировки
 initLock();
@@ -72,20 +73,20 @@ const isWide = () => window.matchMedia(WIDE).matches;
 
 /** Боковая панель компьютера: все разделы */
 const NAV: { id: Extract<View, SectionId>; label: string }[] = [
-  { id: 'today', label: 'Сегодня' },
-  { id: 'home', label: 'Карты' },
-  { id: 'tasks', label: 'Задачи' },
-  { id: 'calendar', label: 'Календарь' },
-  { id: 'habits', label: 'Привычки' },
-  { id: 'health', label: 'Здоровье' },
-  { id: 'assistant', label: 'Ассистент' },
-  { id: 'notes', label: 'Заметки' },
-  { id: 'goals', label: 'Цели' },
-  { id: 'finance', label: 'Финансы' },
-  { id: 'progress', label: 'Прогресс' },
-  { id: 'focus', label: 'Фокус' },
-  { id: 'board', label: 'Доска' },
-  { id: 'settings', label: 'Настройки' },
+  { id: 'today', label: t('Сегодня') },
+  { id: 'home', label: t('Карты') },
+  { id: 'tasks', label: t('Задачи') },
+  { id: 'calendar', label: t('Календарь') },
+  { id: 'habits', label: t('Привычки') },
+  { id: 'health', label: t('Здоровье') },
+  { id: 'assistant', label: t('Ассистент') },
+  { id: 'notes', label: t('Заметки') },
+  { id: 'goals', label: t('Цели') },
+  { id: 'finance', label: t('Финансы') },
+  { id: 'progress', label: t('Прогресс') },
+  { id: 'focus', label: t('Фокус') },
+  { id: 'board', label: t('Доска') },
+  { id: 'settings', label: t('Настройки') },
 ];
 
 
@@ -252,7 +253,7 @@ export default function App() {
         </nav>
       )}
       {view !== 'editor' && !wide && (
-        <nav className="tabbar" aria-label="Разделы">
+        <nav className="tabbar" aria-label={t('Разделы')}>
           {phoneTabs.map((id, i) => (
             <PhoneTabButton
               key={id}

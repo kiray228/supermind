@@ -7,6 +7,7 @@ import { create } from 'zustand';
 import { isObj, mergeValues } from './merge';
 import { mark } from '../perf';
 import { clearAllDirty, dirtyAt, clearDirty, dirtyKeys, get, hasDirty, isSynced, keys, markDirty, onDirty, set, setFromSync, delFromSync, META_KEY } from './kv';
+import { t } from '../i18n/index';
 
 const PROD_API = 'https://br-soft-term-b1xn6yim-supermind.compute.c-5.eu-central-1.aws.neon.tech';
 /** В режиме разработки можно подключить локальный сервер: localStorage['sm-api'] = 'http://127.0.0.1:8787' */
@@ -73,10 +74,10 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   try {
     res = await fetch(API + path, { ...init, headers: { 'Content-Type': 'application/json', ...authHeader(), ...(init.headers ?? {}) } });
   } catch {
-    throw new ApiError(0, 'Нет соединения с сервером — проверьте интернет');
+    throw new ApiError(0, t('Нет соединения с сервером — проверьте интернет'));
   }
   const data = (await res.json().catch(() => ({}))) as T & { error?: string };
-  if (!res.ok) throw new ApiError(res.status, data.error ?? `Ошибка сервера (${res.status})`);
+  if (!res.ok) throw new ApiError(res.status, data.error ?? t('Ошибка сервера ({status})', { status: res.status }));
   return data;
 }
 
@@ -136,9 +137,9 @@ async function startSession(a: Account) {
   if (foreign) {
     const { confirmDialog } = await import('../ui/dialogs');
     const move = await confirmDialog(
-      'Данные другого аккаунта',
-      `На этом устройстве карты и записи, с которыми входили в другой аккаунт. Добавить их в аккаунт ${a.user.email}? Если нет — они уберутся с устройства, но останутся в автокопии «Перед входом в аккаунт».`,
-      { okText: 'Добавить', cancelText: 'Не добавлять' },
+      t('Данные другого аккаунта'),
+      t('На этом устройстве карты и записи, с которыми входили в другой аккаунт. Добавить их в аккаунт {email}? Если нет — они уберутся с устройства, но останутся в автокопии «Перед входом в аккаунт».', { email: a.user.email }),
+      { okText: t('Добавить'), cancelText: t('Не добавлять') },
     );
     foreign = !move;
   }
@@ -285,7 +286,7 @@ export function syncNow(): Promise<void> {
       if (err.status === 401) {
         account = null;
         await delFromSync(ACCOUNT_KEY);
-        useCloud.setState({ account: null, status: 'error', error: 'Сессия истекла — войдите снова' });
+        useCloud.setState({ account: null, status: 'error', error: t('Сессия истекла — войдите снова') });
       } else useCloud.setState({ status: err.status === 0 ? 'offline' : 'error', error: err.message });
     } finally {
       // полученное применяем, даже если отправка не удалась: иначе разделы остались бы со старыми данными
@@ -388,7 +389,7 @@ async function keepConflictCopy(local: unknown, remote: unknown, winner: unknown
   if (strip(loser) === strip(winner)) return;
   const { uid } = await import('../utils/tree');
   const id = uid();
-  const copy = { ...loser, id, title: `${String(loser.title || 'Карта')} (${loser === local ? 'версия с этого устройства' : 'версия с другого устройства'})`, updatedAt: Date.now() };
+  const copy = { ...loser, id, title: loser === local ? t('{title} (версия с этого устройства)', { title: String(loser.title || t('Карта')) }) : t('{title} (версия с другого устройства)', { title: String(loser.title || t('Карта')) }), updatedAt: Date.now() };
   await set(`doc:${id}`, copy);
   changed.add(`doc:${id}`);
 }
@@ -405,7 +406,8 @@ async function keepNoteConflictCopy(key: string, local: unknown, remote: unknown
   const { uid } = await import('../utils/tree');
   const id = uid();
   const now = Date.now();
-  const title = `${String(loser.title || 'Заметка')} (${loser === local ? 'версия с этого устройства' : 'версия с другого устройства'})`;
+  const base = String(loser.title || t('Заметка'));
+  const title = loser === local ? t('{title} (версия с этого устройства)', { title: base }) : t('{title} (версия с другого устройства)', { title: base });
   await set(`note:${id}`, { ...loser, title, updatedAt: now });
   await set('notes', { ...index, notes: [...(index.notes as Obj[]), { ...(meta ?? { preview: '' }), id, title, pinned: false, trashed: undefined, createdAt: now, updatedAt: now }] });
   changed.add(`note:${id}`);
@@ -493,7 +495,7 @@ async function reconcileIndex(changed: Set<string>) {
     if (ids.has(id)) continue;
     const doc = await get<Obj>(k);
     if (!doc) continue;
-    if (doc.locked) next.push({ id, title: 'Защищённая карта', createdAt: Number(doc.updatedAt) || 0, updatedAt: Number(doc.updatedAt) || 0, locked: true });
+    if (doc.locked) next.push({ id, title: t('Защищённая карта'), createdAt: Number(doc.updatedAt) || 0, updatedAt: Number(doc.updatedAt) || 0, locked: true });
     else {
       const { metaFor } = await import('./db');
       next.push(metaFor(doc as never) as unknown as Obj);

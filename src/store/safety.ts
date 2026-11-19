@@ -5,6 +5,7 @@
  */
 import { createStore, entries, get as sget, set as sset, del as sdel, keys as skeys } from 'idb-keyval';
 import { get, set } from './kv';
+import { t, tn } from '../i18n/index';
 
 declare const __APP_VERSION__: string;
 export const APP_VERSION = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : 'dev';
@@ -18,11 +19,11 @@ const KEEP_DAYS = 14;
 
 export type SnapshotReason = 'auto' | 'update' | 'login' | 'restore' | 'manual';
 export const REASON_LABEL: Record<SnapshotReason, string> = {
-  auto: 'Автоматическая',
-  update: 'Перед обновлением',
-  login: 'Перед входом в аккаунт',
-  restore: 'Перед восстановлением',
-  manual: 'Вручную',
+  auto: t('Автоматическая'),
+  update: t('Перед обновлением'),
+  login: t('Перед входом в аккаунт'),
+  restore: t('Перед восстановлением'),
+  manual: t('Вручную'),
 };
 
 export interface SnapshotInfo {
@@ -58,24 +59,16 @@ export function summarize(data: Record<string, unknown>): string {
   const maps = Array.isArray(data['docs:index']) ? (data['docs:index'] as unknown[]).length : 0;
   const tasks = count(data.tasks, 'tasks', (t) => !t.deleted && !t.trashedAt);
   const notes = Object.keys(data).filter((k) => k.startsWith('note:')).length;
-  const parts = [`${maps} ${plural(maps, 'карта', 'карты', 'карт')}`, `${tasks} ${plural(tasks, 'задача', 'задачи', 'задач')}`];
-  if (notes) parts.push(`${notes} ${plural(notes, 'заметка', 'заметки', 'заметок')}`);
+  const parts = [`${maps} ${tn(maps, 'карта', 'карты', 'карт')}`, `${tasks} ${tn(tasks, 'задача', 'задачи', 'задач')}`];
+  if (notes) parts.push(`${notes} ${tn(notes, 'заметка', 'заметки', 'заметок')}`);
   // остальное — только если есть: по копии должно быть видно, что привычки, цели и деньги в ней тоже
   const habits = count(data.planner, 'habits', (h) => !h.deleted && !h.archived);
   const goals = count(data.goals, 'goals');
   const ops = count(data.finance, 'transactions');
-  if (habits) parts.push(`${habits} ${plural(habits, 'привычка', 'привычки', 'привычек')}`);
-  if (goals) parts.push(`${goals} ${plural(goals, 'цель', 'цели', 'целей')}`);
-  if (ops) parts.push(`${ops} ${plural(ops, 'операция', 'операции', 'операций')}`);
+  if (habits) parts.push(`${habits} ${tn(habits, 'привычка', 'привычки', 'привычек')}`);
+  if (goals) parts.push(`${goals} ${tn(goals, 'цель', 'цели', 'целей')}`);
+  if (ops) parts.push(`${ops} ${tn(ops, 'операция', 'операции', 'операций')}`);
   return parts.join(' · ');
-}
-
-function plural(n: number, one: string, few: string, many: string) {
-  const m10 = n % 10;
-  const m100 = n % 100;
-  if (m10 === 1 && m100 !== 11) return one;
-  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
-  return many;
 }
 
 /** Сделать копию всего, что есть на устройстве. Пустое не копируем. */

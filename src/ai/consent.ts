@@ -3,6 +3,7 @@
  * (требование App Store 5.1.2(i) и раскрытие данных для Google Play). Отказ — запрос не уходит.
  */
 import { AIError } from './claude';
+import { t } from '../i18n/index';
 
 export type AiProvider = 'server' | 'claude';
 
@@ -33,8 +34,8 @@ export function setAiConsent(p: AiProvider, on: boolean) {
 
 const TEXT: Record<AiProvider, string> = {
   server:
-    'Ваш запрос и нужные для ответа данные (например, текст карты или заметки, задачи и привычки дня) отправятся через сервер SuperMind бесплатной модели ИИ — Google Gemini или Groq. Эти сервисы могут использовать запросы для улучшения своих моделей. Финансы и настроение можно скрыть от ИИ в Настройках → «Искусственный интеллект».',
-  claude: 'Ваш запрос и нужные для ответа данные (например, текст карты или заметки) отправятся напрямую в Anthropic (Claude) по вашему ключу.',
+    t('Ваш запрос и нужные для ответа данные (например, текст карты или заметки, задачи и привычки дня) отправятся через сервер SuperMind бесплатной модели ИИ — Google Gemini или Groq. Эти сервисы могут использовать запросы для улучшения своих моделей. Финансы и настроение можно скрыть от ИИ в Настройках → «Искусственный интеллект».'),
+  claude: t('Ваш запрос и нужные для ответа данные (например, текст карты или заметки) отправятся напрямую в Anthropic (Claude) по вашему ключу.'),
 };
 
 const pending: Partial<Record<AiProvider, Promise<boolean>>> = {};
@@ -46,7 +47,7 @@ export async function askAiConsent(p: AiProvider): Promise<boolean> {
   if (aiConsentGiven(p)) return true;
   if (declined.has(p)) return false;
   pending[p] ??= import('../ui/dialogs')
-    .then(({ confirmDialog }) => confirmDialog('Отправлять данные ИИ?', TEXT[p], { okText: 'Разрешить', cancelText: 'Не сейчас' }))
+    .then(({ confirmDialog }) => confirmDialog(t('Отправлять данные ИИ?'), TEXT[p], { okText: t('Разрешить'), cancelText: t('Не сейчас') }))
     .then((ok) => {
       if (ok) setAiConsent(p, true);
       else declined.add(p);
@@ -58,5 +59,5 @@ export async function askAiConsent(p: AiProvider): Promise<boolean> {
 
 /** Для запросов к ИИ: без согласия — понятная ошибка вместо отправки */
 export async function requireAiConsent(p: AiProvider) {
-  if (!(await askAiConsent(p))) throw new AIError('ИИ выключен: отправка данных не разрешена. Включить — Настройки → «Искусственный интеллект» → «Отправлять данные ИИ».');
+  if (!(await askAiConsent(p))) throw new AIError(t('ИИ выключен: отправка данных не разрешена. Включить — Настройки → «Искусственный интеллект» → «Отправлять данные ИИ».'));
 }

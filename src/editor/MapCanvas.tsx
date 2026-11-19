@@ -9,6 +9,7 @@ import { FONT_FAMILY } from '../layout/measure';
 import { findInSheet } from '../utils/tree';
 import { primeKeyboard } from '../ui/keyboard';
 import { haptic, isTouchUI, keyboardInset, useKeyboardInset, visibleViewport } from './touch';
+import { t } from '../i18n/index';
 
 const viewTransform = (v: View) => `translate(${v.x},${v.y}) scale(${v.k})`;
 
@@ -1005,16 +1006,16 @@ function QuickAdd({ n, view, isRoot, wrap, onAdd }: { n: LNode; view: View; isRo
       onPointerUp={(e) => e.stopPropagation()}
       onContextMenu={(e) => e.stopPropagation()}
     >
-      <button onClick={() => onAdd('child')} aria-label="Добавить подтему">
+      <button onClick={() => onAdd('child')} aria-label={t('Добавить подтему')}>
         <ArrowElbowDownRight weight="bold" />
-        <span>Подтема</span>
+        <span>{t('Подтема')}</span>
       </button>
       {!isRoot && (
         <>
           <span className="quick-add-sep" />
-          <button onClick={() => onAdd('sibling')} aria-label="Добавить тему рядом">
+          <button onClick={() => onAdd('sibling')} aria-label={t('Добавить тему рядом')}>
             <Plus weight="bold" />
-            <span>Рядом</span>
+            <span>{t('Рядом')}</span>
           </button>
         </>
       )}
@@ -1140,7 +1141,7 @@ function InlineEditor({ n, view, animating }: { n: LNode; view: View; animating?
         transition: animating ? 'left .4s cubic-bezier(.2,.8,.2,1), top .4s cubic-bezier(.2,.8,.2,1), font-size .4s cubic-bezier(.2,.8,.2,1), min-width .4s, min-height .4s, padding .4s' : undefined,
       }}
       spellCheck
-      placeholder="Введите текст"
+      placeholder={t('Введите текст')}
     />
     </>
   );
@@ -1169,18 +1170,18 @@ function EditAccessory({ isRoot, onAction }: { isRoot: boolean; onAction(after?:
     >
       <button onClick={() => act('child')}>
         <ArrowElbowDownRight weight="bold" />
-        Подтема
+        {t('Подтема')}
       </button>
       {!isRoot && (
         <button onClick={() => act('sibling')}>
           <Plus weight="bold" />
-          Рядом
+          {t('Рядом')}
         </button>
       )}
       <span className="grow" />
       <button className="done" onClick={() => act()}>
         <Check weight="bold" />
-        Готово
+        {t('Готово')}
       </button>
     </div>,
     document.body,

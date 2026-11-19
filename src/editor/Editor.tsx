@@ -30,11 +30,12 @@ import { exportDocx, exportPptx, exportXlsx } from '../io/office';
 import { exportNative } from '../io/index';
 import { getTheme } from '../themes';
 import { haptic, isTouchUI, useKeyboardInset } from './touch';
+import { t, tn } from '../i18n/index';
 import './editor.css';
 
 const MapHistory = lazy(() => import('./MapHistory'));
 
-const levelWord = (n: number) => `${n} ${n === 1 ? 'уровень' : n < 5 ? 'уровня' : 'уровней'}`;
+const levelWord = (n: number) => `${n} ${tn(n, 'уровень', 'уровня', 'уровней')}`;
 
 type Mode = 'map' | 'outline' | 'gantt';
 type Panel = null | 'inspector' | 'ai';
@@ -59,9 +60,9 @@ interface MenuItem {
 }
 
 const MODES: { id: Mode; label: string; icon: Icon }[] = [
-  { id: 'map', label: 'Карта', icon: Graph },
-  { id: 'outline', label: 'Структура', icon: TreeView },
-  { id: 'gantt', label: 'Гант', icon: ChartBarHorizontal },
+  { id: 'map', label: t('Карта'), icon: Graph },
+  { id: 'outline', label: t('Структура'), icon: TreeView },
+  { id: 'gantt', label: t('Гант'), icon: ChartBarHorizontal },
 ];
 
 const isMobile = () => window.matchMedia('(max-width: 760px)').matches;
@@ -193,20 +194,20 @@ export default function Editor() {
     const name = findInSheet(sh, list[0])?.topic.text.trim() ?? '';
     s.deleteTopics(list);
     haptic(12);
-    const label = list.length > 1 ? `Удалено тем: ${list.length}` : name ? `Удалено: «${name.length > 26 ? name.slice(0, 25) + '…' : name}»` : 'Тема удалена';
-    toast(label, { label: 'Отменить', run: () => useDoc.getState().undo() });
+    const label = list.length > 1 ? t('Удалено тем: {n}', { n: list.length }) : name ? t('Удалено: «{name}»', { name: name.length > 26 ? name.slice(0, 25) + '…' : name }) : t('Тема удалена');
+    toast(label, { label: t('Отменить'), run: () => useDoc.getState().undo() });
   };
   const del = () => {
     if (selectedRel) {
       st.removeRelationship(selectedRel);
       haptic(12);
-      toast('Связь удалена', { label: 'Отменить', run: () => useDoc.getState().undo() });
+      toast(t('Связь удалена'), { label: t('Отменить'), run: () => useDoc.getState().undo() });
     } else removeTopics();
   };
   const startRel = () => {
-    if (!selId) return toast('Сначала выберите тему');
+    if (!selId) return toast(t('Сначала выберите тему'));
     setRelMode(true);
-    toast('Нажмите на тему, с которой нужно связать');
+    toast(t('Нажмите на тему, с которой нужно связать'));
   };
   const onRelTarget = (id: string) => {
     setRelMode(false);
@@ -230,7 +231,7 @@ export default function Editor() {
     setMenu({
       x: Math.max(8, r.left - 80),
       y: r.bottom + 6,
-      title: 'Вид',
+      title: t('Вид'),
       single: true,
       items: MODES.map((m) => ({ icon: <m.icon size={18} />, label: m.label, checked: mode === m.id, onClick: () => setMode(m.id) })),
     });
@@ -239,11 +240,11 @@ export default function Editor() {
   const exportAs = useCallback(
     async (kind: string) => {
       if (!doc || !sheet) return;
-      const name = safeFilename(doc.title || 'Карта');
+      const name = safeFilename(doc.title || t('Карта'));
       const bg = sheet.background ?? getTheme(sheet.themeId).background;
       const svg = () => {
         const el = canvas.current?.svg();
-        if (!el) throw new Error('Переключитесь в режим карты');
+        if (!el) throw new Error(t('Переключитесь в режим карты'));
         return el;
       };
       try {
@@ -251,7 +252,7 @@ export default function Editor() {
           setMode('map');
           await new Promise((r) => setTimeout(r, 120));
         }
-        toast('Экспорт…');
+        toast(t('Экспорт…'));
         switch (kind) {
           case 'png': await downloadBlob(await exportPng(svg(), bg, 2), name + '.png'); break;
           case 'svg': await downloadBlob(exportSvgBlob(svg(), bg), name + '.svg'); break;
@@ -266,7 +267,7 @@ export default function Editor() {
           case 'native': await downloadBlob(exportNative(doc), name + '.supermind'); break;
         }
       } catch (e) {
-        toast('Ошибка экспорта: ' + (e instanceof Error ? e.message : String(e)));
+        toast(t('Ошибка экспорта: {error}', { error: e instanceof Error ? e.message : String(e) }));
       }
     },
     [doc, sheet, mode],
@@ -274,26 +275,26 @@ export default function Editor() {
 
   const togglePassword = async () => {
     if (password) {
-      if (await confirmDialog('Снять пароль?', 'Документ будет храниться без шифрования.')) {
+      if (await confirmDialog(t('Снять пароль?'), t('Документ будет храниться без шифрования.'))) {
         st.setPassword(null);
-        toast('Пароль снят');
+        toast(t('Пароль снят'));
       }
       return;
     }
-    const p = await askText('Защитить паролем', { message: 'Карта будет зашифрована (AES-256). Если забудете пароль — восстановить её не получится.', placeholder: 'Пароль' });
+    const p = await askText(t('Защитить паролем'), { message: t('Карта будет зашифрована (AES-256). Если забудете пароль — восстановить её не получится.'), placeholder: t('Пароль') });
     if (!p) return;
-    const p2 = await askText('Повторите пароль', { placeholder: 'Пароль ещё раз' });
-    if (p !== p2) return toast('Пароли не совпадают');
+    const p2 = await askText(t('Повторите пароль'), { placeholder: t('Пароль ещё раз') });
+    if (p !== p2) return toast(t('Пароли не совпадают'));
     st.setPassword(p);
-    toast('Карта зашифрована 🔒');
+    toast(t('Карта зашифрована 🔒'));
   };
 
   const openExportMenu = (x: number, y: number) =>
     setMenu({
       x, y,
-      title: 'Экспорт и отправка',
+      title: t('Экспорт и отправка'),
       items: [
-        { icon: <DownloadSimple size={16} />, label: 'PNG (изображение)', onClick: () => exportAs('png') },
+        { icon: <DownloadSimple size={16} />, label: t('PNG (изображение)'), onClick: () => exportAs('png') },
         { icon: <DownloadSimple size={16} />, label: 'PDF', onClick: () => exportAs('pdf') },
         { icon: <DownloadSimple size={16} />, label: 'SVG', onClick: () => exportAs('svg') },
         { icon: <DownloadSimple size={16} />, label: 'Xmind (.xmind)', onClick: () => exportAs('xmind') },
@@ -303,7 +304,7 @@ export default function Editor() {
         { icon: <DownloadSimple size={16} />, label: 'PowerPoint (.pptx)', onClick: () => exportAs('pptx') },
         { icon: <DownloadSimple size={16} />, label: 'Markdown', onClick: () => exportAs('md') },
         { icon: <DownloadSimple size={16} />, label: 'OPML', onClick: () => exportAs('opml') },
-        { icon: <DownloadSimple size={16} />, label: 'Файл SuperMind', onClick: () => exportAs('native') },
+        { icon: <DownloadSimple size={16} />, label: t('Файл SuperMind'), onClick: () => exportAs('native') },
       ],
     });
 
@@ -315,7 +316,7 @@ export default function Editor() {
     const roots = f ? [f.topic] : sheetRoots(s);
     const deep = Math.max(0, ...roots.map(treeDepth));
     if (deep < 2) {
-      toast(f ? 'В этой ветви один уровень подтем' : 'В карте пока один уровень тем');
+      toast(f ? t('В этой ветви один уровень подтем') : t('В карте пока один уровень тем'));
       return;
     }
     const cur = shownLevel(roots);
@@ -330,8 +331,8 @@ export default function Editor() {
     };
     const items: MenuItem[] = [];
     for (let n = 1; n < Math.min(deep, 10); n++) items.push({ label: levelWord(n), kbd: kb ? `Alt+${n}` : undefined, checked: cur === n, onClick: () => apply(n) });
-    items.push({ label: 'Все уровни', kbd: kb ? 'Alt+0' : undefined, checked: cur === Infinity, onClick: () => apply(Infinity) });
-    setMenu({ x, y, title: branchId ? 'Сколько уровней показать в ветви' : 'Сколько уровней показать', single: true, items });
+    items.push({ label: t('Все уровни'), kbd: kb ? 'Alt+0' : undefined, checked: cur === Infinity, onClick: () => apply(Infinity) });
+    setMenu({ x, y, title: branchId ? t('Сколько уровней показать в ветви') : t('Сколько уровней показать'), single: true, items });
   };
 
   // «Сохранить»: запись на устройство с проверкой, затем — в облако, если вошли в аккаунт
@@ -342,17 +343,17 @@ export default function Editor() {
     try {
       const { ok } = await saveNow();
       if (!ok) {
-        toast('Не удалось сохранить: ' + (useDoc.getState().saveError ?? 'ошибка записи'), { label: 'Ещё раз', run: () => void saveMap() });
+        toast(t('Не удалось сохранить: {error}', { error: useDoc.getState().saveError ?? t('ошибка записи') }), { label: t('Ещё раз'), run: () => void saveMap() });
         return;
       }
       haptic();
       const { useCloud, syncNow } = await import('../store/cloud');
-      if (!useCloud.getState().account) return void toast('Карта сохранена');
-      if (!navigator.onLine) return void toast('Карта сохранена на устройстве. В облако отправится, когда появится интернет');
-      toast('Карта сохранена, отправляю в облако…');
+      if (!useCloud.getState().account) return void toast(t('Карта сохранена'));
+      if (!navigator.onLine) return void toast(t('Карта сохранена на устройстве. В облако отправится, когда появится интернет'));
+      toast(t('Карта сохранена, отправляю в облако…'));
       await syncNow();
       const c = useCloud.getState();
-      toast(c.status === 'idle' ? 'Карта сохранена на устройстве и в облаке' : 'Карта сохранена на устройстве. В облако отправится позже' + (c.error ? ` (${c.error})` : ''));
+      toast(c.status === 'idle' ? t('Карта сохранена на устройстве и в облаке') : t('Карта сохранена на устройстве. В облако отправится позже') + (c.error ? ` (${c.error})` : ''));
     } finally {
       savingNow.current = false;
     }
@@ -368,23 +369,23 @@ export default function Editor() {
         // на телефоне часть кнопок верхней панели переехала сюда
         ...(touchUI
           ? [
-              { icon: <ArrowClockwise size={16} />, label: 'Повторить', onClick: () => useDoc.getState().redo() },
-              { icon: <MagnifyingGlass size={16} />, label: 'Найти в карте', onClick: openSearch },
-              { icon: <SlidersHorizontal size={16} />, label: 'Формат', onClick: () => setPanel('inspector') },
-              { icon: <FilePlus size={16} />, label: 'Новый лист', onClick: () => st.addSheet() },
+              { icon: <ArrowClockwise size={16} />, label: t('Повторить'), onClick: () => useDoc.getState().redo() },
+              { icon: <MagnifyingGlass size={16} />, label: t('Найти в карте'), onClick: openSearch },
+              { icon: <SlidersHorizontal size={16} />, label: t('Формат'), onClick: () => setPanel('inspector') },
+              { icon: <FilePlus size={16} />, label: t('Новый лист'), onClick: () => st.addSheet() },
               'sep' as const,
             ]
           : []),
-        { icon: <FloppyDisk size={16} />, label: 'Сохранить', kbd: touchUI ? undefined : 'Ctrl+S', onClick: () => void saveMap() },
-        { icon: <PresentationChart size={16} />, label: 'Презентация', onClick: startPitch },
-        { icon: <ArrowsOutSimple size={16} />, label: 'Режим Zen', kbd: 'Ctrl+E', onClick: () => setZen(true) },
-        { icon: <Stack size={16} />, label: 'Уровни…', onClick: () => openLevelsMenu(x, y) },
-        { icon: <ClockCounterClockwise size={16} />, label: 'История версий', onClick: () => setHistory(true) },
-        { icon: <Export size={16} />, label: 'Экспорт…', onClick: () => openExportMenu(x, y) },
+        { icon: <FloppyDisk size={16} />, label: t('Сохранить'), kbd: touchUI ? undefined : 'Ctrl+S', onClick: () => void saveMap() },
+        { icon: <PresentationChart size={16} />, label: t('Презентация'), onClick: startPitch },
+        { icon: <ArrowsOutSimple size={16} />, label: t('Режим Zen'), kbd: 'Ctrl+E', onClick: () => setZen(true) },
+        { icon: <Stack size={16} />, label: t('Уровни…'), onClick: () => openLevelsMenu(x, y) },
+        { icon: <ClockCounterClockwise size={16} />, label: t('История версий'), onClick: () => setHistory(true) },
+        { icon: <Export size={16} />, label: t('Экспорт…'), onClick: () => openExportMenu(x, y) },
         'sep',
-        { icon: password ? <LockOpen size={16} /> : <Lock size={16} />, label: password ? 'Снять пароль' : 'Защитить паролем', onClick: togglePassword },
+        { icon: password ? <LockOpen size={16} /> : <Lock size={16} />, label: password ? t('Снять пароль') : t('Защитить паролем'), onClick: togglePassword },
         // на телефоне клавиатурных сокращений нет
-        ...(window.matchMedia('(pointer: coarse)').matches ? [] : [{ icon: <Keyboard size={16} />, label: 'Горячие клавиши', onClick: () => setShowKeys(true) }]),
+        ...(window.matchMedia('(pointer: coarse)').matches ? [] : [{ icon: <Keyboard size={16} />, label: t('Горячие клавиши'), onClick: () => setShowKeys(true) }]),
       ],
     });
   };
@@ -395,12 +396,12 @@ export default function Editor() {
       setMenu({
         x, y,
         items: [
-          { icon: <Plus size={16} />, label: 'Плавающая тема', onClick: () => { primeKeyboard(); st.addFloating(wx, wy); haptic(); } },
-          { icon: <ClipboardText size={16} />, label: 'Вставить в центральную', kbd: 'Ctrl+V', onClick: () => st.paste(sheet.root.id) },
+          { icon: <Plus size={16} />, label: t('Плавающая тема'), onClick: () => { primeKeyboard(); st.addFloating(wx, wy); haptic(); } },
+          { icon: <ClipboardText size={16} />, label: t('Вставить в центральную'), kbd: 'Ctrl+V', onClick: () => st.paste(sheet.root.id) },
           'sep',
-          { icon: <CornersOut size={16} />, label: 'Вписать в экран', kbd: 'Ctrl+0', onClick: () => canvas.current?.fit() },
-          { icon: <Stack size={16} />, label: 'Показать уровни…', onClick: () => openLevelsMenu(x, y) },
-          { icon: <ArrowsOutSimple size={16} />, label: 'Развернуть всё', onClick: () => st.collapseAll(false) },
+          { icon: <CornersOut size={16} />, label: t('Вписать в экран'), kbd: 'Ctrl+0', onClick: () => canvas.current?.fit() },
+          { icon: <Stack size={16} />, label: t('Показать уровни…'), onClick: () => openLevelsMenu(x, y) },
+          { icon: <ArrowsOutSimple size={16} />, label: t('Развернуть всё'), onClick: () => st.collapseAll(false) },
         ],
       });
       return;
@@ -411,34 +412,34 @@ export default function Editor() {
     setMenu({
       x, y,
       items: [
-        { icon: <PencilSimple size={16} />, label: 'Редактировать', kbd: 'F2', onClick: () => { primeKeyboard(); st.setEditing(topicId); } },
-        { icon: <ArrowElbowDownRight size={16} />, label: 'Подтема', kbd: 'Tab', onClick: () => { primeKeyboard(); st.addChild(topicId); haptic(); } },
+        { icon: <PencilSimple size={16} />, label: t('Редактировать'), kbd: 'F2', onClick: () => { primeKeyboard(); st.setEditing(topicId); } },
+        { icon: <ArrowElbowDownRight size={16} />, label: t('Подтема'), kbd: 'Tab', onClick: () => { primeKeyboard(); st.addChild(topicId); haptic(); } },
         ...(!isRoot && f?.parent ? [
-          { icon: <Plus size={16} />, label: 'Тема рядом', kbd: 'Enter', onClick: () => { primeKeyboard(); st.addSibling(topicId); haptic(); } },
-          { icon: <ArrowLineUp size={16} />, label: 'Родительская тема', kbd: 'Ctrl+Enter', onClick: () => st.addParent(topicId) },
+          { icon: <Plus size={16} />, label: t('Тема рядом'), kbd: 'Enter', onClick: () => { primeKeyboard(); st.addSibling(topicId); haptic(); } },
+          { icon: <ArrowLineUp size={16} />, label: t('Родительская тема'), kbd: 'Ctrl+Enter', onClick: () => st.addParent(topicId) },
         ] : []),
         'sep',
         ...(f?.parent?.id === sheet.root.id && sheet.structure === 'map'
-          ? [{ icon: <ArrowsLeftRight size={16} />, label: topicSide(sheet, topicId) === 'left' ? 'Перенести направо' : 'Перенести налево', onClick: () => st.setSide(topicId, topicSide(sheet, topicId) === 'left' ? 'right' : 'left') }]
+          ? [{ icon: <ArrowsLeftRight size={16} />, label: topicSide(sheet, topicId) === 'left' ? t('Перенести направо') : t('Перенести налево'), onClick: () => st.setSide(topicId, topicSide(sheet, topicId) === 'left' ? 'right' : 'left') }]
           : []),
         ...(topicId !== sheet.root.id && f?.topic.children.length
-          ? [{ icon: <Crosshair size={16} />, label: topicId === focusId ? 'Показать всю карту' : 'Фокус на ветке', kbd: 'Alt+F', onClick: () => st.setFocus(topicId === focusId ? null : topicId) }]
+          ? [{ icon: <Crosshair size={16} />, label: topicId === focusId ? t('Показать всю карту') : t('Фокус на ветке'), kbd: 'Alt+F', onClick: () => st.setFocus(topicId === focusId ? null : topicId) }]
           : focusId === topicId
-            ? [{ icon: <Crosshair size={16} />, label: 'Показать всю карту', kbd: 'Alt+F', onClick: () => st.setFocus(null) }]
+            ? [{ icon: <Crosshair size={16} />, label: t('Показать всю карту'), kbd: 'Alt+F', onClick: () => st.setFocus(null) }]
             : []),
-        { icon: <BezierCurve size={16} />, label: 'Связь', onClick: startRel },
-        { icon: <Selection size={16} />, label: 'Граница', onClick: () => st.addBoundary(topicId) },
-        { icon: <BracketsCurly size={16} />, label: 'Итог', onClick: () => st.addSummary(topicId) },
-        { icon: <NotePencil size={16} />, label: 'Заметка, задача…', onClick: openNote },
-        { icon: <Sparkle size={16} />, label: 'ИИ: идеи для темы', onClick: () => setPanel('ai') },
+        { icon: <BezierCurve size={16} />, label: t('Связь'), onClick: startRel },
+        { icon: <Selection size={16} />, label: t('Граница'), onClick: () => st.addBoundary(topicId) },
+        { icon: <BracketsCurly size={16} />, label: t('Итог'), onClick: () => st.addSummary(topicId) },
+        { icon: <NotePencil size={16} />, label: t('Заметка, задача…'), onClick: openNote },
+        { icon: <Sparkle size={16} />, label: t('ИИ: идеи для темы'), onClick: () => setPanel('ai') },
         'sep',
-        { icon: <Copy size={16} />, label: 'Копировать', kbd: 'Ctrl+C', onClick: () => st.copy() },
-        ...(!isRoot ? [{ icon: <Scissors size={16} />, label: 'Вырезать', kbd: 'Ctrl+X', onClick: () => st.copy(true) }] : []),
-        { icon: <ClipboardText size={16} />, label: 'Вставить', kbd: 'Ctrl+V', onClick: () => st.paste(topicId) },
-        ...(!isRoot && f?.parent ? [{ icon: <CopySimple size={16} />, label: 'Дублировать', kbd: 'Ctrl+D', onClick: () => st.duplicate(topicId) }] : []),
-        ...(f?.topic.children.length ? [{ icon: <ArrowsInLineVertical size={16} />, label: f.topic.collapsed ? 'Развернуть' : 'Свернуть', kbd: 'Ctrl+/', onClick: () => st.toggleCollapse(topicId) }] : []),
-        ...(f && treeDepth(f.topic) >= 2 ? [{ icon: <Stack size={16} />, label: 'Уровни ветви…', onClick: () => openLevelsMenu(x, y, topicId) }] : []),
-        ...(!isRoot ? ['sep' as const, { icon: <Trash size={16} />, label: 'Удалить', kbd: 'Del', danger: true, onClick: () => removeTopics([topicId]) }] : []),
+        { icon: <Copy size={16} />, label: t('Копировать'), kbd: 'Ctrl+C', onClick: () => st.copy() },
+        ...(!isRoot ? [{ icon: <Scissors size={16} />, label: t('Вырезать'), kbd: 'Ctrl+X', onClick: () => st.copy(true) }] : []),
+        { icon: <ClipboardText size={16} />, label: t('Вставить'), kbd: 'Ctrl+V', onClick: () => st.paste(topicId) },
+        ...(!isRoot && f?.parent ? [{ icon: <CopySimple size={16} />, label: t('Дублировать'), kbd: 'Ctrl+D', onClick: () => st.duplicate(topicId) }] : []),
+        ...(f?.topic.children.length ? [{ icon: <ArrowsInLineVertical size={16} />, label: f.topic.collapsed ? t('Развернуть') : t('Свернуть'), kbd: 'Ctrl+/', onClick: () => st.toggleCollapse(topicId) }] : []),
+        ...(f && treeDepth(f.topic) >= 2 ? [{ icon: <Stack size={16} />, label: t('Уровни ветви…'), onClick: () => openLevelsMenu(x, y, topicId) }] : []),
+        ...(!isRoot ? ['sep' as const, { icon: <Trash size={16} />, label: t('Удалить'), kbd: 'Del', danger: true, onClick: () => removeTopics([topicId]) }] : []),
       ],
     });
   };
@@ -637,7 +638,7 @@ export default function Editor() {
     <div className={`editor ${chrome} ${zen ? 'zen' : ''} ${showChrome && panel ? 'panel-open' : ''}${touchUI && editing ? ' touch-editing' : ''}`}>
       {showChrome && (
         <header className="ed-top glass">
-          <button className="icon-btn ed-back" onClick={() => leaveEditor('home')} title="К списку карт" aria-label="К списку карт">
+          <button className="icon-btn ed-back" onClick={() => leaveEditor('home')} title={t('К списку карт')} aria-label={t('К списку карт')}>
             <CaretLeft weight="bold" />
           </button>
           <input
@@ -650,24 +651,24 @@ export default function Editor() {
           <button
             className={`ed-save ${saveError ? 'err' : ''}`}
             onClick={() => void saveMap()}
-            title={saveError ? 'Карта не сохранилась — нажмите, чтобы сохранить' : saving ? 'Сохранение…' : 'Сохранить (Ctrl+S)'}
-            aria-label="Сохранить карту"
+            title={saveError ? t('Карта не сохранилась — нажмите, чтобы сохранить') : saving ? t('Сохранение…') : t('Сохранить (Ctrl+S)')}
+            aria-label={t('Сохранить карту')}
           >
             {password && <Lock size={13} className="ed-save-lock" />}
             {saveError ? <WarningCircle weight="fill" /> : saving ? <CloudArrowUp /> : <FloppyDisk />}
-            <span className="ed-save-label">Сохранить</span>
+            <span className="ed-save-label">{t('Сохранить')}</span>
           </button>
           <div className="grow" />
           {touchUI ? (
             <>
               {/* телефон: вид — одной кнопкой с меню, остальное — в «Ещё» и нижней панели */}
-              <button className="icon-btn ed-mode-btn" onClick={openModeMenu} title="Вид" aria-label={'Вид: ' + MODES.find((m) => m.id === mode)!.label}>
+              <button className="icon-btn ed-mode-btn" onClick={openModeMenu} title={t('Вид')} aria-label={t('Вид: {mode}', { mode: MODES.find((m) => m.id === mode)!.label })}>
                 <CurrentModeIcon mode={mode} />
                 <CaretDown className="ed-mode-caret" weight="bold" />
               </button>
-              <button className="icon-btn" onClick={() => st.undo()} disabled={!canUndo} title="Отменить" aria-label="Отменить"><ArrowCounterClockwise /></button>
-              <button className={`icon-btn ai-btn ${panel === 'ai' ? 'active' : ''}`} onClick={() => setPanel(panel === 'ai' ? null : 'ai')} title="ИИ" aria-label="ИИ-помощник"><Sparkle weight={panel === 'ai' ? 'fill' : 'duotone'} /></button>
-              <button className="icon-btn" onClick={openMoreMenu} title="Ещё" aria-label="Ещё"><DotsThree weight="bold" /></button>
+              <button className="icon-btn" onClick={() => st.undo()} disabled={!canUndo} title={t('Отменить')} aria-label={t('Отменить')}><ArrowCounterClockwise /></button>
+              <button className={`icon-btn ai-btn ${panel === 'ai' ? 'active' : ''}`} onClick={() => setPanel(panel === 'ai' ? null : 'ai')} title={t('ИИ')} aria-label={t('ИИ-помощник')}><Sparkle weight={panel === 'ai' ? 'fill' : 'duotone'} /></button>
+              <button className="icon-btn" onClick={openMoreMenu} title={t('Ещё')} aria-label={t('Ещё')}><DotsThree weight="bold" /></button>
             </>
           ) : (
             <>
@@ -680,12 +681,12 @@ export default function Editor() {
                 ))}
               </div>
               <div className="grow hide-mobile" />
-              <button className="icon-btn" onClick={() => st.undo()} disabled={!canUndo} title="Отменить (Ctrl+Z)"><ArrowCounterClockwise /></button>
-              <button className="icon-btn hide-xs" onClick={() => st.redo()} disabled={!canRedo} title="Повторить (Ctrl+Shift+Z)"><ArrowClockwise /></button>
-              <button className={`icon-btn ${search !== null ? 'active' : ''}`} onClick={() => setSearch(search === null ? '' : null)} title="Поиск (Ctrl+F)"><MagnifyingGlass weight={search !== null ? 'bold' : 'regular'} /></button>
-              <button className={`icon-btn ai-btn ${panel === 'ai' ? 'active' : ''}`} onClick={() => setPanel(panel === 'ai' ? null : 'ai')} title="ИИ"><Sparkle weight={panel === 'ai' ? 'fill' : 'duotone'} /></button>
-              <button className={`icon-btn ${panel === 'inspector' ? 'active' : ''}`} onClick={() => setPanel(panel === 'inspector' ? null : 'inspector')} title="Формат"><SlidersHorizontal weight={panel === 'inspector' ? 'fill' : 'regular'} /></button>
-              <button className="icon-btn" onClick={openMoreMenu} title="Ещё"><DotsThree weight="bold" /></button>
+              <button className="icon-btn" onClick={() => st.undo()} disabled={!canUndo} title={t('Отменить (Ctrl+Z)')}><ArrowCounterClockwise /></button>
+              <button className="icon-btn hide-xs" onClick={() => st.redo()} disabled={!canRedo} title={t('Повторить (Ctrl+Shift+Z)')}><ArrowClockwise /></button>
+              <button className={`icon-btn ${search !== null ? 'active' : ''}`} onClick={() => setSearch(search === null ? '' : null)} title={t('Поиск (Ctrl+F)')}><MagnifyingGlass weight={search !== null ? 'bold' : 'regular'} /></button>
+              <button className={`icon-btn ai-btn ${panel === 'ai' ? 'active' : ''}`} onClick={() => setPanel(panel === 'ai' ? null : 'ai')} title={t('ИИ')}><Sparkle weight={panel === 'ai' ? 'fill' : 'duotone'} /></button>
+              <button className={`icon-btn ${panel === 'inspector' ? 'active' : ''}`} onClick={() => setPanel(panel === 'inspector' ? null : 'inspector')} title={t('Формат')}><SlidersHorizontal weight={panel === 'inspector' ? 'fill' : 'regular'} /></button>
+              <button className="icon-btn" onClick={openMoreMenu} title={t('Ещё')}><DotsThree weight="bold" /></button>
             </>
           )}
         </header>
@@ -697,7 +698,7 @@ export default function Editor() {
           <input
             autoFocus
             className="grow"
-            placeholder="Найти в карте…"
+            placeholder={t('Найти в карте…')}
             value={search}
             onChange={(e) => { setSearch(e.target.value); setSearchIdx(-1); }}
             onKeyDown={(e) => {
@@ -706,9 +707,9 @@ export default function Editor() {
             }}
           />
           <span className="tiny muted">{hits.length ? (searchIdx >= 0 ? `${Math.min(searchIdx, hits.length - 1) + 1}/${hits.length}` : String(hits.length)) : search ? '0' : ''}</span>
-          <button className="icon-btn" onClick={() => stepHit(-1)} aria-label="Предыдущее совпадение" title="Предыдущее"><CaretLeft size={18} /></button>
-          <button className="icon-btn" onClick={() => stepHit(1)} aria-label="Следующее совпадение" title="Следующее"><CaretRight size={18} /></button>
-          <button className="icon-btn" onClick={() => setSearch(null)} aria-label="Закрыть поиск" title="Закрыть"><X size={18} /></button>
+          <button className="icon-btn" onClick={() => stepHit(-1)} aria-label={t('Предыдущее совпадение')} title={t('Предыдущее')}><CaretLeft size={18} /></button>
+          <button className="icon-btn" onClick={() => stepHit(1)} aria-label={t('Следующее совпадение')} title={t('Следующее')}><CaretRight size={18} /></button>
+          <button className="icon-btn" onClick={() => setSearch(null)} aria-label={t('Закрыть поиск')} title={t('Закрыть')}><X size={18} /></button>
         </div>
       )}
 
@@ -733,19 +734,19 @@ export default function Editor() {
             />
           )}
           {mode === 'map' && focusTrail.length > 0 && !pitch && (
-            <div className="ed-focusbar glass" role="navigation" aria-label="Фокус на ветке">
-              <button className="ed-focus-crumb" onClick={() => st.setFocus(null)} title="Показать всю карту (Esc)">
-                <Crosshair size={15} /> Вся карта
+            <div className="ed-focusbar glass" role="navigation" aria-label={t('Фокус на ветке')}>
+              <button className="ed-focus-crumb" onClick={() => st.setFocus(null)} title={t('Показать всю карту (Esc)')}>
+                <Crosshair size={15} /> {t('Вся карта')}
               </button>
-              {focusTrail.map((t, i) => (
-                <span key={t.id} className="ed-focus-step">
+              {focusTrail.map((ft, i) => (
+                <span key={ft.id} className="ed-focus-step">
                   <CaretRight size={12} className="faint" />
-                  <button className="ed-focus-crumb" disabled={i === focusTrail.length - 1} onClick={() => st.setFocus(t.id)}>
-                    {t.text.trim().slice(0, 40) || 'Без названия'}
+                  <button className="ed-focus-crumb" disabled={i === focusTrail.length - 1} onClick={() => st.setFocus(ft.id)}>
+                    {ft.text.trim().slice(0, 40) || t('Без названия')}
                   </button>
                 </span>
               ))}
-              <button className="icon-btn" onClick={() => st.setFocus(null)} aria-label="Выйти из фокуса">
+              <button className="icon-btn" onClick={() => st.setFocus(null)} aria-label={t('Выйти из фокуса')}>
                 <X size={16} />
               </button>
             </div>
@@ -756,36 +757,36 @@ export default function Editor() {
           {mode === 'map' && showChrome && touchUI && (
             <div className="ed-toolbar glass">
               {relMode ? (
-                <button className="tb-btn active wide" onClick={() => setRelMode(false)} title="Отменить создание связи"><BezierCurve weight="fill" /><span>Нажмите на тему · Отмена</span></button>
+                <button className="tb-btn active wide" onClick={() => setRelMode(false)} title={t('Отменить создание связи')}><BezierCurve weight="fill" /><span>{t('Нажмите на тему · Отмена')}</span></button>
               ) : hasSel ? (
                 <>
                   {/* «Подтема» и «Рядом» — на плавающей панели у самой темы */}
-                  <button className="tb-btn" onClick={() => { if (!selId) return; primeKeyboard(); st.setEditing(selId); }} title="Изменить текст"><PencilSimple /><span>Текст</span></button>
-                  <button className="tb-btn" onClick={() => { setInspTab('style'); setPanel('inspector'); }} title="Стиль темы"><Palette /><span>Стиль</span></button>
-                  <button className="tb-btn" onClick={() => { setInspTab('topic'); setPanel('inspector'); }} title="Заметка, задача, метки"><NotePencil /><span>Заметка</span></button>
-                  <button className="tb-btn danger" onClick={del} disabled={!selection.some((id) => id !== sheet.root.id)} title="Удалить"><Trash /><span>Удалить</span></button>
+                  <button className="tb-btn" onClick={() => { if (!selId) return; primeKeyboard(); st.setEditing(selId); }} title={t('Изменить текст')}><PencilSimple /><span>{t('Текст')}</span></button>
+                  <button className="tb-btn" onClick={() => { setInspTab('style'); setPanel('inspector'); }} title={t('Стиль темы')}><Palette /><span>{t('Стиль')}</span></button>
+                  <button className="tb-btn" onClick={() => { setInspTab('topic'); setPanel('inspector'); }} title={t('Заметка, задача, метки')}><NotePencil /><span>{t('Заметка')}</span></button>
+                  <button className="tb-btn danger" onClick={del} disabled={!selection.some((id) => id !== sheet.root.id)} title={t('Удалить')}><Trash /><span>{t('Удалить')}</span></button>
                   <button
                     className="tb-btn"
                     onClick={(e) => {
                       const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
                       if (selId) topicMenu(r.left, r.top, selId, 0, 0);
                     }}
-                    title="Ещё действия"
+                    title={t('Ещё действия')}
                   >
-                    <DotsThree weight="bold" /><span>Ещё</span>
+                    <DotsThree weight="bold" /><span>{t('Ещё')}</span>
                   </button>
                 </>
               ) : selectedRel ? (
                 <>
-                  <button className="tb-btn" onClick={() => setPanel('inspector')} title="Подпись, цвет, изгиб"><BezierCurve /><span>Связь</span></button>
-                  <button className="tb-btn danger" onClick={del} title="Удалить связь"><Trash /><span>Удалить</span></button>
+                  <button className="tb-btn" onClick={() => setPanel('inspector')} title={t('Подпись, цвет, изгиб')}><BezierCurve /><span>{t('Связь')}</span></button>
+                  <button className="tb-btn danger" onClick={del} title={t('Удалить связь')}><Trash /><span>{t('Удалить')}</span></button>
                 </>
               ) : (
                 <>
-                  <button className="tb-btn" onClick={addChild} title="Новая основная тема"><Plus /><span>Тема</span></button>
-                  <button className="tb-btn" onClick={() => { setInspTab('map'); setPanel('inspector'); }} title="Структура, тема оформления, формы"><Palette /><span>Оформл.</span></button>
-                  <button className="tb-btn" onClick={openSearch} title="Найти в карте"><MagnifyingGlass /><span>Поиск</span></button>
-                  <button className="tb-btn" onClick={() => canvas.current?.fit()} title="Вписать в экран"><CornersOut /><span>Вписать</span></button>
+                  <button className="tb-btn" onClick={addChild} title={t('Новая основная тема')}><Plus /><span>{t('Тема')}</span></button>
+                  <button className="tb-btn" onClick={() => { setInspTab('map'); setPanel('inspector'); }} title={t('Структура, тема оформления, формы')}><Palette /><span>{t('Оформл.')}</span></button>
+                  <button className="tb-btn" onClick={openSearch} title={t('Найти в карте')}><MagnifyingGlass /><span>{t('Поиск')}</span></button>
+                  <button className="tb-btn" onClick={() => canvas.current?.fit()} title={t('Вписать в экран')}><CornersOut /><span>{t('Вписать')}</span></button>
                 </>
               )}
             </div>
@@ -795,30 +796,30 @@ export default function Editor() {
             <div className="ed-toolbar glass">
               {hasSel || selectedRel || !isMobileView ? (
                 <>
-                  <button className="tb-btn" onClick={addChild} title="Подтема (Tab)"><ArrowElbowDownRight /><span>Подтема</span></button>
-                  <button className="tb-btn" onClick={addSibling} disabled={!hasSel} title="Тема рядом (Enter)"><Plus /><span>Рядом</span></button>
-                  <button className="tb-btn" onClick={() => { if (!selId) return; primeKeyboard(); st.setEditing(selId); }} disabled={!hasSel} title="Изменить текст (F2)"><PencilSimple /><span>Текст</span></button>
-                  <button className="tb-btn" onClick={() => { setInspTab('style'); setPanel('inspector'); }} disabled={!hasSel} title="Стиль темы: форма, цвет, шрифт"><Palette /><span>Стиль</span></button>
-                  <button className={`tb-btn ${relMode ? 'active' : ''}`} onClick={() => (relMode ? setRelMode(false) : startRel())} title="Связь"><BezierCurve weight={relMode ? 'fill' : 'regular'} /><span>Связь</span></button>
-                  <button className="tb-btn hide-xs" onClick={() => st.addBoundary()} disabled={!hasSel} title="Граница"><Selection /><span>Граница</span></button>
-                  <button className="tb-btn hide-xs" onClick={() => st.addSummary()} disabled={!hasSel} title="Итог"><BracketsCurly /><span>Итог</span></button>
-                  <button className="tb-btn" onClick={del} disabled={!selection.some((id) => id !== sheet.root.id) && !selectedRel} title="Удалить (Del)"><Trash /><span>Удалить</span></button>
+                  <button className="tb-btn" onClick={addChild} title={t('Подтема (Tab)')}><ArrowElbowDownRight /><span>{t('Подтема')}</span></button>
+                  <button className="tb-btn" onClick={addSibling} disabled={!hasSel} title={t('Тема рядом (Enter)')}><Plus /><span>{t('Рядом')}</span></button>
+                  <button className="tb-btn" onClick={() => { if (!selId) return; primeKeyboard(); st.setEditing(selId); }} disabled={!hasSel} title={t('Изменить текст (F2)')}><PencilSimple /><span>{t('Текст')}</span></button>
+                  <button className="tb-btn" onClick={() => { setInspTab('style'); setPanel('inspector'); }} disabled={!hasSel} title={t('Стиль темы: форма, цвет, шрифт')}><Palette /><span>{t('Стиль')}</span></button>
+                  <button className={`tb-btn ${relMode ? 'active' : ''}`} onClick={() => (relMode ? setRelMode(false) : startRel())} title={t('Связь')}><BezierCurve weight={relMode ? 'fill' : 'regular'} /><span>{t('Связь')}</span></button>
+                  <button className="tb-btn hide-xs" onClick={() => st.addBoundary()} disabled={!hasSel} title={t('Граница')}><Selection /><span>{t('Граница')}</span></button>
+                  <button className="tb-btn hide-xs" onClick={() => st.addSummary()} disabled={!hasSel} title={t('Итог')}><BracketsCurly /><span>{t('Итог')}</span></button>
+                  <button className="tb-btn" onClick={del} disabled={!selection.some((id) => id !== sheet.root.id) && !selectedRel} title={t('Удалить (Del)')}><Trash /><span>{t('Удалить')}</span></button>
                 </>
               ) : (
                 <>
-                  <button className="tb-btn" onClick={addChild} title="Новая основная тема"><Plus /><span>Тема</span></button>
-                  <button className="tb-btn" onClick={() => { setInspTab('map'); setPanel('inspector'); }} title="Структура, тема оформления, формы"><Palette /><span>Оформл.</span></button>
+                  <button className="tb-btn" onClick={addChild} title={t('Новая основная тема')}><Plus /><span>{t('Тема')}</span></button>
+                  <button className="tb-btn" onClick={() => { setInspTab('map'); setPanel('inspector'); }} title={t('Структура, тема оформления, формы')}><Palette /><span>{t('Оформл.')}</span></button>
                 </>
               )}
               <span className="tb-sep hide-mobile" />
-              <button className="tb-btn show-mobile" onClick={() => st.undo()} disabled={!canUndo}><ArrowCounterClockwise /><span>Отмена</span></button>
+              <button className="tb-btn show-mobile" onClick={() => st.undo()} disabled={!canUndo}><ArrowCounterClockwise /><span>{t('Отмена')}</span></button>
               {!hasSel && (
-                <button className="tb-btn show-mobile" onClick={() => st.redo()} disabled={!canRedo}><ArrowClockwise /><span>Повтор</span></button>
+                <button className="tb-btn show-mobile" onClick={() => st.redo()} disabled={!canRedo}><ArrowClockwise /><span>{t('Повтор')}</span></button>
               )}
-              <button className="tb-btn hide-mobile" onClick={() => canvas.current?.zoomBy(1 / 1.2)} title="Уменьшить"><Minus /></button>
+              <button className="tb-btn hide-mobile" onClick={() => canvas.current?.zoomBy(1 / 1.2)} title={t('Уменьшить')}><Minus /></button>
               <button ref={zoomLabel} className="tb-zoom hide-mobile" onClick={() => canvas.current?.setZoom(1)} title="100%">100%</button>
-              <button className="tb-btn hide-mobile" onClick={() => canvas.current?.zoomBy(1.2)} title="Увеличить"><Plus /></button>
-              <button className={`tb-btn ${hasSel && isMobileView ? 'hide-xs' : ''}`} onClick={() => canvas.current?.fit()} title="Вписать (Ctrl+0)"><CornersOut /><span className="show-mobile-inline">Вписать</span></button>
+              <button className="tb-btn hide-mobile" onClick={() => canvas.current?.zoomBy(1.2)} title={t('Увеличить')}><Plus /></button>
+              <button className={`tb-btn ${hasSel && isMobileView ? 'hide-xs' : ''}`} onClick={() => canvas.current?.fit()} title={t('Вписать (Ctrl+0)')}><CornersOut /><span className="show-mobile-inline">{t('Вписать')}</span></button>
             </div>
           )}
 
@@ -834,37 +835,37 @@ export default function Editor() {
                     setMenu({
                       x: e.clientX, y: e.clientY - 150,
                       items: [
-                        { icon: <PencilSimple size={16} />, label: 'Переименовать', onClick: async () => { const t = await askText('Название листа', { value: s.title }); if (t) { st.setActiveSheet(s.id); st.setSheetProps({ title: t }); } } },
-                        { icon: <CopySimple size={16} />, label: 'Дублировать', onClick: () => st.duplicateSheet(s.id) },
-                        ...(doc.sheets.length > 1 ? [{ icon: <Trash size={16} />, label: 'Удалить лист', danger: true, onClick: async () => { if (await confirmDialog('Удалить лист?', s.title, { danger: true, okText: 'Удалить' })) st.removeSheet(s.id); } }] : []),
+                        { icon: <PencilSimple size={16} />, label: t('Переименовать'), onClick: async () => { const title = await askText(t('Название листа'), { value: s.title }); if (title) { st.setActiveSheet(s.id); st.setSheetProps({ title }); } } },
+                        { icon: <CopySimple size={16} />, label: t('Дублировать'), onClick: () => st.duplicateSheet(s.id) },
+                        ...(doc.sheets.length > 1 ? [{ icon: <Trash size={16} />, label: t('Удалить лист'), danger: true, onClick: async () => { if (await confirmDialog(t('Удалить лист?'), s.title, { danger: true, okText: t('Удалить') })) st.removeSheet(s.id); } }] : []),
                       ],
                     });
                   }}
                   onDoubleClick={async () => {
-                    const t = await askText('Название листа', { value: s.title });
-                    if (t) st.setSheetProps({ title: t });
+                    const title = await askText(t('Название листа'), { value: s.title });
+                    if (title) st.setSheetProps({ title });
                   }}
                 >
                   <StructureIcon id={s.structure} size={22} />
                   {s.title}
                 </button>
               ))}
-              <button className="sheet-tab add" onClick={() => st.addSheet()} title="Новый лист"><FilePlus size={15} /></button>
+              <button className="sheet-tab add" onClick={() => st.addSheet()} title={t('Новый лист')}><FilePlus size={15} /></button>
             </div>
           )}
 
           {zen && !pitch && (
             <button className="zen-exit glass" onClick={() => setZen(false)}>
-              <X size={16} /> Выйти из Zen
+              <X size={16} /> {t('Выйти из Zen')}
             </button>
           )}
 
           {pitch && (
             <div className="pitch-bar glass">
-              <button className="icon-btn" onClick={() => setPitch((p) => (p && p.i > 0 ? { ...p, i: p.i - 1 } : p))} disabled={pitch.i === 0} aria-label="Предыдущий слайд"><CaretLeft /></button>
+              <button className="icon-btn" onClick={() => setPitch((p) => (p && p.i > 0 ? { ...p, i: p.i - 1 } : p))} disabled={pitch.i === 0} aria-label={t('Предыдущий слайд')}><CaretLeft /></button>
               <span className="small bold">{pitch.i + 1} / {pitch.slides.length}</span>
-              <button className="icon-btn" onClick={() => setPitch((p) => (p && p.i < p.slides.length - 1 ? { ...p, i: p.i + 1 } : p))} disabled={pitch.i >= pitch.slides.length - 1} aria-label="Следующий слайд"><CaretRight /></button>
-              <button className="icon-btn" onClick={endPitch} aria-label="Закончить показ"><X /></button>
+              <button className="icon-btn" onClick={() => setPitch((p) => (p && p.i < p.slides.length - 1 ? { ...p, i: p.i + 1 } : p))} disabled={pitch.i >= pitch.slides.length - 1} aria-label={t('Следующий слайд')}><CaretRight /></button>
+              <button className="icon-btn" onClick={endPitch} aria-label={t('Закончить показ')}><X /></button>
             </div>
           )}
           {pitch && (
@@ -1006,35 +1007,35 @@ function PanelSheet({ mobile, onClose, children }: { mobile: boolean; onClose():
 }
 
 const KEYS: [string, string][] = [
-  ['Tab', 'Подтема'],
-  ['Enter', 'Тема рядом'],
-  ['Shift+Enter', 'Тема рядом (выше)'],
-  ['Ctrl+Enter', 'Родительская тема'],
-  ['F2 / Пробел / любая буква', 'Редактировать текст'],
-  ['Delete', 'Удалить'],
-  ['Стрелки', 'Перемещение по карте'],
-  ['Ctrl+↑/↓', 'Переместить тему выше/ниже'],
-  ['Ctrl+/', 'Свернуть / развернуть'],
-  ['Alt+1…9 / Alt+0', 'Показать 1…9 уровней / все'],
-  ['Alt+F', 'Фокус на ветке / вся карта'],
-  ['Ctrl+C / X / V / D', 'Копировать / вырезать / вставить / дублировать'],
-  ['Ctrl+Z / Ctrl+Shift+Z', 'Отменить / повторить'],
-  ['Ctrl+B / Ctrl+I', 'Жирный / курсив'],
-  ['Ctrl+F', 'Поиск'],
-  ['Ctrl+0 / Ctrl+= / Ctrl+-', 'Вписать / увеличить / уменьшить'],
-  ['Ctrl+S', 'Сохранить карту'],
-  ['Ctrl+E', 'Режим Zen'],
-  ['Двойной клик по фону', 'Плавающая тема'],
-  ['Перетаскивание темы', 'Переместить (на тему — вложить, на пустое место — открепить)'],
-  ['Shift + перетаскивание по фону', 'Выделить рамкой'],
-  ['Колесо / Ctrl+колесо', 'Прокрутка / масштаб'],
+  ['Tab', t('Подтема')],
+  ['Enter', t('Тема рядом')],
+  ['Shift+Enter', t('Тема рядом (выше)')],
+  ['Ctrl+Enter', t('Родительская тема')],
+  [t('F2 / Пробел / любая буква'), t('Редактировать текст')],
+  ['Delete', t('Удалить')],
+  [t('Стрелки'), t('Перемещение по карте')],
+  ['Ctrl+↑/↓', t('Переместить тему выше/ниже')],
+  ['Ctrl+/', t('Свернуть / развернуть')],
+  ['Alt+1…9 / Alt+0', t('Показать 1…9 уровней / все')],
+  ['Alt+F', t('Фокус на ветке / вся карта')],
+  ['Ctrl+C / X / V / D', t('Копировать / вырезать / вставить / дублировать')],
+  ['Ctrl+Z / Ctrl+Shift+Z', t('Отменить / повторить')],
+  ['Ctrl+B / Ctrl+I', t('Жирный / курсив')],
+  ['Ctrl+F', t('Поиск')],
+  ['Ctrl+0 / Ctrl+= / Ctrl+-', t('Вписать / увеличить / уменьшить')],
+  ['Ctrl+S', t('Сохранить карту')],
+  ['Ctrl+E', t('Режим Zen')],
+  [t('Двойной клик по фону'), t('Плавающая тема')],
+  [t('Перетаскивание темы'), t('Переместить (на тему — вложить, на пустое место — открепить)')],
+  [t('Shift + перетаскивание по фону'), t('Выделить рамкой')],
+  [t('Колесо / Ctrl+колесо'), t('Прокрутка / масштаб')],
 ];
 
 function KeysHelp({ onClose }: { onClose(): void }) {
   return (
     <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal">
-        <h2>Горячие клавиши</h2>
+        <h2>{t('Горячие клавиши')}</h2>
         <div className="col" style={{ gap: 6, marginTop: 12 }}>
           {KEYS.map(([k, v]) => (
             <div key={k} className="row small">
@@ -1043,7 +1044,7 @@ function KeysHelp({ onClose }: { onClose(): void }) {
             </div>
           ))}
         </div>
-        <div className="modal-actions"><button className="btn btn-primary" onClick={onClose}>Понятно</button></div>
+        <div className="modal-actions"><button className="btn btn-primary" onClick={onClose}>{t('Понятно')}</button></div>
       </div>
     </div>
   );

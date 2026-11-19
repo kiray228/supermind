@@ -4,6 +4,7 @@ import { useApp, toast } from './appStore';
 import { initCloud, onBeforeSync, onRemoteChange, syncSoon } from './cloud';
 import { get } from './kv';
 import { mark, whenIdle } from '../perf';
+import { t } from '../i18n/index';
 
 let done = false;
 
@@ -28,7 +29,7 @@ async function refreshOpenDoc(keys: string[], attempt = 0): Promise<void> {
   } else doc = raw;
   if (doc && doc.updatedAt > cur.doc.updatedAt) {
     cur.open(doc, cur.password);
-    toast('Карта обновлена с другого устройства');
+    toast(t('Карта обновлена с другого устройства'));
   }
 }
 

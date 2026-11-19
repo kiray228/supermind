@@ -4,6 +4,9 @@
  */
 import { API, authHeader } from './cloud';
 
+const snoozedText = () => t('Отложенное напоминание');
+import { t } from '../i18n/index';
+
 const DEVICE_KEY = 'sm-push-device';
 
 interface Device {
@@ -55,7 +58,7 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
     headers: { 'Content-Type': 'application/json', ...authHeader(), ...(init.headers ?? {}) },
   });
   const data = (await res.json().catch(() => ({}))) as T & { error?: string };
-  if (!res.ok) throw Object.assign(new Error(data.error ?? `Ошибка ${res.status}`), { status: res.status });
+  if (!res.ok) throw Object.assign(new Error(data.error ?? t('Ошибка {status}', { status: res.status })), { status: res.status });
   return data;
 }
 
@@ -72,13 +75,13 @@ export async function enablePush(): Promise<{ ok: boolean; message: string }> {
     return {
       ok: false,
       message: /iPhone|iPad/.test(navigator.userAgent)
-        ? 'Добавьте SuperMind на экран «Домой» (Поделиться → На экран «Домой») и откройте оттуда — тогда уведомления заработают'
-        : 'Этот браузер не поддерживает push-уведомления',
+        ? t('Добавьте SuperMind на экран «Домой» (Поделиться → На экран «Домой») и откройте оттуда — тогда уведомления заработают')
+        : t('Этот браузер не поддерживает push-уведомления'),
     };
   }
   const perm = await Notification.requestPermission();
-  if (perm !== 'granted') return { ok: false, message: 'Уведомления запрещены — разрешите их в настройках телефона' };
-  if (!navigator.serviceWorker.controller && import.meta.env.DEV) return { ok: false, message: 'В режиме разработки push недоступен' };
+  if (perm !== 'granted') return { ok: false, message: t('Уведомления запрещены — разрешите их в настройках телефона') };
+  if (!navigator.serviceWorker.controller && import.meta.env.DEV) return { ok: false, message: t('В режиме разработки push недоступен') };
   const reg = await navigator.serviceWorker.ready;
   const sub = await subscribe(reg);
   const dev = await call<Device>('/devices', {
@@ -87,7 +90,7 @@ export async function enablePush(): Promise<{ ok: boolean; message: string }> {
   });
   saveDevice(dev);
   await uploadSchedule(true);
-  return { ok: true, message: 'Push-уведомления включены' };
+  return { ok: true, message: t('Push-уведомления включены') };
 }
 
 export async function disablePush() {
@@ -144,7 +147,7 @@ async function doUpload() {
     body: p.body,
     data: Object.fromEntries(Object.entries(p.extra).map(([k, v]) => [k, String(v)])),
   }));
-  for (const s of pendingWebSnoozes()) items.push({ id: `snooze|${s.taskId}|${s.at}`, at: s.at, title: s.title, body: 'Отложенное напоминание', data: { taskId: s.taskId, date: '' } });
+  for (const s of pendingWebSnoozes()) items.push({ id: `snooze|${s.taskId}|${s.at}`, at: s.at, title: s.title, body: snoozedText(), data: { taskId: s.taskId, date: '' } });
   // устройство в подписи: после повторного включения push (новое устройство на сервере) расписание уйдёт заново
   const sig = d.deviceId + JSON.stringify(items);
   if (sig === lastSig) return;

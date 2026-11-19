@@ -9,6 +9,7 @@ import { markdownToTopic } from './markdown';
 import { opmlToTopic } from './opml';
 import { importXmind } from './xmind';
 import { freemindToDoc } from './freemind';
+import { t } from '../i18n/index';
 
 export { downloadBlob, downloadText, pickFile, safeFilename, isIOS } from './download';
 export { sheetToMarkdown, markdownToTopic, textToTopic, textToTopics } from './markdown';
@@ -68,7 +69,7 @@ function normSheet(v: unknown, i: number): Sheet {
   const structure = STRUCTURES.includes(o.structure as StructureType) ? (o.structure as StructureType) : 'map';
   const sheet: Sheet = {
     ...(o as Partial<Sheet>),
-    ...makeSheet(root, str(o.title) || `Лист ${i + 1}`, structure),
+    ...makeSheet(root, str(o.title) || t('Лист {n}', { n: i + 1 }), structure),
   };
   sheet.id = str(o.id) || sheet.id;
   sheet.themeId = str(o.themeId) || 'classic';
@@ -98,7 +99,7 @@ function normSheet(v: unknown, i: number): Sheet {
     .map((b) => ({ ...(strFields(b, ['label', 'color']) as Partial<Boundary>), id: str(b.id) || uid() }) as Boundary);
   sheet.summaries = (Array.isArray(o.summaries) ? o.summaries : [])
     .filter((b): b is Obj => isObj(b) && okId(b.topicId))
-    .map((b) => ({ ...(b as Partial<Summary>), id: str(b.id) || uid(), text: str(b.text) ?? 'Итог' }) as Summary);
+    .map((b) => ({ ...(b as Partial<Summary>), id: str(b.id) || uid(), text: str(b.text) ?? t('Итог') }) as Summary);
   return sheet;
 }
 
@@ -108,15 +109,15 @@ export function parseNative(json: string, filename?: string): MindDoc {
   try {
     raw = JSON.parse(json.replace(/^﻿/, ''));
   } catch {
-    throw new Error('Файл повреждён: не удалось разобрать JSON');
+    throw new Error(t('Файл повреждён: не удалось разобрать JSON'));
   }
-  if (!isObj(raw)) throw new Error('Неизвестный формат файла');
-  if ('locked' in raw && raw.locked === true) throw new Error('Документ зашифрован — импорт невозможен');
-  const fallbackTitle = filename ? stripExt(filename) : 'Импорт';
+  if (!isObj(raw)) throw new Error(t('Неизвестный формат файла'));
+  if ('locked' in raw && raw.locked === true) throw new Error(t('Документ зашифрован — импорт невозможен'));
+  const fallbackTitle = filename ? stripExt(filename) : t('Импорт');
 
   if (Array.isArray(raw.sheets)) {
     const sheets = raw.sheets.map(normSheet);
-    if (!sheets.length) throw new Error('В документе нет листов');
+    if (!sheets.length) throw new Error(t('В документе нет листов'));
     const doc = makeDoc(str(raw.title)?.trim() || sheets[0].root.text || fallbackTitle, sheets);
     const active = str(raw.activeSheet);
     if (active && sheets.some((s) => s.id === active)) doc.activeSheet = active;
@@ -132,7 +133,7 @@ export function parseNative(json: string, filename?: string): MindDoc {
     const root = normTopic(raw, new Set());
     return makeDoc(root.text || fallbackTitle, [makeSheet(root)]);
   }
-  throw new Error('Неизвестный формат файла');
+  throw new Error(t('Неизвестный формат файла'));
 }
 
 // ---------------------------------------------------------------------

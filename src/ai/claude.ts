@@ -1,11 +1,12 @@
 import type { Sheet, Topic } from '../types';
 import { useApp } from '../store/appStore';
 import { sheetToMarkdown } from '../io/markdown';
+import { t } from '../i18n/index';
 
 export const AI_MODELS = [
-  { id: 'claude-opus-5-5', name: 'Claude Opus 5.5 — самый умный' },
-  { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5 — быстрый и дешевле' },
-  { id: 'claude-haiku-5-5', name: 'Claude Haiku 5.5 — самый быстрый и дешёвый' },
+  { id: 'claude-opus-5-5', name: t('Claude Opus 5.5 — самый умный') },
+  { id: 'claude-sonnet-5-5', name: t('Claude Sonnet 5.5 — быстрый и дешевле') },
+  { id: 'claude-haiku-5-5', name: t('Claude Haiku 5.5 — самый быстрый и дешёвый') },
 ];
 
 export class AIError extends Error {}
@@ -13,12 +14,12 @@ export class AIError extends Error {}
 /** SDK Claude большой — загружается только при первом запросе к ИИ, не при запуске приложения */
 async function client() {
   const { apiKey } = useApp.getState().settings;
-  if (!apiKey.trim()) throw new AIError('Добавьте API-ключ Claude в Настройках, чтобы пользоваться ИИ.');
+  if (!apiKey.trim()) throw new AIError(t('Добавьте API-ключ Claude в Настройках, чтобы пользоваться ИИ.'));
   let Anthropic: typeof import('@anthropic-ai/sdk').default;
   try {
     Anthropic = (await import('@anthropic-ai/sdk')).default;
   } catch {
-    throw new AIError('Не удалось загрузить модуль ИИ. Проверьте интернет и попробуйте ещё раз.');
+    throw new AIError(t('Не удалось загрузить модуль ИИ. Проверьте интернет и попробуйте ещё раз.'));
   }
   return { c: new Anthropic({ apiKey: apiKey.trim(), dangerouslyAllowBrowser: true }), Anthropic };
 }

@@ -8,6 +8,7 @@ import type { MindDoc, Relationship, Sheet, Topic, TopicStyle } from '../types';
 import { newTopic, uid } from '../utils/tree';
 import { DEFAULT_ROOT_TEXT, escAttr, escXml, makeDoc, makeSheet, stripExt } from './common';
 import { safeUrl } from '../utils/url';
+import { t } from '../i18n/index';
 
 /** Значки FreeMind → маркеры SuperMind */
 const ICONS: Record<string, string> = {
@@ -127,11 +128,11 @@ function fromNode(el: Element, ctx: Ctx, depth: number): Topic {
 /** Файл .mm → документ SuperMind */
 export function freemindToDoc(xml: string, filename = ''): MindDoc {
   const dom = new DOMParser().parseFromString(xml.replace(/^﻿/, ''), 'application/xml');
-  if (dom.getElementsByTagName('parsererror').length) throw new Error('Не удалось прочитать файл FreeMind: он повреждён');
+  if (dom.getElementsByTagName('parsererror').length) throw new Error(t('Не удалось прочитать файл FreeMind: он повреждён'));
   const map = dom.documentElement;
-  if (map.localName.toLowerCase() !== 'map') throw new Error('Это не карта FreeMind');
+  if (map.localName.toLowerCase() !== 'map') throw new Error(t('Это не карта FreeMind'));
   const top = kids(map, 'node')[0];
-  if (!top) throw new Error('В карте FreeMind нет тем');
+  if (!top) throw new Error(t('В карте FreeMind нет тем'));
   const ctx: Ctx = { ids: new Map(), arrows: [] };
   const root = fromNode(top, ctx, 0);
   if (!root.text) root.text = stripExt(filename) || DEFAULT_ROOT_TEXT;

@@ -1,6 +1,9 @@
 import type { ID, MindDoc, TaskInfo, Topic } from '../types';
 import { loadDoc, saveDoc } from '../store/db';
 import { findInSheet, sheetRoots } from './tree';
+import { isEn, LOCALE, t } from '../i18n/index';
+
+const untitled = () => t('Без названия');
 
 /** Задача, привязанная к теме карты */
 export interface MapTask {
@@ -32,7 +35,7 @@ export function collectMapTasks(docs: MindDoc[]): MapTask[] {
           });
         }
         if (t.children.length) {
-          const next = [...path, t.text || 'Без названия'];
+          const next = [...path, t.text || untitled()];
           for (const c of t.children) rec(c, next);
         }
       };
@@ -109,9 +112,9 @@ export function addDaysYmd(s: string, n: number): string {
 }
 
 export const PRIORITY_META: Record<number, { label: string; color: string }> = {
-  1: { label: 'Высокий', color: '#ef4444' },
-  2: { label: 'Средний', color: '#f97316' },
-  3: { label: 'Низкий', color: '#3b82f6' },
+  1: { label: t('Высокий'), color: '#ef4444' },
+  2: { label: t('Средний'), color: '#f97316' },
+  3: { label: t('Низкий'), color: '#3b82f6' },
 };
 
 /** 'overdue' | 'today' | null для срока */
@@ -128,6 +131,7 @@ const MONTHS_GEN = ['января', 'февраля', 'марта', 'апрел�
 /** «2 окт» / «2 окт 2027» */
 export function formatShortDate(s: string): string {
   const d = fromYmd(s);
+  if (isEn) return d.toLocaleDateString(LOCALE, { month: 'short', day: 'numeric', ...(d.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}) });
   const m = MONTHS_GEN[d.getMonth()].slice(0, 3);
   const y = d.getFullYear() !== new Date().getFullYear() ? ` ${d.getFullYear()}` : '';
   return `${d.getDate()} ${m}${y}`;

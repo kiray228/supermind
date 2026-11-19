@@ -9,6 +9,9 @@ import {
 import type { Zip } from './common';
 import { isSafeUrl } from '../utils/url';
 
+const dueText = (date: string) => t('срок: {date}', { date });
+import { LOCALE, t } from '../i18n/index';
+
 // ---------------------------------------------------------------------
 // Общие части OOXML
 // ---------------------------------------------------------------------
@@ -130,7 +133,7 @@ const DOCX_STYLES =
   XML_DECL +
   `<w:styles xmlns:w="${W_NS}">` +
   '<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:eastAsia="Calibri" w:cs="Calibri"/>' +
-  '<w:sz w:val="22"/><w:szCs w:val="22"/><w:lang w:val="ru-RU" w:eastAsia="en-US" w:bidi="ar-SA"/></w:rPr></w:rPrDefault>' +
+  '<w:sz w:val="22"/><w:szCs w:val="22"/><w:lang w:val="' + LOCALE + '" w:eastAsia="en-US" w:bidi="ar-SA"/></w:rPr></w:rPrDefault>' +
   '<w:pPrDefault><w:pPr><w:spacing w:after="120" w:line="264" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>' +
   '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>' +
   '<w:style w:type="character" w:default="1" w:styleId="DefaultParagraphFont"><w:name w:val="Default Paragraph Font"/><w:uiPriority w:val="1"/><w:semiHidden/><w:unhideWhenUsed/></w:style>' +
@@ -183,7 +186,7 @@ export async function exportDocx(doc: MindDoc): Promise<Blob> {
     }
     const extra: string[] = [];
     if (t.labels?.length) extra.push(t.labels.join(', '));
-    if (t.task?.due) extra.push(`срок: ${t.task.due}`);
+    if (t.task?.due) extra.push(dueText(t.task.due));
     if (t.task?.assignee) extra.push(t.task.assignee);
     if (extra.length) s += wRun(`  [${extra.join('; ')}]`, '<w:color w:val="7F7F7F"/><w:sz w:val="18"/><w:szCs w:val="18"/>');
     return s;
@@ -264,7 +267,7 @@ function xCell(col: number, row: number, value: string, style = 2): string {
 function sheetNames(doc: MindDoc): string[] {
   const used = new Set<string>();
   return doc.sheets.map((s, i) => {
-    let base = (s.title || `Лист ${i + 1}`).replace(/[[\]:*?/\\]/g, ' ').replace(/^'+|'+$/g, '').trim() || `Лист ${i + 1}`;
+    let base = (s.title || t('Лист {n}', { n: i + 1 })).replace(/[[\]:*?/\\]/g, ' ').replace(/^'+|'+$/g, '').trim() || t('Лист {n}', { n: i + 1 });
     base = base.slice(0, 31);
     let name = base;
     let k = 2;
@@ -277,7 +280,7 @@ function sheetNames(doc: MindDoc): string[] {
   });
 }
 
-const ATTR_HEADERS = ['Заметка', 'Метки', 'Статус', 'Приоритет', 'Срок', 'Прогресс'];
+const ATTR_HEADERS = [t('Заметка'), t('Метки'), t('Статус'), t('Приоритет'), t('Срок'), t('Прогресс')];
 
 function attrCells(t: Topic): string[] {
   const prog = topicProgress(t);
@@ -321,7 +324,7 @@ function worksheetXml(sheet: Sheet): string {
   };
   for (const r of roots) rec(r, 0);
 
-  const headers = [...Array.from({ length: levels }, (_, i) => `Уровень ${i + 1}`), ...ATTR_HEADERS];
+  const headers = [...Array.from({ length: levels }, (_, i) => t('Уровень {n}', { n: i + 1 })), ...ATTR_HEADERS];
   const totalCols = headers.length;
   const out: string[] = [];
   out.push(`<row r="1">${headers.map((h, i) => xCell(i, 1, h, 1)).join('')}</row>`);
@@ -429,12 +432,12 @@ function phShape(id: number, name: string, ph: string, spPr: string, bodyPr: str
   );
 }
 
-const EMPTY_P = '<a:p><a:endParaRPr lang="ru-RU"/></a:p>';
+const EMPTY_P = `<a:p><a:endParaRPr lang="${LOCALE}"/></a:p>`;
 
 function aPara(text: string, lvl = 0, noBullet = false): string {
   const pPr = noBullet ? `<a:pPr marL="0" indent="0"${lvl ? ` lvl="${lvl}"` : ''}><a:buNone/></a:pPr>` : lvl ? `<a:pPr lvl="${lvl}"/>` : '';
-  if (!text) return `<a:p>${pPr}<a:endParaRPr lang="ru-RU"/></a:p>`;
-  return `<a:p>${pPr}<a:r><a:rPr lang="ru-RU" dirty="0"/><a:t>${escXml(text)}</a:t></a:r></a:p>`;
+  if (!text) return `<a:p>${pPr}<a:endParaRPr lang="${LOCALE}"/></a:p>`;
+  return `<a:p>${pPr}<a:r><a:rPr lang="${LOCALE}" dirty="0"/><a:t>${escXml(text)}</a:t></a:r></a:p>`;
 }
 
 const PPT_THEME =
@@ -474,8 +477,8 @@ const PPT_MASTER =
   XML_DECL +
   `<p:sldMaster ${P_ROOT_NS}><p:cSld><p:bg><p:bgRef idx="1001"><a:schemeClr val="bg1"/></p:bgRef></p:bg><p:spTree>` +
   GRP +
-  phShape(2, 'Title Placeholder 1', '<p:ph type="title"/>', TITLE_BOX + RECT, '<a:bodyPr anchor="ctr"><a:normAutofit/></a:bodyPr>', '', aPara('Заголовок')) +
-  phShape(3, 'Text Placeholder 2', '<p:ph type="body" idx="1"/>', BODY_BOX + RECT, '<a:bodyPr><a:normAutofit/></a:bodyPr>', '', aPara('Текст')) +
+  phShape(2, 'Title Placeholder 1', '<p:ph type="title"/>', TITLE_BOX + RECT, '<a:bodyPr anchor="ctr"><a:normAutofit/></a:bodyPr>', '', aPara(t('Заголовок'))) +
+  phShape(3, 'Text Placeholder 2', '<p:ph type="body" idx="1"/>', BODY_BOX + RECT, '<a:bodyPr><a:normAutofit/></a:bodyPr>', '', aPara(t('Текст'))) +
   '</p:spTree></p:cSld>' +
   '<p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/>' +
   '<p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/><p:sldLayoutId id="2147483650" r:id="rId2"/></p:sldLayoutIdLst>' +
@@ -487,11 +490,11 @@ const PPT_MASTER =
       `<a:buFont typeface="Arial"/><a:buChar char="${i % 2 ? '–' : '•'}"/>` +
       `<a:defRPr sz="${sz}"><a:solidFill><a:schemeClr val="tx1"/></a:solidFill><a:latin typeface="+mn-lt"/><a:ea typeface="+mn-ea"/><a:cs typeface="+mn-cs"/></a:defRPr></a:lvl${i + 1}pPr>`,
   ).join('') +
-  '</p:bodyStyle><p:otherStyle><a:defPPr><a:defRPr lang="ru-RU"/></a:defPPr></p:otherStyle></p:txStyles></p:sldMaster>';
+  `</p:bodyStyle><p:otherStyle><a:defPPr><a:defRPr lang="${LOCALE}"/></a:defPPr></p:otherStyle></p:txStyles></p:sldMaster>`;
 
 const PPT_LAYOUT_TITLE =
   XML_DECL +
-  `<p:sldLayout ${P_ROOT_NS} type="title" preserve="1"><p:cSld name="Титульный слайд"><p:spTree>` +
+  `<p:sldLayout ${P_ROOT_NS} type="title" preserve="1"><p:cSld name="${t('Титульный слайд')}"><p:spTree>` +
   GRP +
   phShape(
     2, 'Title 1', '<p:ph type="ctrTitle"/>', xfrm(1524000, 1122363, 9144000, 2387600),
@@ -508,7 +511,7 @@ const PPT_LAYOUT_TITLE =
 
 const PPT_LAYOUT_CONTENT =
   XML_DECL +
-  `<p:sldLayout ${P_ROOT_NS} type="obj" preserve="1"><p:cSld name="Заголовок и объект"><p:spTree>` +
+  `<p:sldLayout ${P_ROOT_NS} type="obj" preserve="1"><p:cSld name="${t('Заголовок и объект')}"><p:spTree>` +
   GRP +
   phShape(2, 'Title 1', '<p:ph type="title"/>', TITLE_BOX, '<a:bodyPr/>', '', EMPTY_P) +
   phShape(3, 'Content Placeholder 2', '<p:ph idx="1"/>', BODY_BOX, '<a:bodyPr/>', '', EMPTY_P) +
@@ -607,7 +610,7 @@ export async function exportPptx(doc: MindDoc): Promise<Blob> {
       '<p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId1"/></p:sldMasterIdLst>' +
       `<p:sldIdLst>${slides.map((_, i) => `<p:sldId id="${256 + i}" r:id="rId${i + 3}"/>`).join('')}</p:sldIdLst>` +
       `<p:sldSz cx="${SLIDE_W}" cy="${SLIDE_H}"/><p:notesSz cx="6858000" cy="9144000"/>` +
-      '<p:defaultTextStyle><a:defPPr><a:defRPr lang="ru-RU"/></a:defPPr></p:defaultTextStyle>' +
+      `<p:defaultTextStyle><a:defPPr><a:defRPr lang="${LOCALE}"/></a:defPPr></p:defaultTextStyle>` +
       '</p:presentation>',
   );
   zip.file(
@@ -663,7 +666,7 @@ function csvCell(v: string, sep: string): string {
 /** CSV всех тем с задачами. По умолчанию разделитель «;» и BOM — чтобы Excel (ru) открыл корректно. */
 export function exportCsvTasks(docs: MindDoc[], opts: { sep?: string; bom?: boolean } = {}): string {
   const sep = opts.sep ?? ';';
-  const header = ['Карта', 'Лист', 'Задача', 'Путь', 'Статус', 'Приоритет', 'Начало', 'Срок', 'Исполнитель', 'Прогресс', 'Метки', 'Заметка'];
+  const header = [t('Карта'), t('Лист'), t('Задача'), t('Путь'), t('Статус'), t('Приоритет'), t('Начало'), t('Срок'), t('Исполнитель'), t('Прогресс'), t('Метки'), t('Заметка')];
   const rows: string[][] = [header];
   for (const d of docs) {
     for (const s of d.sheets) {

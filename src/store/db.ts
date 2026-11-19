@@ -2,6 +2,7 @@ import { get, set, del } from './kv';
 import type { BoardData, DocMeta, DocPreview, LockedDoc, MindDoc, PlannerData, PlannerDay, Settings } from '../types';
 import { countTopics } from '../utils/tree';
 import { getTheme } from '../themes';
+import { t } from '../i18n/index';
 
 const INDEX = 'docs:index';
 const docKey = (id: string) => `doc:${id}`;
@@ -50,9 +51,9 @@ export function previewOf(doc: MindDoc): DocPreview {
   const shown = kids.slice(0, PREVIEW_KIDS).map((c, i) => {
     const left = c.side ? c.side === 'left' : free++ >= needRight;
     const color = c.style?.fill || (sheet.rainbow === false ? th.palette[0] : th.palette[i % th.palette.length]);
-    return { t: cut(c.text || 'Тема', 22), c: color, ...(left && sheet.structure === 'map' ? { l: 1 as const } : {}), ...(c.children.length ? { d: 1 as const } : {}) };
+    return { t: cut(c.text || t('Тема'), 22), c: color, ...(left && sheet.structure === 'map' ? { l: 1 as const } : {}), ...(c.children.length ? { d: 1 as const } : {}) };
   });
-  return { r: cut(sheet.root.text || doc.title || 'Карта', 28), s: sheet.structure, k: shown, ...(kids.length > PREVIEW_KIDS ? { more: kids.length - PREVIEW_KIDS } : {}) };
+  return { r: cut(sheet.root.text || doc.title || t('Карта'), 28), s: sheet.structure, k: shown, ...(kids.length > PREVIEW_KIDS ? { more: kids.length - PREVIEW_KIDS } : {}) };
 }
 
 /** У старых карт миниатюры нет — построить один раз (зашифрованные пропускаются) */
@@ -183,9 +184,9 @@ export async function savePlanner(p: PlannerData): Promise<PlannerData> {
 
 export const DEFAULT_BOARD: BoardData = {
   columns: [
-    { id: 'todo', title: 'К выполнению', status: 'todo', color: '#64748b' },
-    { id: 'doing', title: 'В работе', status: 'doing', color: '#f59e0b' },
-    { id: 'done', title: 'Готово', status: 'done', color: '#22c55e' },
+    { id: 'todo', title: t('К выполнению'), status: 'todo', color: '#64748b' },
+    { id: 'doing', title: t('В работе'), status: 'doing', color: '#f59e0b' },
+    { id: 'done', title: t('Готово'), status: 'done', color: '#22c55e' },
   ],
   cards: [],
 };
