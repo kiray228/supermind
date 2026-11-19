@@ -6,7 +6,7 @@ import type { Habit, PlannerData, PlannerDay } from '../types';
 import { toast } from '../store/appStore';
 import { syncSoon } from '../tasks/sync';
 import { addDaysYmd, fromYmd } from '../utils/mapTasks';
-import { isEn, LOCALE, t } from '../i18n/index';
+import { isRu, LOCALE, t } from '../i18n/index';
 import { cleanHabit, frozenOn, pauseUntilLabel, WD_SHORT_BY_DAY, withPause, withResume, withSkip } from './model';
 
 type Days = PlannerData['days'];
@@ -65,8 +65,8 @@ export function freezeHandlers(opts: () => FreezeOpts): FreezeHandlers {
 }
 
 export const MONTHS_SHORT = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
-/** «15 окт» / «Oct 15» */
-const dayMonthShort = (d: Date) => (isEn ? d.toLocaleDateString(LOCALE, { month: 'short', day: 'numeric' }) : `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}`);
+/** «15 окт» / «Oct 15» / «15 қаз.» */
+const dayMonthShort = (d: Date) => (!isRu ? d.toLocaleDateString(LOCALE, { month: 'short', day: 'numeric' }) : `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}`);
 export const shortDay = (ymd: string) => {
   const d = fromYmd(ymd);
   return `${WD_SHORT_BY_DAY[d.getDay()]}, ${dayMonthShort(d)}`;

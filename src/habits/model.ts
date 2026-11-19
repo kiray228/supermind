@@ -16,7 +16,7 @@
  */
 import type { Habit, HabitFreq, HabitPart, HabitPause, PlannerData, PlannerDay } from '../types';
 import { addDaysYmd, fromYmd, toYmd } from '../utils/mapTasks';
-import { isEn, LOCALE, t, tn } from '../i18n/index';
+import { isRu, LOCALE, t, tn } from '../i18n/index';
 
 type Days = PlannerData['days'];
 
@@ -313,7 +313,7 @@ export function pauseUntilLabel(h: Habit, ymd: string): string | null {
   if (back === addDaysYmd(ymd, 1)) return t('до завтра');
   const d = fromYmd(back);
   const other = d.getFullYear() !== fromYmd(ymd).getFullYear();
-  if (isEn) return t('до {date}', { date: d.toLocaleDateString(LOCALE, { month: 'short', day: 'numeric', ...(other ? { year: 'numeric' } : {}) }) });
+  if (!isRu) return t('до {date}', { date: d.toLocaleDateString(LOCALE, { month: 'short', day: 'numeric', ...(other ? { year: 'numeric' } : {}) }) });
   return t('до {date}', { date: `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}${other ? ` ${d.getFullYear()}` : ''}` });
 }
 

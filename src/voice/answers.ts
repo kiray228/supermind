@@ -13,7 +13,7 @@ import { loadPlanner } from '../store/db';
 import { syncSoon } from '../tasks/sync';
 import { useApp, type View } from '../store/appStore';
 import { addDaysYmd, fromYmd, todayYmd } from '../utils/mapTasks';
-import { isEn, LOCALE, t, tn } from '../i18n/index';
+import { isRu, LOCALE, t, tn } from '../i18n/index';
 
 export interface Done {
   ok: boolean;
@@ -36,7 +36,7 @@ export function dayLabel(d: string): string {
   if (d === today) return t('сегодня');
   if (d === addDaysYmd(today, 1)) return t('завтра');
   if (d === addDaysYmd(today, -1)) return t('вчера');
-  if (isEn) return fromYmd(d).toLocaleDateString(LOCALE, { month: 'short', day: 'numeric' });
+  if (!isRu) return fromYmd(d).toLocaleDateString(LOCALE, { month: 'short', day: 'numeric' });
   const [, m, day] = d.split('-').map(Number);
   return `${day} ${MONTHS[m - 1]}`;
 }

@@ -41,7 +41,7 @@ import {
 } from './model';
 import { HABIT_CATEGORIES, HABIT_LIBRARY, habitFromPreset } from './library';
 import type { HabitCategory, HabitPreset } from './library';
-import { isEn, LOCALE, t, tn } from '../i18n/index';
+import { isEn, isRu, LOCALE, t, tn } from '../i18n/index';
 import '../views/habits.css';
 import './freeze.css';
 
@@ -50,11 +50,11 @@ type Days = PlannerData['days'];
 const MONTHS_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
 const dayTitle = (ymd: string) => {
   const d = fromYmd(ymd);
-  if (isEn) return d.toLocaleDateString(LOCALE, { weekday: 'short', month: 'long', day: 'numeric' });
+  if (!isRu) return d.toLocaleDateString(LOCALE, { weekday: 'short', month: 'long', day: 'numeric' });
   return `${WD_SHORT_BY_DAY[d.getDay()]}, ${d.getDate()} ${MONTHS_GEN[d.getMonth()]}`;
 };
-/** «янв» / «Jan» — подпись месяца над тепловой картой */
-const monthShort = (d: Date) => (isEn ? d.toLocaleDateString(LOCALE, { month: 'short' }) : MONTHS_GEN[d.getMonth()].slice(0, 3));
+/** «янв» / «Jan» / «қаң.» — подпись месяца над тепловой картой */
+const monthShort = (d: Date) => (!isRu ? d.toLocaleDateString(LOCALE, { month: 'short' }) : MONTHS_GEN[d.getMonth()].slice(0, 3));
 
 /** Мелкие подписи под названием: время, длительность, частота, счётчик */
 function metaParts(h: Habit, days: Days, date: string): string[] {

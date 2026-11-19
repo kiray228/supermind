@@ -1,5 +1,5 @@
 import type { ID } from '../types';
-import { isEn, LOCALE, t, tn } from '../i18n/index';
+import { isEn, isRu, LOCALE, t, tn } from '../i18n/index';
 import { addDaysYmd, fromYmd, todayYmd, toYmd } from '../utils/mapTasks';
 
 // ================= Модель задач (как в TickTick) =================
@@ -588,9 +588,9 @@ const MONTHS_GEN = ['января', 'февраля', 'марта', 'апрел�
 export const MONTHS = [t('Январь'), t('Февраль'), t('Март'), t('Апрель'), t('Май'), t('Июнь'), t('Июль'), t('Август'), t('Сентябрь'), t('Октябрь'), t('Ноябрь'), t('Декабрь')];
 export const WEEKDAYS = [t('Воскресенье'), t('Понедельник'), t('Вторник'), t('Среда'), t('Четверг'), t('Пятница'), t('Суббота')];
 
-/** «5 марта» / «March 5» (с годом, если задан) */
+/** «5 марта» / «March 5» / «5 наурыз» (с годом, если задан) */
 function dayMonth(d: Date, withYear = false, short = false): string {
-  if (isEn) return d.toLocaleDateString(LOCALE, { month: short ? 'short' : 'long', day: 'numeric', ...(withYear ? { year: 'numeric' } : {}) });
+  if (!isRu) return d.toLocaleDateString(LOCALE, { month: short ? 'short' : 'long', day: 'numeric', ...(withYear ? { year: 'numeric' } : {}) });
   const m = MONTHS_GEN[d.getMonth()];
   return `${d.getDate()} ${short ? m.slice(0, 3) : m}${withYear ? ` ${d.getFullYear()}` : ''}`;
 }

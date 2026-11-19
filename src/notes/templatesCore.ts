@@ -4,7 +4,7 @@
  * Шаблон «Заметка дня» оформляет заметку дня. Модуль чистый — тесты гоняют его в Node; хранение и окна — templates.ts.
  */
 import { type Block, newBlock, stripInline } from './model';
-import { LOCALE, isEn, t } from '../i18n/index';
+import { LOCALE, isEn, isKk, isRu, t } from '../i18n/index';
 import { uid } from '../utils/tree';
 
 export const TEMPLATE_FOLDER = t('Шаблоны');
@@ -17,10 +17,16 @@ export const DAILY_TEMPLATE = t('Заметка дня');
 
 const MONTHS_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
 const WEEKDAYS = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
-const monthName = (d: Date) => (isEn ? d.toLocaleDateString(LOCALE, { month: 'long' }) : MONTHS_GEN[d.getMonth()]);
-const weekdayName = (d: Date) => (isEn ? d.toLocaleDateString(LOCALE, { weekday: 'long' }) : WEEKDAYS[d.getDay()]);
-/** {{дата}} без формата: «16 октября 2026», по-английски — «October 16, 2026» */
-const DATE_FMT = isEn ? 'MMMM D, YYYY' : 'D MMMM YYYY';
+/** месяц в той форме, что рядом с числом: «октября» / «October» / «қазан» (отдельно по-казахски — «Қазан») */
+const monthName = (d: Date) =>
+  isRu ? MONTHS_GEN[d.getMonth()] : (new Intl.DateTimeFormat(LOCALE, { day: 'numeric', month: 'long' }).formatToParts(d).find((p) => p.type === 'month')?.value ?? '');
+const weekdayName = (d: Date) => (!isRu ? d.toLocaleDateString(LOCALE, { weekday: 'long' }) : WEEKDAYS[d.getDay()]);
+/** {{дата}} без формата: «16 октября 2026», по-английски — «October 16, 2026», по-казахски — «2026 ж. 16 қазан» */
+const DATE_FMT = isEn ? 'MMMM D, YYYY' : isKk ? 'YYYY ж. D MMMM' : 'D MMMM YYYY';
+/** Казахские имена подстановок (парсер понимает и русские, и английские, и казахские) */
+const KK_VARS: Record<string, string> = { дата: 'күні', время: 'уақыт', 'день недели': 'апта күні', название: 'атауы', задачи: 'тапсырмалар', цели: 'мақсаттар', вчера: 'кеше' };
+/** Имя подстановки на языке интерфейса */
+const varName = (ru: string, en: string) => (isEn ? en : isKk ? KK_VARS[ru] : ru);
 
 export interface TemplateVars {
   /** день заметки (YYYY-MM-DD) */
@@ -42,13 +48,13 @@ export const hasVars = (s: string) => /\{\{\s*[^{}\n]{1,40}?\s*\}\}/.test(s);
 
 /** Подстановки, которые понимает шаблон (для подсказки) */
 export const TEMPLATE_VARS: { name: string; hint: string }[] = [
-  { name: isEn ? 'date' : 'дата', hint: t('16 октября 2026') },
-  { name: isEn ? 'time' : 'время', hint: '14:05' },
-  { name: isEn ? 'weekday' : 'день недели', hint: t('Пятница') },
-  { name: isEn ? 'title' : 'название', hint: t('название новой заметки') },
-  { name: isEn ? 'tasks' : 'задачи', hint: t('задачи на день — списком') },
-  { name: isEn ? 'goals' : 'цели', hint: t('сроки целей в этот день') },
-  { name: isEn ? 'yesterday' : 'вчера', hint: t('ссылка на прошлую заметку дня') },
+  { name: varName('дата', 'date'), hint: t('16 октября 2026') },
+  { name: varName('время', 'time'), hint: '14:05' },
+  { name: varName('день недели', 'weekday'), hint: t('Пятница') },
+  { name: varName('название', 'title'), hint: t('название новой заметки') },
+  { name: varName('задачи', 'tasks'), hint: t('задачи на день — списком') },
+  { name: varName('цели', 'goals'), hint: t('сроки целей в этот день') },
+  { name: varName('вчера', 'yesterday'), hint: t('ссылка на прошлую заметку дня') },
 ];
 
 const parse = (ymd: string) => {
@@ -107,6 +113,13 @@ const ALIASES: Record<string, VarKind> = {
   'прошлая запись': 'prev',
   prev: 'prev',
   yesterday: 'prev',
+  күні: 'date',
+  уақыт: 'time',
+  'апта күні': 'weekday',
+  атауы: 'title',
+  тапсырмалар: 'tasks',
+  мақсаттар: 'goals',
+  кеше: 'prev',
 };
 
 /** Имя подстановки → вид и формат («дата:DD.MM» → date + «DD.MM»). null — не подстановка (оставить как есть) */
@@ -211,8 +224,8 @@ export interface TemplatePreset {
 
 const h2 = (text: string) => newBlock('h2', { text });
 const p = (text = '') => newBlock('p', { text });
-/** Подстановка в готовом шаблоне — по-русски или по-английски, как интерфейс */
-const V = (ru: string, en: string) => `{{${isEn ? en : ru}}}`;
+/** Подстановка в готовом шаблоне — на языке интерфейса */
+const V = (ru: string, en: string) => `{{${varName(ru, en)}}}`;
 const date = V('дата', 'date');
 
 export const TEMPLATE_PRESETS: TemplatePreset[] = [

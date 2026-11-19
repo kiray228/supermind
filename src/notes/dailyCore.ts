@@ -3,7 +3,7 @@
  * Модуль чистый — тесты гоняют его в Node; открытие и создание — daily.ts.
  */
 import { type Block, newBlock } from './model';
-import { LOCALE, isEn, t } from '../i18n/index';
+import { LOCALE, isRu, t } from '../i18n/index';
 
 const MONTHS_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
 const WEEKDAYS = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
@@ -13,16 +13,16 @@ const parse = (ymd: string) => {
   return new Date(y, m - 1, d);
 };
 
-/** «15 октября 2026» — название заметки дня (одно на день) */
+/** «15 октября 2026» / «October 15, 2026» / «2026 ж. 15 қазан» — название заметки дня (одно на день) */
 export function dailyTitle(ymd: string): string {
   const d = parse(ymd);
-  if (isEn) return d.toLocaleDateString(LOCALE, { month: 'long', day: 'numeric', year: 'numeric' });
+  if (!isRu) return d.toLocaleDateString(LOCALE, { month: 'long', day: 'numeric', year: 'numeric' });
   return `${d.getDate()} ${MONTHS_GEN[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 /** «Четверг» */
 export const weekdayOf = (ymd: string) => {
-  const w = isEn ? parse(ymd).toLocaleDateString(LOCALE, { weekday: 'long' }) : WEEKDAYS[parse(ymd).getDay()];
+  const w = !isRu ? parse(ymd).toLocaleDateString(LOCALE, { weekday: 'long' }) : WEEKDAYS[parse(ymd).getDay()];
   return w[0].toUpperCase() + w.slice(1);
 };
 
