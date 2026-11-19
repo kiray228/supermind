@@ -1,5 +1,6 @@
 import { ArrowClockwise, DownloadSimple, X } from '@phosphor-icons/react';
 import { applyUpdate, dismissUpdate, useAppUpdate } from './appUpdate';
+import { t } from '../i18n/index';
 
 /** «Доступна новая версия»: сайт — перезагрузить, Android (APK с сайта) — скачать новый APK */
 export function UpdateBanner() {
@@ -11,13 +12,13 @@ export function UpdateBanner() {
     <div className="upd-banner" role="status">
       <div className="upd-icon">{apk ? <DownloadSimple weight="bold" /> : <ArrowClockwise weight="bold" />}</div>
       <div className="upd-text">
-        <b>{update.version ? `Новая версия ${update.version}` : 'Доступно обновление'}</b>
-        <span>{apk ? 'Ставится поверх — карты и задачи останутся' : 'Несохранённое сохранится само'}</span>
+        <b>{update.version ? t('Новая версия {version}', { version: update.version }) : t('Доступно обновление')}</b>
+        <span>{apk ? t('Ставится поверх — карты и задачи останутся') : t('Несохранённое сохранится само')}</span>
       </div>
       <button className="upd-go" onClick={() => void applyUpdate()}>
-        {apk ? 'Скачать' : 'Обновить'}
+        {apk ? t('Скачать') : t('Обновить')}
       </button>
-      <button className="icon-btn upd-close" onClick={dismissUpdate} aria-label="Не сейчас" title="Не сейчас">
+      <button className="icon-btn upd-close" onClick={dismissUpdate} aria-label={t('Не сейчас')} title={t('Не сейчас')}>
         <X size={16} weight="bold" />
       </button>
     </div>

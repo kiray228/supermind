@@ -5,6 +5,7 @@ import { describeAction, executeAction, type ActionItem, type ActionView } from 
 import { patchMessage, useChat, type ChatMessage } from './history';
 import { Markdown } from './Markdown';
 import { reportAI } from '../ui/ReportAI';
+import { t } from '../i18n/index';
 
 const KIND_ICON: Record<ActionView['kind'], typeof Check> = {
   task: ListPlus,
@@ -18,9 +19,9 @@ const KIND_ICON: Record<ActionView['kind'], typeof Check> = {
 async function copyText(text: string) {
   try {
     await navigator.clipboard.writeText(text);
-    toast('Скопировано');
+    toast(t('Скопировано'));
   } catch {
-    toast('Не удалось скопировать');
+    toast(t('Не удалось скопировать'));
   }
 }
 
@@ -34,7 +35,7 @@ async function runActions(msgId: string, keys: string[]) {
     try {
       results.set(a.key, await executeAction(a));
     } catch (e) {
-      results.set(a.key, { ok: false, info: e instanceof Error ? e.message : 'Ошибка' });
+      results.set(a.key, { ok: false, info: e instanceof Error ? e.message : t('Ошибка') });
     }
   }
   if (!results.size) return;
@@ -48,7 +49,7 @@ async function runActions(msgId: string, keys: string[]) {
     }),
   });
   const ok = [...results.values()].filter((r) => r.ok).length;
-  if (results.size > 1) toast(ok === results.size ? `Готово: ${ok}` : `Выполнено ${ok} из ${results.size}`);
+  if (results.size > 1) toast(ok === results.size ? t('Готово: {n}', { n: ok }) : t('Выполнено {ok} из {total}', { ok, total: results.size }));
 }
 
 function ActionCard({ a, onRun, busy }: { a: ActionItem; onRun: () => void; busy: boolean }) {
@@ -66,12 +67,12 @@ function ActionCard({ a, onRun, busy }: { a: ActionItem; onRun: () => void; busy
         {(a.info || v.meta) && <div className="as-act-meta">{a.status ? a.info : v.meta}</div>}
       </div>
       {done ? (
-        <span className="as-act-ok" aria-label="Выполнено">
+        <span className="as-act-ok" aria-label={t('Выполнено')}>
           <Check size={16} />
         </span>
       ) : (
         <button className="btn btn-sm as-act-run" onClick={onRun} disabled={busy}>
-          {a.status === 'error' ? 'Повторить' : 'Выполнить'}
+          {a.status === 'error' ? t('Повторить') : t('Выполнить')}
         </button>
       )}
     </div>
@@ -99,10 +100,10 @@ function ActionList({ msg }: { msg: ChatMessage }) {
       {pending.length > 1 && (
         <div className="as-acts-bar">
           <button className="btn btn-primary btn-sm" onClick={() => void run(pending.map((a) => a.key))} disabled={busy}>
-            <Check size={15} /> Выполнить все ({pending.length})
+            <Check size={15} /> {t('Выполнить все ({n})', { n: pending.length })}
           </button>
           <button className="btn btn-ghost btn-sm" onClick={dismiss} disabled={busy}>
-            <X size={15} /> Не нужно
+            <X size={15} /> {t('Не нужно')}
           </button>
         </div>
       )}
@@ -127,18 +128,18 @@ export function MessageView({ msg, onRetry }: { msg: ChatMessage; onRetry?: () =
         {!!msg.actions?.length && <ActionList msg={msg} />}
         <div className="as-msg-tools">
           {!msg.error && msg.text && (
-            <button className="as-tool" onClick={() => void copyText(msg.text)} aria-label="Копировать">
-              <Copy size={14} /> Копировать
+            <button className="as-tool" onClick={() => void copyText(msg.text)} aria-label={t('Копировать')}>
+              <Copy size={14} /> {t('Копировать')}
             </button>
           )}
           {!msg.error && msg.text && (
-            <button className="as-tool" onClick={() => reportAI(msg.text, 'Ассистент')} aria-label="Пожаловаться на ответ ИИ">
-              <MessageSquareWarning size={14} /> Пожаловаться
+            <button className="as-tool" onClick={() => reportAI(msg.text, 'Ассистент')} aria-label={t('Пожаловаться на ответ ИИ')}>
+              <MessageSquareWarning size={14} /> {t('Пожаловаться')}
             </button>
           )}
           {onRetry && (
             <button className="as-tool" onClick={onRetry}>
-              <RotateCcw size={14} /> Повторить
+              <RotateCcw size={14} /> {t('Повторить')}
             </button>
           )}
         </div>
@@ -157,7 +158,7 @@ export function StreamingView({ text }: { text: string }) {
         {text ? (
           <Markdown text={text} className="as-md-live" />
         ) : (
-          <div className="as-typing" aria-label="Ассистент думает">
+          <div className="as-typing" aria-label={t('Ассистент думает')}>
             <i />
             <i />
             <i />

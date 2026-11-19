@@ -1,6 +1,7 @@
 import { Component, type ReactNode } from 'react';
 import { useApp } from '../store/appStore';
 import { recordError } from './errorReport';
+import { t } from '../i18n/index';
 
 /**
  * Ошибка при отрисовке раздела (например, повреждённая карта из файла) — вместо белого экрана
@@ -27,15 +28,15 @@ export class ViewBoundary extends Component<{ children: ReactNode }, { error: Er
     };
     return (
       <div className="view-crash" role="alert">
-        <h2>Этот раздел не открылся</h2>
-        <p className="muted">Что-то в данных помешало его показать. Ваши данные на месте — попробуйте вернуться на главную или перезапустить приложение.</p>
+        <h2>{t('Этот раздел не открылся')}</h2>
+        <p className="muted">{t('Что-то в данных помешало его показать. Ваши данные на месте — попробуйте вернуться на главную или перезапустить приложение.')}</p>
         <p className="tiny faint view-crash-msg">{String(this.state.error.message || this.state.error).slice(0, 200)}</p>
         <div className="row view-crash-acts">
           <button className="btn" onClick={() => location.reload()}>
-            Перезапустить
+            {t('Перезапустить')}
           </button>
           <button className="btn btn-primary" onClick={home}>
-            На главную
+            {t('На главную')}
           </button>
         </div>
       </div>

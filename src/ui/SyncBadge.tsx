@@ -6,6 +6,7 @@
  */
 import { useEffect, useState } from 'react';
 import { ArrowsClockwise, CloudArrowUp, CloudSlash, CloudWarning } from '@phosphor-icons/react';
+import { t } from '../i18n/index';
 import { useApp } from '../store/appStore';
 import { usePendingSync } from '../store/pending';
 import './sync-badge.css';
@@ -21,8 +22,8 @@ function useSyncAlert(): { kind: Kind | null; count: number; syncing: boolean } 
   const [staleSince, setStaleSince] = useState<number>();
   useEffect(() => {
     if (!count || !since) return;
-    const t = setTimeout(() => setStaleSince(since), Math.max(0, since + STALE - Date.now()));
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setStaleSince(since), Math.max(0, since + STALE - Date.now()));
+    return () => clearTimeout(timer);
   }, [count, since]);
   let kind: Kind | null = null;
   if (account) {
@@ -47,15 +48,15 @@ function openSyncSettings() {
 const ICON = { offline: CloudSlash, error: CloudWarning, pending: CloudArrowUp };
 
 function label(kind: Kind) {
-  if (kind === 'error') return 'Ошибка синхронизации';
-  if (kind === 'offline') return 'Нет связи';
-  return 'Не отправлено';
+  if (kind === 'error') return t('Ошибка синхронизации');
+  if (kind === 'offline') return t('Нет связи');
+  return t('Не отправлено');
 }
 
 function hint(kind: Kind, count: number) {
-  if (kind === 'error') return 'Изменения не отправлены. Нажмите, чтобы посмотреть';
-  if (kind === 'offline') return count ? `Нет связи — ${count} изм. отправим, когда появится интернет` : 'Нет связи с облаком';
-  return `Не отправлено в облако: ${count} изм.`;
+  if (kind === 'error') return t('Изменения не отправлены. Нажмите, чтобы посмотреть');
+  if (kind === 'offline') return count ? t('Нет связи — {n} изм. отправим, когда появится интернет', { n: count }) : t('Нет связи с облаком');
+  return t('Не отправлено в облако: {n} изм.', { n: count });
 }
 
 function Ico({ kind, syncing, size }: { kind: Kind; syncing: boolean; size: number }) {
@@ -100,9 +101,9 @@ export function SyncSheetRow({ onPick }: { onPick: () => void }) {
       <Ico kind={kind} syncing={syncing} size={20} />
       <span className="sync-sheet-text">
         {label(kind)}
-        {!!count && <span className="sync-sheet-sub"> · {count > 99 ? '99+' : count} изм.</span>}
+        {!!count && <span className="sync-sheet-sub"> · {t('{n} изм.', { n: count > 99 ? '99+' : count })}</span>}
       </span>
-      <span className="sync-sheet-go">Подробнее</span>
+      <span className="sync-sheet-go">{t('Подробнее')}</span>
     </button>
   );
 }

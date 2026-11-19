@@ -8,6 +8,7 @@
  * - Google Play и iPhone обновляет магазин — здесь ничего.
  */
 import { create } from 'zustand';
+import { t } from '../i18n/index';
 import { isAndroidApp, isNative } from '../platform';
 import { APP_VERSION } from '../store/safety';
 import { apkUpdate, newer, webUpdate, type AppUpdate } from './updateCheck';
@@ -136,9 +137,9 @@ export async function applyUpdate() {
     const { nativeOpenUrl } = await import('../native/widget');
     try {
       await nativeOpenUrl(u.url!);
-      toast(`Скачивается SuperMind ${u.version}. Откройте файл и нажмите «Установить» — карты и задачи останутся`);
+      toast(t('Скачивается SuperMind {version}. Откройте файл и нажмите «Установить» — карты и задачи останутся', { version: u.version ?? '' }));
     } catch {
-      toast('Не удалось открыть браузер. Скачайте новую версию на сайте SuperMind');
+      toast(t('Не удалось открыть браузер. Скачайте новую версию на сайте SuperMind'));
     }
     return;
   }
@@ -153,7 +154,7 @@ export async function applyUpdate() {
     location.reload();
   } catch {
     applying = false;
-    toast('Не удалось обновить — попробуйте ещё раз');
+    toast(t('Не удалось обновить — попробуйте ещё раз'));
   }
 }
 

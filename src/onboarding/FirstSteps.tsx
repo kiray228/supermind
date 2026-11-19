@@ -8,6 +8,7 @@ import { notifyPermission, requestNotifyPermission } from '../tasks/sync';
 import { enablePush, pushActive, pushSupported } from '../store/push';
 import { ensureProgressSources, useProgressExtra } from '../progress/hooks';
 import { checklistWindowOpen, firstSteps, hideChecklist, type Step } from './checklist';
+import { t } from '../i18n/index';
 import './onboarding.css';
 
 /** Уведомления действительно дойдут: в вебе с push — только при активной подписке */
@@ -44,9 +45,9 @@ export function FirstSteps() {
     if (s.to !== 'notify') return go(s.to);
     if (isNative()) {
       const r = await requestNotifyPermission();
-      if (r === 'denied') toast('Уведомления запрещены — разрешите их в настройках телефона');
+      if (r === 'denied') toast(t('Уведомления запрещены — разрешите их в настройках телефона'));
     } else if (pushSupported()) {
-      const r = await enablePush().catch(() => ({ ok: false, message: 'Не удалось включить уведомления' }));
+      const r = await enablePush().catch(() => ({ ok: false, message: t('Не удалось включить уведомления') }));
       toast(r.message);
     } else {
       // iPhone в Safari (не с экрана «Домой») — там подсказка, как включить
@@ -56,15 +57,15 @@ export function FirstSteps() {
   };
 
   return (
-    <section className="card fs-card" aria-label="Первые шаги">
+    <section className="card fs-card" aria-label={t('Первые шаги')}>
       <div className="fs-head">
         <div className="grow">
-          <div className="fs-title">Первые шаги</div>
+          <div className="fs-title">{t('Первые шаги')}</div>
           <div className="fs-sub">
-            {done} из {steps.length} — освоитесь за пару минут
+            {t('{done} из {total} — освоитесь за пару минут', { done, total: steps.length })}
           </div>
         </div>
-        <button className="icon-btn fs-close" onClick={dismiss} aria-label="Скрыть «Первые шаги»" title="Скрыть">
+        <button className="icon-btn fs-close" onClick={dismiss} aria-label={t('Скрыть «Первые шаги»')} title={t('Скрыть')}>
           <X size={18} />
         </button>
       </div>

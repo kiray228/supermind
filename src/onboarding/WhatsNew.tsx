@@ -3,6 +3,7 @@ import { Gift, X } from 'lucide-react';
 import { APP_VERSION } from '../store/safety';
 import { entriesFor } from './changelog';
 import { useWhatsNew } from './state';
+import { t } from '../i18n/index';
 
 export default function WhatsNew({ onClose }: { onClose: () => void }) {
   const open = useWhatsNew((s) => s.open);
@@ -14,7 +15,7 @@ export default function WhatsNew({ onClose }: { onClose: () => void }) {
   return (
     <div className="modal-backdrop wn-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="wn-sheet" role="dialog" aria-modal="true" aria-labelledby="wn-title">
-        <button className="icon-btn wn-close" onClick={onClose} aria-label="Закрыть">
+        <button className="icon-btn wn-close" onClick={onClose} aria-label={t('Закрыть')}>
           <X size={18} />
         </button>
         <div className="wn-head">
@@ -22,7 +23,7 @@ export default function WhatsNew({ onClose }: { onClose: () => void }) {
             <Gift size={22} />
           </span>
           <div>
-            <h2 id="wn-title">Что нового</h2>
+            <h2 id="wn-title">{t('Что нового')}</h2>
             <p className="wn-sub">
               SuperMind {head.version} · {head.title}
             </p>
@@ -64,7 +65,7 @@ export default function WhatsNew({ onClose }: { onClose: () => void }) {
           ))}
         </div>
         <button className="btn btn-primary btn-block wn-ok" onClick={onClose}>
-          Отлично
+          {t('Отлично')}
         </button>
       </div>
     </div>

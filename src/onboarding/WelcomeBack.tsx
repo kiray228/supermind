@@ -3,7 +3,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { CalendarCheck, Flame, Sprout, X } from 'lucide-react';
 import { toast, useApp } from '../store/appStore';
 import { ensureTasks, updateTask, useTasks } from '../tasks/store';
-import { isActive, plural } from '../tasks/model';
+import { isActive } from '../tasks/model';
+import { t, tn } from '../i18n/index';
 import { todayYmd } from '../utils/mapTasks';
 import { useProgress } from '../progress/hooks';
 
@@ -18,16 +19,16 @@ export default function WelcomeBack({ onClose }: { onClose: () => void }) {
     void ensureTasks().catch(() => undefined);
   }, []);
 
-  const overdue = useMemo(() => (tasks?.tasks ?? []).filter((t) => isActive(t) && !!t.date && t.date < today), [tasks, today]);
+  const overdue = useMemo(() => (tasks?.tasks ?? []).filter((x) => isActive(x) && !!x.date && x.date < today), [tasks, today]);
 
   const moveOverdue = () => {
-    const prev = overdue.map((t) => ({ id: t.id, date: t.date }));
-    for (const t of prev) updateTask(t.id, { date: today });
+    const prev = overdue.map((x) => ({ id: x.id, date: x.date }));
+    for (const x of prev) updateTask(x.id, { date: today });
     setMoved(prev.length);
-    toast(`Перенесено на сегодня: ${prev.length}`, {
-      label: 'Отменить',
+    toast(t('Перенесено на сегодня: {n}', { n: prev.length }), {
+      label: t('Отменить'),
       run: () => {
-        for (const t of prev) updateTask(t.id, { date: t.date });
+        for (const x of prev) updateTask(x.id, { date: x.date });
         setMoved(null);
       },
     });
@@ -44,7 +45,7 @@ export default function WelcomeBack({ onClose }: { onClose: () => void }) {
   return (
     <div className="modal-backdrop wn-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="wn-sheet wb-sheet" role="dialog" aria-modal="true" aria-labelledby="wb-title">
-        <button className="icon-btn wn-close" onClick={onClose} aria-label="Закрыть">
+        <button className="icon-btn wn-close" onClick={onClose} aria-label={t('Закрыть')}>
           <X size={18} />
         </button>
         <div className="wn-head">
@@ -54,8 +55,8 @@ export default function WelcomeBack({ onClose }: { onClose: () => void }) {
             </span>
           </span>
           <div>
-            <h2 id="wb-title">С возвращением!</h2>
-            <p className="wn-sub">Рады видеть вас снова</p>
+            <h2 id="wb-title">{t('С возвращением!')}</h2>
+            <p className="wn-sub">{t('Рады видеть вас снова')}</p>
           </div>
         </div>
         <ul className="wn-items wb-items">
@@ -64,11 +65,11 @@ export default function WelcomeBack({ onClose }: { onClose: () => void }) {
               <Flame size={18} />
             </span>
             <span>
-              <b>{lv ? `Уровень ${lv.level} «${lv.title}» на месте` : 'Уровень и награды на месте'}</b>
+              <b>{lv ? t('Уровень {level} «{title}» на месте', { level: lv.level, title: lv.title }) : t('Уровень и награды на месте')}</b>
               <small>
                 {best >= 2
-                  ? `Рекорд серии — ${best} ${plural(best, 'день', 'дня', 'дней')}. Опыт и достижения никуда не делись.`
-                  : 'Опыт, достижения и рекорды сохранены — продолжим с того же места.'}
+                  ? t('Рекорд серии — {n} {days}. Опыт и достижения никуда не делись.', { n: best, days: tn(best, 'день', 'дня', 'дней') })
+                  : t('Опыт, достижения и рекорды сохранены — продолжим с того же места.')}
               </small>
             </span>
           </li>
@@ -78,15 +79,15 @@ export default function WelcomeBack({ onClose }: { onClose: () => void }) {
             <button className="btn btn-block wb-btn" onClick={moveOverdue} disabled={moved !== null}>
               <CalendarCheck size={18} />
               {moved !== null
-                ? `Перенесено на сегодня: ${moved}`
-                : `Перенести просроченные на сегодня (${overdue.length})`}
+                ? t('Перенесено на сегодня: {n}', { n: moved })
+                : t('Перенести просроченные на сегодня ({n})', { n: overdue.length })}
             </button>
           ) : null}
           <button className="btn btn-primary btn-block wb-btn" onClick={startHabit}>
-            <Sprout size={18} /> Начать с одной привычки
+            <Sprout size={18} /> {t('Начать с одной привычки')}
           </button>
           <button className="btn btn-block btn-ghost wb-later" onClick={onClose}>
-            Позже
+            {t('Позже')}
           </button>
         </div>
       </div>

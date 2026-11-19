@@ -4,19 +4,23 @@ import { changePassword, deleteAccount, login, logout, register, syncNow, useClo
 import { enablePush, disablePush, isStandalone, pushActive, pushSupported, testPush } from '../store/push';
 import { toast } from '../store/appStore';
 import { dirtyKeys } from '../store/kv';
-import { changesText, clockText, recount, usePendingSync } from '../store/pending';
+import { clockText, recount, usePendingSync } from '../store/pending';
+import { LOCALE, t, tn } from '../i18n/index';
 import { askPassword, askText, confirmDialog } from './dialogs';
 import { isNative } from '../platform';
 import { IconTile } from './icons';
 import { ListCell, ListRow, ListSection, SwitchRow } from './list';
 
 function ago(ms?: number): string {
-  if (!ms) return 'ещё не было';
+  if (!ms) return t('ещё не было');
   const s = Math.round((Date.now() - ms) / 1000);
-  if (s < 60) return 'только что';
-  if (s < 3600) return `${Math.floor(s / 60)} мин назад`;
-  return new Date(ms).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  if (s < 60) return t('только что');
+  if (s < 3600) return t('{n} мин назад', { n: Math.floor(s / 60) });
+  return new Date(ms).toLocaleString(LOCALE, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
+
+/** «3 изменения» */
+const changesText = (n: number) => `${n} ${tn(n, 'изменение', 'изменения', 'изменений')}`;
 
 /** Аккаунт: вход/регистрация и синхронизация между устройствами */
 export function AccountCard() {
@@ -31,8 +35,8 @@ export function AccountCard() {
   const { count, since } = usePendingSync();
   const [, tick] = useState(0);
   useEffect(() => {
-    const t = setInterval(() => tick((n) => n + 1), 30000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => tick((n) => n + 1), 30000);
+    return () => clearInterval(timer);
   }, []);
 
   const submit = async () => {
@@ -41,7 +45,7 @@ export function AccountCard() {
       if (mode === 'register') await register(name.trim(), email.trim(), password);
       else await login(email.trim(), password);
       setPassword('');
-      toast(mode === 'register' ? 'Аккаунт создан — данные сохраняются в облаке' : 'Вы вошли — данные синхронизированы');
+      toast(mode === 'register' ? t('Аккаунт создан — данные сохраняются в облаке') : t('Вы вошли — данные синхронизированы'));
     } catch (e) {
       toast(e instanceof Error ? e.message : String(e));
     } finally {
@@ -56,10 +60,10 @@ export function AccountCard() {
       await syncNow();
       const left = await recount();
       const s = useCloud.getState();
-      if (s.status === 'offline') toast('Нет интернета — отправим, когда появится связь');
-      else if (s.status === 'error') toast(s.error ?? 'Не удалось синхронизировать');
-      else if (left) toast(`Не всё отправлено: осталось ${changesText(left)}`);
-      else toast(count ? 'Все изменения отправлены в облако' : 'Синхронизировано');
+      if (s.status === 'offline') toast(t('Нет интернета — отправим, когда появится связь'));
+      else if (s.status === 'error') toast(s.error ?? t('Не удалось синхронизировать'));
+      else if (left) toast(t('Не всё отправлено: осталось {changes}', { changes: changesText(left) }));
+      else toast(count ? t('Все изменения отправлены в облако') : t('Синхронизировано'));
     } finally {
       setSending(false);
     }
@@ -70,7 +74,7 @@ export function AccountCard() {
     const syncing = status === 'syncing' || sending;
     const cloudIcon = status === 'offline' ? CloudSlash : status === 'error' ? CloudWarning : count ? CloudArrowUp : CloudCheck;
     const cloudTone = status === 'error' ? 'red' : status === 'offline' || count ? 'orange' : 'blue';
-    const unsent = count ? `Не отправлено: ${changesText(count)}${since ? ` · с ${clockText(since)}` : ''}` : '';
+    const unsent = count ? (since ? t('Не отправлено: {changes} · с {time}', { changes: changesText(count), time: clockText(since) }) : t('Не отправлено: {changes}', { changes: changesText(count) })) : '';
     return (
       <>
         <ListSection>
@@ -78,46 +82,46 @@ export function AccountCard() {
             className="acc-profile"
             icon={<span className="acc-avatar on">{who[0]?.toUpperCase()}</span>}
             title={who}
-            subtitle={account.user.name ? `${account.user.email} · аккаунт SuperMind` : 'Аккаунт SuperMind'}
+            subtitle={account.user.name ? t('{email} · аккаунт SuperMind', { email: account.user.email }) : t('Аккаунт SuperMind')}
           />
         </ListSection>
         <ListSection
           className="acc-sync"
-          header="Синхронизация"
-          footer="Карты, задачи, ежедневник и всё остальное сохраняются в облаке и одинаковы на всех устройствах."
+          header={t('Синхронизация')}
+          footer={t('Карты, задачи, ежедневник и всё остальное сохраняются в облаке и одинаковы на всех устройствах.')}
         >
           <ListRow
             icon={<IconTile icon={cloudIcon} tone={cloudTone} size="list" />}
-            title="Облако"
+            title={t('Облако')}
             subtitle={
               status === 'offline' ? (
                 <>
-                  <span className="acc-status offline">Нет интернета — отправим, когда появится связь</span>
+                  <span className="acc-status offline">{t('Нет интернета — отправим, когда появится связь')}</span>
                   {unsent && <span className="acc-unsent">{unsent}</span>}
                 </>
               ) : status === 'error' ? (
                 <>
-                  <span className="acc-status error">{error ?? 'Ошибка синхронизации'}</span>
+                  <span className="acc-status error">{error ?? t('Ошибка синхронизации')}</span>
                   {unsent && <span className="acc-unsent">{unsent}</span>}
                 </>
               ) : status === 'syncing' ? (
-                count ? `Отправляем ${changesText(count)}…` : 'Синхронизация…'
+                count ? t('Отправляем {changes}…', { changes: changesText(count) }) : t('Синхронизация…')
               ) : (
-                unsent || `Все изменения в облаке${lastSync ? ` · синхронизировано ${ago(lastSync)}` : ''}`
+                unsent || (lastSync ? t('Все изменения в облаке · синхронизировано {ago}', { ago: ago(lastSync) }) : t('Все изменения в облаке'))
               )
             }
-            value={status === 'syncing' && !sending ? <span className="spinner acc-spinner" aria-label="Синхронизация" /> : undefined}
+            value={status === 'syncing' && !sending ? <span className="spinner acc-spinner" aria-label={t('Синхронизация')} /> : undefined}
           />
           {!!localOnly && (
             <ListRow
               icon={<IconTile icon={CloudSlash} tone="orange" size="list" />}
-              title={`${localOnly} ${localOnly === 1 ? 'объект только на устройстве' : 'объекта(ов) только на устройстве'}`}
-              subtitle="Слишком большие для облака (много фото). Скачайте копию файлом в разделе «Файл» ниже."
+              title={t('{n} {objects} только на устройстве', { n: localOnly, objects: tn(localOnly, 'объект', 'объекта', 'объектов') })}
+              subtitle={t('Слишком большие для облака (много фото). Скачайте копию файлом в разделе «Файл» ниже.')}
             />
           )}
           <ListRow
             icon={<IconTile icon={count ? CloudArrowUp : ArrowsClockwise} tone="green" size="list" />}
-            title={syncing ? (count ? 'Отправка…' : 'Синхронизация…') : count ? 'Отправить сейчас' : 'Синхронизировать сейчас'}
+            title={syncing ? (count ? t('Отправка…') : t('Синхронизация…')) : count ? t('Отправить сейчас') : t('Синхронизировать сейчас')}
             tone="accent"
             disabled={syncing}
             trailing={sending ? <span className="spinner acc-spinner" /> : undefined}
@@ -127,44 +131,44 @@ export function AccountCard() {
         <ListSection>
           <ListRow
             icon={<IconTile icon={Password} tone="gray" size="list" />}
-            title="Сменить пароль"
+            title={t('Сменить пароль')}
             chevron
             onClick={async () => {
-              const oldP = await askPassword('Текущий пароль');
+              const oldP = await askPassword(t('Текущий пароль'));
               if (!oldP) return;
-              const newP = await askText('Новый пароль', { placeholder: 'Минимум 8 символов' });
+              const newP = await askText(t('Новый пароль'), { placeholder: t('Минимум 8 символов') });
               if (!newP) return;
               try {
                 await changePassword(oldP, newP);
-                toast('Пароль изменён. На других устройствах нужно войти заново');
+                toast(t('Пароль изменён. На других устройствах нужно войти заново'));
               } catch (e) {
                 toast(e instanceof Error ? e.message : String(e));
               }
             }}
           />
           <ListRow
-            title="Выйти"
+            title={t('Выйти')}
             tone="danger"
             onClick={async () => {
               // сначала отправить несохранённое; не ушло (нет сети) — предупредить
               await syncNow();
               const unsent = Object.keys(await dirtyKeys()).length;
               const text = unsent
-                ? `Не все изменения успели уйти в облако (нет связи): ${unsent} — они останутся только на этом устройстве и отправятся, когда вы снова войдёте в этот аккаунт.`
-                : 'Данные останутся на этом устройстве, но перестанут синхронизироваться.';
-              if (await confirmDialog('Выйти из аккаунта?', text, { okText: 'Выйти', danger: !!unsent })) await logout();
+                ? t('Не все изменения успели уйти в облако (нет связи): {n} — они останутся только на этом устройстве и отправятся, когда вы снова войдёте в этот аккаунт.', { n: unsent })
+                : t('Данные останутся на этом устройстве, но перестанут синхронизироваться.');
+              if (await confirmDialog(t('Выйти из аккаунта?'), text, { okText: t('Выйти'), danger: !!unsent })) await logout();
             }}
           />
           <ListRow
-            title="Удалить аккаунт"
+            title={t('Удалить аккаунт')}
             tone="danger"
             onClick={async () => {
-              if (!(await confirmDialog('Удалить аккаунт?', 'Данные будут удалены из облака навсегда. На этом устройстве они останутся.', { danger: true, okText: 'Удалить' }))) return;
-              const p = await askPassword('Пароль для подтверждения');
+              if (!(await confirmDialog(t('Удалить аккаунт?'), t('Данные будут удалены из облака навсегда. На этом устройстве они останутся.'), { danger: true, okText: t('Удалить') }))) return;
+              const p = await askPassword(t('Пароль для подтверждения'));
               if (!p) return;
               try {
                 await deleteAccount(p);
-                toast('Аккаунт удалён');
+                toast(t('Аккаунт удалён'));
               } catch (e) {
                 toast(e instanceof Error ? e.message : String(e));
               }
@@ -185,8 +189,8 @@ export function AccountCard() {
               <User size={32} weight="fill" />
             </span>
           }
-          title="Войдите в SuperMind"
-          subtitle="Карты, задачи и заметки — в облаке и на всех устройствах"
+          title={t('Войдите в SuperMind')}
+          subtitle={t('Карты, задачи и заметки — в облаке и на всех устройствах')}
         />
       </ListSection>
       <form
@@ -196,21 +200,21 @@ export function AccountCard() {
           void submit();
         }}
       >
-        <h3 className="ls-header">Аккаунт</h3>
+        <h3 className="ls-header">{t('Аккаунт')}</h3>
         <div className="ls-group">
           <ListCell>
             <div className="segmented acc-seg">
               <button type="button" className={mode === 'register' ? 'active' : ''} onClick={() => setMode('register')}>
-                Создать аккаунт
+                {t('Создать аккаунт')}
               </button>
               <button type="button" className={mode === 'login' ? 'active' : ''} onClick={() => setMode('login')}>
-                Войти
+                {t('Войти')}
               </button>
             </div>
           </ListCell>
           {mode === 'register' && (
             <div className="ls-field">
-              <input className="ls-input" placeholder="Имя" aria-label="Имя" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} />
+              <input className="ls-input" placeholder={t('Имя')} aria-label={t('Имя')} autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} />
             </div>
           )}
           <div className="ls-field">
@@ -230,8 +234,8 @@ export function AccountCard() {
             <input
               className="ls-input"
               type="password"
-              aria-label="Пароль"
-              placeholder={mode === 'register' ? 'Пароль (минимум 8 символов)' : 'Пароль'}
+              aria-label={t('Пароль')}
+              placeholder={mode === 'register' ? t('Пароль (минимум 8 символов)') : t('Пароль')}
               autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -240,10 +244,10 @@ export function AccountCard() {
             />
           </div>
         </div>
-        <div className="ls-footer">Без аккаунта всё работает только на этом устройстве.</div>
+        <div className="ls-footer">{t('Без аккаунта всё работает только на этом устройстве.')}</div>
         <div className="acc-form-row">
           <button className="btn btn-primary" type="submit" disabled={busy || !email.trim() || !password}>
-            {busy ? 'Подождите…' : mode === 'register' ? 'Создать аккаунт' : 'Войти'}
+            {busy ? t('Подождите…') : mode === 'register' ? t('Создать аккаунт') : t('Войти')}
           </button>
         </div>
       </form>
@@ -264,25 +268,25 @@ export function PushCard() {
       toast(r.message);
       setOn(r.ok);
     } catch (e) {
-      toast('Не удалось включить: ' + (e instanceof Error ? e.message : String(e)));
+      toast(t('Не удалось включить: {error}', { error: e instanceof Error ? e.message : String(e) }));
     } finally {
       setBusy(false);
     }
   };
   return (
     <ListSection
-      header="Push-уведомления"
+      header={t('Push-уведомления')}
       footer={
         on
-          ? 'Напоминания придут, даже когда SuperMind закрыт. Расписание обновляется автоматически при изменении задач.'
+          ? t('Напоминания придут, даже когда SuperMind закрыт. Расписание обновляется автоматически при изменении задач.')
           : ios && !isStandalone()
-            ? 'На iPhone push работает только у приложения, добавленного на экран «Домой»: Safari → «Поделиться» → «На экран „Домой“», затем откройте SuperMind с иконки и включите.'
-            : 'Включите, чтобы напоминания приходили, даже когда приложение закрыто.'
+            ? t('На iPhone push работает только у приложения, добавленного на экран «Домой»: Safari → «Поделиться» → «На экран „Домой“», затем откройте SuperMind с иконки и включите.')
+            : t('Включите, чтобы напоминания приходили, даже когда приложение закрыто.')
       }
     >
       <SwitchRow
         icon={<IconTile icon={BellRinging} tone="red" size="list" />}
-        title="Push-уведомления"
+        title={t('Push-уведомления')}
         checked={on}
         disabled={busy || (!on && !pushSupported())}
         onChange={async (v) => {
@@ -296,11 +300,11 @@ export function PushCard() {
       {on && (
         <ListRow
           icon={<IconTile icon={PaperPlaneTilt} tone="blue" size="list" />}
-          title="Отправить проверочное"
+          title={t('Отправить проверочное')}
           tone="accent"
           onClick={async () => {
             const ok = await testPush().catch(() => false);
-            toast(ok ? 'Отправлено — уведомление придёт через пару секунд' : 'Не удалось отправить — включите уведомления заново');
+            toast(ok ? t('Отправлено — уведомление придёт через пару секунд') : t('Не удалось отправить — включите уведомления заново'));
           }}
         />
       )}

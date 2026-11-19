@@ -10,7 +10,8 @@ import { fmtMoney } from '../finance/model';
 import { PRIORITY_META, fromYmd, todayYmd } from '../utils/mapTasks';
 import type { PlannerData } from '../types';
 import { AIError } from '../ai/claude';
-import { aiBrief, cachedAiBrief, computeBriefing, plural } from './briefing';
+import { aiBrief, cachedAiBrief, computeBriefing } from './briefing';
+import { t, tn } from '../i18n/index';
 import { Markdown } from './Markdown';
 import { ReportAI } from '../ui/ReportAI';
 import type { BrainBrief } from '../notes/brainBrief';
@@ -27,9 +28,9 @@ function readCollapsed(): boolean {
 
 function relDay(ymd: string, today: string): string {
   const diff = Math.round((fromYmd(ymd).getTime() - fromYmd(today).getTime()) / 86400000);
-  if (diff <= 0) return 'сегодня';
-  if (diff === 1) return 'завтра';
-  return `через ${diff} ${plural(diff, 'день', 'дня', 'дней')}`;
+  if (diff <= 0) return t('сегодня');
+  if (diff === 1) return t('завтра');
+  return t('через {n} {days}', { n: diff, days: tn(diff, 'день', 'дня', 'дней') });
 }
 
 /** Ежедневник (привычки, настроение) читается напрямую из базы и перечитывается при изменениях */
@@ -72,15 +73,15 @@ export function BriefingCard({ hasKey, onCollapse }: { hasKey: boolean; onCollap
     void ensureTasks().catch(() => undefined);
     void ensureGoals().catch(() => undefined);
     void ensureFinance().catch(() => undefined);
-    const t = setInterval(() => setTick(Date.now()), 5 * 60000);
+    const timer = setInterval(() => setTick(Date.now()), 5 * 60000);
     return () => {
-      clearInterval(t);
+      clearInterval(timer);
       abort.current?.abort();
     };
   }, []);
 
   const b = useMemo(() => computeBriefing({ tasks, goals, finance, planner, name, now: new Date(tick) }), [tasks, goals, finance, planner, name, tick]);
-  const mind = useMindBrief(b.today, b.todayTasks.map((t) => t.id).join(','));
+  const mind = useMindBrief(b.today, b.todayTasks.map((task) => task.id).join(','));
   const habitsDone = b.habits.filter((h) => h.done).length;
 
   const toggleCollapsed = () => {
@@ -96,12 +97,12 @@ export function BriefingCard({ hasKey, onCollapse }: { hasKey: boolean; onCollap
   };
 
   const moveOverdue = () => {
-    const prev = b.overdue.map((t) => ({ id: t.id, date: t.date }));
-    for (const t of prev) updateTask(t.id, { date: b.today });
-    toast(`Перенесено на сегодня: ${prev.length}`, {
-      label: 'Отменить',
+    const prev = b.overdue.map((task) => ({ id: task.id, date: task.date }));
+    for (const task of prev) updateTask(task.id, { date: b.today });
+    toast(t('Перенесено на сегодня: {n}', { n: prev.length }), {
+      label: t('Отменить'),
       run: () => {
-        for (const t of prev) updateTask(t.id, { date: t.date });
+        for (const task of prev) updateTask(task.id, { date: task.date });
       },
     });
   };
@@ -120,7 +121,7 @@ export function BriefingCard({ hasKey, onCollapse }: { hasKey: boolean; onCollap
     } catch (e) {
       if (ctrl.signal.aborted) return;
       setAi(cachedAiBrief());
-      setAiError(e instanceof AIError ? e.message : 'Не удалось получить сводку');
+      setAiError(e instanceof AIError ? e.message : t('Не удалось получить сводку'));
     } finally {
       if (abort.current === ctrl) {
         abort.current = null;
@@ -129,10 +130,10 @@ export function BriefingCard({ hasKey, onCollapse }: { hasKey: boolean; onCollap
     }
   };
 
-  const icon = b.greeting === 'Доброе утро' ? '☀️' : b.greeting === 'Добрый день' ? '🌤️' : b.greeting === 'Добрый вечер' ? '🌇' : '🌙';
+  const icon = b.greeting === t('Доброе утро') ? '☀️' : b.greeting === t('Добрый день') ? '🌤️' : b.greeting === t('Добрый вечер') ? '🌇' : '🌙';
 
   return (
-    <section className={`card as-brief${collapsed ? ' collapsed' : ''}`} aria-label="Брифинг на сегодня">
+    <section className={`card as-brief${collapsed ? ' collapsed' : ''}`} aria-label={t('Брифинг на сегодня')}>
       <button className="as-brief-head" onClick={toggleCollapsed} aria-expanded={!collapsed}>
         <span className="as-brief-sun" aria-hidden>
           {icon}
@@ -143,7 +144,7 @@ export function BriefingCard({ hasKey, onCollapse }: { hasKey: boolean; onCollap
             {b.name ? `, ${b.name}` : ''}!
           </span>
           <span className="as-brief-date">
-            {b.dateLabel} · Брифинг на сегодня
+            {b.dateLabel} · {t('Брифинг на сегодня')}
           </span>
         </span>
         <ChevronDown size={20} className="as-brief-chev" />
@@ -152,11 +153,11 @@ export function BriefingCard({ hasKey, onCollapse }: { hasKey: boolean; onCollap
       <div className="as-stats">
         <div className="as-stat">
           <b>{b.todayTasks.length}</b>
-          <span>{plural(b.todayTasks.length, 'задача', 'задачи', 'задач')} сегодня</span>
+          <span>{t('{tasks} сегодня', { tasks: tn(b.todayTasks.length, 'задача', 'задачи', 'задач') })}</span>
         </div>
         <div className={`as-stat${b.overdue.length ? ' warn' : ''}`}>
           <b>{b.overdue.length}</b>
-          <span>просрочено</span>
+          <span>{t('просрочено')}</span>
         </div>
         {b.habits.length > 0 ? (
           <div className={`as-stat${habitsDone === b.habits.length ? ' ok' : ''}`}>
@@ -164,17 +165,17 @@ export function BriefingCard({ hasKey, onCollapse }: { hasKey: boolean; onCollap
               {habitsDone}
               <small>/{b.habits.length}</small>
             </b>
-            <span>привычки</span>
+            <span>{t('привычки')}</span>
           </div>
         ) : (
           <div className="as-stat">
             <b>{b.doneToday}</b>
-            <span>сделано сегодня</span>
+            <span>{t('сделано сегодня')}</span>
           </div>
         )}
         <div className="as-stat ok" title={b.yesterday.titles.join(', ')}>
           <b>{b.yesterday.count}</b>
-          <span>сделано вчера</span>
+          <span>{t('сделано вчера')}</span>
         </div>
       </div>
 
@@ -184,47 +185,47 @@ export function BriefingCard({ hasKey, onCollapse }: { hasKey: boolean; onCollap
             <div className="as-alert">
               <CircleAlert size={18} />
               <span className="grow">
-                {b.overdue.length} {plural(b.overdue.length, 'задача просрочена', 'задачи просрочены', 'задач просрочено')}
-                {b.overdue[0] && <span className="as-alert-sub ellipsis">«{b.overdue[0].title}»{b.overdue.length > 1 ? ' и др.' : ''}</span>}
+                {b.overdue.length} {tn(b.overdue.length, 'задача просрочена', 'задачи просрочены', 'задач просрочено')}
+                {b.overdue[0] && <span className="as-alert-sub ellipsis">«{b.overdue[0].title}»{b.overdue.length > 1 ? ' ' + t('и др.') : ''}</span>}
               </span>
               <button className="btn btn-sm" onClick={moveOverdue}>
-                На сегодня
+                {t('На сегодня')}
               </button>
             </div>
           )}
 
           <div className="as-sec">
             <div className="as-sec-title">
-              <Target size={15} /> Главное на сегодня
+              <Target size={15} /> {t('Главное на сегодня')}
               {b.todayTasks.length > 5 && (
                 <button className="as-link" onClick={() => go('tasks')}>
-                  все {b.todayTasks.length}
+                  {t('все {n}', { n: b.todayTasks.length })}
                 </button>
               )}
             </div>
             {b.top.length === 0 ? (
               <div className="as-empty-row">
-                <span className="faint small">На сегодня задач нет — самое время выбрать главное.</span>
+                <span className="faint small">{t('На сегодня задач нет — самое время выбрать главное.')}</span>
                 <button className="btn btn-sm" onClick={() => openQuickAdd({ date: b.today })}>
-                  <Plus size={15} /> Задача
+                  <Plus size={15} /> {t('Задача')}
                 </button>
               </div>
             ) : (
               <ul className="as-tasks">
-                {b.top.map((t) => (
-                  <li key={t.id} className="as-task">
+                {b.top.map((task) => (
+                  <li key={task.id} className="as-task">
                     <button
                       className="as-check"
-                      style={{ borderColor: t.priority ? PRIORITY_META[t.priority]?.color : undefined }}
-                      onClick={() => toggleDone(t.id)}
-                      aria-label="Выполнить"
+                      style={{ borderColor: task.priority ? PRIORITY_META[task.priority]?.color : undefined }}
+                      onClick={() => toggleDone(task.id)}
+                      aria-label={t('Выполнить')}
                     >
                       <Check size={13} />
                     </button>
-                    <button className="as-task-title" onClick={() => openTask(t.id)}>
-                      {t.title}
+                    <button className="as-task-title" onClick={() => openTask(task.id)}>
+                      {task.title}
                     </button>
-                    {t.time && <span className="as-time">{t.time}</span>}
+                    {task.time && <span className="as-time">{task.time}</span>}
                   </li>
                 ))}
               </ul>
@@ -234,13 +235,13 @@ export function BriefingCard({ hasKey, onCollapse }: { hasKey: boolean; onCollap
           {b.scheduled.length > 1 && (
             <div className="as-sec">
               <div className="as-sec-title">
-                <CalendarClock size={15} /> Расписание
+                <CalendarClock size={15} /> {t('Расписание')}
               </div>
               <div className="as-timeline">
-                {b.scheduled.slice(0, 8).map((t) => (
-                  <button key={t.id} className="as-slot" onClick={() => openTask(t.id)}>
-                    <b>{t.time}</b>
-                    <span className="ellipsis">{t.title}</span>
+                {b.scheduled.slice(0, 8).map((task) => (
+                  <button key={task.id} className="as-slot" onClick={() => openTask(task.id)}>
+                    <b>{task.time}</b>
+                    <span className="ellipsis">{task.title}</span>
                   </button>
                 ))}
               </div>
@@ -250,9 +251,9 @@ export function BriefingCard({ hasKey, onCollapse }: { hasKey: boolean; onCollap
           {b.habits.length > 0 && (
             <div className="as-sec">
               <div className="as-sec-title">
-                <Flame size={15} /> Привычки
+                <Flame size={15} /> {t('Привычки')}
                 <button className="as-link" onClick={() => go('planner')}>
-                  отметить
+                  {t('отметить')}
                 </button>
               </div>
               <div className="as-habits">
@@ -270,7 +271,7 @@ export function BriefingCard({ hasKey, onCollapse }: { hasKey: boolean; onCollap
           {b.goals.length > 0 && (
             <div className="as-sec">
               <div className="as-sec-title">
-                <Target size={15} /> Сроки целей на неделе
+                <Target size={15} /> {t('Сроки целей на неделе')}
               </div>
               <ul className="as-rows">
                 {b.goals.slice(0, 4).map((g) => (
@@ -294,14 +295,14 @@ export function BriefingCard({ hasKey, onCollapse }: { hasKey: boolean; onCollap
           {mind && (mind.cards > 0 || mind.reread) && (
             <div className="as-sec">
               <div className="as-sec-title">
-                <Brain size={15} /> Из второго мозга
+                <Brain size={15} /> {t('Из второго мозга')}
               </div>
               <ul className="as-rows">
                 {mind.cards > 0 && (
                   <li>
                     <button onClick={() => void openCards()}>
                       <GraduationCap size={15} />
-                      <span className="grow ellipsis">Повторить карточки</span>
+                      <span className="grow ellipsis">{t('Повторить карточки')}</span>
                       <b className="as-amount">{mind.cards}</b>
                     </button>
                   </li>
@@ -310,7 +311,7 @@ export function BriefingCard({ hasKey, onCollapse }: { hasKey: boolean; onCollap
                   <li>
                     <button onClick={() => void openReread(mind.reread!.id)}>
                       <BookOpen size={15} />
-                      <span className="grow ellipsis">Перечитать: {mind.reread.title}</span>
+                      <span className="grow ellipsis">{t('Перечитать: {title}', { title: mind.reread.title })}</span>
                     </button>
                   </li>
                 )}
@@ -321,7 +322,7 @@ export function BriefingCard({ hasKey, onCollapse }: { hasKey: boolean; onCollap
           {b.payments.length > 0 && (
             <div className="as-sec">
               <div className="as-sec-title">
-                <Wallet size={15} /> Платежи на неделе
+                <Wallet size={15} /> {t('Платежи на неделе')}
               </div>
               <ul className="as-rows">
                 {b.payments.slice(0, 4).map((p) => (
@@ -345,9 +346,9 @@ export function BriefingCard({ hasKey, onCollapse }: { hasKey: boolean; onCollap
               {ai ? (
                 <>
                   <div className="as-ai-head">
-                    <Sparkles size={15} /> ИИ-план на день
-                    <button className="as-link" onClick={() => void runAi()} disabled={aiBusy} aria-label="Обновить сводку">
-                      <RefreshCw size={13} className={aiBusy ? 'spin' : undefined} /> {aiBusy ? 'пишу…' : 'обновить'}
+                    <Sparkles size={15} /> {t('ИИ-план на день')}
+                    <button className="as-link" onClick={() => void runAi()} disabled={aiBusy} aria-label={t('Обновить сводку')}>
+                      <RefreshCw size={13} className={aiBusy ? 'spin' : undefined} /> {aiBusy ? t('пишу…') : t('обновить')}
                     </button>
                   </div>
                   <Markdown text={ai} />
@@ -355,7 +356,7 @@ export function BriefingCard({ hasKey, onCollapse }: { hasKey: boolean; onCollap
                 </>
               ) : (
                 <button className="as-ai-btn" onClick={() => void runAi()} disabled={aiBusy}>
-                  <Sparkles size={16} /> {aiBusy ? 'Составляю план…' : 'ИИ-сводка на день'}
+                  <Sparkles size={16} /> {aiBusy ? t('Составляю план…') : t('ИИ-сводка на день')}
                 </button>
               )}
               {aiError && <div className="as-ai-err small">{aiError}</div>}
@@ -384,7 +385,7 @@ function useMindBrief(today: string, taskIds: string): BrainBrief | null {
   const [m, setM] = useState<BrainBrief | null>(null);
   useEffect(() => {
     let alive = true;
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       void import('../notes/brainBrief')
         .then((x) => x.brainBriefFor(today, taskIds ? taskIds.split(',') : []))
         .then((r) => alive && setM(r))
@@ -392,7 +393,7 @@ function useMindBrief(today: string, taskIds: string): BrainBrief | null {
     }, 600);
     return () => {
       alive = false;
-      clearTimeout(t);
+      clearTimeout(timer);
     };
   }, [today, taskIds]);
   return m;
