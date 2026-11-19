@@ -1,29 +1,34 @@
 /**
- * Язык интерфейса: русский (исходные строки в коде) или английский (словарь src/i18n/en).
- * Строки пишутся по-русски и оборачиваются в t('…'); английский словарь ищет перевод по русскому тексту.
+ * Язык интерфейса: русский (исходные строки в коде), английский (словарь src/i18n/en) или казахский (src/i18n/kk).
+ * Строки пишутся по-русски и оборачиваются в t('…'); словарь ищет перевод по русскому тексту.
  * Язык выбирается при запуске и не меняется до перезагрузки — поэтому t() можно звать и при загрузке модуля.
  */
-export type Lang = 'ru' | 'en';
+export type Lang = 'ru' | 'en' | 'kk';
 export type LangPref = Lang | 'auto';
 
 const KEY = 'sm-lang';
-/** Языки, носители которых чаще читают по-русски, чем по-английски */
-const RU_LIKE = /^(ru|kk|uk|be|uz|ky|tg|hy|az|ka|tk|mn)\b/i;
+/** Языки, носители которых чаще читают по-русски, чем по-английски (у казахского — свой перевод) */
+const RU_LIKE = /^(ru|uk|be|uz|ky|tg|hy|az|ka|tk|mn)\b/i;
+const KK = /^kk\b/i;
 
 export function langPref(): LangPref {
   try {
     const v = localStorage.getItem(KEY);
-    if (v === 'ru' || v === 'en') return v;
+    if (v === 'ru' || v === 'en' || v === 'kk') return v;
   } catch {
     /* хранилище недоступно */
   }
   return 'auto';
 }
 
-/** Язык по списку языков системы: русский, если среди них есть русский или соседний */
+/** Язык по списку языков системы: первый казахский или русский/соседний — он, иначе английский */
 export function langFromSystem(list: readonly string[]): Lang {
   if (!list.length) return 'ru';
-  return list.some((l) => RU_LIKE.test(l)) ? 'ru' : 'en';
+  for (const l of list) {
+    if (KK.test(l)) return 'kk';
+    if (RU_LIKE.test(l)) return 'ru';
+  }
+  return 'en';
 }
 
 function detect(): Lang {
@@ -37,8 +42,11 @@ function detect(): Lang {
 
 export const lang: Lang = detect();
 export const isEn = lang === 'en';
+export const isKk = lang === 'kk';
+/** Русский интерфейс: русские названия месяцев и дней из массивов в коде; иначе — Intl с LOCALE */
+export const isRu = lang === 'ru';
 /** Локаль для дат, чисел и сортировки (toLocaleDateString, Intl.*) */
-export const LOCALE = isEn ? 'en-US' : 'ru-RU';
+export const LOCALE = isEn ? 'en-US' : isKk ? 'kk-KZ' : 'ru-RU';
 
 /** Сменить язык: запоминается на устройстве, приложение перезапускается */
 export function setLangPref(p: LangPref) {
@@ -63,15 +71,18 @@ const fill = (s: string, vars?: Record<string, string | number>) => (vars ? s.re
  * Нет перевода — показывается русский текст (тест tests/i18n.test.ts ловит такие строки).
  */
 export function t(ru: string, vars?: Record<string, string | number>): string {
-  return fill((isEn && dict[ru]) || ru, vars);
+  return fill((!isRu && dict[ru]) || ru, vars);
 }
 
-/** Форма слова для числа: ru — 1 задача / 2 задачи / 5 задач, en — по ключу «одна|две|пять» → «task|tasks» */
+/**
+ * Форма слова для числа: ru — 1 задача / 2 задачи / 5 задач; en — по ключу «одна|две|пять» → «task|tasks»;
+ * kk — после числа одна форма («5 тапсырма»): значение без «|»
+ */
 export function tn(n: number, one: string, few: string, many: string): string {
-  if (isEn) {
-    const en = dict[`${one}|${few}|${many}`];
-    if (en) {
-      const [s, p = s] = en.split('|');
+  if (!isRu) {
+    const tr = dict[`${one}|${few}|${many}`];
+    if (tr) {
+      const [s, p = s] = tr.split('|');
       return Math.abs(n) === 1 ? s : p;
     }
   }

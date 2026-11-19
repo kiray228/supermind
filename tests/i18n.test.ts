@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import en from '../src/i18n/en/index.ts';
+import kk from '../src/i18n/kk/index.ts';
 import { langFromSystem, t, tn } from '../src/i18n/index.ts';
 
 function walk(dir: string, out: string[] = []): string[] {
@@ -47,9 +48,23 @@ test('в английском словаре нет кириллицы', () => {
 
 test('язык: русский для русскоязычных систем, иначе английский; в тестах — русский', () => {
   assert.equal(langFromSystem(['en-US', 'ru-RU']), 'ru');
-  assert.equal(langFromSystem(['kk-KZ']), 'ru');
+  assert.equal(langFromSystem(['kk-KZ']), 'kk');
+  assert.equal(langFromSystem(['ru-KZ', 'kk-KZ']), 'ru');
+  assert.equal(langFromSystem(['en-US', 'kk']), 'kk');
   assert.equal(langFromSystem(['en-BE']), 'en');
   assert.equal(langFromSystem(['de-DE', 'en']), 'en');
   assert.equal(t('Добавлено: {name}', { name: 'Вода' }), 'Добавлено: Вода');
   assert.equal(`${tn(1, 'задача', 'задачи', 'задач')} ${tn(3, 'задача', 'задачи', 'задач')} ${tn(11, 'задача', 'задачи', 'задач')}`, 'задача задачи задач');
+});
+
+// Казахский: перевод для каждой строки английского словаря, те же подстановки; формы чисел — одна (без «|»)
+test('казахский словарь: подстановки те же, нет лишних ключей', () => {
+  const vars = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort().join(',');
+  const bad = Object.entries(kk).filter(([ru, v]) => !(ru in en) || vars(ru) !== vars(v) || !v.trim()).map(([ru, v]) => `${ru} → ${v}`);
+  assert.deepEqual(bad, []);
+});
+
+test('казахский словарь полный', { skip: Object.keys(kk).length === 0 && 'ещё не переведено' }, () => {
+  const missing = Object.keys(en).filter((k) => !(k in kk));
+  assert.deepEqual(missing.slice(0, 40), [], `нет казахского перевода: ${missing.length}`);
 });

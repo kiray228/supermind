@@ -195,6 +195,7 @@ export default function Settings() {
                 { value: 'auto', label: t('Как в системе') },
                 { value: 'ru', label: 'Русский' },
                 { value: 'en', label: 'English' },
+                { value: 'kk', label: 'Қазақша' },
               ]}
               onChange={(v) => setLangPref(v as LangPref)}
             />
