@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { t } from '../../i18n/index';
 import { Copy, Loader2, X } from 'lucide-react';
 import { onBack } from '../../ui/dialogs';
 import { toast } from '../../store/appStore';
@@ -26,7 +27,7 @@ export function DuplicatesSheet({ onClose }: { onClose: () => void }) {
   }, []);
 
   const meta = (id: string) => notes?.find((n) => n.id === id);
-  const name = (id: string) => meta(id)?.title || meta(id)?.preview.slice(0, 40) || 'Без названия';
+  const name = (id: string) => meta(id)?.title || meta(id)?.preview.slice(0, 40) || t('Без названия');
   const drop = (p: Pair) => setPairs((all) => all?.filter((x) => x !== p) ?? null);
 
   const merge = async (p: Pair, keep: string) => {
@@ -36,7 +37,7 @@ export function DuplicatesSheet({ onClose }: { onClose: () => void }) {
     setBusy(null);
     // заметки из этой пары в других парах больше не актуальны
     setPairs((all) => all?.filter((x) => x.a !== other && x.b !== other) ?? null);
-    toast(`Объединено в «${name(keep)}»`);
+    toast(t('Объединено в «{name}»', { name: name(keep) }));
   };
 
   const side = (p: Pair, id: string) => {
@@ -54,10 +55,10 @@ export function DuplicatesSheet({ onClose }: { onClose: () => void }) {
         </button>
         <div className="nt-dups-meta">
           {m ? noteDate(m.updatedAt) : ''}
-          {m?.wordCount ? ` · ${m.wordCount} сл.` : ''}
+          {m?.wordCount ? ` · ${t('{n} сл.', { n: m.wordCount })}` : ''}
         </div>
         <button className="nt-ai-btn" disabled={!!busy} onClick={() => void merge(p, id)}>
-          Оставить эту
+          {t('Оставить эту')}
         </button>
       </div>
     );
@@ -65,23 +66,23 @@ export function DuplicatesSheet({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal nt-dups" role="dialog" aria-label="Дубли заметок">
+      <div className="modal nt-dups" role="dialog" aria-label={t('Дубли заметок')}>
         <div className="nt-ask-head">
           <Copy size={19} className="nt-ask-logo" />
-          <h2 className="grow">Дубли заметок</h2>
-          <button className="icon-btn" onClick={onClose} aria-label="Закрыть">
+          <h2 className="grow">{t('Дубли заметок')}</h2>
+          <button className="icon-btn" onClick={onClose} aria-label={t('Закрыть')}>
             <X size={20} />
           </button>
         </div>
         {!pairs ? (
           <div className="nt-ask-status">
-            <Loader2 size={15} className="spin" /> Ищу почти одинаковые заметки…
+            <Loader2 size={15} className="spin" /> {t('Ищу почти одинаковые заметки…')}
           </div>
         ) : pairs.length === 0 ? (
-          <p className="nt-dups-empty">Дублей нет — все заметки разные.</p>
+          <p className="nt-dups-empty">{t('Дублей нет — все заметки разные.')}</p>
         ) : (
           <>
-            <p className="nt-dups-hint">«Оставить эту» — вторая заметка добавится в её конец и уйдёт в корзину (её можно вернуть).</p>
+            <p className="nt-dups-hint">{t('«Оставить эту» — вторая заметка добавится в её конец и уйдёт в корзину (её можно вернуть).')}</p>
             <div className="nt-dups-list">
               {pairs.map((p) => (
                 <div key={p.a + '|' + p.b} className={`nt-dups-pair${busy === p.a + p.b ? ' is-busy' : ''}`}>
@@ -97,7 +98,7 @@ export function DuplicatesSheet({ onClose }: { onClose: () => void }) {
                       drop(p);
                     }}
                   >
-                    Это не дубли
+                    {t('Это не дубли')}
                   </button>
                 </div>
               ))}

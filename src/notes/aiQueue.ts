@@ -6,6 +6,7 @@
  * Очередь — на этом устройстве (localStorage).
  */
 import { create } from 'zustand';
+import { t } from '../i18n/index';
 import type { ID } from '../types';
 
 export type QueueItem =
@@ -119,16 +120,16 @@ async function doArticle(it: Extract<QueueItem, { kind: 'article' }>): Promise<s
   const a = extractArticle(page.html, page.url);
   if (a.text.length <= 200) return null;
   const summary = (await streamText({ system: ARTICLE_SYSTEM, messages: [{ role: 'user', content: buildArticlePrompt(a) }], effort: 'low' })).trim();
-  if (!summary) throw new Error('пустой ответ');
+  if (!summary) throw new Error(t('пустой ответ'));
   const s = useNotes.getState();
   const open = s.openId === it.noteId && s.openBody;
   const body = open ? s.openBody! : await loadNoteBody(it.noteId);
   const untouched = bodyStamp(body.blocks) === it.body;
-  const blocks = untouched ? markdownToBlocks(articleMarkdown(a, summary)) : [...body.blocks, newBlock('h2', { text: 'Главное от ИИ' }), ...markdownToBlocks(summary)];
+  const blocks = untouched ? markdownToBlocks(articleMarkdown(a, summary)) : [...body.blocks, newBlock('h2', { text: t('Главное от ИИ') }), ...markdownToBlocks(summary)];
   if (open) editOpenBody((bd) => void (bd.blocks = blocks));
   else saveNoteBody(it.noteId, { ...body, blocks });
   await flushNotes();
-  return `Пересказ статьи «${meta.title || a.title}» готов`;
+  return t('Пересказ статьи «{title}» готов', { title: meta.title || a.title });
 }
 
 /** Голосовая мысль: заметка и задачи по ИИ; запись в дневнике — аккуратнее, если ИИ её предложил */
@@ -139,7 +140,8 @@ async function doDictation(it: Extract<QueueItem, { kind: 'dictation' }>): Promi
   const acts = parseSplit(answer);
   if (!acts.length) return null;
   const { execute } = await import('../voice/run');
-  const parts: string[] = [];
+  let note = '';
+  let tasks = 0;
   /** что-то уже создано: при ошибке дальше не повторяем весь разбор — иначе заметки и задачи появятся дважды */
   let ran = false;
   let failed = 0;
@@ -152,17 +154,16 @@ async function doDictation(it: Extract<QueueItem, { kind: 'dictation' }>): Promi
       }
       const d = await execute(a);
       ran = true;
-      if (d.ok) parts.push(a.type === 'add_note' ? `заметка «${a.title}»` : a.type === 'add_task' ? 'задача' : '');
+      if (d.ok && a.type === 'add_note') note ||= a.title;
+      else if (d.ok && a.type === 'add_task') tasks++;
     } catch (e) {
       if (!ran) throw e;
       failed++;
     }
   }
-  const tasks = parts.filter((p) => p === 'задача').length;
-  const note = parts.find((p) => p.startsWith('заметка'));
-  const what = [note, tasks ? `задач: ${tasks}` : ''].filter(Boolean).join(', ');
-  const tail = failed ? ` (не получилось: ${failed})` : '';
-  return (what ? `Голосовая запись разобрана: ${what}` : 'Голосовая запись разобрана') + tail;
+  const what = [note ? t('заметка «{title}»', { title: note }) : '', tasks ? t('задач: {n}', { n: tasks }) : ''].filter(Boolean).join(', ');
+  const tail = failed ? ` (${t('не получилось: {n}', { n: failed })})` : '';
+  return (what ? t('Голосовая запись разобрана: {what}', { what }) : t('Голосовая запись разобрана')) + tail;
 }
 
 async function replaceJournal(j: { noteId: ID; blockIds: string[] }, text: string) {
@@ -194,7 +195,7 @@ export function initAiQueue() {
       .then(async (r) => {
         if (!r.messages.length) return;
         const { toast } = await import('../store/appStore');
-        toast(r.messages.length === 1 ? r.messages[0] : `Доделано с ИИ: ${r.messages.length} — ${r.messages.join('; ')}`);
+        toast(r.messages.length === 1 ? r.messages[0] : t('Доделано с ИИ: {n} — {list}', { n: r.messages.length, list: r.messages.join('; ') }));
       })
       .catch(() => undefined);
   window.addEventListener('online', () => setTimeout(kick, 3000));

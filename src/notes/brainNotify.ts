@@ -3,6 +3,7 @@
  * («Показать ответ» / «Помню»). Приходят сразу после «Плана на день». Расписание собирает tasks/sync.ts.
  */
 import type { ID } from '../types';
+import { t, tn } from '../i18n/index';
 import { addDaysYmd, todayYmd } from '../utils/mapTasks';
 import { dueCards, type Grade, intervalLabel } from './cardsCore';
 import { shareLocal } from '../store/sharedPrefs';
@@ -58,11 +59,6 @@ const dayStart = (ymd: string) => {
   const [y, m, d] = ymd.split('-').map(Number);
   return new Date(y, m - 1, d).getTime();
 };
-const plural = (n: number, f: [string, string, string]) => {
-  const a = n % 10;
-  const b = n % 100;
-  return f[a === 1 && b !== 11 ? 0 : a >= 2 && a <= 4 && (b < 10 || b >= 20) ? 1 : 2];
-};
 
 /** Утренние уведомления мозга в промежутке [fromMs, toMs]; briefTime — время «Плана на день» ('' — выключен) */
 export async function planBrainNotifications(fromMs: number, toMs: number, briefTime: string): Promise<BrainPlanned[]> {
@@ -90,7 +86,7 @@ export async function planBrainNotifications(fromMs: number, toMs: number, brief
       out.push({
         key: `question|${day}`,
         at,
-        title: '❓ Вопрос дня',
+        title: t('❓ Вопрос дня'),
         body: p.question,
         extra: { brain: 'question', date: day, noteId: p.noteId },
         actionTypeId: 'sm-question',
@@ -113,7 +109,7 @@ export async function planBrainNotifications(fromMs: number, toMs: number, brief
       out.push({
         key: `cards|${day}`,
         at,
-        title: due.length > 1 ? `🗂 Вспомните ответ · ещё ${due.length - 1} ${plural(due.length - 1, ['карточка', 'карточки', 'карточек'])}` : '🗂 Вспомните ответ',
+        title: due.length > 1 ? t('🗂 Вспомните ответ · ещё {n} {cards}', { n: due.length - 1, cards: tn(due.length - 1, 'карточка', 'карточки', 'карточек') }) : t('🗂 Вспомните ответ'),
         body: c.q,
         extra: { brain: 'cards', date: day, cardId: c.id },
         actionTypeId: 'sm-card',
@@ -128,15 +124,15 @@ export const BRAIN_ACTION_TYPES = [
   {
     id: 'sm-question',
     actions: [
-      { id: 'answer', title: 'Ответить', input: true, inputButtonTitle: 'Записать', inputPlaceholder: 'Ваш ответ — в заметку дня' },
-      { id: 'skip', title: 'Не сегодня' },
+      { id: 'answer', title: t('Ответить'), input: true, inputButtonTitle: t('Записать'), inputPlaceholder: t('Ваш ответ — в заметку дня') },
+      { id: 'skip', title: t('Не сегодня') },
     ],
   },
   {
     id: 'sm-card',
     actions: [
-      { id: 'card-show', title: 'Показать ответ' },
-      { id: 'card-good', title: '✓ Помню' },
+      { id: 'card-show', title: t('Показать ответ') },
+      { id: 'card-good', title: t('✓ Помню') },
     ],
   },
 ];
@@ -157,8 +153,8 @@ export async function brainAction(action: string, ex: Record<string, string>, in
       const ok = await q.answerFromNotification(day, ex.noteId, question, input);
       if (ok) {
         const { openDailyNote } = await import('./daily');
-        toast('Ответ записан в заметку дня', { label: 'Открыть', run: () => void openDailyNote() });
-      } else toast('Не удалось записать ответ');
+        toast(t('Ответ записан в заметку дня'), { label: t('Открыть'), run: () => void openDailyNote() });
+      } else toast(t('Не удалось записать ответ'));
       return;
     }
     if (action === 'skip') {
@@ -178,18 +174,18 @@ export async function brainAction(action: string, ex: Record<string, string>, in
       cards.gradeCard(ex.cardId, 2 as Grade);
       const next = cards.todaysCards().length;
       const c = (await import('./store')).useNotes.getState().data?.cards?.find((x) => x.id === ex.cardId);
-      const when = c ? `Следующий раз — через ${intervalLabel(c.interval)}` : 'Запомнено';
+      const when = c ? t('Следующий раз — через {interval}', { interval: intervalLabel(c.interval) }) : t('Запомнено');
       if (next)
-        toast(`${when}. Ещё ${next} ${plural(next, ['карточка', 'карточки', 'карточек'])}`, {
-          label: 'Повторить',
+        toast(t('{when}. Ещё {n} {cards}', { when, n: next, cards: tn(next, 'карточка', 'карточки', 'карточек') }), {
+          label: t('Повторить'),
           run: () => void toNotes().then(() => cards.openCardsReview()),
         });
-      else toast(`${when}. На сегодня всё 🎉`);
+      else toast(t('{when}. На сегодня всё 🎉', { when }));
       return;
     }
     await toNotes();
     if (exists(ex.cardId)) cards.openCardsAt(ex.cardId, action === 'card-show');
     else if (cards.todaysCards().length) cards.openCardsReview();
-    else toast('Карточки на сегодня уже повторены 🎉');
+    else toast(t('Карточки на сегодня уже повторены 🎉'));
   }
 }

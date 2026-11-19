@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { t } from '../i18n/index';
 import { del, get, set } from '../store/kv';
 import { getMany } from 'idb-keyval';
 import { blobSync } from '../store/blobSync';
@@ -48,7 +49,7 @@ function normalize(raw: Partial<NotesData> | undefined): NotesData {
   return {
     version: 1,
     notes: (raw.notes ?? []).filter((n) => n && n.id).map((n) => ({ ...n, title: n.title ?? '', preview: n.preview ?? '', createdAt: n.createdAt ?? n.updatedAt ?? 0, updatedAt: n.updatedAt ?? 0 })),
-    folders: (raw.folders ?? []).filter((f) => f && f.id).map((f, i) => ({ ...f, name: f.name ?? 'Папка', color: f.color ?? FOLDER_COLORS[0], order: f.order ?? i, createdAt: f.createdAt ?? 0, updatedAt: f.updatedAt ?? 0 })),
+    folders: (raw.folders ?? []).filter((f) => f && f.id).map((f, i) => ({ ...f, name: f.name ?? t('Папка'), color: f.color ?? FOLDER_COLORS[0], order: f.order ?? i, createdAt: f.createdAt ?? 0, updatedAt: f.updatedAt ?? 0 })),
     gone: raw.gone ?? {},
     aiTerms: (raw.aiTerms ?? []).filter((r) => r && r.id).map((r) => ({ ...r, drop: r.drop ?? [], add: r.add ?? [], at: r.at ?? 0, checkedAt: r.checkedAt ?? 0, updatedAt: r.updatedAt ?? 0 })),
     aiLinks: (raw.aiLinks ?? []).filter((r) => r && r.id && typeof r.ok === 'boolean').map((r) => ({ ...r, by: r.by === 'user' ? 'user' : 'ai', updatedAt: r.updatedAt ?? 0 })),
@@ -87,7 +88,7 @@ const index = blobSync<NotesData>({
   read: () => useNotes.getState().data,
   write: (data) => useNotes.setState({ data }),
   normalize: (raw) => normalize(raw),
-  onError: () => toast('Не удалось сохранить заметки'),
+  onError: () => toast(t('Не удалось сохранить заметки')),
 });
 
 function flushIndex(): Promise<void> {
@@ -156,12 +157,12 @@ async function writeNow(id: ID, body: NoteBody): Promise<void> {
   const size = JSON.stringify(body).length;
   if (size > BODY_WARN_BYTES && !warned.has(id)) {
     warned.add(id);
-    toast(`Заметка очень большая (${(size / 1048576).toFixed(1)} МБ) — синхронизация может быть медленной. Разделите её или уберите часть фото и записей.`);
+    toast(t('Заметка очень большая ({size} МБ) — синхронизация может быть медленной. Разделите её или уберите часть фото и записей.', { size: (size / 1048576).toFixed(1) }));
   }
   try {
     await set(noteBodyKey(id), body);
   } catch {
-    toast('Не удалось сохранить заметку');
+    toast(t('Не удалось сохранить заметку'));
     return;
   }
   textCache.set(id, { at: body.updatedAt, text: searchNorm(body.title + '\n' + bodyPlainText(body)) });
@@ -388,7 +389,7 @@ export function trashNote(id: ID) {
     const m = d.notes.find((n) => n.id === id);
     if (m) Object.assign(m, { trashed: Date.now(), updatedAt: Date.now() });
   });
-  toast('Заметка перемещена в корзину', { label: 'Отменить', run: () => restoreNote(id) });
+  toast(t('Заметка перемещена в корзину'), { label: t('Отменить'), run: () => restoreNote(id) });
 }
 
 export function restoreNote(id: ID) {
@@ -431,7 +432,7 @@ export async function duplicateNote(id: ID): Promise<NoteMeta | null> {
   const src = d?.notes.find((n) => n.id === id);
   if (!d || !src) return null;
   const body = await loadNoteBody(id);
-  const copy: NoteBody = { title: body.title ? body.title + ' (копия)' : '', blocks: body.blocks.map((b) => ({ ...b, id: uid() })), updatedAt: Date.now() };
+  const copy: NoteBody = { title: body.title ? t('{title} (копия)', { title: body.title }) : '', blocks: body.blocks.map((b) => ({ ...b, id: uid() })), updatedAt: Date.now() };
   const now = Date.now();
   const meta: NoteMeta = { ...src, id: uid(), title: copy.title, createdAt: now, updatedAt: now };
   delete meta.day;
@@ -482,7 +483,7 @@ export function addFolder(name: string, emoji?: string, color?: string): Folder 
   const now = Date.now();
   const f: Folder = {
     id: uid(),
-    name: name.trim() || 'Папка',
+    name: name.trim() || t('Папка'),
     color: color ?? FOLDER_COLORS[d.folders.length % FOLDER_COLORS.length],
     order: Math.max(0, ...d.folders.map((x) => x.order + 1)),
     createdAt: now,

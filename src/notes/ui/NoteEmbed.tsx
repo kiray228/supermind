@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { t } from '../../i18n/index';
 import { ArrowUpRight, FileText, Mic, Pencil, Plus } from 'lucide-react';
 import type { ID } from '../../types';
 import { type Block, fmtDuration, type NoteBody } from '../model';
@@ -19,7 +20,7 @@ function EmbedBlock({ b, num }: { b: Block; num: number }) {
   if (b.type === 'audio')
     return (
       <div className="nt-embed-line faint">
-        <Mic size={14} /> Голосовая запись {fmtDuration(b.duration ?? 0)}
+        <Mic size={14} /> {t('Голосовая запись')} {fmtDuration(b.duration ?? 0)}
         {b.transcript?.trim() ? ` — ${b.transcript.trim().slice(0, 160)}` : ''}
       </div>
     );
@@ -79,7 +80,7 @@ export function NoteEmbed({ target, selfId, onEdit }: { target: EmbedRef; selfId
   const other = !id ? findByTitle(target.title) : undefined;
   const head = (
     <div className="nt-embed-head">
-      <button className="nt-embed-title" onClick={() => openWiki(target.title, target.section)} title="Открыть заметку">
+      <button className="nt-embed-title" onClick={() => openWiki(target.title, target.section)} title={t('Открыть заметку')}>
         <FileText size={14} />
         <span className="ellipsis">
           {target.title}
@@ -87,28 +88,28 @@ export function NoteEmbed({ target, selfId, onEdit }: { target: EmbedRef; selfId
         </span>
         <ArrowUpRight size={14} />
       </button>
-      <button className="icon-btn nt-embed-edit" onClick={onEdit} aria-label="Изменить встраивание" title="Изменить">
+      <button className="icon-btn nt-embed-edit" onClick={onEdit} aria-label={t('Изменить встраивание')} title={t('Изменить')}>
         <Pencil size={14} />
       </button>
     </div>
   );
 
   let content;
-  if (id && id === selfId) content = <div className="nt-embed-note faint">Заметку нельзя встроить в саму себя</div>;
+  if (id && id === selfId) content = <div className="nt-embed-note faint">{t('Заметку нельзя встроить в саму себя')}</div>;
   else if (!id)
     content = other ? (
-      <div className="nt-embed-note faint">Встроить можно только заметку — нажмите на название, чтобы открыть</div>
+      <div className="nt-embed-note faint">{t('Встроить можно только заметку — нажмите на название, чтобы открыть')}</div>
     ) : (
       <div className="nt-embed-note">
-        <span className="faint">Такой заметки ещё нет</span>
+        <span className="faint">{t('Такой заметки ещё нет')}</span>
         <button className="nt-ai-btn" onClick={() => openWiki(target.title)}>
-          <Plus size={14} /> Создать
+          <Plus size={14} /> {t('Создать')}
         </button>
       </div>
     );
-  else if (!body || body.id !== id) content = <div className="nt-embed-note faint">Загружаю…</div>;
-  else if (!shown) content = <div className="nt-embed-note faint">Раздела «{target.section}» в заметке нет</div>;
-  else if (!shown.blocks.length) content = <div className="nt-embed-note faint">{target.section ? 'Раздел пуст' : 'Заметка пуста'}</div>;
+  else if (!body || body.id !== id) content = <div className="nt-embed-note faint">{t('Загружаю…')}</div>;
+  else if (!shown) content = <div className="nt-embed-note faint">{t('Раздела «{section}» в заметке нет', { section: target.section ?? '' })}</div>;
+  else if (!shown.blocks.length) content = <div className="nt-embed-note faint">{target.section ? t('Раздел пуст') : t('Заметка пуста')}</div>;
   else
     content = (
       <>
@@ -117,7 +118,7 @@ export function NoteEmbed({ target, selfId, onEdit }: { target: EmbedRef; selfId
         ))}
         {shown.more > 0 && (
           <button className="nt-embed-more" onClick={() => openWiki(target.title, target.section)}>
-            Ещё {shown.more} — открыть заметку
+            {t('Ещё {n} — открыть заметку', { n: shown.more })}
           </button>
         )}
       </>

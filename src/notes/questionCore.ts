@@ -1,3 +1,4 @@
+import { t } from '../i18n/index';
 /**
  * Вопрос дня: какую давнюю заметку вспомнить сегодня и какой вопрос по ней задать.
  * Модуль чистый — тесты гоняют его в Node; хранение и ответ — question.ts.
@@ -75,7 +76,7 @@ export function parseQuestion(answer: string): string | null {
 }
 
 /** Вопрос без ИИ */
-export const fallbackQuestion = (title: string) => `«${title}» — это всё ещё так? Что изменилось с тех пор?`;
+export const fallbackQuestion = (title: string) => t('«{title}» — это всё ещё так? Что изменилось с тех пор?', { title });
 
 /** Вопрос, заранее выбранный на день (для утреннего уведомления); ai — вопрос уже от ИИ */
 export interface PlannedQuestion {

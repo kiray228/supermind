@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { LOCALE, t, tn } from '../i18n/index';
 import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, Lightbulb, Network, X } from 'lucide-react';
 import { toast } from '../store/appStore';
@@ -14,7 +15,7 @@ import { computeWeek, dayShort, journalText, lines, minutesLabel, moodForScore, 
 import { appendJournal, markSaved, readDraft, savedWeek, writeDraft } from './state';
 import './weekly.css';
 
-const fmt = (n: number) => Math.round(n).toLocaleString('ru-RU');
+const fmt = (n: number) => Math.round(n).toLocaleString(LOCALE);
 
 /** «+3», «−2», '' */
 const delta = (cur: number, prev: number) => (cur === prev || prev === 0 ? '' : cur > prev ? `+${fmt(cur - prev)}` : `−${fmt(prev - cur)}`);
@@ -45,30 +46,30 @@ export function WeeklyReview({ monday: start, onClose }: { monday: string; onClo
 
   return createPortal(
     <div className="modal-backdrop wr-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal wr-sheet" role="dialog" aria-label="Итоги недели">
+      <div className="modal wr-sheet" role="dialog" aria-label={t('Итоги недели')}>
         <div className="wr-bar">
           <span />
-          <div className="wr-bar-title">Итоги недели</div>
-          <button className="icon-btn wr-close" onClick={onClose} aria-label="Закрыть">
+          <div className="wr-bar-title">{t('Итоги недели')}</div>
+          <button className="icon-btn wr-close" onClick={onClose} aria-label={t('Закрыть')}>
             <X />
           </button>
         </div>
 
         <div className="wr-switch">
-          <button className="icon-btn" onClick={() => setMonday(addDaysYmd(monday, -7))} aria-label="Предыдущая неделя">
+          <button className="icon-btn" onClick={() => setMonday(addDaysYmd(monday, -7))} aria-label={t('Предыдущая неделя')}>
             <ChevronLeft />
           </button>
           <div className="wr-switch-mid">
             <b>{s.label}</b>
-            <span>{monday === thisMonday ? 'Эта неделя' : monday === addDaysYmd(thisMonday, -7) ? 'Прошлая неделя' : `Неделя с ${dayShort(monday)}`}</span>
+            <span>{monday === thisMonday ? t('Эта неделя') : monday === addDaysYmd(thisMonday, -7) ? t('Прошлая неделя') : t('Неделя с {day}', { day: dayShort(monday) })}</span>
           </div>
-          <button className="icon-btn" onClick={() => setMonday(addDaysYmd(monday, 7))} disabled={monday >= thisMonday} aria-label="Следующая неделя">
+          <button className="icon-btn" onClick={() => setMonday(addDaysYmd(monday, 7))} disabled={monday >= thisMonday} aria-label={t('Следующая неделя')}>
             <ChevronRight />
           </button>
         </div>
 
         {!ready ? (
-          <div className="empty">Считаем итоги…</div>
+          <div className="empty">{t('Считаем итоги…')}</div>
         ) : (
           <>
             <Stats s={s} />
@@ -89,38 +90,38 @@ function Stats({ s }: { s: WeeklyStats }) {
   const today = todayYmd();
   const headline =
     s.tasksDone || s.habitRate != null
-      ? [s.tasksDone ? `${s.tasksDone} ${plural(s.tasksDone, 'задача', 'задачи', 'задач')}` : '', s.habitRate != null ? `привычки ${Math.round(s.habitRate * 100)}%` : '']
+      ? [s.tasksDone ? `${s.tasksDone} ${tn(s.tasksDone, 'задача', 'задачи', 'задач')}` : '', s.habitRate != null ? t('привычки {n}%', { n: Math.round(s.habitRate * 100) }) : '']
           .filter(Boolean)
           .join(' · ')
-      : 'Неделя без отметок';
+      : t('Неделя без отметок');
 
   return (
     <div className="wr-stats">
       <section className={`wr-hero${s.habitRate === 1 ? ' full' : ''}`}>
         <div className="wr-hero-big">{headline}</div>
         <div className="wr-hero-sub">
-          {s.current ? 'Неделя ещё идёт' : 'Неделя завершена'}
+          {s.current ? t('Неделя ещё идёт') : t('Неделя завершена')}
           {s.xp > 0 ? ` · +${fmt(s.xp)} XP` : ''}
         </div>
       </section>
 
       <div className="wr-tiles">
-        <Tile icon="✅" value={fmt(s.tasksDone)} label={plural(s.tasksDone, 'задача', 'задачи', 'задач')} note={delta(s.tasksDone, s.prevTasksDone)} good={s.tasksDone >= s.prevTasksDone} />
-        <Tile icon="🔥" value={s.habitRate == null ? '—' : `${Math.round(s.habitRate * 100)}%`} label={s.habitExpected ? `привычки · ${s.habitDone} из ${s.habitExpected}` : 'привычки'} />
-        <Tile icon="⏱️" value={minutesLabel(s.focusMin)} label="фокус" note={s.prevFocusMin ? delta(Math.round(s.focusMin), Math.round(s.prevFocusMin)) : ''} good={s.focusMin >= s.prevFocusMin} />
-        <Tile icon="✨" value={`+${fmt(s.xp)}`} label="опыта (XP)" note={delta(s.xp, s.prevXp)} good={s.xp >= s.prevXp} />
+        <Tile icon="✅" value={fmt(s.tasksDone)} label={tn(s.tasksDone, 'задача', 'задачи', 'задач')} note={delta(s.tasksDone, s.prevTasksDone)} good={s.tasksDone >= s.prevTasksDone} />
+        <Tile icon="🔥" value={s.habitRate == null ? '—' : `${Math.round(s.habitRate * 100)}%`} label={s.habitExpected ? t('привычки · {done} из {total}', { done: s.habitDone, total: s.habitExpected }) : t('привычки')} />
+        <Tile icon="⏱️" value={minutesLabel(s.focusMin)} label={t('фокус')} note={s.prevFocusMin ? delta(Math.round(s.focusMin), Math.round(s.prevFocusMin)) : ''} good={s.focusMin >= s.prevFocusMin} />
+        <Tile icon="✨" value={`+${fmt(s.xp)}`} label={t('опыта (XP)')} note={delta(s.xp, s.prevXp)} good={s.xp >= s.prevXp} />
         {s.hasFinance && (
-          <Tile icon="💸" value={money(s.spent)} label="расходы" note={spentPct != null && spentPct !== 0 ? `${spentPct > 0 ? '+' : '−'}${Math.abs(spentPct)}%` : ''} good={spentPct != null && spentPct < 0} />
+          <Tile icon="💸" value={money(s.spent)} label={t('расходы')} note={spentPct != null && spentPct !== 0 ? `${spentPct > 0 ? '+' : '−'}${Math.abs(spentPct)}%` : ''} good={spentPct != null && spentPct < 0} />
         )}
-        {s.hasFinance && <Tile icon="💰" value={money(s.income)} label="доходы" note={delta(s.income, s.prevIncome)} good={s.income >= s.prevIncome} />}
+        {s.hasFinance && <Tile icon="💰" value={money(s.income)} label={t('доходы')} note={delta(s.income, s.prevIncome)} good={s.income >= s.prevIncome} />}
       </div>
 
-      <section className="wr-card wr-moods" aria-label="Настроение за неделю">
+      <section className="wr-card wr-moods" aria-label={t('Настроение за неделю')}>
         <div className="wr-card-title">
-          Настроение
+          {t('Настроение')}
           {s.moodAvg != null && (
             <span className="wr-card-aside">
-              {moodForScore(s.moodAvg)} {s.moodAvg.toFixed(1).replace('.', ',')} из 5
+              {moodForScore(s.moodAvg)} {t('{n} из 5', { n: s.moodAvg.toLocaleString(LOCALE, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) })}
             </span>
           )}
         </div>
@@ -132,7 +133,7 @@ function Stats({ s }: { s: WeeklyStats }) {
             </div>
           ))}
         </div>
-        {s.moodDays === 0 && <div className="wr-hint">Отмечайте настроение в разделе «Привычки» — здесь появится картина недели.</div>}
+        {s.moodDays === 0 && <div className="wr-hint">{t('Отмечайте настроение в разделе «Привычки» — здесь появится картина недели.')}</div>}
       </section>
 
       {(s.bestDay || s.bestStreak) && (
@@ -141,9 +142,9 @@ function Stats({ s }: { s: WeeklyStats }) {
             <div className="wr-row">
               <span className="wr-row-ic">🏆</span>
               <span className="grow">
-                <span className="wr-row-t">Лучший день</span>
+                <span className="wr-row-t">{t('Лучший день')}</span>
                 <span className="wr-row-s">
-                  {[`${s.bestDay.tasks} ${plural(s.bestDay.tasks, 'задача', 'задачи', 'задач')}`, s.bestDay.focus ? `фокус ${minutesLabel(s.bestDay.focus)}` : '', s.bestDay.xp ? `${fmt(s.bestDay.xp)} XP` : '']
+                  {[`${s.bestDay.tasks} ${tn(s.bestDay.tasks, 'задача', 'задачи', 'задач')}`, s.bestDay.focus ? t('фокус {time}', { time: minutesLabel(s.bestDay.focus) }) : '', s.bestDay.xp ? `${fmt(s.bestDay.xp)} XP` : '']
                     .filter(Boolean)
                     .join(' · ')}
                 </span>
@@ -155,7 +156,7 @@ function Stats({ s }: { s: WeeklyStats }) {
             <div className="wr-row">
               <span className="wr-row-ic">{s.bestStreak.icon ?? '🔥'}</span>
               <span className="grow">
-                <span className="wr-row-t">Лучшая серия</span>
+                <span className="wr-row-t">{t('Лучшая серия')}</span>
                 <span className="wr-row-s ellipsis">{s.bestStreak.name}</span>
               </span>
               <span className="wr-row-v">{s.bestStreak.text}</span>
@@ -193,21 +194,13 @@ function Tile({ icon, value, label, note, good }: { icon: string; value: string;
   );
 }
 
-function plural(n: number, one: string, few: string, many: string): string {
-  const a = Math.abs(n) % 100;
-  const b = a % 10;
-  if (a > 10 && a < 20) return many;
-  if (b > 1 && b < 5) return few;
-  if (b === 1) return one;
-  return many;
-}
 
 // ---------- Вопросы и сохранение ----------
 
 const PROMPTS: { k: keyof ReviewAnswers; title: string; ph: string }[] = [
-  { k: 'good', title: 'Что получилось', ph: 'Закрыл проект, 3 тренировки, прочитал книгу…' },
-  { k: 'bad', title: 'Что мешало', ph: 'Поздно ложился, много отвлекался на телефон…' },
-  { k: 'next', title: 'Главное на следующую неделю', ph: 'По одному пункту в строке — станут задачами на понедельник' },
+  { k: 'good', title: t('Что получилось'), ph: t('Закрыл проект, 3 тренировки, прочитал книгу…') },
+  { k: 'bad', title: t('Что мешало'), ph: t('Поздно ложился, много отвлекался на телефон…') },
+  { k: 'next', title: t('Главное на следующую неделю'), ph: t('По одному пункту в строке — станут задачами на понедельник') },
 ];
 
 function ReviewForm({ s, onClose }: { s: WeeklyStats; onClose: () => void }) {
@@ -227,7 +220,7 @@ function ReviewForm({ s, onClose }: { s: WeeklyStats; onClose: () => void }) {
 
   const save = async () => {
     if (busy) return;
-    if (empty) return toast('Напишите хотя бы пару строк');
+    if (empty) return toast(t('Напишите хотя бы пару строк'));
     setBusy(true);
     try {
       const prev = savedWeek(s.monday);
@@ -249,9 +242,9 @@ function ReviewForm({ s, onClose }: { s: WeeklyStats; onClose: () => void }) {
       }
       markSaved(s.monday, { text, tasks: [...done] });
       setSaved(true);
-      toast(created ? `Итоги в дневнике · ${created} ${plural(created, 'задача', 'задачи', 'задач')} на понедельник` : 'Итоги сохранены в дневник воскресенья');
+      toast(created ? t('Итоги в дневнике · {n} {tasks} на понедельник', { n: created, tasks: tn(created, 'задача', 'задачи', 'задач') }) : t('Итоги сохранены в дневник воскресенья'));
     } catch {
-      toast('Не удалось сохранить итоги');
+      toast(t('Не удалось сохранить итоги'));
     } finally {
       setBusy(false);
     }
@@ -261,18 +254,18 @@ function ReviewForm({ s, onClose }: { s: WeeklyStats; onClose: () => void }) {
     if (busy) return;
     setBusy(true);
     try {
-      const doc = docFromMarkdown(reviewMarkdown(s, a, textMoney), `Неделя ${s.label}`, 'map');
+      const doc = docFromMarkdown(reviewMarkdown(s, a, textMoney), t('Неделя {label}', { label: s.label }), 'map');
       onClose();
       await createAndOpen(doc);
     } catch {
-      toast('Не удалось создать карту');
+      toast(t('Не удалось создать карту'));
       setBusy(false);
     }
   };
 
   return (
     <div className="wr-form">
-      <div className="wr-form-title">Подведите итоги — 2 минуты</div>
+      <div className="wr-form-title">{t('Подведите итоги — 2 минуты')}</div>
       {PROMPTS.map((p) => (
         <label key={p.k} className="wr-q">
           <span className="wr-q-t">{p.title}</span>
@@ -281,18 +274,18 @@ function ReviewForm({ s, onClose }: { s: WeeklyStats; onClose: () => void }) {
       ))}
       {plans.length > 0 && (
         <div className="wr-hint">
-          {plans.length} {plural(plans.length, 'задача будет создана', 'задачи будут созданы', 'задач будут созданы')} на понедельник, {dayShort(addDaysYmd(s.monday, 7))}
+          {t('{n} {created} на понедельник, {day}', { n: plans.length, created: tn(plans.length, 'задача будет создана', 'задачи будут созданы', 'задач будут созданы'), day: dayShort(addDaysYmd(s.monday, 7)) })}
         </div>
       )}
       <div className="wr-actions">
         <button className="btn btn-primary btn-block" onClick={() => void save()} disabled={busy || empty}>
-          {saved ? 'Сохранено ✓' : 'Сохранить'}
+          {saved ? t('Сохранено ✓') : t('Сохранить')}
         </button>
         <button className="btn btn-tinted btn-block" onClick={() => void saveMap()} disabled={busy}>
-          <Network size={17} /> Сохранить как карту
+          <Network size={17} /> {t('Сохранить как карту')}
         </button>
       </div>
-      <div className="wr-foot">Итоги допишутся в дневник воскресенья, {dayShort(s.sunday)}.</div>
+      <div className="wr-foot">{t('Итоги допишутся в дневник воскресенья, {day}.', { day: dayShort(s.sunday) })}</div>
     </div>
   );
 }

@@ -3,6 +3,7 @@
  * Разбор — obsidianImport.ts; здесь — чтение файлов, папки, картинки и создание заметок.
  */
 import type { ID } from '../types';
+import { t } from '../i18n/index';
 import { loadZip } from '../io/common';
 import { imageFileToDataUrl } from './media';
 import { normTitle } from './links';
@@ -44,7 +45,7 @@ async function readFiles(files: File[]): Promise<{ md: VaultInput[]; images: Map
       try {
         zip = await JSZip.loadAsync(f);
       } catch {
-        throw new ImportError(`Не удалось открыть архив «${f.name}»`);
+        throw new ImportError(t('Не удалось открыть архив «{name}»', { name: f.name }));
       }
       for (const e of Object.values(zip.files)) {
         if (e.dir) continue;
@@ -91,7 +92,7 @@ export async function importObsidian(files: File[], onProgress?: (done: number, 
   await ensureNotes();
   await flushNotes();
   const { md, images } = await readFiles(files);
-  if (!md.length) throw new ImportError('Заметок не нашлось — выберите архив хранилища (.zip) или файлы .md');
+  if (!md.length) throw new ImportError(t('Заметок не нашлось — выберите архив хранилища (.zip) или файлы .md'));
   const notes = parseVault(md, [...images.keys()]).slice(0, MAX_NOTES);
 
   // такие же заметки (название и текст) уже есть — не повторять
@@ -135,7 +136,7 @@ export async function importObsidian(files: File[], onProgress?: (done: number, 
       if (src) {
         blocks.push({ ...b, src });
         res.images++;
-      } else blocks.push(newBlock('p', { text: `*[Изображение: ${b.caption || path.slice(path.lastIndexOf('/') + 1)}]*` }));
+      } else blocks.push(newBlock('p', { text: t('*[Изображение: {name}]*', { name: b.caption || path.slice(path.lastIndexOf('/') + 1) }) }));
     }
     blocks.push(...tagLine);
     if (!blocks.length) blocks.push(newBlock('p'));

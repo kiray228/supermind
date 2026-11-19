@@ -3,6 +3,7 @@
  * Модуль без браузерных зависимостей — тесты гоняют его в Node; чтение архива и создание заметок — obsidianImportRun.ts.
  */
 import { normTitle } from './links';
+import { t } from '../i18n/index';
 import { type Block, markdownToBlocks, newBlock } from './model';
 
 export interface ImportedNote {
@@ -109,7 +110,7 @@ export function splitFrontmatter(text: string): { front: Front; body: string } {
 
 /** Раздел «## Связанные заметки» из экспорта SuperMind: в приложении связи и так считаются сами */
 export function dropOwnRelated(md: string): string {
-  return md.replace(/\n*^## Связанные заметки\n+(?:^- \[\[[^\n]*\]\][ \t]*(?:\n|$))+\s*(?![\s\S])/m, '\n');
+  return md.replace(/\n*^## (?:Связанные заметки|Related notes)\n+(?:^- \[\[[^\n]*\]\][ \t]*(?:\n|$))+\s*(?![\s\S])/m, '\n');
 }
 
 /** Ссылки и картинки по кускам вне блоков кода */
@@ -198,7 +199,7 @@ export function obsidianToBlocks(md: string, ctx: ResolveCtx): Block[] {
     if (m) {
       const im = images[+m[1]];
       if (im.path) out.push(newBlock('image', { src: IMG_REF + im.path, ...(im.caption ? { caption: im.caption } : {}) }));
-      else out.push(newBlock('p', { text: `*[Изображение: ${im.caption || im.name}]*` }));
+      else out.push(newBlock('p', { text: t('*[Изображение: {name}]*', { name: im.caption || im.name }) }));
       continue;
     }
     if (b.type === 'callout' && b.text) b.text = b.text.replace(/^\s+/, '');

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { t } from '../i18n/index';
 import { CalendarCheck, ChevronRight, X } from 'lucide-react';
 import { WeeklyReview } from './WeeklyReview';
 import { defaultReviewMonday, weekLabel } from './weekly';
@@ -26,20 +27,20 @@ export function WeeklyReviewCard() {
   return (
     <>
       {show && monday && (
-        <section className="card wr-entry-card" aria-label="Итоги недели">
+        <section className="card wr-entry-card" aria-label={t('Итоги недели')}>
           <button className="wr-entry-main" onClick={() => setOpen(monday)}>
             <span className="wr-entry-ic" aria-hidden>
               🗓️
             </span>
             <span className="grow">
-              <span className="wr-entry-t">Итоги недели готовы</span>
-              <span className="wr-entry-s">{weekLabel(monday)} · 2 минуты, чтобы подвести итоги</span>
+              <span className="wr-entry-t">{t('Итоги недели готовы')}</span>
+              <span className="wr-entry-s">{weekLabel(monday)} · {t('2 минуты, чтобы подвести итоги')}</span>
             </span>
             <ChevronRight size={18} className="wr-entry-chev" />
           </button>
           <button
             className="wr-entry-x"
-            aria-label="Скрыть до следующей недели"
+            aria-label={t('Скрыть до следующей недели')}
             onClick={() => {
               dismiss(monday);
               setHidden((n) => n + 1);
@@ -66,8 +67,8 @@ export function WeeklyReviewEntry() {
           <CalendarCheck size={18} />
         </span>
         <span className="grow">
-          <span className="wr-entry-t">Итоги недели</span>
-          <span className="wr-entry-s">{weekLabel(monday)} · цифры, настроение и планы</span>
+          <span className="wr-entry-t">{t('Итоги недели')}</span>
+          <span className="wr-entry-s">{weekLabel(monday)} · {t('цифры, настроение и планы')}</span>
         </span>
         <ChevronRight size={18} className="wr-entry-chev" />
       </button>

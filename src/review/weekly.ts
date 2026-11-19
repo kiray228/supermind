@@ -3,6 +3,7 @@
  * настроение, деньги, опыт — и несколько простых наблюдений. Работает офлайн, без ИИ.
  */
 import type { Habit, PlannerData } from '../types';
+import { LOCALE, isEn, t, tn } from '../i18n/index';
 import type { TasksData } from '../tasks/model';
 import type { FinanceData } from '../finance/model';
 import { summarize } from '../finance/model';
@@ -32,39 +33,39 @@ export function moodForScore(v: number): string {
 // ---------- Подписи ----------
 
 const MONTHS_SHORT = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
-export const WD_SHORT = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
+export const WD_SHORT = isEn ? ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'] : ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
 const WD_ACC = ['воскресенье', 'понедельник', 'вторник', 'среду', 'четверг', 'пятницу', 'субботу'];
+const monShort = (d: Date) => (isEn ? d.toLocaleDateString(LOCALE, { month: 'short' }) : MONTHS_SHORT[d.getMonth()]);
+/** «3,5» — по-английски «3.5» */
+const dec = (v: string | number) => (isEn ? String(v) : String(v).replace('.', ','));
 
 /** «6–12 окт», «29 сен – 5 окт» */
 export function weekLabel(monday: string): string {
   const a = fromYmd(monday);
   const b = fromYmd(addDaysYmd(monday, 6));
   const yr = b.getFullYear() !== new Date().getFullYear() ? ` ${b.getFullYear()}` : '';
-  if (a.getMonth() === b.getMonth()) return `${a.getDate()}–${b.getDate()} ${MONTHS_SHORT[b.getMonth()]}${yr}`;
-  return `${a.getDate()} ${MONTHS_SHORT[a.getMonth()]} – ${b.getDate()} ${MONTHS_SHORT[b.getMonth()]}${yr}`;
+  if (isEn) {
+    if (a.getMonth() === b.getMonth()) return `${monShort(b)} ${a.getDate()}–${b.getDate()}${yr}`;
+    return `${monShort(a)} ${a.getDate()} – ${monShort(b)} ${b.getDate()}${yr}`;
+  }
+  if (a.getMonth() === b.getMonth()) return `${a.getDate()}–${b.getDate()} ${monShort(b)}${yr}`;
+  return `${a.getDate()} ${monShort(a)} – ${b.getDate()} ${monShort(b)}${yr}`;
 }
 
 /** «вт, 8 окт» */
 export function dayShort(ymd: string): string {
   const d = fromYmd(ymd);
+  if (isEn) return d.toLocaleDateString(LOCALE, { weekday: 'short', month: 'short', day: 'numeric' });
   return `${WD_SHORT[d.getDay()]}, ${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}`;
 }
 
 export function minutesLabel(min: number): string {
   const m = Math.round(min);
-  if (m < 60) return `${m} мин`;
+  if (m < 60) return t('{m} мин', { m });
   const h = Math.floor(m / 60);
-  return m % 60 ? `${h} ч ${m % 60} мин` : `${h} ч`;
+  return m % 60 ? t('{h} ч {m} мин', { h, m: m % 60 }) : t('{h} ч', { h });
 }
 
-function plural(n: number, one: string, few: string, many: string): string {
-  const a = Math.abs(n) % 100;
-  const b = a % 10;
-  if (a > 10 && a < 20) return many;
-  if (b > 1 && b < 5) return few;
-  if (b === 1) return one;
-  return many;
-}
 
 /** Какую неделю показывать по умолчанию: в понедельник — прошедшую, иначе — текущую */
 export function defaultReviewMonday(now = new Date()): string {
@@ -220,11 +221,11 @@ function moodHabitInsight(days: Days, habits: Habit[], end: string): string | nu
     if (!best || Math.abs(a - b) > Math.abs(best.a - best.b)) best = { h, a, b };
   }
   if (!best) return null;
-  const f = (v: number) => v.toFixed(1).replace('.', ',');
+  const f = (v: number) => dec(v.toFixed(1));
   const name = `${best.h.icon ? best.h.icon + ' ' : ''}«${best.h.name}»`;
   return best.a > best.b
-    ? `В дни с привычкой ${name} настроение выше: ${f(best.a)} против ${f(best.b)}`
-    : `В дни с привычкой ${name} настроение ниже: ${f(best.a)} против ${f(best.b)} — может, стоит её пересмотреть`;
+    ? t('В дни с привычкой {name} настроение выше: {a} против {b}', { name, a: f(best.a), b: f(best.b) })
+    : t('В дни с привычкой {name} настроение ниже: {a} против {b} — может, стоит её пересмотреть', { name, a: f(best.a), b: f(best.b) });
 }
 
 /** Самый продуктивный день недели за последние 8 недель (по выполненным задачам) */
@@ -244,7 +245,8 @@ function productiveWeekdayInsight(per: Map<string, number>, sunday: string): str
   // явный лидер: заметно больше среднего дня
   if (sums[wd] < (total / 7) * 1.25) return null;
   const v = avg >= 10 ? Math.round(avg) : Math.round(avg * 10) / 10;
-  return `Самый продуктивный день недели — ${WD_ACC[wd]}: в среднем ${String(v).replace('.', ',')} ${plural(Math.round(v), 'задача', 'задачи', 'задач')}`;
+  const day = isEn ? new Date(2024, 0, 7 + wd).toLocaleDateString(LOCALE, { weekday: 'long' }) : WD_ACC[wd];
+  return t('Самый продуктивный день недели — {day}: в среднем {n} {tasks}', { day, n: dec(v), tasks: tn(Math.round(v), 'задача', 'задачи', 'задач') });
 }
 
 const pctChange = (cur: number, prev: number) => (prev > 0 ? Math.round(((cur - prev) / prev) * 100) : null);
@@ -324,11 +326,11 @@ export function computeWeek(src: WeekInputs, monday: string, now = new Date()): 
     if (pw) insights.push(pw);
     const tc = pctChange(tasksDone, prevTasksDone);
     if (!current && tc != null && Math.abs(tc) >= 15 && prevTasksDone >= 3)
-      insights.push(tc > 0 ? `Задач выполнено на ${tc}% больше, чем неделей раньше` : `Задач выполнено на ${-tc}% меньше, чем неделей раньше — бывает, главное не сдаваться`);
+      insights.push(tc > 0 ? t('Задач выполнено на {n}% больше, чем неделей раньше', { n: tc }) : t('Задач выполнено на {n}% меньше, чем неделей раньше — бывает, главное не сдаваться', { n: -tc }));
     const sc = pctChange(spent, prevSpent);
     if (insights.length < 3 && !current && sc != null && Math.abs(sc) >= 20 && spent > 0)
-      insights.push(sc > 0 ? `Расходы выросли на ${sc}% по сравнению с прошлой неделей` : `Расходы на ${-sc}% меньше, чем на прошлой неделе`);
-    if (insights.length < 3 && hw.expected > 0 && hw.done === hw.expected && hw.expected >= 3) insights.push('Все привычки выполнены по плану — отличная неделя!');
+      insights.push(sc > 0 ? t('Расходы выросли на {n}% по сравнению с прошлой неделей', { n: sc }) : t('Расходы на {n}% меньше, чем на прошлой неделе', { n: -sc }));
+    if (insights.length < 3 && hw.expected > 0 && hw.done === hw.expected && hw.expected >= 3) insights.push(t('Все привычки выполнены по плану — отличная неделя!'));
   }
 
   return {
@@ -380,27 +382,27 @@ export interface ReviewAnswers {
 
 /** Короткая сводка цифрами (для дневника и карты) */
 export function statLines(s: WeeklyStats, money: (v: number) => string): string[] {
-  const out = [`Задач выполнено: ${s.tasksDone}`];
-  if (s.habitRate != null) out.push(`Привычки: ${Math.round(s.habitRate * 100)}% (${s.habitDone} из ${s.habitExpected})`);
-  if (s.bestStreak) out.push(`Лучшая серия: ${s.bestStreak.icon ? s.bestStreak.icon + ' ' : ''}${s.bestStreak.name} — ${s.bestStreak.text}`);
-  if (s.focusMin > 0) out.push(`Фокус: ${minutesLabel(s.focusMin)}`);
-  if (s.moodAvg != null) out.push(`Настроение: ${moodForScore(s.moodAvg)} ${s.moodAvg.toFixed(1).replace('.', ',')} из 5`);
-  if (s.hasFinance) out.push(`Расходы: ${money(s.spent)}${s.income > 0 ? `, доходы: ${money(s.income)}` : ''}`);
-  if (s.xp > 0) out.push(`Опыт: +${Math.round(s.xp)} XP`);
-  if (s.bestDay) out.push(`Лучший день: ${dayShort(s.bestDay.date)}`);
+  const out = [t('Задач выполнено: {n}', { n: s.tasksDone })];
+  if (s.habitRate != null) out.push(t('Привычки: {n}% ({done} из {total})', { n: Math.round(s.habitRate * 100), done: s.habitDone, total: s.habitExpected }));
+  if (s.bestStreak) out.push(t('Лучшая серия: {name} — {text}', { name: `${s.bestStreak.icon ? s.bestStreak.icon + ' ' : ''}${s.bestStreak.name}`, text: s.bestStreak.text }));
+  if (s.focusMin > 0) out.push(t('Фокус: {time}', { time: minutesLabel(s.focusMin) }));
+  if (s.moodAvg != null) out.push(t('Настроение: {mood} {n} из 5', { mood: moodForScore(s.moodAvg), n: dec(s.moodAvg.toFixed(1)) }));
+  if (s.hasFinance) out.push(s.income > 0 ? t('Расходы: {spent}, доходы: {income}', { spent: money(s.spent), income: money(s.income) }) : t('Расходы: {spent}', { spent: money(s.spent) }));
+  if (s.xp > 0) out.push(t('Опыт: +{n} XP', { n: Math.round(s.xp) }));
+  if (s.bestDay) out.push(t('Лучший день: {day}', { day: dayShort(s.bestDay.date) }));
   return out;
 }
 
 /** Запись в дневник воскресенья */
 export function journalText(s: WeeklyStats, a: ReviewAnswers, money: (v: number) => string): string {
-  const parts = [`🗓 Итоги недели ${s.label}`, statLines(s, money).join(' · ')];
+  const parts = [t('🗓 Итоги недели {label}', { label: s.label }), statLines(s, money).join(' · ')];
   const block = (title: string, text: string) => {
     const ls = lines(text);
     if (ls.length) parts.push(`${title}:\n${ls.map((l) => `— ${l}`).join('\n')}`);
   };
-  block('Получилось', a.good);
-  block('Мешало', a.bad);
-  block('Главное на следующую неделю', a.next);
+  block(t('Получилось'), a.good);
+  block(t('Мешало'), a.bad);
+  block(t('Главное на следующую неделю'), a.next);
   return parts.join('\n\n');
 }
 
@@ -409,10 +411,10 @@ export function reviewMarkdown(s: WeeklyStats, a: ReviewAnswers, money: (v: numb
   const esc = (l: string) => l.replace(/\r?\n/g, ' ');
   const sec = (title: string, items: string[], task = false) => [`- ${title}`, ...items.map((l) => `  - ${task ? '[ ] ' : ''}${esc(l)}`)].join('\n');
   return [
-    `# Неделя ${s.label}`,
-    sec('Итоги', statLines(s, money)),
-    sec('Получилось', lines(a.good)),
-    sec('Мешало', lines(a.bad)),
-    sec('Планы', lines(a.next), true),
+    `# ${t('Неделя {label}', { label: s.label })}`,
+    sec(t('Итоги'), statLines(s, money)),
+    sec(t('Получилось'), lines(a.good)),
+    sec(t('Мешало'), lines(a.bad)),
+    sec(t('Планы'), lines(a.next), true),
   ].join('\n');
 }

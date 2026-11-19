@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { t, tn } from '../../i18n/index';
 import { BookOpenText, ChevronRight, CircleDot, Maximize2, Minus, Plus, Scan, SlidersHorizontal, Sparkles, Waypoints, X } from 'lucide-react';
 import type { ID } from '../../types';
 import { AIError } from '../../ai/claude';
@@ -38,8 +39,8 @@ const SHAPE: Record<BrainKind, NodeShape> = { note: 'circle', map: 'square', goa
 const KIND_COLOR: Record<BrainKind, string> = { note: 'var(--accent)', map: '#8b5cf6', goal: '#f59e0b', task: '#22c55e' };
 /** цвета тем — различимые и в светлой, и в тёмной теме */
 const TOPIC_COLORS = ['#3b82f6', '#f97316', '#22c55e', '#a855f7', '#ef4444', '#14b8a6', '#eab308', '#ec4899', '#06b6d4', '#84cc16'];
-const KIND_PLURAL: Record<BrainKind, string> = { note: 'Заметки', map: 'Карты', goal: 'Цели', task: 'Задачи' };
-const OPEN_LABEL: Record<BrainKind, string> = { note: 'Открыть заметку', map: 'Открыть карту', goal: 'Открыть цель', task: 'Открыть задачу' };
+const KIND_PLURAL: Record<BrainKind, string> = { note: t('Заметки'), map: t('Карты'), goal: t('Цели'), task: t('Задачи') };
+const OPEN_LABEL: Record<BrainKind, string> = { note: t('Открыть заметку'), map: t('Открыть карту'), goal: t('Открыть цель'), task: t('Открыть задачу') };
 
 interface Props {
   /** заметки текущего раздела (папка, закреплённые); null — все заметки, а с ними карты, задачи и цели */
@@ -129,7 +130,7 @@ export function NotesGraph({ noteScope, folders, highlight, focusId, onFocused, 
       .filter(([c, n]) => n >= 2 && c < TOPIC_COLORS.length)
       // большие темы — первыми (номер кластера и есть место по размеру)
       .sort((a, b) => a[0] - b[0])
-      .map(([c, n]) => ({ c, n, name: capitalize(names.get(c) ?? 'Тема ' + (c + 1)), color: TOPIC_COLORS[c] }));
+      .map(([c, n]) => ({ c, n, name: capitalize(names.get(c) ?? t('Тема {n}', { n: c + 1 })), color: TOPIC_COLORS[c] }));
     return { shown, links, clusters, size, topics, total: pool.length };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, edges, ix, orphans, kindsKey, scopeKey, hood]);
@@ -154,7 +155,7 @@ export function NotesGraph({ noteScope, folders, highlight, focusId, onFocused, 
     };
     const nodes: ViewNode[] = model.shown.map((i) => ({
       id: i.id,
-      label: i.title || i.preview.slice(0, 40) || 'Без названия',
+      label: i.title || i.preview.slice(0, 40) || t('Без названия'),
       color: colorOf(i),
       shape: SHAPE[i.kind],
       ...(i.done ? { done: true } : {}),
@@ -222,12 +223,12 @@ export function NotesGraph({ noteScope, folders, highlight, focusId, onFocused, 
     if (bulk) return;
     setPanel(false);
     const ids = await notesToReview(model.shown.filter((n) => n.kind === 'note').map((n) => n.id));
-    if (!ids.length) return toast('Все заметки уже проверены ИИ');
+    if (!ids.length) return toast(t('Все заметки уже проверены ИИ'));
     const n = ids.length;
     const ok = await confirmDialog(
-      `Проверить ${n} ${plural(n, 'заметку', 'заметки', 'заметок')} ИИ?`,
-      'ИИ оценит важные слова и связи каждой заметки — по одному запросу на заметку. Остановить можно в любой момент.',
-      { okText: 'Проверить' },
+      t('Проверить {n} {notes} ИИ?', { n, notes: tn(n, 'заметку', 'заметки', 'заметок') }),
+      t('ИИ оценит важные слова и связи каждой заметки — по одному запросу на заметку. Остановить можно в любой момент.'),
+      { okText: t('Проверить') },
     );
     if (!ok) return;
     const ac = new AbortController();
@@ -255,7 +256,7 @@ export function NotesGraph({ noteScope, folders, highlight, focusId, onFocused, 
     }
     bulkAbort.current = null;
     setBulk(null);
-    if (done) toast(`ИИ проверил ${done} ${plural(done, 'заметку', 'заметки', 'заметок')}: убрал случайных связей — ${rejected}, нашёл новых — ${found}`);
+    if (done) toast(t('ИИ проверил {n} {notes}: убрал случайных связей — {rejected}, нашёл новых — {found}', { n: done, notes: tn(done, 'заметку', 'заметки', 'заметок'), rejected, found }));
   };
 
   const pick = (id: ID) => {
@@ -267,7 +268,7 @@ export function NotesGraph({ noteScope, folders, highlight, focusId, onFocused, 
   const folder = selItem?.kind === 'note' && folderOf.get(selItem.id) ? folders.find((f) => f.id === folderOf.get(selItem.id)) : undefined;
   const titleOf = (id: ID) => {
     const m = items.find((n) => n.id === id);
-    return m ? m.title || m.preview.slice(0, 40) || 'Без названия' : '';
+    return m ? m.title || m.preview.slice(0, 40) || t('Без названия') : '';
   };
   const hoodTitle = hood ? titleOf(hood.id) : '';
   /** конспект выбранной темы: её записи — самые связанные первыми */
@@ -284,21 +285,21 @@ export function NotesGraph({ noteScope, folders, highlight, focusId, onFocused, 
     openDigest(t.name, ids.sort((a, b) => (deg.get(b) ?? 0) - (deg.get(a) ?? 0)));
   };
   const scopeAll = !noteScope;
-  const statLabel = scopeAll ? plural(model.shown.length, 'единица', 'единицы', 'единиц') : plural(model.shown.length, 'заметка', 'заметки', 'заметок');
+  const statLabel = scopeAll ? tn(model.shown.length, 'единица', 'единицы', 'единиц') : tn(model.shown.length, 'заметка', 'заметки', 'заметок');
 
   return (
     <div className="nt-graph">
-      <canvas ref={canvasRef} className="nt-graph-canvas" aria-label="Граф связей между заметками, картами, целями и задачами" />
+      <canvas ref={canvasRef} className="nt-graph-canvas" aria-label={t('Граф связей между заметками, картами, целями и задачами')} />
 
       {/* панель и легенда — одной колонкой: панель переносится на вторую строку — легенда сдвигается */}
       <div className="nt-graph-top">
         <div className="nt-graph-bar">
           <span className="nt-graph-stat">
             <Waypoints size={15} />
-            {model.shown.length} {statLabel} · {model.links.length} {plural(model.links.length, 'связь', 'связи', 'связей')}
+            {model.shown.length} {statLabel} · {model.links.length} {tn(model.links.length, 'связь', 'связи', 'связей')}
           </span>
-          <button className={`nt-graph-chip${panel ? ' active' : ''}`} onClick={() => setPanel(!panel)} aria-expanded={panel} title="Что показывать и как раскрасить">
-            <SlidersHorizontal size={14} /> Вид
+          <button className={`nt-graph-chip${panel ? ' active' : ''}`} onClick={() => setPanel(!panel)} aria-expanded={panel} title={t('Что показывать и как раскрасить')}>
+            <SlidersHorizontal size={14} /> {t('Вид')}
           </button>
           {hood && (
             <span className="nt-graph-chip active nt-graph-hood">
@@ -307,11 +308,11 @@ export function NotesGraph({ noteScope, folders, highlight, focusId, onFocused, 
               <button
                 className="nt-graph-hood-depth"
                 onClick={() => setHood({ ...hood, depth: hood.depth === 1 ? 2 : 1 })}
-                title="Сколько шагов по связям показывать"
+                title={t('Сколько шагов по связям показывать')}
               >
-                {hood.depth === 1 ? '1 шаг' : '2 шага'}
+                {hood.depth === 1 ? t('1 шаг') : t('2 шага')}
               </button>
-              <button className="nt-graph-hood-x" onClick={() => setHood(null)} aria-label="Показать весь граф">
+              <button className="nt-graph-hood-x" onClick={() => setHood(null)} aria-label={t('Показать весь граф')}>
                 <X size={14} />
               </button>
             </span>
@@ -319,10 +320,10 @@ export function NotesGraph({ noteScope, folders, highlight, focusId, onFocused, 
         </div>
 
         {colorMode === 'topic' && model.topics.length > 0 && (
-          <div className="nt-graph-legend" aria-label="Темы">
+          <div className="nt-graph-legend" aria-label={t('Темы')}>
             {topic !== null && model.topics.some((t) => t.c === topic) && (
-              <button className="nt-graph-topic nt-graph-digest active" style={{ '--tc': 'var(--accent)' } as CSSProperties} onClick={digestTopic} title="ИИ соберёт записи темы в обзор со ссылками">
-                <BookOpenText size={14} /> Конспект
+              <button className="nt-graph-topic nt-graph-digest active" style={{ '--tc': 'var(--accent)' } as CSSProperties} onClick={digestTopic} title={t('ИИ соберёт записи темы в обзор со ссылками')}>
+                <BookOpenText size={14} /> {t('Конспект')}
               </button>
             )}
             {model.topics.map((t) => (
@@ -345,10 +346,10 @@ export function NotesGraph({ noteScope, folders, highlight, focusId, onFocused, 
       {panel && (
         <>
           <div className="nt-graph-panel-shield" onPointerDown={() => setPanel(false)} />
-          <div className="nt-graph-panel" role="dialog" aria-label="Вид графа">
+          <div className="nt-graph-panel" role="dialog" aria-label={t('Вид графа')}>
             {scopeAll && (
               <>
-                <div className="nt-graph-panel-label">Показывать</div>
+                <div className="nt-graph-panel-label">{t('Показывать')}</div>
                 <div className="nt-graph-panel-row">
                   {KINDS.map((k) => {
                     const Icon = KIND_ICON[k];
@@ -363,16 +364,16 @@ export function NotesGraph({ noteScope, folders, highlight, focusId, onFocused, 
             )}
             <div className="nt-graph-panel-row">
               <button className={`nt-graph-chip${orphans ? ' active' : ''}`} onClick={toggleOrphans} aria-pressed={orphans}>
-                <CircleDot size={14} /> Без связей
+                <CircleDot size={14} /> {t('Без связей')}
               </button>
             </div>
-            <div className="nt-graph-panel-label">Цвет</div>
-            <div className="nt-seg" role="radiogroup" aria-label="Цвет точек">
+            <div className="nt-graph-panel-label">{t('Цвет')}</div>
+            <div className="nt-seg" role="radiogroup" aria-label={t('Цвет точек')}>
               {(
                 [
-                  ['folder', 'Папки'],
-                  ['topic', 'Темы'],
-                  ['kind', 'Типы'],
+                  ['folder', t('Папки')],
+                  ['topic', t('Темы')],
+                  ['kind', t('Типы')],
                 ] as [ColorMode, string][]
               ).map(([m, l]) => (
                 <button key={m} className={colorMode === m ? 'on' : ''} onClick={() => setColor(m)} role="radio" aria-checked={colorMode === m}>
@@ -382,7 +383,7 @@ export function NotesGraph({ noteScope, folders, highlight, focusId, onFocused, 
             </div>
             {model.shown.some((n) => n.kind === 'note') && !bulk && (
               <button className="nt-ai-btn nt-graph-panel-ai" onClick={() => void reviewAll()}>
-                <Sparkles size={14} /> Проверить связи ИИ
+                <Sparkles size={14} /> {t('Проверить связи ИИ')}
               </button>
             )}
           </div>
@@ -390,13 +391,13 @@ export function NotesGraph({ noteScope, folders, highlight, focusId, onFocused, 
       )}
 
       <div className="nt-graph-tools">
-        <button className="nt-graph-tool" onClick={() => viewRef.current?.zoomBy(1.4)} aria-label="Приблизить">
+        <button className="nt-graph-tool" onClick={() => viewRef.current?.zoomBy(1.4)} aria-label={t('Приблизить')}>
           <Plus size={18} />
         </button>
-        <button className="nt-graph-tool" onClick={() => viewRef.current?.zoomBy(1 / 1.4)} aria-label="Отдалить">
+        <button className="nt-graph-tool" onClick={() => viewRef.current?.zoomBy(1 / 1.4)} aria-label={t('Отдалить')}>
           <Minus size={18} />
         </button>
-        <button className="nt-graph-tool" onClick={() => viewRef.current?.fit()} aria-label="Вписать граф в экран">
+        <button className="nt-graph-tool" onClick={() => viewRef.current?.fit()} aria-label={t('Вписать граф в экран')}>
           <Maximize2 size={16} />
         </button>
       </div>
@@ -407,10 +408,10 @@ export function NotesGraph({ noteScope, folders, highlight, focusId, onFocused, 
             <span style={{ width: `${Math.round((bulk.done / Math.max(1, bulk.total)) * 100)}%` }} />
           </div>
           <span className="faint tiny">
-            ИИ проверяет связи… {bulk.done} из {bulk.total}
+            {t('ИИ проверяет связи… {n} из {total}', { n: bulk.done, total: bulk.total })}
           </span>
           <button className="nt-ai-btn" onClick={() => bulkAbort.current?.abort()}>
-            Стоп
+            {t('Стоп')}
           </button>
         </div>
       )}
@@ -420,17 +421,17 @@ export function NotesGraph({ noteScope, folders, highlight, focusId, onFocused, 
           <div className="nt-rel-bar">
             <span style={{ width: `${Math.round((analysing ? analysing.done / Math.max(1, analysing.total) : (progress ?? 0)) * 100)}%` }} />
           </div>
-          <span className="faint tiny">{analysing ? `Анализирую… ${analysing.done} из ${analysing.total}` : 'Ищу связи…'}</span>
+          <span className="faint tiny">{analysing ? t('Анализирую… {n} из {total}', { n: analysing.done, total: analysing.total }) : t('Ищу связи…')}</span>
         </div>
       )}
 
       {!busy && model.shown.length === 0 && (
         <div className="nt-graph-empty">
           <Waypoints size={36} />
-          <div>{model.total === 0 ? 'Здесь пока нет заметок' : 'Связей пока нет. Они появятся сами, когда одни и те же темы встретятся в разных заметках, картах и задачах.'}</div>
+          <div>{model.total === 0 ? t('Здесь пока нет заметок') : t('Связей пока нет. Они появятся сами, когда одни и те же темы встретятся в разных заметках, картах и задачах.')}</div>
           {model.total > 0 && !orphans && (
             <button className="btn btn-sm" onClick={toggleOrphans}>
-              Показать всё
+              {t('Показать всё')}
             </button>
           )}
         </div>
@@ -440,7 +441,7 @@ export function NotesGraph({ noteScope, folders, highlight, focusId, onFocused, 
         <div className="nt-graph-card" style={folder ? ({ '--fc': folder.color } as CSSProperties) : undefined}>
           <div className="nt-graph-card-top">
             <div className="grow" style={{ minWidth: 0 }}>
-              <div className="nt-graph-card-title">{selItem.title || 'Без названия'}</div>
+              <div className="nt-graph-card-title">{selItem.title || t('Без названия')}</div>
               <div className="nt-graph-card-meta">
                 {selItem.kind !== 'note' && <span className="nt-graph-card-kind">{KIND_LABEL[selItem.kind]}</span>}
                 {folder && (
@@ -449,10 +450,10 @@ export function NotesGraph({ noteScope, folders, highlight, focusId, onFocused, 
                     {folder.name}
                   </span>
                 )}
-                {neighbors.length ? `${neighbors.length} ${plural(neighbors.length, 'связь', 'связи', 'связей')}` : 'Без связей'}
+                {neighbors.length ? `${neighbors.length} ${tn(neighbors.length, 'связь', 'связи', 'связей')}` : t('Без связей')}
               </div>
             </div>
-            <button className="icon-btn" onClick={() => (viewRef.current?.select(null), select(null))} aria-label="Снять выделение">
+            <button className="icon-btn" onClick={() => (viewRef.current?.select(null), select(null))} aria-label={t('Снять выделение')}>
               <X size={18} />
             </button>
           </div>
@@ -468,8 +469,8 @@ export function NotesGraph({ noteScope, folders, highlight, focusId, onFocused, 
           )}
           <div className="nt-graph-card-actions">
             {neighbors.length > 0 && hood?.id !== selItem.id && (
-              <button className="btn" onClick={() => setHood({ id: selItem.id, depth: 2 })} title="Показать только связи этой единицы">
-                <Scan size={16} /> Окрестность
+              <button className="btn" onClick={() => setHood({ id: selItem.id, depth: 2 })} title={t('Показать только связи этой единицы')}>
+                <Scan size={16} /> {t('Окрестность')}
               </button>
             )}
             <button className="btn btn-primary grow nt-graph-open" onClick={() => void openItem(selItem.id)}>
@@ -484,10 +485,3 @@ export function NotesGraph({ noteScope, folders, highlight, focusId, onFocused, 
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-function plural(n: number, one: string, few: string, many: string) {
-  const a = n % 10;
-  const b = n % 100;
-  if (a === 1 && b !== 11) return one;
-  if (a >= 2 && a <= 4 && (b < 12 || b > 14)) return few;
-  return many;
-}

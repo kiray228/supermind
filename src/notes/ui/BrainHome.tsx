@@ -3,6 +3,7 @@
  * Ниже — обычный список заметок (Notes.tsx).
  */
 import { useEffect, useMemo, useState } from 'react';
+import { t, tn } from '../../i18n/index';
 import { CalendarDays, ChevronRight, Compass, GraduationCap, Sparkles, Waypoints } from 'lucide-react';
 import { useApp } from '../../store/appStore';
 import { useLinkGraph } from '../related';
@@ -17,7 +18,6 @@ import { loadPlanner } from '../../store/db';
 import type { Habit, PlannerData } from '../../types';
 import { activeHabits, currentStreak } from '../../habits/model';
 import { todayYmd } from '../../utils/mapTasks';
-import { plural } from '../../tasks/model';
 
 const KIND_COLOR: Record<BrainKind, string> = { note: '#ff9f0a', goal: '#ff375f', map: '#5e5ce6', task: '#0a84ff' };
 /** сколько узлов в превью графа */
@@ -73,20 +73,20 @@ export function BrainHome({ onGraph, onReview, onDaily }: { onGraph: () => void;
     <div className="bh">
       <button className="bh-ask" onClick={() => openAsk()}>
         <Sparkles size={17} />
-        <span>Спросить мозг: что я писал про…</span>
+        <span>{t('Спросить мозг: что я писал про…')}</span>
       </button>
       <div className="bh-chips">
         <button onClick={onDaily}>
-          <CalendarDays size={15} /> Заметка дня
+          <CalendarDays size={15} /> {t('Заметка дня')}
         </button>
         <button onClick={openCardsReview}>
-          <GraduationCap size={15} /> Карточки{due ? ` · ${due}` : ''}
+          <GraduationCap size={15} /> {t('Карточки')}{due ? ` · ${due}` : ''}
         </button>
         <button onClick={onReview}>
-          <Compass size={15} /> Обзор
+          <Compass size={15} /> {t('Обзор')}
         </button>
         <button onClick={onGraph}>
-          <Waypoints size={15} /> Граф
+          <Waypoints size={15} /> {t('Граф')}
         </button>
       </div>
 
@@ -95,8 +95,8 @@ export function BrainHome({ onGraph, onReview, onDaily }: { onGraph: () => void;
       {goals.length > 0 && (
         <section className="bh-card">
           <div className="bh-card-h">
-            <span>Цели</span>
-            <button onClick={() => useApp.getState().go('goals')}>Все</button>
+            <span>{t('Цели')}</span>
+            <button onClick={() => useApp.getState().go('goals')}>{t('Все')}</button>
           </div>
           {goals.map((g) => (
             <GoalRow key={g.id} g={g} pct={goalProgress(g, look)} links={linkChips(itemId('goal', g.id))} />
@@ -107,15 +107,15 @@ export function BrainHome({ onGraph, onReview, onDaily }: { onGraph: () => void;
       {habits.length > 0 && (
         <section className="bh-card">
           <div className="bh-card-h">
-            <span>Привычки</span>
-            <button onClick={() => useApp.getState().go('habits')}>Все</button>
+            <span>{t('Привычки')}</span>
+            <button onClick={() => useApp.getState().go('habits')}>{t('Все')}</button>
           </div>
           {habits.map(({ h, s }) => (
             <button key={h.id} className="bh-row" onClick={() => useApp.getState().go('habits')}>
               <span className="bh-emoji">{h.icon || '🔁'}</span>
               <span className="bh-row-x">
                 <b>{h.name}</b>
-                <small>{s.n ? `серия ${s.n} ${s.unit === 'week' ? plural(s.n, 'неделя', 'недели', 'недель') : plural(s.n, 'день', 'дня', 'дней')}` : 'серия ещё не началась'}</small>
+                <small>{s.n ? t('серия {n} {unit}', { n: s.n, unit: s.unit === 'week' ? tn(s.n, 'неделя', 'недели', 'недель') : tn(s.n, 'день', 'дня', 'дней') }) : t('серия ещё не началась')}</small>
               </span>
               <ChevronRight size={16} className="bh-chev" />
             </button>
@@ -149,7 +149,7 @@ function GoalRow({ g, pct, links }: { g: Goal; pct: number; links: { id: string;
             {links.map((l) => (
               <span key={l.id} className="bh-link">
                 <i style={{ background: KIND_COLOR[l.kind] }} />
-                {l.title || 'Без названия'}
+                {l.title || t('Без названия')}
               </span>
             ))}
           </span>
@@ -186,7 +186,7 @@ function MiniGraph({ graph, onOpen }: { graph: ReturnType<typeof useLinkGraph>; 
 
   const counting = graph.progress !== null && !graph.edges;
   return (
-    <button className="bh-graph" onClick={onOpen} aria-label="Открыть граф связей">
+    <button className="bh-graph" onClick={onOpen} aria-label={t('Открыть граф связей')}>
       <svg viewBox="0 0 320 130" aria-hidden="true">
         {model.shown.map((e) => {
           const a = model.pos.get(e.a)!;
@@ -200,7 +200,7 @@ function MiniGraph({ graph, onOpen }: { graph: ReturnType<typeof useLinkGraph>; 
         })}
       </svg>
       <span className="bh-graph-cap">
-        {counting ? 'Считаю связи…' : model.total ? `Связи · ${model.total}` : 'Связей пока нет — пишите заметки, и они появятся'}
+        {counting ? t('Считаю связи…') : model.total ? t('Связи · {n}', { n: model.total }) : t('Связей пока нет — пишите заметки, и они появятся')}
         <ChevronRight size={14} />
       </span>
     </button>

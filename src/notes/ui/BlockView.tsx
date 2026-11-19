@@ -1,4 +1,5 @@
 import { memo, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent } from 'react';
+import { t } from '../../i18n/index';
 import { Check, FileText, Lightbulb, Mic, MoreHorizontal } from 'lucide-react';
 import type { ID } from '../../types';
 import { type Block, type BlockType, fmtDuration } from '../model';
@@ -29,16 +30,16 @@ export interface BlockCtx {
 }
 
 const PH: Partial<Record<BlockType, string>> = {
-  p: 'Текст или «/» для команд',
-  h1: 'Заголовок 1',
-  h2: 'Заголовок 2',
-  h3: 'Заголовок 3',
-  bullet: 'Пункт списка',
-  number: 'Пункт списка',
-  todo: 'Что сделать?',
-  quote: 'Цитата',
-  code: 'Код',
-  callout: 'Важная мысль',
+  p: t('Текст или «/» для команд'),
+  h1: t('Заголовок 1'),
+  h2: t('Заголовок 2'),
+  h3: t('Заголовок 3'),
+  bullet: t('Пункт списка'),
+  number: t('Пункт списка'),
+  todo: t('Что сделать?'),
+  quote: t('Цитата'),
+  code: t('Код'),
+  callout: t('Важная мысль'),
 };
 
 export const FIELD_SIZING = typeof CSS !== 'undefined' && !!CSS.supports?.('field-sizing', 'content');
@@ -55,7 +56,7 @@ export function autosize(el: HTMLTextAreaElement | null) {
 
 function Handle({ id, ctx }: { id: ID; ctx: BlockCtx }) {
   return (
-    <button className="nt-handle" onPointerDown={(e) => e.preventDefault()} onClick={(e) => ctx.menu(id, e.currentTarget)} aria-label="Действия с блоком">
+    <button className="nt-handle" onPointerDown={(e) => e.preventDefault()} onClick={(e) => ctx.menu(id, e.currentTarget)} aria-label={t('Действия с блоком')}>
       <MoreHorizontal size={16} />
     </button>
   );
@@ -87,7 +88,7 @@ const TextBlock = memo(function TextBlock({ b, num, sole, ctx }: { b: Block; num
 
   useLayoutEffect(() => autosize(ta.current), [text, ghost, b.type]);
 
-  const placeholder = sole ? 'Начните писать…' : editing || /^h[123]$/.test(b.type) ? PH[b.type] : '';
+  const placeholder = sole ? t('Начните писать…') : editing || /^h[123]$/.test(b.type) ? PH[b.type] : '';
 
   return (
     <div className={`nt-b nt-b-${b.type}${b.checked ? ' is-checked' : ''}`} data-id={b.id}>
@@ -95,7 +96,7 @@ const TextBlock = memo(function TextBlock({ b, num, sole, ctx }: { b: Block; num
       {b.type === 'bullet' && <span className="nt-mark nt-bullet" />}
       {b.type === 'number' && <span className="nt-mark nt-num">{num}.</span>}
       {b.type === 'todo' && (
-        <button className={`nt-mark nt-check${b.checked ? ' on' : ''}`} onPointerDown={(e) => e.preventDefault()} onClick={() => ctx.toggle(b.id)} aria-label={b.checked ? 'Не выполнено' : 'Выполнено'}>
+        <button className={`nt-mark nt-check${b.checked ? ' on' : ''}`} onPointerDown={(e) => e.preventDefault()} onClick={() => ctx.toggle(b.id)} aria-label={b.checked ? t('Не выполнено') : t('Выполнено')}>
           {b.checked && <Check size={14} strokeWidth={3} />}
         </button>
       )}
@@ -163,7 +164,7 @@ const MediaBlock = memo(function MediaBlock({ b, selected, ctx }: { b: Block; se
             }}
           />
         )}
-        <input className="nt-caption" value={b.caption ?? ''} placeholder="Подпись" onFocus={() => ctx.select(b.id)} onChange={(e) => ctx.patch(b.id, { caption: e.target.value }, 'type')} />
+        <input className="nt-caption" value={b.caption ?? ''} placeholder={t('Подпись')} onFocus={() => ctx.select(b.id)} onChange={(e) => ctx.patch(b.id, { caption: e.target.value }, 'type')} />
       </figure>
     );
   }
@@ -173,17 +174,17 @@ const MediaBlock = memo(function MediaBlock({ b, selected, ctx }: { b: Block; se
       <Handle id={b.id} ctx={ctx} />
       <div className="nt-audio-head">
         <Mic size={15} />
-        <span className="grow">Голосовая запись</span>
+        <span className="grow">{t('Голосовая запись')}</span>
         <span className="faint tiny">{fmtDuration(b.duration ?? 0)}</span>
       </div>
-      {b.src ? <AudioPlayer src={b.src} duration={b.duration} /> : <div className="faint small">Запись недоступна</div>}
+      {b.src ? <AudioPlayer src={b.src} duration={b.duration} /> : <div className="faint small">{t('Запись недоступна')}</div>}
       {!!b.transcript?.trim() && (
         <div className="nt-transcript">
           <button className="nt-tr-toggle" onClick={() => setShowTr(!showTr)}>
-            <FileText size={14} /> {showTr ? 'Скрыть расшифровку' : 'Расшифровка'}
+            <FileText size={14} /> {showTr ? t('Скрыть расшифровку') : t('Расшифровка')}
           </button>
           <button className="nt-tr-toggle" onClick={() => ctx.transcriptToText(b.id)}>
-            В текст
+            {t('В текст')}
           </button>
           {showTr && <p>{b.transcript}</p>}
         </div>

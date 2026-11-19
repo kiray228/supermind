@@ -3,6 +3,7 @@
  * (ссылки [1] → [[Название]], в конце — список источников). Модуль чистый — тесты гоняют его в Node.
  */
 import { type AskSource, splitCitations } from './askPrompt';
+import { t } from '../i18n/index';
 
 export const DIGEST_SYSTEM = `Ты составляешь конспект темы из личных записей человека: заметок, карт, задач и целей.
 Пиши по-русски, кратко и по делу, в markdown, без вступления и без общего заголовка. Разделы:
@@ -20,7 +21,7 @@ export function buildDigestPrompt(topic: string, sources: AskSource[]): string {
 
 /** Название можно сделать [[ссылкой]]: нет скобок и черты, которые сломают ссылку */
 const linkable = (t: string) => !!t.trim() && !/[[\]|\n]/.test(t);
-const asLink = (t: string) => (linkable(t) ? `[[${t.trim()}]]` : `«${t.trim() || 'Без названия'}»`);
+const asLink = (s: string) => (linkable(s) ? `[[${s.trim()}]]` : `«${s.trim() || t('Без названия')}»`);
 
 /**
  * Ответ ИИ → текст заметки: [1] → [[Название источника]], повторы одной ссылки подряд не дублируются;
@@ -45,5 +46,5 @@ export function digestToMarkdown(text: string, sources: AskSource[]): string {
     .join('\n')
     .trim();
   const list = sources.map((s) => `- ${asLink(s.title)} — ${s.kind.toLowerCase()}`);
-  return `${body}\n\n## Источники\n\n${list.join('\n')}\n`;
+  return `${body}\n\n## ${t('Источники')}\n\n${list.join('\n')}\n`;
 }

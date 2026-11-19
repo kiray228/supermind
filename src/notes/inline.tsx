@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { t } from '../i18n/index';
 import { parseWiki } from './links';
 
 /**
@@ -100,7 +101,7 @@ export function renderInline(text: string, depth = 0, opts?: InlineOpts): ReactN
           key={key}
           href="#"
           className={`nt-link nt-wiki${exists ? '' : ' is-new'}`}
-          title={exists ? title : `«${title}» — такой заметки ещё нет, нажмите, чтобы создать`}
+          title={exists ? title : t('«{title}» — такой заметки ещё нет, нажмите, чтобы создать', { title })}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             stop(e);

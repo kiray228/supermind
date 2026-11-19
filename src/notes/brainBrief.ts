@@ -3,6 +3,7 @@
  * она связана с задачами дня (или с тем, что вы правили в последние дни). Добавляется в «План на день».
  */
 import { relatedTo, type LinkIndex } from './links';
+import { t } from '../i18n/index';
 import { itemId, parseItemId } from './brainDocs';
 import { dueCards } from './cardsCore';
 import type { NoteMeta, StudyCard } from './model';
@@ -78,5 +79,5 @@ export async function brainBriefFor(day: string, taskIds: string[]): Promise<Bra
 /** Хвост текста утреннего уведомления: «карточек: 5», «Перечитать: «…»» */
 export function briefParts(b: BrainBrief | null): { part?: string; tail?: string } {
   if (!b) return {};
-  return { ...(b.cards ? { part: `карточек: ${b.cards}` } : {}), ...(b.reread ? { tail: `Перечитать: «${b.reread.title}»` } : {}) };
+  return { ...(b.cards ? { part: t('карточек: {n}', { n: b.cards }) } : {}), ...(b.reread ? { tail: t('Перечитать: «{title}»', { title: b.reread.title }) } : {}) };
 }

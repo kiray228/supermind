@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
+import { t } from '../../i18n/index';
 import {
   AudioLines,
   Bold,
@@ -50,6 +51,7 @@ import { brainItems } from '../related';
 import { headingsOf, sectionBlocks } from '../embedCore';
 import { takeSection } from './wikiNav';
 import { createFromTemplate, isTemplateNote, openTemplates, templateFolderIds } from '../templates';
+import { TEMPLATE_VARS } from '../templatesCore';
 
 type MenuState = { kind: 'type' | 'format' | 'block' | 'note' | 'folder'; anchor: MenuAnchor; blockId?: ID; replace?: boolean } | null;
 /** noteId — заметка, в которой начали запись (запись идёт туда, даже если открыли другую) */
@@ -61,7 +63,7 @@ async function saveRecordingTo(st: RecState) {
     st.recog?.abort();
     const { src, duration } = await st.r.stop();
     await appendBlocksToNote(st.noteId, [newBlock('audio', { src, duration, ...(st.final.trim() ? { transcript: st.final.trim() } : {}) })]);
-    toast('Голосовая запись сохранена в заметку, где её начали');
+    toast(t('Голосовая запись сохранена в заметку, где её начали'));
   } catch {
     /* запись не удалась — сохранять нечего */
   }
@@ -233,7 +235,7 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
     const sec = takeSection(openId);
     if (!sec) return;
     const id = sectionBlocks(body.blocks, sec)?.[0]?.id;
-    if (!id) return void toast(`Раздела «${sec}» в заметке нет`);
+    if (!id) return void toast(t('Раздела «{section}» в заметке нет', { section: sec }));
     requestAnimationFrame(() => {
       const el = document.querySelector<HTMLElement>(`.nt-b[data-id="${id}"]`);
       if (!el) return;
@@ -422,7 +424,7 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
   function format(k: FormatKind) {
     const id = lastFocus.current;
     const el = id ? tas.current.get(id) : undefined;
-    if (!id || !el) return toast('Поставьте курсор в текст');
+    if (!id || !el) return toast(t('Поставьте курсор в текст'));
     const [open, closeM] = FORMAT_MARKS[k];
     const r = wrapSelection(el.value, el.selectionStart, el.selectionEnd, open, closeM);
     patch(id, { text: r.text });
@@ -450,24 +452,24 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
 
   function transcriptToText(id: ID) {
     const b = blocksNow().find((x) => x.id === id);
-    const t = b?.transcript?.trim();
-    if (!t) return;
-    const paras = (t.match(/[^.!?…\n]+[.!?…]*/g) ?? [t]).map((s) => s.trim()).filter(Boolean);
+    const tr = b?.transcript?.trim();
+    if (!tr) return;
+    const paras = (tr.match(/[^.!?…\n]+[.!?…]*/g) ?? [tr]).map((s) => s.trim()).filter(Boolean);
     // по 2–3 предложения в абзаце
     const out: Block[] = [];
     for (let i = 0; i < paras.length; i += 3) out.push(newBlock('p', { text: paras.slice(i, i + 3).join(' ') }));
     insertBlocks(id, out);
-    toast('Расшифровка добавлена текстом');
+    toast(t('Расшифровка добавлена текстом'));
   }
 
   async function makeTask(id: ID) {
     const b = blocksNow().find((x) => x.id === id);
     const title = stripInline(b?.text ?? '').trim();
-    if (!title) return toast('Пункт пустой');
+    if (!title) return toast(t('Пункт пустой'));
     await ensureTasks().catch(() => undefined);
-    const t = addTask({ title });
-    if (t) toast('Задача создана во «Входящих»', { label: 'Открыть', run: () => openTask(t.id) });
-    else toast('Не удалось создать задачу');
+    const task = addTask({ title });
+    if (task) toast(t('Задача создана во «Входящих»'), { label: t('Открыть'), run: () => openTask(task.id) });
+    else toast(t('Не удалось создать задачу'));
   }
 
   // ---------- Ввод текста ----------
@@ -537,7 +539,7 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
   function startWiki() {
     const id = lastFocus.current;
     const el = id ? tas.current.get(id) : undefined;
-    if (!id || !el) return toast('Поставьте курсор в текст');
+    if (!id || !el) return toast(t('Поставьте курсор в текст'));
     const v = el.value;
     const s0 = el.selectionStart;
     const s1 = el.selectionEnd;
@@ -650,7 +652,7 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
       const noteId = openId;
       void imageFileToDataUrl(file)
         .then((src) => placeImage(noteId, b.id, src))
-        .catch(() => toast('Не удалось вставить изображение'));
+        .catch(() => toast(t('Не удалось вставить изображение')));
       return;
     }
     if (b.type === 'code' || !text.includes('\n')) return;
@@ -699,7 +701,7 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
       cur.recog?.stop();
       return;
     }
-    if (!speechSupported()) return toast('Диктовка не поддерживается в этом браузере. Попробуйте Safari или Chrome.');
+    if (!speechSupported()) return toast(t('Диктовка не поддерживается в этом браузере. Попробуйте Safari или Chrome.'));
     if (recRef.current) return;
     let id = lastFocus.current;
     let b = id ? blocksNow().find((x) => x.id === id) : undefined;
@@ -730,20 +732,20 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
     if (!st.recog) {
       dictRef.current = null;
       setDict(null);
-      toast('Не удалось запустить диктовку');
+      toast(t('Не удалось запустить диктовку'));
     }
   }
 
   async function startRec(after: ID | null = anchorId()) {
     if (recRef.current) return;
-    if (!recordingSupported()) return toast('Запись голоса не поддерживается в этом браузере');
+    if (!recordingSupported()) return toast(t('Запись голоса не поддерживается в этом браузере'));
     dictRef.current?.recog?.stop();
     tas.current.forEach((el) => el.blur());
     try {
       const r = await startRecording({
         onTick: (sec) => setRec((x) => (x ? { ...x, sec } : x)),
         onLimit: () => {
-          toast(`Запись остановлена: максимум ${MAX_AUDIO_SEC / 60} минут`);
+          toast(t('Запись остановлена: максимум {n} минут', { n: MAX_AUDIO_SEC / 60 }));
           void stopRec();
         },
       });
@@ -761,7 +763,7 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
         });
       }
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Не удалось начать запись');
+      toast(e instanceof Error ? e.message : t('Не удалось начать запись'));
     }
   }
 
@@ -784,7 +786,7 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
       if (useNotes.getState().openId === st.noteId && useNotes.getState().openBody) insertBlocks(st.after, [audio]);
       else await appendBlocksToNote(st.noteId, [audio]);
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Не удалось сохранить запись');
+      toast(e instanceof Error ? e.message : t('Не удалось сохранить запись'));
     } finally {
       setRec(null);
     }
@@ -804,7 +806,7 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
     const b = useNotes.getState().openBody;
     const id = openId;
     if (!b || !id) return;
-    if (isBodyEmpty(b)) return toast('Заметка пустая');
+    if (isBodyEmpty(b)) return toast(t('Заметка пустая'));
     const ac = new AbortController();
     aiAbort.current = ac;
     setAi({ kind, chars: 0 });
@@ -815,16 +817,17 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
       const now = useNotes.getState().openBody;
       const textOf = (x: NoteBody) => JSON.stringify(x.blocks.filter((k) => k.type !== 'image' && k.type !== 'audio').map((k) => [k.type, k.text ?? '']));
       if (kind === 'improve' && now && textOf(now) !== textOf(b)) {
-        toast('Заметку изменили, пока ИИ работал, — улучшение не применено. Запустите ещё раз');
+        toast(t('Заметку изменили, пока ИИ работал, — улучшение не применено. Запустите ещё раз'));
         return;
       }
       editOpenBody((bd) => void (bd.blocks = applyNoteAI(kind, bd.blocks, res)));
-      toast(kind === 'improve' ? 'Текст улучшен' : 'Готово', { label: 'Отменить', run: undoOpenBody });
+      toast(kind === 'improve' ? t('Текст улучшен') : t('Готово'), { label: t('Отменить'), run: undoOpenBody });
     } catch (e) {
       if (e instanceof AIError) {
-        if (e.message === 'Остановлено') return;
-        toast(e.message, /API-ключ/.test(e.message) ? { label: 'Настройки', run: () => useApp.getState().go('settings') } : undefined);
-      } else toast('Ошибка ИИ: ' + (e instanceof Error ? e.message : String(e)));
+        // текст ошибки — из ../ai/claude: русский или уже переведённый
+        if (e.message === 'Остановлено' || e.message === t('Остановлено')) return;
+        toast(e.message, /API-ключ|API key/i.test(e.message) ? { label: t('Настройки'), run: () => useApp.getState().go('settings') } : undefined);
+      } else toast(t('Ошибка ИИ: {error}', { error: e instanceof Error ? e.message : String(e) }));
     } finally {
       if (aiAbort.current === ac) aiAbort.current = null;
       setAi(null);
@@ -839,7 +842,7 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
     const text = noteToMarkdown(b);
     if (typeof navigator.share === 'function') {
       try {
-        await navigator.share({ title: b.title || 'Заметка', text });
+        await navigator.share({ title: b.title || t('Заметка'), text });
         return;
       } catch (e) {
         if (e instanceof DOMException && e.name === 'AbortError') return;
@@ -853,21 +856,21 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
     if (!b) return;
     try {
       await navigator.clipboard.writeText(noteToMarkdown(b));
-      toast('Текст заметки скопирован');
+      toast(t('Текст заметки скопирован'));
     } catch {
-      toast('Не удалось скопировать');
+      toast(t('Не удалось скопировать'));
     }
   }
 
   function exportMd() {
     const b = useNotes.getState().openBody;
     if (!b) return;
-    void downloadText(noteToMarkdown(b, { media: true }), safeFilename(b.title || 'Заметка') + '.md', 'text/markdown').catch(() => toast('Не удалось сохранить файл'));
+    void downloadText(noteToMarkdown(b, { media: true }), safeFilename(b.title || t('Заметка')) + '.md', 'text/markdown').catch(() => toast(t('Не удалось сохранить файл')));
   }
 
   async function newFolderAndMove() {
     if (!openId) return;
-    const name = (await askText('Новая папка', { placeholder: 'Название' }))?.trim();
+    const name = (await askText(t('Новая папка'), { placeholder: t('Название') }))?.trim();
     if (!name) return;
     const f = addFolder(name);
     if (f) moveNote(openId, f.id);
@@ -924,17 +927,16 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
     return (
       <div className="nt-editor">
         <div className="nt-missing">
-          <h3>{meta.title || 'Заметка'}</h3>
+          <h3>{meta.title || t('Заметка')}</h3>
           <p className="muted">
-            Текст этой заметки ещё не пришёл на это устройство. Он появится после синхронизации — проверьте связь. Очень большие заметки (с крупными фото) хранятся только на устройстве, где их
-            создали.
+            {t('Текст этой заметки ещё не пришёл на это устройство. Он появится после синхронизации — проверьте связь. Очень большие заметки (с крупными фото) хранятся только на устройстве, где их создали.')}
           </p>
           <div className="row nt-missing-acts">
             <button className="btn" onClick={onClose}>
-              Закрыть
+              {t('Закрыть')}
             </button>
             <button className="btn btn-primary" onClick={() => void openNote(openId, true)}>
-              Проверить снова
+              {t('Проверить снова')}
             </button>
           </div>
         </div>
@@ -987,26 +989,26 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
         for (const f of files.slice(0, 10))
           void imageFileToDataUrl(f)
             .then((src) => placeImage(noteId, after, src))
-            .catch(() => toast('Не удалось вставить изображение'));
+            .catch(() => toast(t('Не удалось вставить изображение')));
       }}
     >
       <div className="nt-ed-head">
-        <button className="icon-btn nt-back" onClick={() => void close()} aria-label={hasNoteTrail() ? 'Назад к предыдущей заметке' : 'Назад к заметкам'}>
+        <button className="icon-btn nt-back" onClick={() => void close()} aria-label={hasNoteTrail() ? t('Назад к предыдущей заметке') : t('Назад к заметкам')}>
           <ChevronLeft />
-          <span className="nt-back-text">{hasNoteTrail() ? 'Назад' : 'Заметки'}</span>
+          <span className="nt-back-text">{hasNoteTrail() ? t('Назад') : t('Заметки')}</span>
         </button>
         <button className="nt-folder-chip" onClick={(e) => setMenu({ kind: 'folder', anchor: e.currentTarget })} style={folder ? ({ '--fc': folder.color } as CSSProperties) : undefined}>
-          {folder ? (folder.emoji ? folder.emoji + ' ' : '') + folder.name : 'Без папки'}
+          {folder ? (folder.emoji ? folder.emoji + ' ' : '') + folder.name : t('Без папки')}
           <ChevronDown size={14} />
         </button>
         <div className="grow" />
-        <button className="icon-btn nt-desk-only" onClick={undoOpenBody} disabled={!canUndo} aria-label="Отменить">
+        <button className="icon-btn nt-desk-only" onClick={undoOpenBody} disabled={!canUndo} aria-label={t('Отменить')}>
           <Undo2 />
         </button>
-        <button className={`icon-btn${meta.pinned ? ' active' : ''}`} onClick={() => togglePin(meta.id)} aria-label={meta.pinned ? 'Открепить' : 'Закрепить'}>
+        <button className={`icon-btn${meta.pinned ? ' active' : ''}`} onClick={() => togglePin(meta.id)} aria-label={meta.pinned ? t('Открепить') : t('Закрепить')}>
           {meta.pinned ? <PinOff /> : <Pin />}
         </button>
-        <button className="icon-btn" onClick={(e) => setMenu({ kind: 'note', anchor: e.currentTarget })} aria-label="Ещё">
+        <button className="icon-btn" onClick={(e) => setMenu({ kind: 'note', anchor: e.currentTarget })} aria-label={t('Ещё')}>
           <MoreHorizontal />
         </button>
       </div>
@@ -1018,7 +1020,7 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
             className="nt-title"
             rows={1}
             value={body.title}
-            placeholder="Заголовок"
+            placeholder={t('Заголовок')}
             enterKeyHint="next"
             onChange={(e) => editOpenBody((bd) => void (bd.title = e.target.value.replace(/\n/g, ' ')), 'type')}
             onFocus={() => setFocusId(null)}
@@ -1038,16 +1040,17 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
             <div className="nt-tpl-banner">
               <LayoutTemplate size={16} />
               <span className="grow">
-                <b>Это шаблон.</b> {'{{дата}}, {{время}}, {{задачи}}'} и другие подстановки заполнятся в новой заметке.
+                <b>{t('Это шаблон.')}</b>{' '}
+                {t('{vars} и другие подстановки заполнятся в новой заметке.', { vars: [0, 1, 4].map((i) => `{{${TEMPLATE_VARS[i].name}}}`).join(', ') })}
               </span>
               <button className="nt-ai-btn" onClick={() => void createFromTemplate(meta.id)}>
-                <Plus size={14} /> Заметка по шаблону
+                <Plus size={14} /> {t('Заметка по шаблону')}
               </button>
             </div>
           )}
           <div className="nt-info faint tiny">
             {noteDate(meta.updatedAt)}
-            {!!meta.wordCount && ` · ${meta.wordCount} сл.`}
+            {!!meta.wordCount && ` · ${t('{n} сл.', { n: meta.wordCount })}`}
             {!!meta.todoTotal && ` · ✓ ${meta.todoDone ?? 0}/${meta.todoTotal}`}
           </div>
           <div className="nt-blocks">
@@ -1074,9 +1077,9 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
           {dict && (
             <>
               <span className="nt-rec-dot" />
-              <span className="grow ellipsis">{dict.interim || 'Говорите…'}</span>
+              <span className="grow ellipsis">{dict.interim || t('Говорите…')}</span>
               <button className="btn btn-sm" onPointerDown={keep} onClick={toggleDictation}>
-                Готово
+                {t('Готово')}
               </button>
             </>
           )}
@@ -1084,10 +1087,10 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
             <>
               <Loader2 size={16} className="spin" />
               <span className="grow ellipsis">
-                {NOTE_AI_LABELS[ai.kind]}… {ai.chars ? `${ai.chars} симв.` : ''}
+                {NOTE_AI_LABELS[ai.kind]}… {ai.chars ? t('{n} симв.', { n: ai.chars }) : ''}
               </span>
               <button className="btn btn-sm" onClick={() => aiAbort.current?.abort()}>
-                Стоп
+                {t('Стоп')}
               </button>
             </>
           )}
@@ -1096,36 +1099,36 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
 
       {rec ? (
         <div className="nt-toolbar nt-recbar">
-          <button className="icon-btn" onClick={cancelRec} disabled={rec.saving} aria-label="Отменить запись">
+          <button className="icon-btn" onClick={cancelRec} disabled={rec.saving} aria-label={t('Отменить запись')}>
             <X />
           </button>
           <span className="nt-rec-dot" />
           <span className="nt-rec-time">
             {fmtDuration(rec.sec)} <span className="faint">/ {fmtDuration(MAX_AUDIO_SEC)}</span>
           </span>
-          <span className="grow ellipsis small muted">{rec.saving ? 'Сохраняю…' : rec.text || 'Идёт запись'}</span>
-          <button className="nt-rec-stop" onClick={() => void stopRec()} disabled={rec.saving} aria-label="Остановить и сохранить">
+          <span className="grow ellipsis small muted">{rec.saving ? t('Сохраняю…') : rec.text || t('Идёт запись')}</span>
+          <button className="nt-rec-stop" onClick={() => void stopRec()} disabled={rec.saving} aria-label={t('Остановить и сохранить')}>
             <Square size={16} fill="currentColor" />
           </button>
         </div>
       ) : (
         <div className="nt-toolbar">
           <div className="nt-tools">
-            {tb('Добавить блок', <Plus />, (el) => setMenu({ kind: 'type', anchor: el }))}
-            {tb('Чек-лист', <SquareCheck />, toggleTodo, { active: focusedBlock?.type === 'todo' })}
-            {tb('Оформление', <Bold />, (el) => setMenu({ kind: 'format', anchor: el }))}
-            {tb('Ссылка на заметку', <Link2 />, startWiki)}
-            {tb('Фото', <ImageIcon />, () => pickImage(anchorId()))}
-            {tb('Диктовка', <Mic />, toggleDictation, { active: !!dict })}
-            {tb('Голосовая запись', <AudioLines />, () => void startRec())}
-            {tb('Отменить', <Undo2 />, undoOpenBody, { disabled: !canUndo })}
-            {tb('Действия с блоком', <MoreHorizontal />, (el) => {
+            {tb(t('Добавить блок'), <Plus />, (el) => setMenu({ kind: 'type', anchor: el }))}
+            {tb(t('Чек-лист'), <SquareCheck />, toggleTodo, { active: focusedBlock?.type === 'todo' })}
+            {tb(t('Оформление'), <Bold />, (el) => setMenu({ kind: 'format', anchor: el }))}
+            {tb(t('Ссылка на заметку'), <Link2 />, startWiki)}
+            {tb(t('Фото'), <ImageIcon />, () => pickImage(anchorId()))}
+            {tb(t('Диктовка'), <Mic />, toggleDictation, { active: !!dict })}
+            {tb(t('Голосовая запись'), <AudioLines />, () => void startRec())}
+            {tb(t('Отменить'), <Undo2 />, undoOpenBody, { disabled: !canUndo })}
+            {tb(t('Действия с блоком'), <MoreHorizontal />, (el) => {
               const id = anchorId();
               if (id && blocksNow().some((b) => b.id === id)) setMenu({ kind: 'block', anchor: el, blockId: id });
-              else toast('Выберите блок');
+              else toast(t('Выберите блок'));
             })}
           </div>
-          {kb && tb('Скрыть клавиатуру', <ChevronDown />, () => (document.activeElement as HTMLElement | null)?.blur(), { cls: 'nt-tool-kb' })}
+          {kb && tb(t('Скрыть клавиатуру'), <ChevronDown />, () => (document.activeElement as HTMLElement | null)?.blur(), { cls: 'nt-tool-kb' })}
         </div>
       )}
 
@@ -1135,15 +1138,15 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
           if (!opts.length) return null;
           return (
             <NtMenu anchor={wiki.anchor} onClose={() => setWiki(null)} keepFocus className="nt-wiki-menu">
-              <MenuLabel>Ссылка на…</MenuLabel>
+              <MenuLabel>{t('Ссылка на…')}</MenuLabel>
               {opts.map((o, i) => {
                 const Icon = KIND_ICON[o.kind];
                 return (
                   <MenuItem
                     key={o.kind + o.title + (o.create ? '+' : '')}
                     icon={o.create ? <Plus size={17} /> : o.section ? <Hash size={17} /> : <Icon size={17} />}
-                    label={o.create ? `Создать «${o.title}»` : (o.section ?? o.title)}
-                    hint={o.create ? undefined : o.section ? 'Раздел' : KIND_LABEL[o.kind]}
+                    label={o.create ? t('Создать «{title}»', { title: o.title }) : (o.section ?? o.title)}
+                    hint={o.create ? undefined : o.section ? t('Раздел') : KIND_LABEL[o.kind]}
                     active={i === Math.min(wiki.sel, opts.length - 1)}
                     onClick={() => chooseWiki(o.title)}
                   />
@@ -1189,45 +1192,45 @@ export function NoteEditor({ onClose }: { onClose: () => void }) {
       )}
       {menu?.kind === 'folder' && data && (
         <NtMenu anchor={menu.anchor} onClose={() => setMenu(null)}>
-          <MenuLabel>Папка</MenuLabel>
-          <MenuItem icon={<FolderInput size={17} />} label="Без папки" active={!meta.folderId} onClick={() => moveNote(meta.id, undefined)} />
+          <MenuLabel>{t('Папка')}</MenuLabel>
+          <MenuItem icon={<FolderInput size={17} />} label={t('Без папки')} active={!meta.folderId} onClick={() => moveNote(meta.id, undefined)} />
           {sortedFolders(data).map((f) => (
             <MenuItem key={f.id} icon={<span className="nt-fdot" style={{ background: f.color }}>{f.emoji}</span>} label={f.name} active={meta.folderId === f.id} onClick={() => moveNote(meta.id, f.id)} />
           ))}
           <MenuSep />
-          <MenuItem icon={<FolderPlus size={17} />} label="Новая папка…" onClick={() => void newFolderAndMove()} />
+          <MenuItem icon={<FolderPlus size={17} />} label={t('Новая папка…')} onClick={() => void newFolderAndMove()} />
         </NtMenu>
       )}
       {menu?.kind === 'note' && (
         <NtMenu anchor={menu.anchor} onClose={() => setMenu(null)}>
-          <MenuItem icon={meta.pinned ? <PinOff size={17} /> : <Pin size={17} />} label={meta.pinned ? 'Открепить' : 'Закрепить'} onClick={() => togglePin(meta.id)} />
-          <MenuItem icon={<FolderInput size={17} />} label="Переместить в папку" onClick={() => setTimeout(() => setMenu({ kind: 'folder', anchor: menu.anchor }), 0)} />
-          <MenuItem icon={<Share2 size={17} />} label="Поделиться" onClick={() => void share()} />
-          <MenuItem icon={<Copy size={17} />} label="Копировать текст" onClick={() => void copyText()} />
-          <MenuItem icon={<Download size={17} />} label="Экспорт в Markdown" onClick={exportMd} />
+          <MenuItem icon={meta.pinned ? <PinOff size={17} /> : <Pin size={17} />} label={meta.pinned ? t('Открепить') : t('Закрепить')} onClick={() => togglePin(meta.id)} />
+          <MenuItem icon={<FolderInput size={17} />} label={t('Переместить в папку')} onClick={() => setTimeout(() => setMenu({ kind: 'folder', anchor: menu.anchor }), 0)} />
+          <MenuItem icon={<Share2 size={17} />} label={t('Поделиться')} onClick={() => void share()} />
+          <MenuItem icon={<Copy size={17} />} label={t('Копировать текст')} onClick={() => void copyText()} />
+          <MenuItem icon={<Download size={17} />} label={t('Экспорт в Markdown')} onClick={exportMd} />
           <MenuSep />
           {(Object.keys(NOTE_AI_LABELS) as NoteAIKind[]).map((k) => (
             <MenuItem key={k} icon={<Sparkles size={17} />} label={NOTE_AI_LABELS[k]} onClick={() => void runAI(k)} />
           ))}
-          <MenuItem icon={<GraduationCap size={17} />} label="Карточки для повторения" onClick={() => openNoteCards(meta.id)} />
+          <MenuItem icon={<GraduationCap size={17} />} label={t('Карточки для повторения')} onClick={() => openNoteCards(meta.id)} />
           <MenuSep />
           <MenuItem
             icon={<Copy size={17} />}
-            label="Дублировать"
+            label={t('Дублировать')}
             onClick={() =>
               void duplicateNote(meta.id).then((m) => {
                 if (m) void openNote(m.id);
               })
             }
           />
-          <MenuItem icon={<Trash2 size={17} />} label="Удалить" danger onClick={() => trashNote(meta.id)} />
+          <MenuItem icon={<Trash2 size={17} />} label={t('Удалить')} danger onClick={() => trashNote(meta.id)} />
         </NtMenu>
       )}
 
       {viewer && (
         <div className="modal-backdrop nt-viewer" onPointerDown={(e) => e.target === e.currentTarget && setViewer(null)}>
           <img src={viewer} alt="" onClick={() => setViewer(null)} />
-          <button className="icon-btn nt-viewer-close" onClick={() => setViewer(null)} aria-label="Закрыть">
+          <button className="icon-btn nt-viewer-close" onClick={() => setViewer(null)} aria-label={t('Закрыть')}>
             <X />
           </button>
         </div>

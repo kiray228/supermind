@@ -4,6 +4,7 @@
  * карты и тела заметок кэшируются по времени изменения.
  */
 import type { ComponentType } from 'react';
+import { LOCALE, isEn, t, tn } from '../i18n/index';
 import { CircleDot, NotebookPen, Network, Repeat, SquareCheck, StickyNote, Target, Wallet, Zap } from 'lucide-react';
 import { useApp, toast, type View } from '../store/appStore';
 import { listDocs, loadDoc, loadPlanner } from '../store/db';
@@ -46,14 +47,14 @@ export interface Entry {
 }
 
 export const GROUPS: Record<GroupId, { label: string; icon: ComponentType<{ size?: number }> }> = {
-  cmd: { label: 'Команды', icon: Zap },
-  maps: { label: 'Карты', icon: Network },
-  task: { label: 'Задачи', icon: SquareCheck },
-  note: { label: 'Заметки', icon: StickyNote },
-  goal: { label: 'Цели', icon: Target },
-  habit: { label: 'Привычки', icon: Repeat },
-  journal: { label: 'Дневник', icon: NotebookPen },
-  tx: { label: 'Финансы', icon: Wallet },
+  cmd: { label: t('Команды'), icon: Zap },
+  maps: { label: t('Карты'), icon: Network },
+  task: { label: t('Задачи'), icon: SquareCheck },
+  note: { label: t('Заметки'), icon: StickyNote },
+  goal: { label: t('Цели'), icon: Target },
+  habit: { label: t('Привычки'), icon: Repeat },
+  journal: { label: t('Дневник'), icon: NotebookPen },
+  tx: { label: t('Финансы'), icon: Wallet },
 };
 
 export const KIND_ICON: Record<Kind, ComponentType<{ size?: number }>> = {
@@ -102,6 +103,7 @@ export function dateLabel(ymd: string): string {
   const [y, m, d] = ymd.split('-').map(Number);
   if (!y || !m || !d) return ymd;
   const yr = y !== new Date().getFullYear() ? ` ${y}` : '';
+  if (isEn) return new Date(y, m - 1, d).toLocaleDateString(LOCALE, { month: 'long', day: 'numeric', ...(yr ? { year: 'numeric' } : {}) });
   return `${d} ${MONTHS[m - 1]}${yr}`;
 }
 const ymdTime = (ymd: string) => {
@@ -109,6 +111,11 @@ const ymdTime = (ymd: string) => {
   return Number.isFinite(t) ? t : undefined;
 };
 const oneLine = (s: string) => s.replace(/\s+/g, ' ').trim();
+// в циклах ниже `t` — задача или тема, поэтому подписи переведены заранее
+const L_WONT = t('Не буду делать');
+const L_DONE = t('Выполнена');
+const L_INBOX = t('Входящие');
+const L_TOPIC = t('Тема');
 const plain = (s: string) => (s.includes('<') ? s.replace(/<[^>]+>/g, ' ') : s);
 
 // ---------- Источники ----------
@@ -122,7 +129,7 @@ async function tasksSource(): Promise<Entry[]> {
     const list = lists.get(t.listId);
     const closed = t.done || !!t.wontDo;
     const sub = [
-      closed ? (t.wontDo ? 'Не буду делать' : 'Выполнена') : '',
+      closed ? (t.wontDo ? L_WONT : L_DONE) : '',
       t.date ? dayLabel(t.date) + (t.time ? ' ' + t.time : '') : '',
       list && list.id !== INBOX ? (list.emoji ? list.emoji + ' ' : '') + list.name : '',
       t.tags.length ? t.tags.map((x) => '#' + x).join(' ') : '',
@@ -135,7 +142,7 @@ async function tasksSource(): Promise<Entry[]> {
         kind: 'task',
         title: oneLine(t.title),
         body: [t.notes ?? '', ...t.checklist.map((c) => c.text), ...t.tags.map((x) => '#' + x)].filter(Boolean).join('\n'),
-        sub: sub || 'Входящие',
+        sub: sub || L_INBOX,
         at: t.updatedAt,
         boost: closed ? -2 : 0,
         done: closed,
@@ -165,7 +172,7 @@ async function notesSource(withBodies: boolean): Promise<Entry[]> {
       entry({
         key: 'n:' + n.id,
         kind: 'note',
-        title: oneLine(n.title) || 'Без названия',
+        title: oneLine(n.title) || t('Без названия'),
         body: text ?? n.preview,
         sub: [f ? (f.emoji ? f.emoji + ' ' : '') + f.name : '', oneLine(n.preview).slice(0, 90)].filter(Boolean).join(' · '),
         at: n.updatedAt,
@@ -188,10 +195,10 @@ async function goalsSource(): Promise<Entry[]> {
     return entry({
       key: 'g:' + g.id,
       kind: 'goal',
-      title: oneLine(g.title) || 'Цель',
+      title: oneLine(g.title) || t('Цель'),
       emoji: g.emoji || undefined,
       body: [g.why, g.notes, ...g.stages.flatMap((s) => [s.title, ...s.steps.map((x) => x.title)])].filter(Boolean).join('\n'),
-      sub: [g.status !== 'active' ? STATUS_LABEL[g.status] : '', area ? `${area.emoji} ${area.name}` : '', g.deadline ? 'до ' + dateLabel(g.deadline) : ''].filter(Boolean).join(' · '),
+      sub: [g.status !== 'active' ? STATUS_LABEL[g.status] : '', area ? `${area.emoji} ${area.name}` : '', g.deadline ? t('до {date}', { date: dateLabel(g.deadline) }) : ''].filter(Boolean).join(' · '),
       at: g.updatedAt,
       boost: closed ? -1.5 : 0,
       done: g.status === 'done',
@@ -207,7 +214,7 @@ async function financeSource(): Promise<Entry[]> {
   const d = await ensureFinance();
   const accounts = new Map(d.accounts.map((a) => [a.id, a]));
   const cats = new Map(d.categories.map((c) => [c.id, c]));
-  const TYPE = { expense: 'Расход', income: 'Доход', transfer: 'Перевод' } as const;
+  const TYPE = { expense: t('Расход'), income: t('Доход'), transfer: t('Перевод') };
   return d.transactions.map((tx) => {
     const acc = accounts.get(tx.accountId);
     const to = tx.toAccountId ? accounts.get(tx.toAccountId) : undefined;
@@ -242,7 +249,7 @@ async function plannerSource(): Promise<Entry[]> {
         kind: 'habit',
         title: oneLine(h.name),
         emoji: h.icon || undefined,
-        sub: ['Привычка', h.time ?? '', h.unit && h.target && h.target > 1 ? `${h.target} ${h.unit}` : ''].filter(Boolean).join(' · '),
+        sub: [t('Привычка'), h.time ?? '', h.unit && h.target && h.target > 1 ? `${h.target} ${h.unit}` : ''].filter(Boolean).join(' · '),
         at: h.updatedAt,
         run: () => nav('planner'),
       }),
@@ -261,7 +268,7 @@ async function plannerSource(): Promise<Entry[]> {
         at: ymdTime(ymd),
         run: async () => {
           await nav('planner');
-          toast(`Запись за ${dateLabel(ymd)} — выберите этот день в календаре`);
+          toast(t('Запись за {date} — выберите этот день в календаре', { date: dateLabel(ymd) }));
         },
       }),
     );
@@ -290,7 +297,7 @@ function docTopics(doc: MindDoc): Entry[] {
         entry({
           key: `m:${doc.id}:${t.id}`,
           kind: 'topic',
-          title: text || 'Тема',
+          title: text || L_TOPIC,
           body: [note, ...(t.labels ?? [])].filter(Boolean).join('\n'),
           sub: doc.title + (multi && sheet.title ? ` · ${sheet.title}` : ''),
           at: doc.updatedAt,
@@ -313,8 +320,8 @@ async function mapsSource(withTopics: boolean): Promise<Entry[]> {
       entry({
         key: 'd:' + m.id,
         kind: 'map',
-        title: m.title || 'Без названия',
-        sub: m.locked ? 'Защищена паролем' : m.topicCount ? `${m.topicCount} ${plural(m.topicCount, 'тема', 'темы', 'тем')}` : 'Карта',
+        title: m.title || t('Без названия'),
+        sub: m.locked ? t('Защищена паролем') : m.topicCount ? `${m.topicCount} ${tn(m.topicCount, 'тема', 'темы', 'тем')}` : t('Карта'),
         at: m.updatedAt,
         boost: 0.5 + (m.starred ? 0.5 : 0),
         run: () => openDoc(m.id),
@@ -334,14 +341,6 @@ async function mapsSource(withTopics: boolean): Promise<Entry[]> {
   return out;
 }
 
-export function plural(n: number, one: string, few: string, many: string): string {
-  const a = n % 100;
-  const b = n % 10;
-  if (a > 10 && a < 20) return many;
-  if (b === 1) return one;
-  if (b >= 2 && b <= 4) return few;
-  return many;
-}
 
 /**
  * Собрать индекс. onUpdate вызывается по мере готовности: сначала быстрые источники

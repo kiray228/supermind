@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { t } from '../../i18n/index';
 import {
   ArrowDown,
   ArrowUp,
@@ -55,7 +56,7 @@ const TEXT_ORDER: BlockType[] = ['p', 'h1', 'h2', 'h3', 'bullet', 'number', 'tod
 export function TypeMenuItems({ current, onPick, withMedia, onEmbed, onTemplate }: { current?: BlockType; onPick: (t: BlockType) => void; withMedia: boolean; onEmbed?: () => void; onTemplate?: () => void }) {
   return (
     <>
-      <MenuLabel>Блоки</MenuLabel>
+      <MenuLabel>{t('Блоки')}</MenuLabel>
       {TEXT_ORDER.map((t) => (
         <MenuItem key={t} icon={BLOCK_ICONS[t]} label={BLOCK_LABELS[t]} hint={HINTS[t]} active={current === t} onClick={() => onPick(t)} />
       ))}
@@ -63,13 +64,13 @@ export function TypeMenuItems({ current, onPick, withMedia, onEmbed, onTemplate 
       {withMedia && (
         <>
           <MenuSep />
-          <MenuItem icon={BLOCK_ICONS.image} label="Фото или картинка" onClick={() => onPick('image')} />
-          <MenuItem icon={BLOCK_ICONS.audio} label="Голосовая запись" onClick={() => onPick('audio')} />
+          <MenuItem icon={BLOCK_ICONS.image} label={t('Фото или картинка')} onClick={() => onPick('image')} />
+          <MenuItem icon={BLOCK_ICONS.audio} label={t('Голосовая запись')} onClick={() => onPick('audio')} />
         </>
       )}
       {(onEmbed || onTemplate) && <MenuSep />}
-      {onEmbed && <MenuItem icon={<SquareArrowOutUpRight size={17} />} label="Встроить заметку" hint="![[" onClick={onEmbed} />}
-      {onTemplate && <MenuItem icon={<LayoutTemplate size={17} />} label="Вставить шаблон" onClick={onTemplate} />}
+      {onEmbed && <MenuItem icon={<SquareArrowOutUpRight size={17} />} label={t('Встроить заметку')} hint="![[" onClick={onEmbed} />}
+      {onTemplate && <MenuItem icon={<LayoutTemplate size={17} />} label={t('Вставить шаблон')} onClick={onTemplate} />}
     </>
   );
 }
@@ -87,13 +88,13 @@ export const FORMAT_MARKS: Record<FormatKind, [string, string]> = {
 export function FormatMenuItems({ onPick }: { onPick: (k: FormatKind) => void }) {
   return (
     <>
-      <MenuLabel>Оформление выделенного</MenuLabel>
-      <MenuItem icon={<Bold size={17} />} label="Жирный" hint="**" onClick={() => onPick('bold')} />
-      <MenuItem icon={<Italic size={17} />} label="Курсив" hint="*" onClick={() => onPick('italic')} />
-      <MenuItem icon={<Strikethrough size={17} />} label="Зачёркнутый" hint="~~" onClick={() => onPick('strike')} />
-      <MenuItem icon={<Highlighter size={17} />} label="Выделение цветом" hint="==" onClick={() => onPick('mark')} />
-      <MenuItem icon={<Code size={17} />} label="Код" hint="`" onClick={() => onPick('code')} />
-      <MenuItem icon={<Link size={17} />} label="Ссылка" onClick={() => onPick('link')} />
+      <MenuLabel>{t('Оформление выделенного')}</MenuLabel>
+      <MenuItem icon={<Bold size={17} />} label={t('Жирный')} hint="**" onClick={() => onPick('bold')} />
+      <MenuItem icon={<Italic size={17} />} label={t('Курсив')} hint="*" onClick={() => onPick('italic')} />
+      <MenuItem icon={<Strikethrough size={17} />} label={t('Зачёркнутый')} hint="~~" onClick={() => onPick('strike')} />
+      <MenuItem icon={<Highlighter size={17} />} label={t('Выделение цветом')} hint="==" onClick={() => onPick('mark')} />
+      <MenuItem icon={<Code size={17} />} label={t('Код')} hint="`" onClick={() => onPick('code')} />
+      <MenuItem icon={<Link size={17} />} label={t('Ссылка')} onClick={() => onPick('link')} />
     </>
   );
 }
@@ -114,7 +115,7 @@ export function BlockMenuItems({ b, a, first, last }: { b: Block; a: BlockMenuAc
     <>
       {isTextBlock(b) && (
         <>
-          <MenuLabel>Превратить в</MenuLabel>
+          <MenuLabel>{t('Превратить в')}</MenuLabel>
           <div className="nt-type-grid">
             {TEXT_ORDER.map((t) => (
               <button key={t} className={`nt-type-btn${b.type === t ? ' active' : ''}`} onClick={() => a.convert(t)} title={BLOCK_LABELS[t]} aria-label={BLOCK_LABELS[t]}>
@@ -125,13 +126,13 @@ export function BlockMenuItems({ b, a, first, last }: { b: Block; a: BlockMenuAc
           <MenuSep />
         </>
       )}
-      {b.type === 'todo' && <MenuItem icon={<ListTodo size={17} />} label="Создать задачу из пункта" onClick={a.makeTask} />}
-      {b.type === 'audio' && !!b.transcript?.trim() && <MenuItem icon={<FileText size={17} />} label="Расшифровку — в текст" onClick={a.toText} />}
-      {b.type === 'image' && <MenuItem icon={<Maximize2 size={17} />} label="Открыть" onClick={a.view} />}
-      {!first && <MenuItem icon={<ArrowUp size={17} />} label="Выше" onClick={() => a.move(-1)} />}
-      {!last && <MenuItem icon={<ArrowDown size={17} />} label="Ниже" onClick={() => a.move(1)} />}
-      <MenuItem icon={<Copy size={17} />} label="Дублировать" onClick={a.duplicate} />
-      <MenuItem icon={<Trash2 size={17} />} label="Удалить блок" danger onClick={a.remove} />
+      {b.type === 'todo' && <MenuItem icon={<ListTodo size={17} />} label={t('Создать задачу из пункта')} onClick={a.makeTask} />}
+      {b.type === 'audio' && !!b.transcript?.trim() && <MenuItem icon={<FileText size={17} />} label={t('Расшифровку — в текст')} onClick={a.toText} />}
+      {b.type === 'image' && <MenuItem icon={<Maximize2 size={17} />} label={t('Открыть')} onClick={a.view} />}
+      {!first && <MenuItem icon={<ArrowUp size={17} />} label={t('Выше')} onClick={() => a.move(-1)} />}
+      {!last && <MenuItem icon={<ArrowDown size={17} />} label={t('Ниже')} onClick={() => a.move(1)} />}
+      <MenuItem icon={<Copy size={17} />} label={t('Дублировать')} onClick={a.duplicate} />
+      <MenuItem icon={<Trash2 size={17} />} label={t('Удалить блок')} danger onClick={a.remove} />
     </>
   );
 }

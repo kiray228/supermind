@@ -4,6 +4,7 @@
  * Решение человека («Вернуть», «Убрать связь») ИИ не меняет.
  */
 import { streamText } from '../ai/claude';
+import { t } from '../i18n/index';
 import type { ID } from '../types';
 import { keywordTerms, keywordsOf, pairKey, relatedTo } from './links';
 import { bodyPlainText, type AiLinkReview, type AiTermsReview } from './model';
@@ -45,7 +46,7 @@ export async function reviewNote(id: ID, signal?: AbortSignal): Promise<ReviewSu
   const data = useNotes.getState().data;
   const meta = data?.notes.find((n) => n.id === id);
   const raw = rawFeatures(id);
-  if (!meta || !raw || !ix.docs.has(id)) throw new ReviewError('В заметке пока мало текста — проверять нечего.');
+  if (!meta || !raw || !ix.docs.has(id)) throw new ReviewError(t('В заметке пока мало текста — проверять нечего.'));
   const body = await loadNoteBody(id);
 
   // что видит ИИ: выбор алгоритма без прежних правок и связи без прежних решений
@@ -68,7 +69,7 @@ export async function reviewNote(id: ID, signal?: AbortSignal): Promise<ReviewSu
 
   const answer = await streamText({ system: REVIEW_SYSTEM, messages: [{ role: 'user', content: buildReviewPrompt(input) }], signal, effort: 'low' });
   const res = parseReview(answer, input);
-  if (!res) throw new ReviewError('ИИ ответил непонятно — попробуйте ещё раз.');
+  if (!res) throw new ReviewError(t('ИИ ответил непонятно — попробуйте ещё раз.'));
 
   // запомнить, как было, — для «Отменить»
   const cur = useNotes.getState().data;

@@ -4,6 +4,7 @@
  * Разбор и запрос к ИИ — articleCore.ts.
  */
 import { Capacitor } from '@capacitor/core';
+import { t } from '../i18n/index';
 import { streamText } from '../ai/claude';
 import type { ID } from '../types';
 import { type Article, ARTICLE_SYSTEM, articleMarkdown, buildArticlePrompt, decodePage, extractArticle } from './articleCore';
@@ -24,7 +25,7 @@ export async function fetchPage(url: string, signal?: AbortSignal): Promise<{ ur
       const r = await CapacitorHttp.get({ url, responseType: 'arraybuffer', headers: { 'Accept-Language': 'ru,en;q=0.8' }, connectTimeout: 10000, readTimeout: 15000 });
       if (r.status >= 200 && r.status < 300 && typeof r.data === 'string') {
         const type = Object.entries(r.headers ?? {}).find(([k]) => k.toLowerCase() === 'content-type')?.[1] ?? '';
-        if (type && !/text\/|xhtml|xml/i.test(type)) throw new ArticleError('По ссылке не страница, а файл');
+        if (type && !/text\/|xhtml|xml/i.test(type)) throw new ArticleError(t('По ссылке не страница, а файл'));
         return { url: r.url || url, html: decodePage(b64bytes(r.data), type) };
       }
     } catch (e) {
@@ -32,14 +33,14 @@ export async function fetchPage(url: string, signal?: AbortSignal): Promise<{ ur
       /* не вышло напрямую — через сервер */
     }
   }
-  if (signal?.aborted) throw new ArticleError('Остановлено');
+  if (signal?.aborted) throw new ArticleError(t('Остановлено'));
   const { api, useCloud } = await import('../store/cloud');
-  if (!useCloud.getState().account) throw new ArticleError('Войдите в аккаунт — страницу читает сервер SuperMind');
+  if (!useCloud.getState().account) throw new ArticleError(t('Войдите в аккаунт — страницу читает сервер SuperMind'));
   try {
     const r = await api<{ url: string; contentType: string; base64: string }>('/web/page', { method: 'POST', body: JSON.stringify({ url }), signal });
     return { url: r.url, html: decodePage(b64bytes(r.base64), r.contentType) };
   } catch (e) {
-    throw new ArticleError(e instanceof Error ? e.message : 'Не удалось открыть страницу');
+    throw new ArticleError(e instanceof Error ? e.message : t('Не удалось открыть страницу'));
   }
 }
 
@@ -61,7 +62,7 @@ export async function saveArticle(url: string, opts: { signal?: AbortSignal; onS
   opts.onStage?.('fetch');
   const page = await fetchPage(url, opts.signal);
   const a = extractArticle(page.html, page.url);
-  if (!a.text && !a.description) throw new ArticleError('На странице не нашлось текста статьи');
+  if (!a.text && !a.description) throw new ArticleError(t('На странице не нашлось текста статьи'));
   let summary = '';
   let aiFailed = false;
   if (a.text.length > 200) {
@@ -69,7 +70,7 @@ export async function saveArticle(url: string, opts: { signal?: AbortSignal; onS
     try {
       summary = await streamText({ system: ARTICLE_SYSTEM, messages: [{ role: 'user', content: buildArticlePrompt(a) }], signal: opts.signal, effort: 'low' });
     } catch {
-      if (opts.signal?.aborted) throw new ArticleError('Остановлено');
+      if (opts.signal?.aborted) throw new ArticleError(t('Остановлено'));
       // ИИ недоступен — сохраним без пересказа, пересказ доделается, когда ИИ станет доступен
       aiFailed = true;
     }
@@ -77,7 +78,7 @@ export async function saveArticle(url: string, opts: { signal?: AbortSignal; onS
   opts.onStage?.('save');
   const blocks = markdownToBlocks(articleMarkdown(a, summary));
   const m = createNote({ title: a.title, blocks, source: a.url, ...(opts.folderId ? { folderId: opts.folderId } : {}) });
-  if (!m) throw new ArticleError('Не удалось сохранить заметку');
+  if (!m) throw new ArticleError(t('Не удалось сохранить заметку'));
   await flushNotes();
   if (aiFailed) {
     const { queueArticle, bodyStamp } = await import('./aiQueue');
@@ -97,16 +98,16 @@ export async function saveArticleAndOpen(url: string, opts: { signal?: AbortSign
   await ensureNotes();
   const have = savedArticle(url);
   if (have) {
-    toast('Эта статья уже сохранена', { label: 'Открыть', run: () => open(have) });
+    toast(t('Эта статья уже сохранена'), { label: t('Открыть'), run: () => open(have) });
     return true;
   }
   try {
     const r = await saveArticle(url, opts);
-    toast(r.summary ? 'Статья сохранена — с главными мыслями' : 'Статья сохранена; пересказ ИИ добавится, когда появится связь');
+    toast(r.summary ? t('Статья сохранена — с главными мыслями') : t('Статья сохранена; пересказ ИИ добавится, когда появится связь'));
     open(r.id);
     return true;
   } catch (e) {
-    toast(e instanceof Error ? e.message : 'Не удалось сохранить статью');
+    toast(e instanceof Error ? e.message : t('Не удалось сохранить статью'));
     return false;
   }
 }
@@ -116,10 +117,10 @@ export async function askArticle(): Promise<void> {
   const { askText } = await import('../ui/dialogs');
   const { toast } = await import('../store/appStore');
   const { firstUrl } = await import('./articleCore');
-  const v = await askText('Статья по ссылке', { placeholder: 'https://…', message: 'ИИ прочитает статью и сохранит заметкой главные мысли со ссылкой на источник.', okText: 'Сохранить' });
+  const v = await askText(t('Статья по ссылке'), { placeholder: 'https://…', message: t('ИИ прочитает статью и сохранит заметкой главные мысли со ссылкой на источник.'), okText: t('Сохранить') });
   if (v === null) return;
   const url = firstUrl(v.trim()) ?? (/^[\w-]+(\.[\w-]+)+(\/\S*)?$/.test(v.trim()) ? 'https://' + v.trim() : null);
-  if (!url) return toast('Это не похоже на ссылку');
-  toast('Читаю статью…');
+  if (!url) return toast(t('Это не похоже на ссылку'));
+  toast(t('Читаю статью…'));
   await saveArticleAndOpen(url);
 }

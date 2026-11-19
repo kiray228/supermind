@@ -1,3 +1,4 @@
+import { t } from '../i18n/index';
 /**
  * Журнал скорости второго мозга на этом устройстве: сколько заняли разбор заметок, сборка индекса,
  * точечное обновление, граф, обзор и дубли — и на скольких записях. Видно, если на телефоне что-то медленно.
@@ -14,13 +15,13 @@ export interface PerfEntry {
 }
 
 export const PERF_LABEL: Record<PerfOp, string> = {
-  features: 'Разбор новых и изменённых записей',
-  index: 'Полная сборка индекса',
-  patch: 'Обновление после правки',
-  graph: 'Связи для графа',
-  'graph-patch': 'Граф после правки',
-  review: 'Обзор мозга',
-  dups: 'Поиск дублей',
+  features: t('Разбор новых и изменённых записей'),
+  index: t('Полная сборка индекса'),
+  patch: t('Обновление после правки'),
+  graph: t('Связи для графа'),
+  'graph-patch': t('Граф после правки'),
+  review: t('Обзор мозга'),
+  dups: t('Поиск дублей'),
 };
 
 /** медленно — с какого времени (мс) стоит насторожиться */
@@ -91,7 +92,7 @@ export function perfSummary(list: PerfEntry[] = entries()): PerfRow[] {
   return rows;
 }
 
-export const fmtMs = (ms: number) => (ms < 1000 ? `${ms} мс` : `${(ms / 1000).toFixed(ms < 10000 ? 1 : 0)} с`);
+export const fmtMs = (ms: number) => (ms < 1000 ? t('{n} мс', { n: ms }) : t('{n} с', { n: (ms / 1000).toFixed(ms < 10000 ? 1 : 0) }));
 
 /** Текст отчёта — скопировать и прислать разработчику */
 export function perfReport(device: string, notes: number, list: PerfEntry[] = entries()): string {
