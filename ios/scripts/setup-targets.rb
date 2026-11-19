@@ -96,6 +96,16 @@ Dir[File.join(ROOT, 'Shared', '*.swift')].sort.each do |path|
   end
 end
 
+# 6. Остальные Swift-файлы виджетов (новые виджеты, кнопки Пункта управления) — в цель SuperMindWidget
+wgroup = project.main_group.find_subpath('SuperMindWidget', true)
+Dir[File.join(ROOT, 'SuperMindWidget', '*.swift')].sort.each do |path|
+  name = File.basename(path)
+  next if widget.source_build_phase.files_references.any? { |r| r && r.path && File.basename(r.path) == name }
+  ref = wgroup.files.find { |f| f.path == name } || wgroup.new_reference(name)
+  widget.add_file_references([ref])
+  puts "SuperMindWidget: + #{name}"
+end
+
 app_settings = app.build_configurations.first.build_settings
 widget.build_configurations.each do |c|
   s = c.build_settings
