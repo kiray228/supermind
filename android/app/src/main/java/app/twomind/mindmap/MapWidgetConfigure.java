@@ -35,7 +35,7 @@ public class MapWidgetConfigure extends AppCompatActivity {
             finish();
             return;
         }
-        setTitle("Карта на виджете");
+        setTitle(Lang.t(this, "Карта на виджете", "Map on widget"));
         buildUi();
     }
 
@@ -59,7 +59,7 @@ public class MapWidgetConfigure extends AppCompatActivity {
         root.setPadding(dp(8), dp(20), dp(8), dp(12));
 
         TextView title = new TextView(this);
-        title.setText("Какую карту показать?");
+        title.setText(Lang.t(this, "Какую карту показать?", "Which map to show?"));
         title.setTextColor(text);
         title.setTextSize(20);
         title.setTypeface(title.getTypeface(), android.graphics.Typeface.BOLD);
@@ -67,7 +67,8 @@ public class MapWidgetConfigure extends AppCompatActivity {
         root.addView(title);
 
         TextView hint = new TextView(this);
-        hint.setText("Виджет покажет центральную тему и основные ветви. Нажатие откроет карту.");
+        hint.setText(Lang.t(this, "Виджет покажет центральную тему и основные ветви. Нажатие откроет карту.",
+            "The widget shows the central topic and main branches. Tap it to open the map."));
         hint.setTextColor(text2);
         hint.setTextSize(13);
         hint.setPadding(dp(16), 0, dp(16), dp(12));
@@ -83,17 +84,19 @@ public class MapWidgetConfigure extends AppCompatActivity {
         JSONObject data = SmWidgets.data(this);
         JSONArray maps = MapWidget.maps(data);
 
-        list.addView(row("✨", 0xFF10B981, "Последняя изменённая", "Всегда карта, с которой вы работали последней", "".equals(current), text, text2, ""));
+        list.addView(row("✨", 0xFF10B981, Lang.t(this, "Последняя изменённая", "Last edited"),
+            Lang.t(this, "Всегда карта, с которой вы работали последней", "Always the map you worked on last"), "".equals(current), text, text2, ""));
         for (int i = 0; i < maps.length(); i++) {
             JSONObject m = maps.optJSONObject(i);
             if (m == null) continue;
             String id = m.optString("id");
-            list.addView(row(null, SmWidgets.parseColor(m.optString("rc"), 0xFF6366F1), m.optString("t", "Карта"), MapWidget.subtitle(m),
+            list.addView(row(null, SmWidgets.parseColor(m.optString("rc"), 0xFF6366F1), m.optString("t", Lang.str(this, R.string.w_map_title)), MapWidget.subtitle(this, m),
                 id.equals(current), text, text2, id));
         }
         if (maps.length() == 0) {
             TextView none = new TextView(this);
-            none.setText(data == null ? "Откройте SuperMind хотя бы раз — здесь появятся ваши карты." : "Пока нет карт. Виджет покажет первую созданную карту.");
+            none.setText(data == null ? Lang.t(this, "Откройте SuperMind хотя бы раз — здесь появятся ваши карты.", "Open SuperMind at least once — your maps will appear here.")
+                : Lang.t(this, "Пока нет карт. Виджет покажет первую созданную карту.", "No maps yet. The widget will show the first map you create."));
             none.setTextColor(text2);
             none.setTextSize(13);
             none.setPadding(dp(16), dp(12), dp(16), dp(8));
@@ -132,7 +135,7 @@ public class MapWidgetConfigure extends AppCompatActivity {
         dot.setGravity(Gravity.CENTER);
         dot.setTextSize(16);
         dot.setTextColor(MapPreview.isLight(color) ? 0xFF1B1C20 : 0xFFFFFFFF);
-        dot.setText(emoji != null ? emoji : name.isEmpty() ? "•" : name.substring(0, name.offsetByCodePoints(0, 1)).toUpperCase(SmWidgets.RU));
+        dot.setText(emoji != null ? emoji : name.isEmpty() ? "•" : name.substring(0, name.offsetByCodePoints(0, 1)).toUpperCase(Lang.locale(this)));
         r.addView(dot, new LinearLayout.LayoutParams(dp(36), dp(36)));
 
         LinearLayout col = new LinearLayout(this);

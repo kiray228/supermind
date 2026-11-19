@@ -64,14 +64,14 @@ public class FocusLivePlugin extends Plugin {
     static void show(Context ctx, JSONObject s) {
         NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null) return;
-        channel(ctx, nm, s.optString("channel", "Фокус"));
+        channel(ctx, nm, s.optString("channel", Lang.t(ctx, "Фокус", "Focus")));
         boolean running = s.optBoolean("running");
         boolean stopwatch = s.optBoolean("stopwatch");
         long now = System.currentTimeMillis();
 
         Notification.Builder b = Build.VERSION.SDK_INT >= 26 ? new Notification.Builder(ctx, CHANNEL) : new Notification.Builder(ctx);
         b.setSmallIcon(R.drawable.ic_stat_supermind)
-            .setContentTitle(s.optString("title", "Фокус"))
+            .setContentTitle(s.optString("title", Lang.t(ctx, "Фокус", "Focus")))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setCategory(Notification.CATEGORY_PROGRESS)
@@ -89,7 +89,7 @@ public class FocusLivePlugin extends Plugin {
         } else {
             b.setShowWhen(false);
             long ms = stopwatch ? s.optLong("elapsed", 0) : s.optLong("left", 0);
-            String text = s.optString("pausedLabel", "На паузе") + " · " + clock(ms);
+            String text = s.optString("pausedLabel", Lang.t(ctx, "На паузе", "Paused")) + " · " + clock(ms);
             b.setContentText(task.isEmpty() ? text : text + " · " + task);
         }
         if (!stopwatch && s.optLong("total", 0) > 0) {
@@ -97,9 +97,9 @@ public class FocusLivePlugin extends Plugin {
             long left = running ? Math.max(0, s.optLong("endAt", now) - now) : s.optLong("left", 0);
             b.setProgress(1000, (int) Math.min(1000, Math.max(0, (total - left) * 1000 / total)), false);
         }
-        b.addAction(new Notification.Action.Builder(null, running ? s.optString("pauseLabel", "Пауза") : s.optString("resumeLabel", "Продолжить"),
+        b.addAction(new Notification.Action.Builder(null, running ? s.optString("pauseLabel", Lang.t(ctx, "Пауза", "Pause")) : s.optString("resumeLabel", Lang.t(ctx, "Продолжить", "Resume")),
             actionIntent(ctx, running ? "pause" : "resume")).build());
-        b.addAction(new Notification.Action.Builder(null, s.optString("stopLabel", "Стоп"), actionIntent(ctx, "stop")).build());
+        b.addAction(new Notification.Action.Builder(null, s.optString("stopLabel", Lang.t(ctx, "Стоп", "Stop")), actionIntent(ctx, "stop")).build());
         try {
             nm.notify(NID, b.build());
         } catch (SecurityException ignored) {

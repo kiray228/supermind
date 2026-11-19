@@ -60,7 +60,7 @@ public class SmAlarmPlugin extends Plugin {
                 JSONObject a = list.getJSONObject(i);
                 next.put(String.valueOf(a.getInt("id")), new JSONObject()
                     .put("at", a.getLong("at"))
-                    .put("title", a.optString("title", "Задача"))
+                    .put("title", a.optString("title", Lang.t(getContext(), "Задача", "Task")))
                     .put("body", a.optString("body", ""))
                     .put("taskId", a.optString("taskId", ""))
                     .put("date", a.optString("date", ""))
@@ -143,7 +143,9 @@ public class SmAlarmPlugin extends Plugin {
     @PluginMethod
     public void test(PluginCall call) {
         try {
-            AlarmReceiver.ring(getContext(), new JSONObject().put("title", "Проверка будильника").put("body", "Так зазвонит напоминание-будильник"));
+            AlarmReceiver.ring(getContext(), new JSONObject()
+                .put("title", Lang.t(getContext(), "Проверка будильника", "Alarm test"))
+                .put("body", Lang.t(getContext(), "Так зазвонит напоминание-будильник", "This is how an alarm reminder will ring")));
             call.resolve();
         } catch (Exception e) {
             call.reject(e.getMessage());

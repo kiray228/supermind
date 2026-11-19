@@ -22,6 +22,32 @@
     <string name="sc_focus_long">Начать фокус</string>
     <string name="sc_map_short">Новая карта</string>
     <string name="sc_map_long">Новая интеллект-карта</string>
+    <!-- Подписи в самих виджетах (код подставляет их на языке приложения, см. Lang) -->
+    <string name="w_today_title">Сегодня</string>
+    <string name="w_calendar_title">Календарь</string>
+    <string name="w_habits_title">Привычки</string>
+    <string name="w_map_title">Карта</string>
+    <string name="w_add_task">Добавить задачу</string>
+    <string name="w_complete">Выполнить</string>
+    <string name="w_check_off">Отметить</string>
+    <string name="w_all_done">На сегодня всё сделано 🎉</string>
+    <!-- Примеры в превью виджетов (список виджетов Android 12+) -->
+    <string name="pv_habits_progress">Привычки 2/5</string>
+    <string name="pv_task_internet">Оплатить интернет</string>
+    <string name="pv_yesterday">Вчера</string>
+    <string name="pv_task_call">Созвон с командой</string>
+    <string name="pv_task_groceries">Купить продукты</string>
+    <string name="pv_cal_sub">Сегодня 3 дела</string>
+    <string name="pv_workout">Тренировка</string>
+    <string name="pv_tomorrow">Завтра</string>
+    <string name="pv_goal">Срок цели: запуск проекта</string>
+    <string name="pv_habits_count">1 из 2</string>
+    <string name="pv_water">Пить воду</string>
+    <string name="pv_water_sub">3 из 8 стаканов  ·  🔥 5 дней</string>
+    <string name="pv_run">Пробежка</string>
+    <string name="pv_run_sub">🔥 12 дней</string>
+    <string name="pv_map">Мои идеи</string>
+    <string name="pv_map_sub">4 ветви · изменена сегодня</string>
     <dimen name="widget_radius">24dp</dimen>
     <dimen name="widget_inner_radius">14dp</dimen>
     <color name="widget_bg">#F7FFFFFF</color>

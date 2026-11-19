@@ -70,7 +70,7 @@ public class WidgetBridgePlugin extends Plugin {
         androidx.fragment.app.FragmentActivity act = (androidx.fragment.app.FragmentActivity) getActivity();
         String title = call.getString("title", "SuperMind");
         String subtitle = call.getString("subtitle", "");
-        String negative = call.getString("negative", "Отмена");
+        String negative = call.getString("negative", Lang.t(getContext(), "Отмена", "Cancel"));
         act.runOnUiThread(() -> {
             // окно уже не на экране (приложение уходит в фон) — системное окно не откроется и не ответит
             if (!act.getLifecycle().getCurrentState().isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED) || act.isFinishing()) {

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Английские подписи виджетов и ярлыков значка (русские — в values/widget.xml) -->
+<resources>
+    <string name="widget_today_label">SuperMind — Today</string>
+    <string name="widget_today_description">Today\'s tasks, habit progress and quick add</string>
+    <string name="widget_calendar_label">SuperMind — Calendar</string>
+    <string name="widget_calendar_description">Your week and plans for the next two weeks: tasks, goal deadlines and calendar events</string>
+    <string name="widget_habits_label">SuperMind — Habits</string>
+    <string name="widget_habits_description">Today\'s habits: check them off right from the home screen</string>
+    <string name="widget_map_label">SuperMind — Map</string>
+    <string name="widget_map_description">A sketch of the chosen mind map: the central topic and main branches</string>
+    <string name="sc_task_short">New task</string>
+    <string name="sc_task_long">New task</string>
+    <string name="sc_habits_short">Habits</string>
+    <string name="sc_habits_long">Check off habits</string>
+    <string name="sc_voice_short">By voice</string>
+    <string name="sc_voice_long">Voice command</string>
+    <string name="sc_search_short">Search</string>
+    <string name="sc_search_long">Search SuperMind</string>
+    <string name="sc_note_short">New note</string>
+    <string name="sc_note_long">New note</string>
+    <string name="sc_focus_short">Focus</string>
+    <string name="sc_focus_long">Start focus</string>
+    <string name="sc_map_short">New map</string>
+    <string name="sc_map_long">New mind map</string>
+    <string name="w_today_title">Today</string>
+    <string name="w_calendar_title">Calendar</string>
+    <string name="w_habits_title">Habits</string>
+    <string name="w_map_title">Map</string>
+    <string name="w_add_task">Add task</string>
+    <string name="w_complete">Complete</string>
+    <string name="w_check_off">Check off</string>
+    <string name="w_all_done">All done for today 🎉</string>
+    <string name="pv_habits_progress">Habits 2/5</string>
+    <string name="pv_task_internet">Pay the internet bill</string>
+    <string name="pv_yesterday">Yesterday</string>
+    <string name="pv_task_call">Team call</string>
+    <string name="pv_task_groceries">Buy groceries</string>
+    <string name="pv_cal_sub">3 items today</string>
+    <string name="pv_workout">Workout</string>
+    <string name="pv_tomorrow">Tomorrow</string>
+    <string name="pv_goal">Goal deadline: project launch</string>
+    <string name="pv_habits_count">1 of 2</string>
+    <string name="pv_water">Drink water</string>
+    <string name="pv_water_sub">3 of 8 glasses  ·  🔥 5 days</string>
+    <string name="pv_run">Run</string>
+    <string name="pv_run_sub">🔥 12 days</string>
+    <string name="pv_map">My ideas</string>
+    <string name="pv_map_sub">4 branches · edited today</string>
+</resources>
