@@ -74,3 +74,14 @@ test('старые Android WebView: structuredClone и новые методы �
   assert.equal(c.self, c);
   assert.throws(() => cloneDeep({ f: () => 1 }));
 });
+
+test('Health Connect: приложение просит только шаги и сон', () => {
+  // каждое разрешение здоровья нужно обосновать в Play Console — лишние из плагина вырезаем
+  const m = read('android/app/src/main/AndroidManifest.xml');
+  const plugin = read('node_modules/@capgo/capacitor-health/android/src/main/AndroidManifest.xml');
+  const keep = ['READ_STEPS', 'READ_SLEEP'];
+  for (const [, p] of plugin.matchAll(/android\.permission\.health\.([A-Z0-9_]+)/g)) {
+    if (keep.includes(p)) assert.match(m, new RegExp(`health\.${p}" />`));
+    else assert.match(m, new RegExp(`health\.${p}" tools:node="remove"`), `не вырезано ${p}`);
+  }
+});
