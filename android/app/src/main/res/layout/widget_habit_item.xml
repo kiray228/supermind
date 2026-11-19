@@ -61,7 +61,7 @@
         android:id="@+id/w_hb_btn"
         android:layout_width="50dp"
         android:layout_height="match_parent"
-        android:contentDescription="Отметить">
+        android:contentDescription="@string/w_check_off">
 
         <ImageView
             android:id="@+id/w_hb_check_ring"

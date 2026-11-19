@@ -56,8 +56,10 @@ final class SmWidgets {
         return s.isEmpty() ? s : s.substring(0, 1).toUpperCase(RU) + s.substring(1);
     }
 
-    static String fmt(String pattern, Calendar c) {
-        return new SimpleDateFormat(pattern, RU).format(c.getTime()).replace(".", "");
+    /** Дата на языке приложения: свой шаблон для русского и английского (по-английски месяц впереди: «Mon, Nov 3») */
+    static String fmt(Context ctx, String ruPattern, String enPattern, Calendar c) {
+        boolean en = Lang.en(ctx);
+        return new SimpleDateFormat(en ? enPattern : ruPattern, en ? Lang.EN : RU).format(c.getTime()).replace(".", "");
     }
 
     static int minutesOf(String hhmm) {

@@ -16,7 +16,6 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
@@ -43,7 +42,6 @@ public class TodayWidget extends AppWidgetProvider {
     static final String ACTION_COMPLETE = "app.twomind.mindmap.widget.COMPLETE";
     static final String EXTRA_ACTION = "sm_action";
     private static final int MAX_ROWS = 6;
-    private static final Locale RU = Locale.forLanguageTag("ru");
 
     // ---------- Хранилище ----------
 
@@ -54,6 +52,7 @@ public class TodayWidget extends AppWidgetProvider {
     static synchronized void saveData(Context ctx, String json) {
         // свежие данные приложения уже учитывают применённые выполнения
         prefs(ctx).edit().putString(KEY_DATA, json).remove(KEY_RECENT).remove(KEY_RECENT_HABITS).commit();
+        Lang.onData(ctx, json);
     }
 
     static synchronized void queue(Context ctx, JSONObject action) {
@@ -324,10 +323,6 @@ public class TodayWidget extends AppWidgetProvider {
         return String.format(Locale.US, "%04d-%02d-%02d", c.get(Calendar.YEAR), c.get(Calendar.MONTH) + 1, c.get(Calendar.DAY_OF_MONTH));
     }
 
-    private static String cap(String s) {
-        return s.isEmpty() ? s : s.substring(0, 1).toUpperCase(RU) + s.substring(1);
-    }
-
     private static int minutesOf(String hhmm) {
         try {
             String[] p = hhmm.split(":");
@@ -356,7 +351,10 @@ public class TodayWidget extends AppWidgetProvider {
         String yesterday = ymd(y);
         int nowMin = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE);
 
-        rv.setTextViewText(R.id.w_date, cap(new SimpleDateFormat("EEEE, d MMMM", RU).format(now.getTime())));
+        rv.setTextViewText(R.id.w_date, SmWidgets.cap(SmWidgets.fmt(ctx, "EEEE, d MMMM", "EEEE, MMMM d", now)));
+        rv.setTextViewText(R.id.w_title, Lang.str(ctx, R.string.w_today_title));
+        rv.setContentDescription(R.id.w_mic, Lang.str(ctx, R.string.sc_voice_long));
+        rv.setContentDescription(R.id.w_add, Lang.str(ctx, R.string.w_add_task));
 
         String raw = prefs(ctx).getString(KEY_DATA, null);
         JSONObject data = null;
@@ -413,7 +411,7 @@ public class TodayWidget extends AppWidgetProvider {
         boolean showHabits = hTotal > 0;
         rv.setViewVisibility(R.id.w_habits, showHabits ? View.VISIBLE : View.GONE);
         if (showHabits) {
-            rv.setTextViewText(R.id.w_habits_text, "Привычки " + hDone + "/" + hTotal);
+            rv.setTextViewText(R.id.w_habits_text, Lang.t(ctx, "Привычки ", "Habits ") + hDone + "/" + hTotal);
             rv.setProgressBar(R.id.w_habits_bar, hTotal, Math.min(hDone, hTotal), false);
         }
 
@@ -432,7 +430,7 @@ public class TodayWidget extends AppWidgetProvider {
             row.setTextViewText(R.id.w_row_title, r.title);
             String label;
             if (r.date.compareTo(today) < 0) {
-                label = r.date.equals(yesterday) ? "Вчера" : shortDate(r.date);
+                label = r.date.equals(yesterday) ? Lang.t(ctx, "Вчера", "Yesterday") : shortDate(ctx, r.date);
             } else label = r.time;
             row.setTextViewText(R.id.w_row_time, label);
             row.setViewVisibility(R.id.w_row_time, label.isEmpty() ? View.GONE : View.VISIBLE);
@@ -443,16 +441,17 @@ public class TodayWidget extends AppWidgetProvider {
             }
             row.setOnClickPendingIntent(R.id.w_row, activityIntent(ctx, 1000 + wid * 16 + i, "open_task", r.id, null));
             row.setOnClickPendingIntent(R.id.w_row_check, completeIntent(ctx, r.id, r.date));
-            row.setContentDescription(R.id.w_row_check, "Выполнить: " + r.title);
+            row.setContentDescription(R.id.w_row_check, Lang.t(ctx, "Выполнить: ", "Complete: ") + r.title);
             rv.addView(R.id.w_list, row);
         }
 
         boolean empty = rows.isEmpty();
         rv.setViewVisibility(R.id.w_empty, empty ? View.VISIBLE : View.GONE);
-        if (empty) rv.setTextViewText(R.id.w_empty, data == null ? "Откройте SuperMind, чтобы увидеть задачи" : "На сегодня всё сделано 🎉");
+        if (empty) rv.setTextViewText(R.id.w_empty, data == null ? Lang.t(ctx, "Откройте SuperMind, чтобы увидеть задачи", "Open SuperMind to see your tasks")
+            : Lang.str(ctx, R.string.w_all_done));
         int more = rows.size() - shown;
         rv.setViewVisibility(R.id.w_more, more > 0 ? View.VISIBLE : View.GONE);
-        if (more > 0) rv.setTextViewText(R.id.w_more, "Ещё " + more + " →");
+        if (more > 0) rv.setTextViewText(R.id.w_more, Lang.t(ctx, "Ещё ", "") + more + Lang.t(ctx, " →", " more →"));
         rv.setTextViewText(R.id.w_count, rows.isEmpty() ? "" : String.valueOf(rows.size()));
         rv.setViewVisibility(R.id.w_count, rows.isEmpty() ? View.GONE : View.VISIBLE);
 
@@ -466,11 +465,11 @@ public class TodayWidget extends AppWidgetProvider {
         m.updateAppWidget(wid, rv);
     }
 
-    private static String shortDate(String ymd) {
+    private static String shortDate(Context ctx, String ymd) {
         try {
             Calendar c = Calendar.getInstance();
             c.set(Integer.parseInt(ymd.substring(0, 4)), Integer.parseInt(ymd.substring(5, 7)) - 1, Integer.parseInt(ymd.substring(8, 10)));
-            return new SimpleDateFormat("d MMM", RU).format(c.getTime()).replace(".", "");
+            return SmWidgets.fmt(ctx, "d MMM", "MMM d", c);
         } catch (Exception e) {
             return ymd;
         }

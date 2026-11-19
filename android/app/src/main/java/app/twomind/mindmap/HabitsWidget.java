@@ -68,7 +68,7 @@ public class HabitsWidget extends AppWidgetProvider {
             if (h == null) continue;
             Row r = new Row();
             r.id = a.optString(0);
-            r.name = h.optString("n", "Привычка");
+            r.name = h.optString("n", Lang.t(ctx, "Привычка", "Habit"));
             r.emoji = h.optString("e", "");
             r.unit = h.optString("u", "");
             r.color = SmWidgets.parseColor(h.optString("c"), 0xFF22C55E);
@@ -142,26 +142,19 @@ public class HabitsWidget extends AppWidgetProvider {
 
     // ---------- Отрисовка ----------
 
-    static String plural(int n, String one, String few, String many) {
-        int a = Math.abs(n) % 100, b = a % 10;
-        if (a > 10 && a < 20) return many;
-        if (b == 1) return one;
-        if (b >= 2 && b <= 4) return few;
-        return many;
-    }
-
-    private static String subtitle(Row r) {
+    private static String subtitle(Context ctx, Row r) {
         StringBuilder sb = new StringBuilder();
         if (r.target > 1) {
-            sb.append(Math.min(r.count, 999)).append(" из ").append(r.target);
+            sb.append(Math.min(r.count, 999)).append(Lang.t(ctx, " из ", " of ")).append(r.target);
             if (!r.unit.isEmpty()) sb.append(' ').append(r.unit);
         }
         if (r.streak > 0) {
             if (sb.length() > 0) sb.append("  ·  ");
             sb.append("🔥 ").append(r.streak).append(' ');
-            sb.append(r.weeks ? plural(r.streak, "неделя", "недели", "недель") : plural(r.streak, "день", "дня", "дней"));
+            sb.append(r.weeks ? Lang.plural(ctx, r.streak, "неделя", "недели", "недель", "week", "weeks")
+                : Lang.plural(ctx, r.streak, "день", "дня", "дней", "day", "days"));
         }
-        if (sb.length() == 0) sb.append(r.done() ? "Выполнено" : "Отметьте сегодня");
+        if (sb.length() == 0) sb.append(r.done() ? Lang.t(ctx, "Выполнено", "Done") : Lang.t(ctx, "Отметьте сегодня", "Check off today"));
         return sb.toString();
     }
 
@@ -176,11 +169,13 @@ public class HabitsWidget extends AppWidgetProvider {
         int done = 0, total = rows != null ? rows.size() : 0;
         if (rows != null) for (Row r : rows) if (r.done()) done++;
 
-        rv.setTextViewText(R.id.w_hb_date, total > 0 && done == total ? "Всё выполнено 🎉" : SmWidgets.cap(SmWidgets.fmt("EEEE, d MMMM", now)));
+        rv.setTextViewText(R.id.w_hb_date, total > 0 && done == total ? Lang.t(ctx, "Всё выполнено 🎉", "All done 🎉")
+            : SmWidgets.cap(SmWidgets.fmt(ctx, "EEEE, d MMMM", "EEEE, MMMM d", now)));
+        rv.setTextViewText(R.id.w_hb_title, Lang.str(ctx, R.string.w_habits_title));
         rv.setViewVisibility(R.id.w_hb_count, total > 0 ? View.VISIBLE : View.GONE);
         rv.setViewVisibility(R.id.w_hb_ring, total > 0 ? View.VISIBLE : View.GONE);
         if (total > 0) {
-            rv.setTextViewText(R.id.w_hb_count, done + " из " + total);
+            rv.setTextViewText(R.id.w_hb_count, done + Lang.t(ctx, " из ", " of ") + total);
             rv.setProgressBar(R.id.w_hb_ring, total, done, false);
         }
 
@@ -211,12 +206,13 @@ public class HabitsWidget extends AppWidgetProvider {
         boolean empty = n == 0;
         rv.setViewVisibility(R.id.w_hb_empty, empty ? View.VISIBLE : View.GONE);
         if (empty) {
-            rv.setTextViewText(R.id.w_hb_empty, data == null ? "Откройте SuperMind, чтобы увидеть привычки"
-                : rows == null ? "Откройте SuperMind, чтобы обновить привычки" : "На сегодня привычек нет.\nНажмите, чтобы добавить");
+            rv.setTextViewText(R.id.w_hb_empty, data == null ? Lang.t(ctx, "Откройте SuperMind, чтобы увидеть привычки", "Open SuperMind to see your habits")
+                : rows == null ? Lang.t(ctx, "Откройте SuperMind, чтобы обновить привычки", "Open SuperMind to update your habits")
+                : Lang.t(ctx, "На сегодня привычек нет.\nНажмите, чтобы добавить", "No habits for today.\nTap to add one"));
         }
         int more = n - shown;
         rv.setViewVisibility(R.id.w_hb_more, more > 0 ? View.VISIBLE : View.GONE);
-        if (more > 0) rv.setTextViewText(R.id.w_hb_more, "Ещё " + more + " →");
+        if (more > 0) rv.setTextViewText(R.id.w_hb_more, Lang.t(ctx, "Ещё ", "") + more + Lang.t(ctx, " →", " more →"));
 
         PendingIntent open = SmWidgets.activityIntent(ctx, 30, "open_view", null, "habits");
         rv.setOnClickPendingIntent(R.id.w_hb_header, open);
@@ -229,12 +225,12 @@ public class HabitsWidget extends AppWidgetProvider {
         boolean done = r.done();
         chip.setInt(R.id.w_hb_icon_bg, "setColorFilter", r.color);
         chip.setInt(R.id.w_hb_icon_bg, "setImageAlpha", done ? 80 : 48);
-        String glyph = !r.emoji.isEmpty() ? r.emoji : r.name.isEmpty() ? "•" : r.name.substring(0, r.name.offsetByCodePoints(0, 1)).toUpperCase(SmWidgets.RU);
+        String glyph = !r.emoji.isEmpty() ? r.emoji : r.name.isEmpty() ? "•" : r.name.substring(0, r.name.offsetByCodePoints(0, 1)).toUpperCase(Lang.locale(ctx));
         chip.setTextViewText(R.id.w_hb_emoji, glyph);
         chip.setTextColor(R.id.w_hb_emoji, r.color);
         chip.setTextViewText(R.id.w_hb_name, r.name);
         SmWidgets.textColor(ctx, chip, R.id.w_hb_name, done ? R.color.widget_text2 : R.color.widget_text);
-        chip.setTextViewText(R.id.w_hb_sub, subtitle(r));
+        chip.setTextViewText(R.id.w_hb_sub, subtitle(ctx, r));
 
         boolean counter = r.target > 1;
         chip.setViewVisibility(R.id.w_hb_fill, done ? View.VISIBLE : View.GONE);
@@ -254,7 +250,8 @@ public class HabitsWidget extends AppWidgetProvider {
         }
         int next = counter ? (done ? 0 : r.count + 1) : (done ? 0 : 1);
         chip.setOnClickPendingIntent(R.id.w_hb_btn, toggleIntent(ctx, r.id, today, next));
-        chip.setContentDescription(R.id.w_hb_btn, (done ? "Снять отметку: " : counter ? "Плюс один: " : "Отметить: ") + r.name);
+        chip.setContentDescription(R.id.w_hb_btn, (done ? Lang.t(ctx, "Снять отметку: ", "Uncheck: ")
+            : counter ? Lang.t(ctx, "Плюс один: ", "Plus one: ") : Lang.t(ctx, "Отметить: ", "Check off: ")) + r.name);
         chip.setOnClickPendingIntent(R.id.w_hb_chip, SmWidgets.activityIntent(ctx, 31, "open_view", null, "habits"));
     }
 

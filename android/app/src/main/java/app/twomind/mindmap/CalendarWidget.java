@@ -88,12 +88,12 @@ public class CalendarWidget extends AppWidgetProvider {
         for (Item it : items) {
             if (!it.day.equals(cur)) {
                 if (!todayShown && it.day.compareTo(today) > 0) {
-                    rows.add(header(today, today));
-                    rows.add(free());
+                    rows.add(header(ctx, today, today));
+                    rows.add(free(ctx));
                     todayShown = true;
                 }
                 cur = it.day;
-                rows.add(header(it.day, today));
+                rows.add(header(ctx, it.day, today));
                 if (it.day.equals(today)) todayShown = true;
             }
             if (it.day.equals(today) && !it.time.isEmpty()) {
@@ -103,28 +103,38 @@ public class CalendarWidget extends AppWidgetProvider {
             rows.add(it);
         }
         if (!todayShown) {
-            rows.add(0, header(today, today));
-            rows.add(1, free());
+            rows.add(0, header(ctx, today, today));
+            rows.add(1, free(ctx));
         }
         return rows;
     }
 
-    private static Item header(String day, String today) {
+    private static Item header(Context ctx, String day, String today) {
         Item h = new Item();
         h.type = 0;
         h.day = day;
         Calendar c = SmWidgets.parseYmd(day);
-        if (day.equals(today)) h.title = "Сегодня · " + SmWidgets.fmt("EE, d MMM", c);
-        else if (day.equals(SmWidgets.addDays(today, 1))) h.title = "Завтра · " + SmWidgets.fmt("EE, d MMM", c);
-        else h.title = SmWidgets.cap(SmWidgets.fmt("EEEE, d MMM", c));
+        String shortDay = SmWidgets.fmt(ctx, "EE, d MMM", "EEE, MMM d", c);
+        if (day.equals(today)) h.title = Lang.t(ctx, "Сегодня · ", "Today · ") + shortDay;
+        else if (day.equals(SmWidgets.addDays(today, 1))) h.title = Lang.t(ctx, "Завтра · ", "Tomorrow · ") + shortDay;
+        else h.title = SmWidgets.cap(SmWidgets.fmt(ctx, "EEEE, d MMM", "EEEE, MMM d", c));
         return h;
     }
 
-    private static Item free() {
+    private static Item free(Context ctx) {
         Item f = new Item();
         f.type = 2;
-        f.title = "Ничего не запланировано";
+        f.title = Lang.t(ctx, "Ничего не запланировано", "Nothing planned");
         return f;
+    }
+
+    /** День недели в полосе: «ПН» / «MO» */
+    private static String weekday(Context ctx, Calendar c) {
+        if (Lang.en(ctx)) {
+            String s = SmWidgets.fmt(ctx, "EE", "EEE", c);
+            return (s.length() > 2 ? s.substring(0, 2) : s).toUpperCase(Lang.EN);
+        }
+        return SmWidgets.fmt(ctx, "EE", "EE", c).toUpperCase(SmWidgets.RU);
     }
 
     // ---------- Жизненный цикл ----------
@@ -159,16 +169,17 @@ public class CalendarWidget extends AppWidgetProvider {
         JSONObject data = SmWidgets.data(ctx);
         List<Item> items = items(ctx, data, today);
 
-        rv.setTextViewText(R.id.w_cal_title, SmWidgets.cap(SmWidgets.fmt("LLLL", now)));
+        rv.setTextViewText(R.id.w_cal_title, SmWidgets.cap(SmWidgets.fmt(ctx, "LLLL", "LLLL", now)));
         int todayCount = 0;
         Set<String> busy = new HashSet<>();
         for (Item it : items) {
             busy.add(it.day);
             if (it.day.equals(today)) todayCount++;
         }
-        rv.setTextViewText(R.id.w_cal_sub, data == null ? SmWidgets.cap(SmWidgets.fmt("EEEE, d MMMM", now))
-            : todayCount == 0 ? "Сегодня свободно"
-            : "Сегодня " + todayCount + " " + HabitsWidget.plural(todayCount, "дело", "дела", "дел"));
+        rv.setTextViewText(R.id.w_cal_sub, data == null ? SmWidgets.cap(SmWidgets.fmt(ctx, "EEEE, d MMMM", "EEEE, MMMM d", now))
+            : todayCount == 0 ? Lang.t(ctx, "Сегодня свободно", "Free today")
+            : Lang.en(ctx) ? todayCount + " " + (todayCount == 1 ? "item" : "items") + " today"
+            : "Сегодня " + todayCount + " " + Lang.ruPlural(todayCount, "дело", "дела", "дел"));
 
         // полоса недели (с понедельника); на низком виджете — скрыта
         int[] size = SmWidgets.sizeDp(m, wid, 250, 250);
@@ -184,7 +195,7 @@ public class CalendarWidget extends AppWidgetProvider {
                 String d = SmWidgets.ymd(c);
                 boolean isToday = d.equals(today);
                 RemoteViews cell = new RemoteViews(pkg, R.layout.widget_cal_day);
-                cell.setTextViewText(R.id.w_cd_wd, SmWidgets.fmt("EE", c).toUpperCase(SmWidgets.RU));
+                cell.setTextViewText(R.id.w_cd_wd, weekday(ctx, c));
                 cell.setTextViewText(R.id.w_cd_num, String.valueOf(c.get(Calendar.DAY_OF_MONTH)));
                 cell.setViewVisibility(R.id.w_cd_dot, busy.contains(d) ? View.VISIBLE : View.INVISIBLE);
                 if (isToday) {
@@ -207,7 +218,8 @@ public class CalendarWidget extends AppWidgetProvider {
         svc.setData(Uri.parse("supermind-widget://calendar/" + wid));
         rv.setRemoteAdapter(R.id.w_cal_list, svc);
         rv.setEmptyView(R.id.w_cal_list, R.id.w_cal_empty);
-        rv.setTextViewText(R.id.w_cal_empty, "Откройте SuperMind, чтобы увидеть планы");
+        rv.setTextViewText(R.id.w_cal_empty, Lang.t(ctx, "Откройте SuperMind, чтобы увидеть планы", "Open SuperMind to see your plans"));
+        rv.setContentDescription(R.id.w_cal_add, Lang.str(ctx, R.string.w_add_task));
 
         Intent tpl = new Intent(ctx, MainActivity.class);
         tpl.setAction("app.twomind.mindmap.widget.calendar_item");
@@ -250,11 +262,11 @@ public class CalendarWidget extends AppWidgetProvider {
             v.setTextViewText(R.id.w_ci_end, it.end);
             v.setViewVisibility(R.id.w_ci_end, it.end.isEmpty() ? View.GONE : View.VISIBLE);
         } else {
-            v.setTextViewText(R.id.w_ci_time, "Весь");
-            v.setTextViewText(R.id.w_ci_end, "день");
+            v.setTextViewText(R.id.w_ci_time, Lang.t(ctx, "Весь", "All"));
+            v.setTextViewText(R.id.w_ci_end, Lang.t(ctx, "день", "day"));
             v.setViewVisibility(R.id.w_ci_end, View.VISIBLE);
         }
-        String sub = "g".equals(it.kind) ? "Срок цели" : "e".equals(it.kind) ? "Календарь телефона" : "";
+        String sub = "g".equals(it.kind) ? Lang.t(ctx, "Срок цели", "Goal deadline") : "e".equals(it.kind) ? Lang.t(ctx, "Календарь телефона", "Phone calendar") : "";
         v.setTextViewText(R.id.w_ci_sub, sub);
         v.setViewVisibility(R.id.w_ci_sub, sub.isEmpty() ? View.GONE : View.VISIBLE);
         if ("t".equals(it.kind) && it.id != null) {

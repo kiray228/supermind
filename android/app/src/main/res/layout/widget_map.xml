@@ -25,7 +25,7 @@
             android:layout_height="wrap_content"
             android:ellipsize="end"
             android:maxLines="1"
-            android:text="Карта"
+            android:text="@string/w_map_title"
             android:textColor="@color/widget_text"
             android:textSize="17sp"
             android:textStyle="bold" />

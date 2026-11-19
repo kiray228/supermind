@@ -77,22 +77,23 @@ public class MapWidget extends AppWidgetProvider {
         for (int id : ids) render(ctx, m, id);
     }
 
-    static String updatedLabel(long at) {
+    static String updatedLabel(Context ctx, long at) {
         if (at <= 0) return "";
         Calendar c = Calendar.getInstance();
         c.setTimeInMillis(at);
         Calendar now = Calendar.getInstance();
-        if (SmWidgets.ymd(c).equals(SmWidgets.ymd(now))) return "изменена сегодня в " + SmWidgets.fmt("HH:mm", c);
+        if (SmWidgets.ymd(c).equals(SmWidgets.ymd(now))) return Lang.t(ctx, "изменена сегодня в ", "edited today at ") + SmWidgets.fmt(ctx, "HH:mm", "HH:mm", c);
         now.add(Calendar.DAY_OF_MONTH, -1);
-        if (SmWidgets.ymd(c).equals(SmWidgets.ymd(now))) return "изменена вчера";
-        return "изменена " + SmWidgets.fmt("d MMM", c);
+        if (SmWidgets.ymd(c).equals(SmWidgets.ymd(now))) return Lang.t(ctx, "изменена вчера", "edited yesterday");
+        return Lang.t(ctx, "изменена ", "edited ") + SmWidgets.fmt(ctx, "d MMM", "MMM d", c);
     }
 
-    static String subtitle(JSONObject map) {
+    static String subtitle(Context ctx, JSONObject map) {
         JSONArray b = map.optJSONArray("b");
         int n = b != null ? b.length() : 0;
-        String s = n == 0 ? "без ветвей" : n + " " + HabitsWidget.plural(n, "ветвь", "ветви", "ветвей");
-        String u = updatedLabel(map.optLong("u"));
+        String s = n == 0 ? Lang.t(ctx, "без ветвей", "no branches")
+            : n + " " + Lang.plural(ctx, n, "ветвь", "ветви", "ветвей", "branch", "branches");
+        String u = updatedLabel(ctx, map.optLong("u"));
         return u.isEmpty() ? s : s + " · " + u;
     }
 
@@ -102,17 +103,18 @@ public class MapWidget extends AppWidgetProvider {
         String id = chosen(ctx, wid);
         JSONObject map = pick(data, id);
         if (map == null) {
-            rv.setTextViewText(R.id.w_map_title, "Карта");
+            rv.setTextViewText(R.id.w_map_title, Lang.str(ctx, R.string.w_map_title));
             rv.setTextViewText(R.id.w_map_sub, "SuperMind");
             rv.setViewVisibility(R.id.w_map_img, View.GONE);
             rv.setViewVisibility(R.id.w_map_empty, View.VISIBLE);
-            rv.setTextViewText(R.id.w_map_empty, data == null ? "Откройте SuperMind, чтобы увидеть карты" : "Пока нет карт — создайте первую");
+            rv.setTextViewText(R.id.w_map_empty, data == null ? Lang.t(ctx, "Откройте SuperMind, чтобы увидеть карты", "Open SuperMind to see your maps")
+                : Lang.t(ctx, "Пока нет карт — создайте первую", "No maps yet — create your first one"));
             rv.setOnClickPendingIntent(android.R.id.background, SmWidgets.activityIntent(ctx, 50, "open_view", null, "home"));
             m.updateAppWidget(wid, rv);
             return;
         }
-        rv.setTextViewText(R.id.w_map_title, map.optString("t", "Карта"));
-        rv.setTextViewText(R.id.w_map_sub, subtitle(map));
+        rv.setTextViewText(R.id.w_map_title, map.optString("t", Lang.str(ctx, R.string.w_map_title)));
+        rv.setTextViewText(R.id.w_map_sub, subtitle(ctx, map));
         rv.setViewVisibility(R.id.w_map_empty, View.GONE);
         rv.setViewVisibility(R.id.w_map_img, View.VISIBLE);
 
@@ -124,12 +126,12 @@ public class MapWidget extends AppWidgetProvider {
         // память RemoteViews ограничена — большой виджет рисуем чуть мельче
         while (w * h * scale * scale * 4 > 3_000_000 && scale > 1f) scale -= 0.25f;
         try {
-            Bitmap bmp = MapPreview.draw(map, w, h, scale);
+            Bitmap bmp = MapPreview.draw(map, w, h, scale, Lang.en(ctx));
             rv.setImageViewBitmap(R.id.w_map_img, bmp);
         } catch (Throwable t) {
             rv.setViewVisibility(R.id.w_map_img, View.GONE);
         }
-        rv.setContentDescription(R.id.w_map_img, "Карта «" + map.optString("t") + "»");
+        rv.setContentDescription(R.id.w_map_img, Lang.en(ctx) ? "Map “" + map.optString("t") + "”" : "Карта «" + map.optString("t") + "»");
         rv.setOnClickPendingIntent(android.R.id.background, SmWidgets.activityIntent(ctx, 5000 + wid, "open_map", map.optString("id"), null));
         m.updateAppWidget(wid, rv);
     }

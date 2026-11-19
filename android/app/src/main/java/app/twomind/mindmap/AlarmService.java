@@ -102,9 +102,21 @@ public class AlarmService extends Service {
     static void ensureChannel(Context c) {
         if (Build.VERSION.SDK_INT < 26) return;
         NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
-        if (nm == null || nm.getNotificationChannel(CHANNEL) != null) return;
-        NotificationChannel ch = new NotificationChannel(CHANNEL, "Будильники", NotificationManager.IMPORTANCE_HIGH);
-        ch.setDescription("Напоминания-будильники: звонят, пока не выключите");
+        if (nm == null) return;
+        String name = Lang.t(c, "Будильники", "Alarms");
+        String desc = Lang.t(c, "Напоминания-будильники: звонят, пока не выключите", "Alarm reminders: they ring until you stop them");
+        NotificationChannel old = nm.getNotificationChannel(CHANNEL);
+        if (old != null) {
+            // язык сменили — переименовать канал (звук и важность у существующего канала не меняются)
+            if (!name.contentEquals(old.getName())) {
+                old.setName(name);
+                old.setDescription(desc);
+                nm.createNotificationChannel(old);
+            }
+            return;
+        }
+        NotificationChannel ch = new NotificationChannel(CHANNEL, name, NotificationManager.IMPORTANCE_HIGH);
+        ch.setDescription(desc);
         // звук и вибрацию даёт сам будильник — у уведомления их нет, иначе звучало бы дважды
         ch.setSound(null, null);
         ch.enableVibration(false);
@@ -125,8 +137,8 @@ public class AlarmService extends Service {
         NotificationCompat.Builder b = new NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_supermind)
             .setColor(0xFF007AFF)
-            .setContentTitle("⏰ " + ex.getString("title", "Задача"))
-            .setContentText(body.isEmpty() ? "Будильник SuperMind" : body)
+            .setContentTitle("⏰ " + ex.getString("title", Lang.t(this, "Задача", "Task")))
+            .setContentText(body.isEmpty() ? Lang.t(this, "Будильник SuperMind", "SuperMind alarm") : body)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -134,9 +146,9 @@ public class AlarmService extends Service {
             .setAutoCancel(false)
             .setContentIntent(fullPi)
             .setFullScreenIntent(fullPi, true)
-            .addAction(0, "Выключить", action(AlarmReceiver.ACTION_STOP, ex, 11))
-            .addAction(0, "Отложить 10 мин", action(AlarmReceiver.ACTION_SNOOZE, ex, 12));
-        if (!ex.getString("taskId", "").isEmpty()) b.addAction(0, "✓ Готово", action(AlarmReceiver.ACTION_DONE, ex, 13));
+            .addAction(0, Lang.t(this, "Выключить", "Stop"), action(AlarmReceiver.ACTION_STOP, ex, 11))
+            .addAction(0, Lang.t(this, "Отложить 10 мин", "Snooze 10 min"), action(AlarmReceiver.ACTION_SNOOZE, ex, 12));
+        if (!ex.getString("taskId", "").isEmpty()) b.addAction(0, Lang.t(this, "✓ Готово", "✓ Done"), action(AlarmReceiver.ACTION_DONE, ex, 13));
         return b.build();
     }
 
