@@ -66,6 +66,8 @@
 	<string>Чтобы сохранять картинки карт и заметок в «Фото».</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>SuperMind показывает ваши шаги и сон в разделе «Здоровье и спорт» и сам отмечает привычки «шаги» и «сон». Данные остаются на телефоне.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>SuperMind ничего не записывает в «Здоровье»: он только читает шаги и сон, чтобы показать их и отметить ваши привычки.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
