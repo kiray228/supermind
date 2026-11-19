@@ -1,5 +1,5 @@
 /** «Что нового»: главное в каждой версии. Новые версии — сверху. */
-import { Heart, Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge, MessageCircleQuestion, CloudOff, LayoutTemplate, SquareArrowOutUpRight, BellRing, Target, Timer, Lock, Crosshair, Move, GitMerge, EyeOff, CalendarRange, Fingerprint, ArrowUpDown, Banknote, MonitorSmartphone, Coins, ListChecks, FileInput, Split, CornerDownRight, KeyRound, Keyboard, LifeBuoy, Zap, FileSpreadsheet, Gauge as GaugeIcon, MessagesSquare, Accessibility, Focus, Save, Flag, RefreshCw } from 'lucide-react';
+import { Heart, Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge, MessageCircleQuestion, CloudOff, LayoutTemplate, SquareArrowOutUpRight, BellRing, Target, Timer, Lock, Crosshair, Move, GitMerge, EyeOff, CalendarRange, Fingerprint, ArrowUpDown, Banknote, MonitorSmartphone, Coins, ListChecks, FileInput, Split, CornerDownRight, KeyRound, Keyboard, LifeBuoy, Zap, FileSpreadsheet, Gauge as GaugeIcon, MessagesSquare, Accessibility, Focus, Save, Flag, RefreshCw, Footprints, Kanban, Smartphone } from 'lucide-react';
 
 export interface ChangeItem {
   icon: typeof Sparkles;
@@ -15,6 +15,16 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.53',
+    title: 'Виджеты на iPhone, шаги и сон, доска в телефоне',
+    items: [
+      { icon: LayoutGrid, title: 'Виджеты на iPhone', text: 'Виджеты «Сегодня» и «Привычки» на экране «Домой»: задачи и привычки дня, отметка касанием прямо в виджете. Удерживайте экран «Домой» → «+» → SuperMind. Нужна iOS 17 или новее.' },
+      { icon: Footprints, title: 'Шаги и сон из «Здоровья»', text: 'В «Здоровье и спорт» → «Подключить Apple «Здоровье»» (на Android — Health Connect): шаги за неделю и сон за ночь. Привычки «10 000 шагов», «Сон 8 часов», «Лечь спать до 23:00» отмечаются сами. Данные остаются на телефоне.' },
+      { icon: Kanban, title: 'Доска в телефоне', text: 'Канбан-доска теперь и на телефоне: Ещё → «Доска». Колонки листаются свайпом, карточку можно перенести пальцем или через меню «Переместить в…».' },
+      { icon: Smartphone, title: 'На любом телефоне и планшете', text: 'Приложение подогнано под вырезы камеры, узкие экраны и iPad, а на старых Android больше не закрывается при открытии «Сегодня» и карт.' },
+    ],
+  },
   {
     version: '1.52',
     title: 'Своя нижняя панель и валюты',
