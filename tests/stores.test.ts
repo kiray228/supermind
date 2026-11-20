@@ -14,6 +14,14 @@ describe('Google Play: разрешения', () => {
     assert.doesNotMatch(manifest, /android\.permission\.USE_EXACT_ALARM/);
     assert.match(manifest, /android\.permission\.SCHEDULE_EXACT_ALARM/);
   });
+  test('будильник без mediaPlayback (Play требует для него декларацию с видео): systemExempted, иначе shortService', () => {
+    assert.doesNotMatch(manifest, /mediaPlayback|FOREGROUND_SERVICE_MEDIA_PLAYBACK/);
+    assert.match(manifest, /foregroundServiceType="systemExempted\|shortService"/);
+    const svc = read('android/app/src/main/java/app/twomind/mindmap/AlarmService.java');
+    assert.doesNotMatch(svc, /MEDIA_PLAYBACK/);
+    assert.match(svc, /FOREGROUND_SERVICE_TYPE_SHORT_SERVICE/);
+    assert.match(svc, /void onTimeout\(int startId, int fgsType\)/);
+  });
   test('разрешили точные будильники — будильники ставятся заново', () => {
     assert.match(manifest, /SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED/);
   });

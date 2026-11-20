@@ -78,17 +78,19 @@ public class AlarmService extends Service {
         return START_NOT_STICKY;
     }
 
+    /**
+     * Типы сервиса: systemExempted — приложению с точными будильниками разрешено звонить из фона;
+     * без разрешения «Будильники и напоминания» (Android 14+) — shortService: звонок до ~3 минут.
+     * mediaPlayback не используем: для него Google Play требует отдельную декларацию с видео.
+     */
     private void startInForeground(Notification n) {
         try {
             if (Build.VERSION.SDK_INT >= 34) {
                 try {
-                    // приложению с точными будильниками разрешён этот тип: звонить из фона можно
                     startForeground(NOTIFICATION_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SYSTEM_EXEMPTED);
                 } catch (Exception e) {
-                    startForeground(NOTIFICATION_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
+                    startForeground(NOTIFICATION_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SHORT_SERVICE);
                 }
-            } else if (Build.VERSION.SDK_INT >= 29) {
-                startForeground(NOTIFICATION_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
             } else {
                 startForeground(NOTIFICATION_ID, n);
             }
@@ -97,6 +99,17 @@ public class AlarmService extends Service {
             NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
             if (nm != null) nm.notify(NOTIFICATION_ID, n);
         }
+    }
+
+    /** Короткий сервис (shortService) исчерпал время — замолкаем сами, иначе система сочтёт это ошибкой */
+    @Override
+    public void onTimeout(int startId) {
+        stopSelf();
+    }
+
+    @Override
+    public void onTimeout(int startId, int fgsType) {
+        stopSelf();
     }
 
     static void ensureChannel(Context c) {

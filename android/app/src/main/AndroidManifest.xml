@@ -233,7 +233,7 @@
             android:name=".AlarmService"
             android:directBootAware="true"
             android:exported="false"
-            android:foregroundServiceType="systemExempted|mediaPlayback" />
+            android:foregroundServiceType="systemExempted|shortService" />
         <receiver
             android:name=".AlarmReceiver"
             android:directBootAware="true"
@@ -273,7 +273,6 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <!-- голосовой ввод (RECORD_AUDIO) по умолчанию делает микрофон обязательным, и Google Play прячет приложение
