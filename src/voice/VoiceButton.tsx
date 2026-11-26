@@ -1,8 +1,8 @@
 /** Кнопки голосовой команды: пункт в боковой панели (компьютер) и круглая кнопка в центре панели вкладок (телефон) */
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Microphone } from '@phosphor-icons/react';
 import { openVoice } from './state';
+import { Orb } from './Orb';
 import { IconTile, type SectionId } from '../ui/icons';
 import { createThing, type CreateKind } from '../ui/createActions';
 import { haptic } from '../editor/touch';
@@ -13,7 +13,7 @@ export function VoiceNavButton() {
   return (
     <button className="nav-item vc-nav" onClick={openVoice} title={t('Голосовая команда')}>
       <span className="nav-ico">
-        <Microphone size={24} weight="fill" />
+        <Orb size={22} />
       </span>
       <span>{t('Голосом')}</span>
     </button>
@@ -67,7 +67,7 @@ export function VoiceFab() {
   return (
     <>
       <button
-        className="vc-fab"
+        className="vc-fab has-orb"
         onClick={click}
         onPointerDown={down}
         onPointerUp={cancel}
@@ -76,7 +76,7 @@ export function VoiceFab() {
         onContextMenu={(e) => e.preventDefault()}
         aria-label={t('Голосовая команда. Удерживайте, чтобы создать задачу, заметку или трату')}
       >
-        <Microphone size={28} weight="fill" />
+        <Orb size={62} />
       </button>
       {/* в document.body: панель вкладок со стеклом (backdrop-filter) иначе стала бы рамкой для fixed-слоя */}
       {menu &&
@@ -90,7 +90,7 @@ export function VoiceFab() {
                 </button>
               ))}
             </div>
-            <p className="vc-create-hint">{t('Или нажмите на микрофон и скажите, что создать')}</p>
+            <p className="vc-create-hint">{t('Или нажмите на сферу и скажите, что создать')}</p>
           </div>,
           document.body,
         )}

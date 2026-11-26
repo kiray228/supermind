@@ -36,3 +36,4 @@ desktop/updater.key
 # Сборка приложения для Windows
 desktop/out/
 desktop/src-tauri/target/
+test-builds/

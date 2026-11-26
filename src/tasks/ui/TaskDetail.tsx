@@ -21,6 +21,7 @@ import {
   X,
   Ban,
   Undo2,
+  NotebookPen,
 } from 'lucide-react';
 import { PRIORITY_META, todayYmd } from '../../utils/mapTasks';
 import { uid } from '../../utils/tree';
@@ -38,6 +39,10 @@ import { LOCALE, t } from '../../i18n/index';
 import './tasks.css';
 import { RelatedNotes } from '../../notes/ui/RelatedNotes';
 import { itemId } from '../../notes/brainDocs';
+import { openAiDo } from '../aiDoState';
+import { openAiNote } from '../aiRun';
+import { Orb } from '../../voice/Orb';
+import './aido.css';
 
 /** Окно задачи поверх любого раздела */
 export function TaskDetailHost() {
@@ -264,6 +269,23 @@ function TaskDetail({ task, onClose }: { task: TaskItem; onClose: () => void }) 
           onEnter={commitTitle}
         />
         <AutoText className="td-notes" value={notes} placeholder={t('Описание, заметки, ссылки…')} onChange={setNotes} onBlur={commitNotes} multiline />
+
+        {/* ИИ делает задачу за человека: результат — в заметку, привязанную к задаче */}
+        {!task.deleted && (
+          <div className="td-ai">
+            {!task.done && (
+              <button className="td-ai-btn" onClick={() => (commitNotes(), openAiDo(task.id))}>
+                <Orb size={26} />
+                {t('Сделать с ИИ')}
+              </button>
+            )}
+            {task.aiNoteId && (
+              <button className="td-ai-btn ghost" onClick={() => void openAiNote(task.aiNoteId!)}>
+                <NotebookPen size={16} /> {t('Результат ИИ')}
+              </button>
+            )}
+          </div>
+        )}
 
         {/* подзадачи */}
         <div className="td-section">

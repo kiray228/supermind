@@ -80,6 +80,8 @@ export interface TaskItem {
   focusMinutes?: number;
   /** задача сделана из пункта чек-листа этой задачи (подзадача со своей датой) */
   parentId?: ID;
+  /** заметка с результатом «Сделать с ИИ» (черновик презентации, текста, письма…) */
+  aiNoteId?: ID;
 }
 
 export interface TaskList {

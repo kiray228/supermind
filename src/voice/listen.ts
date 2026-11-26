@@ -3,36 +3,9 @@
  * (плагин), в браузере — Web Speech API (Chrome, Safari). Бесплатно, без ключей.
  */
 import { isNative } from '../platform';
-import { LOCALE, t } from '../i18n/index';
-
-export interface Listening {
-  /** закончить и дождаться итогового текста */
-  stop(): void;
-  /** прервать без результата */
-  abort(): void;
-}
-
-export interface ListenOpts {
-  /** текущий текст (по мере распознавания) */
-  onText: (text: string) => void;
-  /** фраза закончилась: итоговый текст (может быть пустым) */
-  onDone: (text: string) => void;
-  onError: (msg: string) => void;
-}
-
-type SR = {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  maxAlternatives: number;
-  start(): void;
-  stop(): void;
-  abort(): void;
-  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }> & { isFinal: boolean }> }) => void) | null;
-  onerror: ((e: { error: string }) => void) | null;
-  onend: (() => void) | null;
-};
-type SRCtor = new () => SR;
+import { t } from '../i18n/index';
+import { nativeSession, smSession, webSession, type Listening, type ListenOpts, type NativeSR, type SmSpeechSR, type SRCtor } from './sessions';
+export type { Listening, ListenOpts };
 
 function webCtor(): SRCtor | null {
   if (typeof window === 'undefined') return null;
@@ -44,65 +17,43 @@ function webCtor(): SRCtor | null {
 export const canListen = () => isNative() || !!webCtor();
 
 export async function listen(o: ListenOpts): Promise<Listening | null> {
-  return isNative() ? listenNative(o) : listenWeb(o);
+  if (isNative()) return listenNative(o);
+  const C = webCtor();
+  return C ? webSession(C, o) : null;
 }
 
-function listenWeb(o: ListenOpts): Listening | null {
-  const C = webCtor();
-  if (!C) return null;
-  const r = new C();
-  r.lang = LOCALE;
-  r.continuous = false;
-  r.interimResults = true;
-  r.maxAlternatives = 1;
-  let text = '';
-  let failed = false;
-  r.onresult = (e) => {
-    let s = '';
-    for (let i = 0; i < e.results.length; i++) s += e.results[i][0]?.transcript ?? '';
-    text = s.replace(/\s+/g, ' ').trim();
-    o.onText(text);
-  };
-  r.onerror = (e) => {
-    if (e.error === 'no-speech' || e.error === 'aborted') return;
-    failed = true;
-    o.onError(
-      e.error === 'not-allowed' || e.error === 'service-not-allowed'
-        ? t('Нет доступа к микрофону — разрешите его в настройках')
-        : e.error === 'network'
-          ? t('Для распознавания речи нужен интернет')
-          : t('Не удалось распознать речь'),
-    );
-  };
-  r.onend = () => {
-    if (!failed) o.onDone(text);
-  };
+interface SmSpeechPlugin extends SmSpeechSR {
+  available(): Promise<{ available: boolean }>;
+  checkPermissions(): Promise<{ microphone: string }>;
+  requestPermissions(o: { permissions: string[] }): Promise<{ microphone: string }>;
+}
+
+/** Android: свой модуль SmSpeech (сторонний плагин в режиме диктовки не заканчивал фразу и молча падал на каждом втором запуске) */
+async function listenAndroid(o: ListenOpts): Promise<Listening | null> {
+  const { registerPlugin } = await import('@capacitor/core');
+  const SR = registerPlugin<SmSpeechPlugin>('SmSpeech');
   try {
-    r.start();
-  } catch {
+    const { available } = await SR.available();
+    if (!available) {
+      o.onError(t('На телефоне нет распознавания речи — установите приложение Google'));
+      return null;
+    }
+    let perm = await SR.checkPermissions();
+    if (perm.microphone !== 'granted') perm = await SR.requestPermissions({ permissions: ['microphone'] });
+    if (perm.microphone !== 'granted') {
+      o.onError(t('Нет доступа к микрофону — разрешите его в настройках'));
+      return null;
+    }
+  } catch (e) {
+    o.onError(e instanceof Error ? e.message : t('Распознавание речи недоступно'));
     return null;
   }
-  return {
-    stop: () => {
-      try {
-        r.stop();
-      } catch {
-        /* уже остановлено */
-      }
-    },
-    abort: () => {
-      r.onend = null;
-      r.onerror = null;
-      try {
-        r.abort();
-      } catch {
-        /* уже остановлено */
-      }
-    },
-  };
+  return smSession(SR, o);
 }
 
 async function listenNative(o: ListenOpts): Promise<Listening | null> {
+  const { Capacitor } = await import('@capacitor/core');
+  if (Capacitor.getPlatform() === 'android' && Capacitor.isPluginAvailable('SmSpeech')) return listenAndroid(o);
   const { SpeechRecognition } = await import('@capacitor-community/speech-recognition');
   try {
     const { available } = await SpeechRecognition.available();
@@ -120,65 +71,5 @@ async function listenNative(o: ListenOpts): Promise<Listening | null> {
     o.onError(e instanceof Error ? e.message : t('Распознавание речи недоступно'));
     return null;
   }
-
-  let text = '';
-  let done = false;
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const handles: { remove(): Promise<void> }[] = [];
-  const finish = (fire: boolean) => {
-    if (done) return;
-    done = true;
-    clearTimeout(timer);
-    for (const h of handles) void h.remove();
-    if (fire) o.onDone(text);
-  };
-  // окончательный результат приходит чуть позже конца речи — ждём его, но недолго
-  const settle = (ms: number) => {
-    clearTimeout(timer);
-    timer = setTimeout(() => finish(true), ms);
-  };
-  let ended = false;
-  handles.push(
-    await SpeechRecognition.addListener('partialResults', (d) => {
-      const t = (d.matches?.[0] ?? '').trim();
-      if (t) {
-        text = t;
-        o.onText(t);
-      }
-      if (ended) settle(350);
-    }),
-  );
-  handles.push(
-    await SpeechRecognition.addListener('listeningState', (d) => {
-      if (d.status === 'stopped') {
-        ended = true;
-        settle(1500);
-      }
-    }),
-  );
-  try {
-    await SpeechRecognition.start({ language: LOCALE, maxResults: 1, partialResults: true, popup: false });
-  } catch (e) {
-    finish(false);
-    o.onError(e instanceof Error && e.message ? t('Не удалось распознать: {error}', { error: e.message }) : t('Не удалось начать распознавание'));
-    return null;
-  }
-  // тишина без единого слова — распознаватель молча останавливается: страховка
-  timer = setTimeout(() => {
-    if (!text) {
-      void SpeechRecognition.stop().catch(() => {});
-      finish(true);
-    }
-  }, 9000);
-  return {
-    stop: () => {
-      ended = true;
-      void SpeechRecognition.stop().catch(() => {});
-      settle(900);
-    },
-    abort: () => {
-      void SpeechRecognition.stop().catch(() => {});
-      finish(false);
-    },
-  };
+  return nativeSession(SpeechRecognition as unknown as NativeSR, o);
 }

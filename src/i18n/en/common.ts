@@ -47,5 +47,16 @@ const d: Record<string, string> = {
   "Виджеты «Финансы» и «Фокус»": "Finance and Focus widgets",
   "Траты за сегодня и месяц с кнопкой «+ трата» и таймер фокуса с кнопкой «Старт» — на экране «Домой» iPhone и Android.": "Today's and this month's spending with a “+ expense” button, and a focus timer with a Start button — on iPhone and Android Home Screens.",
   "Шесть вариантов значка SuperMind: Настройки → Оформление → «Иконка приложения».": "Six versions of the SuperMind icon: Settings → Appearance → App icon.",
+  'ИИ делает задачи за вас и голосовая сфера': 'AI does your tasks for you, and a new voice orb',
+  '«Сделать с ИИ»': 'Do it with AI',
+  'В каждой задаче: ИИ сам делает работу — презентацию по слайдам с текстом для выступления, письмо, пост, план или список покупок. Результат сохраняется в заметку и привязывается к задаче.': 'In every task: the AI does the work for you — a slide-by-slide presentation with speaker notes, an email, a post, a plan or a shopping list. The result is saved to a note linked to the task.',
+  '«ИИ поможет успеть»': 'AI can help you make it',
+  'На экране «Сегодня» — задачи на сегодня и завтра, которые ИИ может сделать. А «Черновики заранее» в Настройках → «ИИ-помощник» готовят черновик сами, когда срок близко.': 'The Today screen shows tasks for today and tomorrow that the AI can do. Turn on Drafts in advance in Settings → AI helper, and the AI prepares a draft by itself when a deadline is near.',
+  'Голосовая сфера': 'Voice orb',
+  'Вместо микрофона — объёмная сфера цвета вашей темы. Она слушает, думает и отвечает, а при разговоре пульсирует в такт голосу.': 'The mic button is now a 3D orb in your theme colour. It listens, thinks and answers, and pulses with your voice as you speak.',
+  'Голос без лишних нажатий': 'Voice with fewer taps',
+  'Скажите и замолчите — фраза отправится сама. «Готово» срабатывает с первого касания, а на Android распознавание больше не сбивается при повторном запуске.': 'Just speak and pause, and your phrase is sent by itself. Done works on the first tap, and on Android recognition no longer fails when you start it again.',
+  'Больше места на экране iPhone': 'More room on the iPhone screen',
+  'Заголовок «Сегодня» и других разделов стоит выше, в одной строке с кнопками — без пустого места под Dynamic Island.': 'The Today title and other section titles now sit higher, in one row with the buttons, with no empty space under the Dynamic Island.',
 };
 export default d;

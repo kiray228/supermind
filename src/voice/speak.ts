@@ -55,7 +55,12 @@ export async function speak(text: string): Promise<void> {
   u.lang = LOCALE;
   const voice = synth.getVoices().find((v) => v.lang?.toLowerCase().startsWith(LOCALE.slice(0, 2)));
   if (voice) u.voice = voice;
-  synth.speak(u);
+  // промис — до конца фразы: сфера «говорит», пока звучит ответ (страховка — браузер иногда не присылает конец)
+  await new Promise<void>((done) => {
+    const end = setTimeout(done, 1500 + t.length * 90);
+    u.onend = u.onerror = () => (clearTimeout(end), done());
+    synth.speak(u);
+  });
 }
 
 export async function stopSpeaking() {

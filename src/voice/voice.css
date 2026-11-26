@@ -14,18 +14,17 @@
 /* кнопка-«сфера» микрофона */
 .vc-orb {
   position: relative; width: 92px; height: 92px; border-radius: 50%; border: 0; cursor: pointer; margin: 4px 0 6px;
-  display: grid; place-items: center; color: #fff;
-  background: radial-gradient(circle at 32% 28%, color-mix(in srgb, var(--accent) 70%, #fff), var(--accent) 62%, color-mix(in srgb, var(--accent) 80%, #000));
-  box-shadow: 0 10px 30px color-mix(in srgb, var(--accent) 38%, transparent), inset 0 1px 1px rgba(255, 255, 255, 0.45);
+  display: grid; place-items: center; padding: 0; background: transparent;
+  box-shadow: 0 12px 34px color-mix(in srgb, var(--orb-a) 40%, transparent);
   transition: transform .25s cubic-bezier(.3, 1.6, .5, 1);
 }
 .vc-orb:active { transform: scale(.92); }
-.vc-orb svg { position: relative; z-index: 1; }
-.vc-ring { position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--accent); opacity: 0; pointer-events: none; }
+.vc-orb .orb { position: relative; z-index: 1; }
+.vc-ring { position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--orb-a); opacity: 0; pointer-events: none; }
 .vc-orb.on .vc-ring { animation: vc-ring 1.6s cubic-bezier(.2, .6, .3, 1) infinite; }
 .vc-orb.on .vc-ring.r2 { animation-delay: .8s; }
 .vc-orb.on { animation: vc-breathe 1.6s ease-in-out infinite; }
-.vc-orb.busy { opacity: .7; animation: vc-breathe .9s ease-in-out infinite; }
+.vc-orb.busy { animation: vc-breathe .9s ease-in-out infinite; }
 @keyframes vc-ring { from { transform: scale(1); opacity: .55; } to { transform: scale(1.75); opacity: 0; } }
 @keyframes vc-breathe { 50% { transform: scale(1.05); } }
 
@@ -90,3 +89,6 @@
   background: var(--accent); color: #fff; font: inherit; font-size: 16px; font-weight: 600; cursor: pointer;
 }
 
+/* громкость голоса (Android): сфера пульсирует в такт речи */
+.vc-orb .orb { transition: transform .12s ease-out; }
+.vc-orb.on .orb { transform: scale(calc(1 + var(--lvl, 0) * .14)); }

@@ -12,6 +12,7 @@ import { isNative } from '../platform';
 import { closeVoice, useVoice } from './state';
 import { speak, speakEnabled, setSpeakEnabled, stopSpeaking } from './speak';
 import { t } from '../i18n/index';
+import { Orb } from './Orb';
 import './voice.css';
 
 /** Окно открыто, пока VoiceHost в DOM; закрывается снаружи через closeVoice */
@@ -35,10 +36,19 @@ function VoiceSheet() {
   const [cards, setCards] = useState<Card[]>([]);
   const [error, setError] = useState('');
   const [voiceOut, setVoiceOut] = useState(speakEnabled);
+  const [speaking, setSpeaking] = useState(false);
   const rec = useRef<Listening | null>(null);
+  /** номер текущего прослушивания: «Готово» или закрытие отменяют то, что ещё только запускается */
+  const listenSeq = useRef(0);
+  /** последний услышанный текст — «Готово» сразу отправляет его, не дожидаясь распознавателя */
+  const heardNow = useRef('');
+  const listeningNow = useRef(false);
   const alive = useRef(true);
   const seq = useRef(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  /** сфера в окне: громкость голоса — CSS-переменной, без перерисовки React */
+  const orbRef = useRef<HTMLButtonElement>(null);
+  const setLevel = (l: number) => orbRef.current?.style.setProperty('--lvl', l.toFixed(2));
   const voiceOk = canListen();
 
   /** byVoice — фраза сказана голосом: тогда и ответ проговариваем */
@@ -62,7 +72,10 @@ function VoiceSheet() {
       setPhase('done');
       haptic(15);
       const say = out.map((c) => c.say).filter(Boolean).join(' ');
-      if (say && byVoice && speakEnabled()) void speak(say);
+      if (say && byVoice && speakEnabled()) {
+        setSpeaking(true);
+        void speak(say).finally(() => alive.current && setSpeaking(false));
+      }
     } catch (e) {
       if (!alive.current) return;
       setError(e instanceof Error ? e.message : String(e));
@@ -72,34 +85,63 @@ function VoiceSheet() {
 
   const start = async () => {
     if (rec.current) return;
+    const my = ++listenSeq.current;
+    const mine = () => alive.current && listenSeq.current === my;
     setError('');
     setHeard('');
+    heardNow.current = '';
+    listeningNow.current = true;
     setPhase('listening');
     haptic();
     const r = await listen({
-      onText: (s) => alive.current && setHeard(s),
+      onLevel: (l) => mine() && setLevel(l),
+      onText: (s) => {
+        if (!mine()) return;
+        heardNow.current = s;
+        setHeard(s);
+      },
       onDone: (s) => {
+        if (!mine()) return;
         rec.current = null;
-        if (!alive.current) return;
+        listeningNow.current = false;
+        listenSeq.current++;
         if (s.trim()) void run(s, true);
         else {
-          setError(t('Ничего не услышал — нажмите на микрофон и скажите ещё раз'));
+          setError(t('Ничего не услышал — нажмите на сферу и скажите ещё раз'));
           setPhase('idle');
         }
       },
       onError: (msg) => {
+        if (!mine()) return;
         rec.current = null;
-        if (!alive.current) return;
+        listeningNow.current = false;
+        listenSeq.current++;
         setError(msg);
         setPhase('idle');
       },
     });
-    if (!alive.current) return r?.abort();
+    // пока микрофон запускался, нажали «Готово» или закрыли окно
+    if (!mine()) return r?.abort();
     rec.current = r;
-    if (!r) setPhase((p) => (p === 'listening' ? 'idle' : p));
+    if (!r) {
+      listeningNow.current = false;
+      setPhase((p) => (p === 'listening' ? 'idle' : p));
+    }
   };
 
-  const stop = () => rec.current?.stop();
+  /** «Готово»: сразу берём то, что уже услышали, а распознаватель гасим — не ждём, пока он сам закончит */
+  const stop = () => {
+    // касание и «клик» по «Готово» приходят оба — второй уже ничего не делает
+    if (!listeningNow.current) return;
+    listeningNow.current = false;
+    listenSeq.current++;
+    rec.current?.abort();
+    rec.current = null;
+    const s = heardNow.current.trim();
+    haptic(10);
+    if (s) void run(s, true);
+    else setPhase('idle');
+  };
 
   useEffect(() => {
     alive.current = true;
@@ -109,6 +151,7 @@ function VoiceSheet() {
     window.addEventListener('keydown', onKey);
     return () => {
       alive.current = false;
+      listenSeq.current++;
       rec.current?.abort();
       rec.current = null;
       void stopSpeaking();
@@ -120,6 +163,8 @@ function VoiceSheet() {
   const submitTyped = () => {
     const t = typed.trim();
     if (!t || phase === 'thinking') return;
+    listenSeq.current++;
+    listeningNow.current = false;
     rec.current?.abort();
     rec.current = null;
     setTyped('');
@@ -145,7 +190,7 @@ function VoiceSheet() {
           : phase === 'done'
             ? t('Готово')
             : voiceOk
-              ? t('Нажмите на микрофон и скажите команду')
+              ? t('Нажмите на сферу и скажите команду')
               : t('Напишите команду');
 
   return (
@@ -171,20 +216,28 @@ function VoiceSheet() {
         <div className="vc-top">
           {voiceOk && (
             <button
+              ref={orbRef}
               className={`vc-orb${listening ? ' on' : ''}${phase === 'thinking' ? ' busy' : ''}`}
               onClick={() => (listening ? stop() : phase !== 'thinking' && void start())}
               aria-label={listening ? t('Закончить') : t('Сказать команду')}
             >
               <span className="vc-ring" />
               <span className="vc-ring r2" />
-              <Microphone size={34} weight="fill" />
+              <Orb size={92} state={listening ? 'listening' : phase === 'thinking' ? 'thinking' : speaking ? 'speaking' : 'idle'} />
             </button>
           )}
           <div className={`vc-status${phase === 'unknown' ? ' warn' : ''}`}>{status}</div>
           {heard ? <div className={`vc-heard${listening ? ' live' : ''}`}>«{heard}»</div> : null}
           {error && <div className="vc-error">{error}</div>}
           {listening && (
-            <button className="vc-stop" onClick={stop}>
+            <button
+              className="vc-stop"
+              onPointerDown={(e) => {
+                e.preventDefault();
+                stop();
+              }}
+              onClick={stop}
+            >
               {t('Готово')}
             </button>
           )}
@@ -241,6 +294,8 @@ function VoiceSheet() {
             onChange={(e) => setTyped(e.target.value)}
             onFocus={() => {
               if (!listening) return;
+              listenSeq.current++;
+              listeningNow.current = false;
               rec.current?.abort();
               rec.current = null;
               setPhase('idle');

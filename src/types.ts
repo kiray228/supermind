@@ -315,4 +315,6 @@ export interface Settings {
   glass?: 'soft' | 'liquid';
   /** фон приложения */
   backdrop?: 'gradient' | 'aurora' | 'plain';
+  /** ИИ сам готовит черновики задач, срок которых близко («Сделать с ИИ») */
+  aiDrafts?: boolean;
 }

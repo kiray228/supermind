@@ -6,7 +6,11 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { CaretRight, Flame, MagnifyingGlass, Play, Plus, Wallet } from '@phosphor-icons/react';
 import { useApp } from '../store/appStore';
 import { ensureTasks, openQuickAdd, openTask, toggleDone, useTasks } from '../tasks/store';
-import { isActive, minutesOf, mondayOf, WEEKDAYS, type TaskItem } from '../tasks/model';
+import { autoDrafts, helpable } from '../tasks/aiAuto';
+import { openAiDo } from '../tasks/aiDoState';
+import { openAiNote } from '../tasks/aiRun';
+import { Orb } from '../voice/Orb';
+import { isActive, minutesOf, mondayOf, whenLabel, WEEKDAYS, type TaskItem } from '../tasks/model';
 import { addDaysYmd, fromYmd, todayYmd, toYmd } from '../utils/mapTasks';
 import { loadPlanner } from '../store/db';
 import type { Habit, PlannerData } from '../types';
@@ -77,6 +81,12 @@ export default function Today() {
   const now = useMemo(() => pickNow(timed, allDay, overdue), [timed, allDay, overdue]);
   const habits = useMemo(() => habitsForDay(planner, today), [planner, today]);
   const spent = useMemo(() => (fin ? summarize(fin, { from: today, to: today }).expense : 0), [fin, today]);
+  const aiHelp = useMemo(() => helpable(tasks, today).slice(0, 2), [tasks, today]);
+  // черновики заранее (если включены в настройках) — когда задачи загрузились
+  useEffect(() => {
+    if (data) void autoDrafts(data.tasks.filter(isActive), today);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!data, today]);
 
   const d = fromYmd(today);
   return (
@@ -94,6 +104,7 @@ export default function Today() {
           </p>
           <Week today={today} tasks={tasks} />
           {now && <NowCard task={now} />}
+          {aiHelp.length > 0 && <AiHelpCard tasks={aiHelp} />}
           {habits.length > 0 && <HabitsRow habits={habits} planner={planner} today={today} />}
           <button className="td-money" onClick={() => go('finance')}>
             <span className="td-money-ico">
@@ -163,6 +174,35 @@ function Week({ today, tasks }: { today: string; tasks: TaskItem[] }) {
         ))}
       </div>
     </div>
+  );
+}
+
+/** Срок близко, а задачу может сделать ИИ (презентация, текст, письмо…) — предложить */
+function AiHelpCard({ tasks }: { tasks: TaskItem[] }) {
+  return (
+    <section className="td-aihelp">
+      <div className="td-aihelp-h">
+        <Orb size={22} />
+        <span>{t('ИИ поможет успеть')}</span>
+      </div>
+      {tasks.map((x) => (
+        <div key={x.id} className="td-aihelp-row">
+          <button className="td-aihelp-x" onClick={() => openTask(x.id)}>
+            <b>{x.title || t('Без названия')}</b>
+            <small>{whenLabel(x)}</small>
+          </button>
+          {x.aiNoteId ? (
+            <button className="td-aihelp-go ready" onClick={() => void openAiNote(x.aiNoteId!)}>
+              {t('Черновик')}
+            </button>
+          ) : (
+            <button className="td-aihelp-go" onClick={() => openAiDo(x.id)}>
+              {t('Сделать')}
+            </button>
+          )}
+        </div>
+      ))}
+    </section>
   );
 }
 

@@ -21,6 +21,7 @@ import { initLargeTitles } from './ui/navbar';
 import { VoiceFab, VoiceNavButton } from './voice/VoiceButton';
 import { SyncDot, SyncNavButton } from './ui/SyncBadge';
 import { useVoice } from './voice/state';
+import { useAiDo } from './tasks/aiDoState';
 import { SectionIcon, type SectionId } from './ui/icons';
 import { CaretLeft, type Icon } from '@phosphor-icons/react';
 import './ui/appearance.css';
@@ -53,6 +54,7 @@ const Progress = lazy(() => import('./views/Progress'));
 const Health = lazy(() => import('./views/Health'));
 const LevelBadge = lazy(() => import('./progress/LevelBadge').then((m) => ({ default: m.LevelBadge })));
 const VoiceHost = lazy(() => import('./voice/VoiceSheet'));
+const AiDoHost = lazy(() => import('./tasks/ui/AiDoSheet'));
 const OnboardingHost = lazy(() => import('./onboarding/OnboardingHost'));
 // поздравления с уровнем, достижениями и серией — в любом разделе
 const ProgressWatcher = lazy(() => import('./progress/ProgressWatcher'));
@@ -98,6 +100,7 @@ export default function App() {
   const view = useApp((s) => s.view);
   const go = useApp((s) => s.go);
   const voiceOpen = useVoice((s) => s.open);
+  const aiDoOpen = useAiDo((s) => !!s.taskId);
   const theme = useApp((s) => s.settings.theme);
   const accent = useApp((s) => s.settings.accent);
   const glass = useApp((s) => s.settings.glass);
@@ -323,6 +326,11 @@ export default function App() {
       {voiceOpen && (
         <Suspense fallback={null}>
           <VoiceHost />
+        </Suspense>
+      )}
+      {aiDoOpen && (
+        <Suspense fallback={null}>
+          <AiDoHost />
         </Suspense>
       )}
       <AuthGate />

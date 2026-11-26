@@ -66,6 +66,12 @@
   /* верхняя строка шапки не ниже кнопки «назад» — заголовок не подъезжает под неё (и без кнопок справа) */
   .app:has(> .phone-back) .page-header:not(.cv-header) { padding-top: calc(8px + var(--safe-top)) !important; }
   .app:has(> .phone-back) .page-header:not(.cv-header)::before { content: ''; flex: 0 0 0; height: 44px; }
+  /* главные вкладки (без «назад»): заголовок в одной строке с кнопками — без пустой строки под «чёлкой»/Dynamic Island */
+  .app:not(:has(> .phone-back)) .page-header:not(.cv-header) { padding-top: calc(6px + var(--safe-top)) !important; min-height: calc(50px + var(--safe-top)); align-items: center; }
+  .app:not(:has(> .phone-back)) .page-header:not(.cv-header) > :is(h1, .tk-title-btn, .nt-title-btn) {
+    order: -1; flex: 1 1 0; min-width: 45%; margin-top: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .app:not(:has(> .phone-back)) .page.is-scrolled .page-header:not(.cv-header) { padding-top: calc(4px + var(--safe-top)) !important; }
 }
 
 /* значок с числом задач на сегодня */

@@ -1,3 +1,4 @@
+import { AiHelperSettings } from '../ui/AiHelperSettings';
 import { useEffect, useState, type CSSProperties } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { canInstallPwa, installPwa, isAndroidApp, isDesktopApp, isIOSApp, isNative, onInstallChange, WINDOWS_SETUP_URL } from '../platform';
@@ -183,6 +184,8 @@ export default function Settings() {
           </ListSection>
 
           <AiPrivacySettings />
+
+          <AiHelperSettings />
 
           <TaskSettings />
 
