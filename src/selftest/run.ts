@@ -234,7 +234,7 @@ async function firstRun() {
     const { SpeechRecognition } = await import('@capacitor-community/speech-recognition');
     const { available } = await SpeechRecognition.available();
     const perm = await SpeechRecognition.checkPermissions();
-    return `доступно: ${available}, разрешение: ${perm.speechRecognition}`;
+    return `доступно: ${available}, разрешение: ${perm?.speechRecognition}`;
   });
 
   await check('озвучка: список голосов', async () => {

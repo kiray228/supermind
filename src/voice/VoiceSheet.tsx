@@ -1,9 +1,10 @@
 /**
  * Голосовая команда: нажал на микрофон → сказал → задача / расход / привычка / заметка появилась.
- * Результат можно сразу отменить или открыть.
+ * Всё сохраняется сразу: окно так и говорит «Сохранено», сохранённое можно отменить крестиком или открыть.
+ * Конец фразы приложение ловит само по паузе — кнопки «закончить» нет, но сфера по нажатию тоже заканчивает.
  */
 import { useEffect, useRef, useState } from 'react';
-import { ArrowCounterClockwise, ArrowUp, CaretRight, ChatCircleText, CheckCircle, CheckSquare, Microphone, NotePencil, Plant, SpeakerHigh, SpeakerSlash, Wallet, X } from '@phosphor-icons/react';
+import { ArrowUp, CaretRight, ChatCircleText, Check, CheckCircle, CheckSquare, Microphone, NotePencil, Plant, SpeakerHigh, SpeakerSlash, Wallet, X } from '@phosphor-icons/react';
 import { canListen, listen, type Listening } from './listen';
 import { execute, interpret, type Done, type VoiceAction } from './run';
 import { haptic } from '../editor/touch';
@@ -34,13 +35,15 @@ function VoiceSheet() {
   const [heard, setHeard] = useState('');
   const [typed, setTyped] = useState('');
   const [cards, setCards] = useState<Card[]>([]);
+  /** итог последней команды: что-то сохранено / только ответ на вопрос / не получилось */
+  const [outcome, setOutcome] = useState<'saved' | 'answer' | 'failed'>('saved');
   const [error, setError] = useState('');
   const [voiceOut, setVoiceOut] = useState(speakEnabled);
   const [speaking, setSpeaking] = useState(false);
   const rec = useRef<Listening | null>(null);
-  /** номер текущего прослушивания: «Готово» или закрытие отменяют то, что ещё только запускается */
+  /** номер текущего прослушивания: нажатие на сферу или закрытие отменяют то, что ещё только запускается */
   const listenSeq = useRef(0);
-  /** последний услышанный текст — «Готово» сразу отправляет его, не дожидаясь распознавателя */
+  /** последний услышанный текст — нажатие на сферу сразу отправляет его, не дожидаясь распознавателя */
   const heardNow = useRef('');
   const listeningNow = useRef(false);
   const alive = useRef(true);
@@ -69,6 +72,7 @@ function VoiceSheet() {
       for (const a of actions) out.push({ ...(await execute(a)), key: ++seq.current, kind: a.type });
       if (!alive.current) return;
       setCards((c) => [...out, ...c]);
+      setOutcome(out.some((c) => c.ok && c.kind !== 'ask') ? 'saved' : out.some((c) => c.ok) ? 'answer' : 'failed');
       setPhase('done');
       haptic(15);
       const say = out.map((c) => c.say).filter(Boolean).join(' ');
@@ -120,7 +124,7 @@ function VoiceSheet() {
         setPhase('idle');
       },
     });
-    // пока микрофон запускался, нажали «Готово» или закрыли окно
+    // пока микрофон запускался, нажали на сферу или закрыли окно
     if (!mine()) return r?.abort();
     rec.current = r;
     if (!r) {
@@ -129,9 +133,9 @@ function VoiceSheet() {
     }
   };
 
-  /** «Готово»: сразу берём то, что уже услышали, а распознаватель гасим — не ждём, пока он сам закончит */
+  /** Нажали на сферу во время записи: сразу берём то, что уже услышали, а распознаватель гасим */
   const stop = () => {
-    // касание и «клик» по «Готово» приходят оба — второй уже ничего не делает
+    // повторное нажатие уже ничего не делает
     if (!listeningNow.current) return;
     listeningNow.current = false;
     listenSeq.current++;
@@ -188,7 +192,11 @@ function VoiceSheet() {
         : phase === 'unknown'
           ? t('Не понял команду — скажите иначе')
           : phase === 'done'
-            ? t('Готово')
+            ? outcome === 'saved'
+              ? t('Сохранено')
+              : outcome === 'answer'
+                ? t('Ответ')
+                : t('Не получилось')
             : voiceOk
               ? t('Нажмите на сферу и скажите команду')
               : t('Напишите команду');
@@ -226,21 +234,14 @@ function VoiceSheet() {
               <Orb size={92} state={listening ? 'listening' : phase === 'thinking' ? 'thinking' : speaking ? 'speaking' : 'idle'} />
             </button>
           )}
-          <div className={`vc-status${phase === 'unknown' ? ' warn' : ''}`}>{status}</div>
+          <div className={`vc-status${phase === 'unknown' || (phase === 'done' && outcome === 'failed') ? ' warn' : ''}${phase === 'done' && outcome === 'saved' ? ' ok' : ''}`}>
+            {phase === 'done' && outcome === 'saved' && <CheckCircle size={22} weight="fill" />}
+            {status}
+          </div>
           {heard ? <div className={`vc-heard${listening ? ' live' : ''}`}>«{heard}»</div> : null}
+          {listening && <div className="vc-hint">{t('Закончу сам, когда вы замолчите')}</div>}
+          {phase === 'done' && outcome === 'saved' && <div className="vc-hint">{t('Подтверждать не нужно — всё уже сохранено. Передумали — нажмите ✕.')}</div>}
           {error && <div className="vc-error">{error}</div>}
-          {listening && (
-            <button
-              className="vc-stop"
-              onPointerDown={(e) => {
-                e.preventDefault();
-                stop();
-              }}
-              onClick={stop}
-            >
-              {t('Готово')}
-            </button>
-          )}
         </div>
 
         {cards.length > 0 && (
@@ -259,7 +260,7 @@ function VoiceSheet() {
                   </button>
                   {c.ok && !c.undone && c.undo ? (
                     <button className="vc-undo" onClick={() => void undo(c)} aria-label={t('Отменить')} title={t('Отменить')}>
-                      <ArrowCounterClockwise size={18} weight="bold" />
+                      <X size={18} weight="bold" />
                     </button>
                   ) : c.open && !c.undone ? (
                     <CaretRight size={16} className="vc-caret" />
@@ -307,10 +308,17 @@ function VoiceSheet() {
             <ArrowUp size={18} weight="bold" />
           </button>
         </form>
-        {phase === 'done' && voiceOk && (
-          <button className="vc-again" onClick={() => void start()}>
-            <Microphone size={18} weight="fill" /> {t('Ещё команда')}
-          </button>
+        {phase === 'done' && (
+          <div className="vc-actions">
+            {voiceOk && (
+              <button className="vc-again" onClick={() => void start()}>
+                <Microphone size={18} weight="fill" /> {t('Ещё команда')}
+              </button>
+            )}
+            <button className="vc-finish" onClick={close}>
+              <Check size={18} weight="bold" /> {t('Готово')}
+            </button>
+          </div>
         )}
       </div>
     </div>

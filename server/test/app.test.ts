@@ -601,3 +601,72 @@ test('отчёты об ошибках: без входа, одинаковые 
   list = await req<Errs>('GET', '/admin/errors?status=all', undefined, boss);
   assert.equal(list.data.items.find((x) => x.id === v43.id)!.note, 'Исправлено в 1.44');
 });
+
+test('ссылки на карты: просмотр и правка, карта у получателя с владельцем, отзыв ссылки', async () => {
+  const owner = (await call<{ token: string }>('POST', '/auth/register', { name: 'Анна', email: 'share-owner@b.cd', password: '12345678' })).data.token;
+  const guest = (await call<{ token: string }>('POST', '/auth/register', { name: 'Борис', email: 'share-guest@b.cd', password: '12345678' })).data.token;
+  const doc = { id: 'm1', title: 'План', sheets: [], activeSheet: 's', createdAt: 1, updatedAt: 1 };
+  const pushed = await call<{ results: { seq: number }[] }>('POST', '/sync', { items: [{ key: 'doc:m1', value: doc, updatedAt: 1, baseSeq: 0 }] }, owner);
+  const seq0 = pushed.data.results[0].seq;
+
+  // карты, которой нет в облаке, и чужой карты — не поделиться
+  assert.equal((await call('POST', '/shares', { docId: 'nope', role: 'view' }, owner)).status, 404);
+  assert.equal((await call('POST', '/shares', { docId: 'm1', role: 'view' }, guest)).status, 404);
+  assert.equal((await call('POST', '/shares', { docId: 'm1', role: 'admin' }, owner)).status, 400);
+
+  const view = (await call<{ token: string }>('POST', '/shares', { docId: 'm1', role: 'view' }, owner)).data.token;
+  const edit = (await call<{ token: string }>('POST', '/shares', { docId: 'm1', role: 'edit' }, owner)).data.token;
+  assert.equal((await call<{ token: string }>('POST', '/shares', { docId: 'm1', role: 'view' }, owner)).data.token, view, 'одна ссылка на роль');
+  assert.notEqual(view, edit);
+
+  // без входа не открыть; своя ссылка — просто id карты
+  assert.equal((await call('GET', `/s/${view}`)).status, 401);
+  const own = await call<{ own: boolean; docId: string }>('GET', `/s/${view}`, undefined, owner);
+  assert.deepEqual([own.data.own, own.data.docId], [true, 'm1']);
+
+  // просмотр: карта и владелец, править нельзя
+  const v = await call<{ role: string; owner: { name: string }; doc: { title: string }; seq: number }>('GET', `/s/${view}`, undefined, guest);
+  assert.equal(v.status, 200);
+  assert.deepEqual([v.data.role, v.data.owner.name, v.data.doc.title, v.data.seq], ['view', 'Анна', 'План', seq0]);
+  assert.equal((await call('PUT', `/s/${view}`, { doc: { ...doc, title: 'Взлом' }, baseSeq: seq0 }, guest)).status, 403);
+
+  // правка: пишется в данные владельца, его устройства получают её синхронизацией
+  const e = await call<{ seq: number }>('GET', `/s/${edit}`, undefined, guest);
+  const saved = await call<{ ok: boolean; seq: number }>('PUT', `/s/${edit}`, { doc: { ...doc, title: 'План 2', updatedAt: 2 }, baseSeq: e.data.seq }, guest);
+  assert.equal(saved.status, 200);
+  const pull = await call<{ items: { key: string; value: { title: string }; seq: number }[] }>('GET', `/sync?since=${seq0}`, undefined, owner);
+  assert.deepEqual(pull.data.items.map((i) => [i.key, i.value.title]), [['doc:m1', 'План 2']]);
+
+  // устаревшая версия — 409 со свежей картой; чужой id карты — 400
+  const stale = await call<{ doc: { title: string }; seq: number }>('PUT', `/s/${edit}`, { doc: { ...doc, title: 'Старое' }, baseSeq: e.data.seq }, guest);
+  assert.equal(stale.status, 409);
+  assert.deepEqual([stale.data.doc.title, stale.data.seq], ['План 2', saved.data.seq]);
+  assert.equal((await call('PUT', `/s/${edit}`, { doc: { ...doc, id: 'other' }, baseSeq: saved.data.seq }, guest)).status, 400);
+
+  // у получателя — в списке с владельцем; можно убрать из списка
+  let mine = await call<{ maps: { token: string; title: string; role: string; owner: { name: string } }[] }>('GET', '/shared', undefined, guest);
+  assert.deepEqual(
+    mine.data.maps.map((m) => [m.role, m.title, m.owner.name]).sort(),
+    [['edit', 'План 2', 'Анна'], ['view', 'План 2', 'Анна']],
+  );
+  assert.equal((await call<{ maps: unknown[] }>('GET', '/shared', undefined, owner)).data.maps.length, 0, 'свои карты не дублируются');
+  await call('DELETE', `/shared/${view}`, undefined, guest);
+  mine = await call('GET', '/shared', undefined, guest);
+  assert.deepEqual(mine.data.maps.map((m) => m.role), ['edit']);
+
+  // список ссылок владельца и отзыв: ссылка перестаёт работать, у получателя карта пропадает
+  const links = await call<{ links: { token: string; role: string; people: number }[] }>('GET', '/shares?docId=m1', undefined, owner);
+  assert.deepEqual(links.data.links.map((l) => [l.role, l.people]), [['view', 0], ['edit', 1]]);
+  assert.equal((await call('DELETE', `/shares/${edit}`, undefined, guest)).status, 404, 'отзывает только владелец');
+  assert.equal((await call('DELETE', `/shares/${edit}`, undefined, owner)).status, 200);
+  assert.equal((await call('GET', `/s/${edit}`, undefined, guest)).status, 404);
+  assert.equal((await call<{ maps: unknown[] }>('GET', '/shared', undefined, guest)).data.maps.length, 0);
+  const fresh = (await call<{ token: string }>('POST', '/shares', { docId: 'm1', role: 'edit' }, owner)).data.token;
+  assert.notEqual(fresh, edit, 'после отзыва — новая ссылка');
+
+  // карту с паролем по ссылке не открыть
+  const cur = await call<{ items: { seq: number }[] }>('GET', `/sync?since=0`, undefined, owner);
+  const last = cur.data.items.find((i) => (i as unknown as { key: string }).key === 'doc:m1')!.seq;
+  await call('POST', '/sync', { items: [{ key: 'doc:m1', value: { id: 'm1', locked: true, data: 'x' }, updatedAt: 9, baseSeq: last }] }, owner);
+  assert.equal((await call('GET', `/s/${view}`, undefined, guest)).status, 403);
+});

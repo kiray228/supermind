@@ -2,7 +2,7 @@ import { LOCALE, t, tn } from '../i18n/index';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
-  Plus, Sparkles, Upload, Search, Star, Trash2, MoreHorizontal, Lock, Copy, Pencil, RotateCcw, Download, Clock, X, ArrowUpDown, LayoutTemplate, Check, ChevronRight,
+  Plus, Sparkles, Upload, Search, Star, Trash2, MoreHorizontal, Lock, Copy, Pencil, RotateCcw, Download, Clock, X, ArrowUpDown, LayoutTemplate, Check, ChevronRight, Link2, Share2,
 } from 'lucide-react';
 import type { DocMeta } from '../types';
 import { deleteDoc, fillPreviews, listDocs, loadDoc, saveDoc, saveLocked, updateMeta } from '../store/db';
@@ -21,6 +21,10 @@ import './home.css';
 import { mark } from '../perf';
 import { IconTile } from '../ui/icons';
 import { InstallAppButton } from '../ui/InstallAppButton';
+import { SharedMaps } from '../share/SharedMaps';
+import { askOpenLink } from '../share/open';
+
+const ShareDialog = lazy(() => import('../share/ShareDialog'));
 
 // импорт/экспорт (xmind, office…) и ИИ — отдельными модулями, только когда нужны
 const AICreate = lazy(() => import('./HomeAI'));
@@ -48,6 +52,8 @@ export default function Home() {
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [aiOpen, setAiOpen] = useState(false);
   const [tplOpen, setTplOpen] = useState(false);
+  /** «Поделиться ссылкой» для карты из списка */
+  const [shareDoc, setShareDoc] = useState<DocMeta | null>(null);
   const [sort, setSortState] = useState<Sort>(() => {
     try {
       const v = localStorage.getItem(SORT_KEY);
@@ -149,6 +155,9 @@ export default function Home() {
         }
         break;
       }
+      case 'share':
+        setShareDoc(m);
+        return;
       case 'star':
         await updateMeta(id, { starred: !m.starred });
         toast(m.starred ? t('Убрано из избранного') : t('⭐ В избранном'));
@@ -204,6 +213,7 @@ export default function Home() {
           ]
         : [
             { label: t('Открыть'), icon: <ChevronRight size={16} />, run: () => act(menu.id, 'open') },
+            { label: t('Поделиться ссылкой'), icon: <Share2 size={16} />, run: () => act(menu.id, 'share') },
             { label: t('Переименовать'), icon: <Pencil size={16} />, run: () => act(menu.id, 'rename') },
             { label: menuDoc?.starred ? t('Убрать из избранного') : t('В избранное'), icon: <Star size={16} />, run: () => act(menu.id, 'star') },
             { label: t('Дублировать'), icon: <Copy size={16} />, run: () => act(menu.id, 'dup') },
@@ -235,6 +245,9 @@ export default function Home() {
           <button className="home-chip" onClick={doImport} title={t('Импорт файла (.xmind, .mm, .md, .opml)')}>
             <Upload size={16} /> {t('Импорт')}
           </button>
+          <button className="home-chip" onClick={() => void askOpenLink()} title={t('Открыть карту, которой с вами поделились')}>
+            <Link2 size={16} /> {t('По ссылке')}
+          </button>
         </div>
 
         {/* телефон: одна строка — вкладки списка и действия (вместо двух рядов кнопок и переключателя) */}
@@ -254,6 +267,9 @@ export default function Home() {
             </button>
             <button className="home-chip" onClick={doImport}>
               <Upload size={15} /> {t('Импорт')}
+            </button>
+            <button className="home-chip" onClick={() => void askOpenLink()}>
+              <Link2 size={15} /> {t('По ссылке')}
             </button>
             <button className={`home-chip${tab === 'trash' ? ' is-on' : ''}`} onClick={() => setTab('trash')} aria-pressed={tab === 'trash'}>
               <Trash2 size={14} /> {t('Корзина')}{trashCount > 0 ? ` · ${trashCount}` : ''}
@@ -324,6 +340,7 @@ export default function Home() {
             )}
           </>
         )}
+        {tab === 'recent' && <SharedMaps q={q} />}
       </div>
 
       {menu &&
@@ -359,6 +376,11 @@ export default function Home() {
       {aiOpen && (
         <Suspense fallback={null}>
           <AICreate onClose={() => setAiOpen(false)} />
+        </Suspense>
+      )}
+      {shareDoc && (
+        <Suspense fallback={null}>
+          <ShareDialog docId={shareDoc.id} title={shareDoc.title} locked={!!shareDoc.locked} onClose={() => setShareDoc(null)} />
         </Suspense>
       )}
       {tplOpen && (

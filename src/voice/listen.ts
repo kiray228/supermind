@@ -4,7 +4,8 @@
  */
 import { isNative } from '../platform';
 import { t } from '../i18n/index';
-import { nativeSession, smSession, webSession, type Listening, type ListenOpts, type NativeSR, type SmSpeechSR, type SRCtor } from './sessions';
+import { recordError } from '../ui/errorReport';
+import { micAllowed, nativeSession, smSession, webSession, type Listening, type ListenOpts, type NativeSR, type SmSpeechSR, type SRCtor } from './sessions';
 export type { Listening, ListenOpts };
 
 function webCtor(): SRCtor | null {
@@ -20,6 +21,12 @@ export async function listen(o: ListenOpts): Promise<Listening | null> {
   if (isNative()) return listenNative(o);
   const C = webCtor();
   return C ? webSession(C, o) : null;
+}
+
+/** Сбой плагина — понятное сообщение пользователю, подробности — в отчёт об ошибках */
+function failed(o: ListenOpts, e: unknown) {
+  recordError(e, 'error');
+  o.onError(t('Распознавание речи недоступно'));
 }
 
 interface SmSpeechPlugin extends SmSpeechSR {
@@ -38,14 +45,12 @@ async function listenAndroid(o: ListenOpts): Promise<Listening | null> {
       o.onError(t('На телефоне нет распознавания речи — установите приложение Google'));
       return null;
     }
-    let perm = await SR.checkPermissions();
-    if (perm.microphone !== 'granted') perm = await SR.requestPermissions({ permissions: ['microphone'] });
-    if (perm.microphone !== 'granted') {
+    if (!(await micAllowed(() => SR.checkPermissions(), () => SR.requestPermissions({ permissions: ['microphone'] }), 'microphone'))) {
       o.onError(t('Нет доступа к микрофону — разрешите его в настройках'));
       return null;
     }
   } catch (e) {
-    o.onError(e instanceof Error ? e.message : t('Распознавание речи недоступно'));
+    failed(o, e);
     return null;
   }
   return smSession(SR, o);
@@ -61,14 +66,12 @@ async function listenNative(o: ListenOpts): Promise<Listening | null> {
       o.onError(t('На телефоне нет распознавания речи — установите приложение Google'));
       return null;
     }
-    let perm = await SpeechRecognition.checkPermissions();
-    if (perm.speechRecognition !== 'granted') perm = await SpeechRecognition.requestPermissions();
-    if (perm.speechRecognition !== 'granted') {
+    if (!(await micAllowed(() => SpeechRecognition.checkPermissions(), () => SpeechRecognition.requestPermissions(), 'speechRecognition'))) {
       o.onError(t('Нет доступа к микрофону — разрешите его в настройках'));
       return null;
     }
   } catch (e) {
-    o.onError(e instanceof Error ? e.message : t('Распознавание речи недоступно'));
+    failed(o, e);
     return null;
   }
   return nativeSession(SpeechRecognition as unknown as NativeSR, o);

@@ -3,7 +3,7 @@ import {
   CaretLeft, ArrowCounterClockwise, ArrowClockwise, Sparkle, SlidersHorizontal, MagnifyingGlass, DotsThree, Plus, ArrowElbowDownRight, Trash, BezierCurve, Selection,
   BracketsCurly, Minus, CornersOut, PresentationChart, ArrowsOutSimple, DownloadSimple, Lock, LockOpen, Graph, TreeView, ChartBarHorizontal, X, CaretRight,
   Keyboard, Copy, Scissors, ClipboardText, FilePlus, PencilSimple, ArrowsInLineVertical, ArrowLineUp, CopySimple, NotePencil, CloudArrowUp, Check, Palette, ArrowsLeftRight,
-  Export, CaretDown, Stack, ClockCounterClockwise, Crosshair, FloppyDisk, WarningCircle, type Icon,
+  Export, CaretDown, Stack, ClockCounterClockwise, Crosshair, FloppyDisk, WarningCircle, ShareNetwork, Eye, type Icon,
 } from '@phosphor-icons/react';
 import { focusPath, focusSheet } from './focus';
 import { useDoc, topicSide, saveNow } from '../store/docStore';
@@ -34,6 +34,8 @@ import { t, tn } from '../i18n/index';
 import './editor.css';
 
 const MapHistory = lazy(() => import('./MapHistory'));
+const ShareDialog = lazy(() => import('../share/ShareDialog'));
+import '../share/share.css';
 
 const levelWord = (n: number) => `${n} ${tn(n, 'уровень', 'уровня', 'уровней')}`;
 
@@ -108,6 +110,10 @@ export default function Editor() {
   }, []);
   const [showKeys, setShowKeys] = useState(false);
   const [history, setHistory] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  /** чужая карта по ссылке: чья и что можно (null — своя) */
+  const shared = useDoc((s) => s.shared);
+  const viewOnly = shared?.role === 'view';
   const [isMobileView, setIsMobileView] = useState(isMobile);
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 760px)');
@@ -380,10 +386,12 @@ export default function Editor() {
         { icon: <PresentationChart size={16} />, label: t('Презентация'), onClick: startPitch },
         { icon: <ArrowsOutSimple size={16} />, label: t('Режим Zen'), kbd: 'Ctrl+E', onClick: () => setZen(true) },
         { icon: <Stack size={16} />, label: t('Уровни…'), onClick: () => openLevelsMenu(x, y) },
-        { icon: <ClockCounterClockwise size={16} />, label: t('История версий'), onClick: () => setHistory(true) },
+        // у чужой карты история версий и пароль — у владельца
+        ...(shared ? [] : [{ icon: <ShareNetwork size={16} />, label: t('Поделиться ссылкой'), onClick: () => setShareOpen(true) }]),
+        ...(shared ? [] : [{ icon: <ClockCounterClockwise size={16} />, label: t('История версий'), onClick: () => setHistory(true) }]),
         { icon: <Export size={16} />, label: t('Экспорт…'), onClick: () => openExportMenu(x, y) },
         'sep',
-        { icon: password ? <LockOpen size={16} /> : <Lock size={16} />, label: password ? t('Снять пароль') : t('Защитить паролем'), onClick: togglePassword },
+        ...(shared ? [] : [{ icon: password ? <LockOpen size={16} /> : <Lock size={16} />, label: password ? t('Снять пароль') : t('Защитить паролем'), onClick: togglePassword }]),
         // на телефоне клавиатурных сокращений нет
         ...(window.matchMedia('(pointer: coarse)').matches ? [] : [{ icon: <Keyboard size={16} />, label: t('Горячие клавиши'), onClick: () => setShowKeys(true) }]),
       ],
@@ -645,10 +653,11 @@ export default function Editor() {
             className="ed-title"
             defaultValue={doc.title}
             key={doc.id + doc.title}
+            readOnly={viewOnly}
             onBlur={(e) => e.target.value.trim() && e.target.value !== doc.title && st.setTitle(e.target.value.trim())}
             onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
           />
-          <button
+          {!viewOnly && <button
             className={`ed-save ${saveError ? 'err' : ''}`}
             onClick={() => void saveMap()}
             title={saveError ? t('Карта не сохранилась — нажмите, чтобы сохранить') : saving ? t('Сохранение…') : t('Сохранить (Ctrl+S)')}
@@ -657,7 +666,7 @@ export default function Editor() {
             {password && <Lock size={13} className="ed-save-lock" />}
             {saveError ? <WarningCircle weight="fill" /> : saving ? <CloudArrowUp /> : <FloppyDisk />}
             <span className="ed-save-label">{t('Сохранить')}</span>
-          </button>
+          </button>}
           <div className="grow" />
           {touchUI ? (
             <>
@@ -690,6 +699,12 @@ export default function Editor() {
             </>
           )}
         </header>
+      )}
+      {showChrome && shared && (
+        <span className="shared-badge" title={viewOnly ? t('Владелец карты — {name}. Только просмотр', { name: shared.owner.name }) : t('Владелец карты — {name}. Правки сохраняются у владельца', { name: shared.owner.name })}>
+          {viewOnly ? <Eye size={14} weight="bold" /> : <PencilSimple size={14} weight="bold" />}
+          {viewOnly ? t('Просмотр · {name}', { name: shared.owner.name }) : t('Владелец: {name}', { name: shared.owner.name })}
+        </span>
       )}
 
       {search !== null && showChrome && (
@@ -728,7 +743,7 @@ export default function Editor() {
                 if (url) window.open(url, '_blank', 'noopener');
               }}
               pitchFocus={pitchFocus}
-              readOnly={!!pitch}
+              readOnly={!!pitch || viewOnly}
               searchHits={hitSet}
               onViewChange={onViewChange}
             />
@@ -891,6 +906,11 @@ export default function Editor() {
       {history && (
         <Suspense fallback={null}>
           <MapHistory onClose={() => setHistory(false)} />
+        </Suspense>
+      )}
+      {shareOpen && (
+        <Suspense fallback={null}>
+          <ShareDialog docId={doc.id} title={doc.title} locked={!!password} onClose={() => setShareOpen(false)} />
         </Suspense>
       )}
     </div>

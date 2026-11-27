@@ -110,6 +110,7 @@ export function AuthGate() {
         <img src="./icon.svg" alt="" className="auth-logo" />
         <h1 id="auth-title" className="auth-title">SuperMind</h1>
         <p className="auth-sub">{sub}</p>
+        {/[#?&]map=/.test(location.hash) && !recovering && <p className="auth-sub auth-shared">{t('С вами поделились картой — она откроется сразу после входа.')}</p>}
 
         {recovering ? (
           <h2 className="auth-step">{mode === 'forgot' ? t('Восстановление пароля') : t('Новый пароль')}</h2>

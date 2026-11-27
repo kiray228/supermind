@@ -1,7 +1,7 @@
 /** Сеансы распознавания одной фразы — без зависимостей от приложения (тесты гоняют их в Node на подделках) */
 import { LOCALE, t } from '../i18n/index';
 
-import { SILENCE_MS, silenceTimer } from './silence';
+import { FINAL_WAIT_MS, SILENCE_MS, silenceTimer } from './silence';
 
 export interface Listening {
   /** закончить и дождаться итогового текста */
@@ -141,7 +141,7 @@ export async function nativeSession(SR: NativeSR, o: ListenOpts): Promise<Listen
   };
   const quiet = silenceTimer(SILENCE_MS, () => {
     halt();
-    end(450);
+    end(FINAL_WAIT_MS);
   });
   handles.push(
     await SR.addListener('partialResults', (d) => {
@@ -158,14 +158,16 @@ export async function nativeSession(SR: NativeSR, o: ListenOpts): Promise<Listen
   );
   handles.push(
     await SR.addListener('listeningState', (d) => {
-      if (d.status === 'stopped' && !done) end(text ? 900 : 1500);
+      if (d.status === 'stopped' && !done) end(text ? FINAL_WAIT_MS : 1500);
     }),
   );
   try {
     await SR.start({ language: LOCALE, maxResults: 1, partialResults: true, popup: false });
   } catch (e) {
     finish(false);
-    o.onError(e instanceof Error && e.message ? t('Не удалось распознать: {error}', { error: e.message }) : t('Не удалось начать распознавание'));
+    // без доступа к микрофону плагин отказывает в запуске («Missing permission»)
+    if (e instanceof Error && /permission/i.test(e.message)) o.onError(t('Нет доступа к микрофону — разрешите его в настройках'));
+    else o.onError(e instanceof Error && e.message ? t('Не удалось распознать: {error}', { error: e.message }) : t('Не удалось начать распознавание'));
     return null;
   }
   noSpeech = setTimeout(() => {
@@ -176,7 +178,7 @@ export async function nativeSession(SR: NativeSR, o: ListenOpts): Promise<Listen
   return {
     stop: () => {
       halt();
-      end(700);
+      end(text ? FINAL_WAIT_MS : 700);
     },
     abort: () => {
       halt();
@@ -203,7 +205,7 @@ export interface SmSpeechSR {
   addListener(ev: 'speech', fn: (e: SmSpeechEvent) => void): Promise<{ remove(): Promise<void> }>;
 }
 
-/** Сколько ждать окончательный текст после конца фразы */
+/** Сколько ждать окончательный текст после конца фразы, если не услышали ни слова */
 export const RESULT_WAIT_MS = 2500;
 
 /** Текст ошибки — литералами t('…'), чтобы проверка переводов их видела */
@@ -244,9 +246,11 @@ export async function smSession(SR: SmSpeechSR, o: ListenOpts): Promise<Listenin
     clearTimeout(timer);
     timer = setTimeout(() => finish(true), wait);
   };
+  /** конец фразы: со сказанным текстом окончательный ждём недолго, без него — дольше (он может ещё прийти) */
+  const endPhrase = () => end(text ? FINAL_WAIT_MS : RESULT_WAIT_MS);
   const quiet = silenceTimer(SILENCE_MS, () => {
     void SR.stop().catch(() => {});
-    end(RESULT_WAIT_MS);
+    endPhrase();
   });
   handle = await SR.addListener('speech', (e) => {
     if (done || (mine !== null && e.session !== mine)) return;
@@ -265,7 +269,7 @@ export async function smSession(SR: SmSpeechSR, o: ListenOpts): Promise<Listenin
         break;
       }
       case 'end':
-        end(RESULT_WAIT_MS);
+        endPhrase();
         break;
       case 'result': {
         const s = (e.text ?? '').trim();
@@ -298,11 +302,23 @@ export async function smSession(SR: SmSpeechSR, o: ListenOpts): Promise<Listenin
   return {
     stop: () => {
       void SR.stop().catch(() => {});
-      end(1200);
+      end(text ? FINAL_WAIT_MS : 1200);
     },
     abort: () => {
       void SR.cancel().catch(() => {});
       finish(false);
     },
   };
+}
+
+/**
+ * Есть ли доступ к микрофону. Плагины на части телефонов отвечают на проверку разрешения пустым
+ * результатом — тогда не гадаем, а запускаем распознавание: без доступа запуск сам вернёт ошибку доступа.
+ */
+export async function micAllowed(check: () => Promise<unknown>, request: () => Promise<unknown>, key: string): Promise<boolean> {
+  const state = (r: unknown) => (r && typeof r === 'object' ? (r as Record<string, unknown>)[key] : undefined);
+  const now = state(await check());
+  if (now === 'granted') return true;
+  const after = state(await request());
+  return after === 'granted' || after === undefined;
 }

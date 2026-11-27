@@ -28,15 +28,13 @@
 @keyframes vc-ring { from { transform: scale(1); opacity: .55; } to { transform: scale(1.75); opacity: 0; } }
 @keyframes vc-breathe { 50% { transform: scale(1.05); } }
 
-.vc-status { font-size: 17px; font-weight: 600; letter-spacing: -0.02em; color: var(--text); }
+.vc-status { display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 17px; font-weight: 600; letter-spacing: -0.02em; color: var(--text); }
+.vc-status.ok { color: var(--ios-green, #34c759); font-size: 19px; }
+.vc-hint { font-size: 13px; line-height: 1.35; color: var(--text-2); max-width: 300px; }
 .vc-status.warn { color: var(--ios-orange, #ff9500); }
 .vc-heard { font-size: 20px; line-height: 1.3; letter-spacing: -0.02em; color: var(--text); max-width: 100%; overflow-wrap: anywhere; }
 .vc-heard.live { color: var(--text-2); }
 .vc-error { font-size: 14px; color: var(--ios-red); }
-.vc-stop {
-  min-height: 40px; padding: 0 22px; border-radius: 999px; border: 0; background: var(--fill-3); color: var(--text);
-  font: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
-}
 
 /* результаты */
 .vc-cards { display: flex; flex-direction: column; gap: 8px; }
@@ -84,10 +82,13 @@
   width: 36px; height: 36px; border-radius: 50%; border: 0; background: var(--accent); color: #fff; display: grid; place-items: center; cursor: pointer; flex-shrink: 0;
 }
 .vc-send:disabled { background: var(--fill-2); color: var(--text-2); }
-.vc-again {
-  display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; border-radius: 14px; border: 0;
-  background: var(--accent); color: #fff; font: inherit; font-size: 16px; font-weight: 600; cursor: pointer;
+.vc-actions { display: flex; gap: 8px; }
+.vc-again, .vc-finish {
+  flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; border-radius: 14px; border: 0;
+  font: inherit; font-size: 16px; font-weight: 600; cursor: pointer;
 }
+.vc-again { background: var(--fill-3); color: var(--text); }
+.vc-finish { background: var(--accent); color: #fff; }
 
 /* громкость голоса (Android): сфера пульсирует в такт речи */
 .vc-orb .orb { transition: transform .12s ease-out; }

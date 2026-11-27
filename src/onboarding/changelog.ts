@@ -1,5 +1,5 @@
 /** «Что нового»: главное в каждой версии. Новые версии — сверху. */
-import { Heart, Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge, MessageCircleQuestion, CloudOff, LayoutTemplate, SquareArrowOutUpRight, BellRing, Target, Timer, Lock, Crosshair, Move, GitMerge, EyeOff, CalendarRange, Fingerprint, ArrowUpDown, Banknote, MonitorSmartphone, Coins, ListChecks, FileInput, Split, CornerDownRight, KeyRound, Keyboard, LifeBuoy, Zap, FileSpreadsheet, Gauge as GaugeIcon, MessagesSquare, Accessibility, Focus, Save, Flag, RefreshCw, Footprints, Kanban, Smartphone, Languages, ScanFace, ScanText, SlidersHorizontal } from 'lucide-react';
+import { Heart, Bot, CalendarClock, Cloud, LayoutGrid, Palette, Repeat, Search, Share2, Sparkles, Trophy, Wallet, Wrench, ShieldCheck, Sunrise, Mic, Layers, History, Waypoints, Flame, Hand, ClipboardList, AlarmClock, Undo2, Network, Link2, Download, Brain, AtSign, Copy, Equal, Upload, BookOpenText, Compass, NotebookPen, GraduationCap, Share, Newspaper, Sun, Gauge, MessageCircleQuestion, CloudOff, LayoutTemplate, SquareArrowOutUpRight, BellRing, Target, Timer, Lock, Crosshair, Move, GitMerge, EyeOff, CalendarRange, Fingerprint, ArrowUpDown, Banknote, MonitorSmartphone, Coins, ListChecks, FileInput, Split, CornerDownRight, KeyRound, Keyboard, LifeBuoy, Zap, FileSpreadsheet, Gauge as GaugeIcon, MessagesSquare, Accessibility, Focus, Save, Flag, RefreshCw, Footprints, Kanban, Smartphone, Languages, ScanFace, ScanText, SlidersHorizontal, Users, CheckCircle2 } from 'lucide-react';
 import { t } from '../i18n/index';
 
 export interface ChangeItem {
@@ -17,6 +17,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   // 1.50 и новее — с переводом (t), старые записи остаются по-русски
+  {
+    version: '1.55',
+    title: t('Ссылки на карты и голос без лишних кнопок'),
+    items: [
+      { icon: Share2, title: t('Поделиться картой по ссылке'), text: t('В меню карты «Поделиться ссылкой»: выберите «Только просмотр» или «Может редактировать» и отправьте ссылку. Ссылку можно отключить в любой момент.') },
+      { icon: Users, title: t('«Доступные мне»'), text: t('Карты, которыми с вами поделились, видны в «Картах» с именем владельца. По ссылке с правом правки вы меняете карту вместе с владельцем — правки видны обоим через несколько секунд.') },
+      { icon: Mic, title: t('Голос сам заканчивает фразу'), text: t('Кнопки «Готово» во время записи больше нет: замолчите — и команда выполнится, на телефоне — заметно быстрее.') },
+      { icon: CheckCircle2, title: t('Понятно, что всё сохранено'), text: t('После голосовой команды окно пишет «Сохранено» — подтверждать ничего не нужно. Передумали — нажмите ✕ рядом с записью.') },
+      { icon: Wrench, title: t('Исправления'), text: t('На некоторых телефонах голосовой ввод падал с ошибкой «speechRecognition» — теперь он работает, а если нет доступа к микрофону, приложение так и скажет.') },
+    ],
+  },
   {
     version: '1.54',
     title: t('ИИ делает задачи за вас и голосовая сфера'),

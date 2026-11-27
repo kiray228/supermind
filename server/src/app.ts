@@ -15,6 +15,9 @@
  *   GET /sync?since=N · POST /sync
  *   GET /snapshots · GET /snapshots/:id · POST /snapshots — облачные копии данных (каждый час при изменениях — сами)
  *   GET /push/key · POST /devices · PUT /devices/:id/schedule · POST /devices/:id/test · DELETE /devices/:id
+ *   POST /shares {docId, role} · GET /shares?docId= · DELETE /shares/:token — ссылки владельца на свою карту (смотреть / править)
+ *   GET /s/:token — открыть карту по ссылке · PUT /s/:token — сохранить правку (ссылка с правом правки)
+ *   GET /shared — карты, открытые по ссылкам · DELETE /shared/:token — убрать чужую карту из своего списка
  *   POST /cron — Neon Function Trigger раз в минуту: рассылает наступившие напоминания
  */
 import { hashPassword, newToken, tokenHash, verifyPassword } from './crypto.ts';
@@ -25,7 +28,7 @@ import { doneMail, envMailer, feedbackMail, replyMail, resetMail, type Mailer } 
 import { commandPrompt, envAi, envVision, ocrPrompt, parseAiJson, parseOcrText, readOcrImage, type Ai, type Vision } from './ai.ts';
 import { fetchPublicPage, isPublicIp, WebError, type FetchPage } from './web.ts';
 import { HELP_DOC } from './helpdoc.ts';
-import { randomInt } from 'node:crypto';
+import { randomBytes, randomInt } from 'node:crypto';
 
 export interface Deps {
   sql: Sql;
@@ -864,6 +867,163 @@ ${HELP_DOC}`;
     return json({ items, cursor, more });
   }
 
+  // ================= Ссылки на карты =================
+
+  const SHARE_ROLES = new Set(['view', 'edit']);
+  /** ссылок на одну карту (обе роли и пересозданные после отзыва) */
+  const MAX_SHARE_LINKS = 20;
+
+  /** Карта владельца из его данных: null — удалена; locked — с паролем (по ссылке не открыть) */
+  async function ownerDoc(ownerId: string, docId: string) {
+    const rows = await sql.query(`SELECT value, seq, deleted FROM kv WHERE user_id = $1 AND key = $2`, [ownerId, `doc:${docId}`]);
+    const r = rows[0];
+    if (!r || r[2] === 't' || r[2] === 'true' || r[0] == null) return null;
+    const doc = JSON.parse(r[0]) as Record<string, unknown> | null;
+    if (!doc || typeof doc !== 'object') return null;
+    return { doc, seq: Number(r[1]), locked: 'locked' in doc };
+  }
+
+  /** Владелец создаёт ссылку: на каждую роль — одна действующая (повторный запрос возвращает её же) */
+  async function createShare(request: Request) {
+    const user = await userOf(request);
+    const b = await body<{ docId?: string; role?: string }>(request);
+    const docId = str(b.docId);
+    const role = str(b.role);
+    if (!docId || docId.length > 100 || !SHARE_ROLES.has(role)) throw new HttpError(400, 'Неверный запрос');
+    const d = await ownerDoc(user.id, docId);
+    if (!d) throw new HttpError(404, 'Карта ещё не в облаке — подождите синхронизацию и попробуйте снова');
+    if (d.locked) throw new HttpError(400, 'Карту с паролем нельзя открыть по ссылке — сначала снимите пароль');
+    const have = await sql.query(
+      `SELECT token FROM map_shares WHERE owner_id = $1 AND doc_id = $2 AND role = $3 AND revoked_at IS NULL LIMIT 1`,
+      [user.id, docId, role],
+    );
+    if (have[0]) return json({ token: have[0][0], role });
+    const count = await sql.query(`SELECT count(*) FROM map_shares WHERE owner_id = $1 AND doc_id = $2`, [user.id, docId]);
+    if (Number(count[0]?.[0] ?? 0) >= MAX_SHARE_LINKS) throw new HttpError(429, 'Слишком много ссылок на эту карту');
+    const token = randomBytes(16).toString('base64url');
+    await sql.query(`INSERT INTO map_shares (token, owner_id, doc_id, role) VALUES ($1, $2, $3, $4)`, [token, user.id, docId, role]);
+    return json({ token, role });
+  }
+
+  /** Действующие ссылки владельца на карту и сколько человек по ним заходило */
+  async function listShares(request: Request, url: URL) {
+    const user = await userOf(request);
+    const docId = url.searchParams.get('docId') ?? '';
+    const rows = await sql.query(
+      `SELECT s.token, s.role, s.created_at, (SELECT count(*) FROM map_share_members m WHERE m.token = s.token)
+       FROM map_shares s WHERE s.owner_id = $1 AND s.doc_id = $2 AND s.revoked_at IS NULL ORDER BY s.created_at`,
+      [user.id, docId],
+    );
+    return json({ links: rows.map(([token, role, createdAt, people]) => ({ token, role, createdAt, people: Number(people) })) });
+  }
+
+  /** Отозвать ссылку: по ней больше не открыть, у получателей карта пропадает из списка */
+  async function revokeShare(request: Request, token: string) {
+    const user = await userOf(request);
+    const rows = await sql.query(
+      `UPDATE map_shares SET revoked_at = now() WHERE token = $1 AND owner_id = $2 AND revoked_at IS NULL RETURNING token`,
+      [token, user.id],
+    );
+    if (!rows[0]) throw new HttpError(404, 'Ссылка не найдена');
+    await sql.query(`DELETE FROM map_share_members WHERE token = $1`, [token]);
+    return json({ ok: true });
+  }
+
+  async function activeShare(token: string) {
+    const rows = await sql.query(
+      `SELECT s.owner_id, s.doc_id, s.role, u.name, u.email FROM map_shares s JOIN users u ON u.id = s.owner_id
+       WHERE s.token = $1 AND s.revoked_at IS NULL`,
+      [token],
+    );
+    if (!rows[0]) throw new HttpError(404, 'Ссылка больше не действует — попросите владельца прислать новую');
+    const [ownerId, docId, role, name, email] = rows[0] as string[];
+    return { ownerId, docId, role: role as 'view' | 'edit', owner: { name: name || email.split('@')[0] } };
+  }
+
+  /** Открыть карту по ссылке: свою — просто её id; чужую — карта, право и владелец (и запомнить в «Моих картах») */
+  async function openShare(request: Request, token: string) {
+    const user = await userOf(request);
+    const s = await activeShare(token);
+    if (s.ownerId === user.id) return json({ own: true, docId: s.docId, role: s.role });
+    const d = await ownerDoc(s.ownerId, s.docId);
+    if (!d) throw new HttpError(404, 'Владелец удалил эту карту');
+    if (d.locked) throw new HttpError(403, 'Владелец поставил на карту пароль — по ссылке она больше не открывается');
+    await sql.query(
+      `INSERT INTO map_share_members (token, user_id) VALUES ($1, $2) ON CONFLICT (token, user_id) DO UPDATE SET opened_at = now()`,
+      [token, user.id],
+    );
+    return json({ own: false, token, docId: s.docId, role: s.role, owner: s.owner, doc: d.doc, seq: d.seq });
+  }
+
+  /**
+   * Правка по ссылке: карта записывается в данные владельца (его устройства получат её обычной синхронизацией).
+   * baseSeq — версия, которую видел редактор: если карту тем временем изменили, ответ 409 с новой версией.
+   */
+  async function saveShared(request: Request, token: string) {
+    // правят только вошедшие: так видно, что это аккаунт, а не случайный робот со ссылкой
+    await userOf(request);
+    const s = await activeShare(token);
+    if (s.role !== 'edit') throw new HttpError(403, 'По этой ссылке карту можно только смотреть');
+    const b = await body<{ doc?: Record<string, unknown>; baseSeq?: number }>(request);
+    const doc = b.doc;
+    if (!doc || typeof doc !== 'object' || doc.id !== s.docId || 'locked' in doc) throw new HttpError(400, 'Неверная карта');
+    const value = JSON.stringify(doc);
+    if (value.length > MAX_ITEM_BYTES) throw new HttpError(413, 'Карта слишком большая');
+    const cur = await ownerDoc(s.ownerId, s.docId);
+    if (!cur) throw new HttpError(404, 'Владелец удалил эту карту');
+    if (cur.locked) throw new HttpError(403, 'Владелец поставил на карту пароль — по ссылке она больше не открывается');
+    const used = await sql.query(`SELECT coalesce(sum(octet_length(value::text)), 0) FROM kv WHERE user_id = $1 AND key <> $2`, [
+      s.ownerId,
+      `doc:${s.docId}`,
+    ]);
+    if (Number(used[0]?.[0] ?? 0) + Buffer.byteLength(value) > quotaBytes) throw new HttpError(413, 'У владельца карты закончилось место в облаке');
+    const base = Math.max(0, Number(b.baseSeq) || 0);
+    if (base !== cur.seq) return json({ ok: false, error: 'Карту изменили — обновляю', doc: cur.doc, seq: cur.seq }, 409);
+    await autoSnapshot(s.ownerId);
+    const rows = await sql.query(
+      `WITH u AS (UPDATE users SET kv_seq = coalesce(kv_seq, 0) + 1 WHERE id = $1 RETURNING kv_seq)
+       UPDATE kv SET value = $3::jsonb, updated_at = $4, deleted = false, seq = u.kv_seq
+       FROM u WHERE kv.user_id = $1 AND kv.key = $2 AND kv.seq = $5 AND NOT kv.deleted
+       RETURNING kv.seq`,
+      [s.ownerId, `doc:${s.docId}`, value, Math.round(Number(doc.updatedAt) || now()), base],
+    );
+    if (rows[0]) return json({ ok: true, seq: Number(rows[0][0]) });
+    // карту изменили, пока здесь правили: свежая версия — клиенту, он сольёт и повторит
+    const fresh = await ownerDoc(s.ownerId, s.docId);
+    return json({ ok: false, error: 'Карту изменили — обновляю', doc: fresh?.doc ?? null, seq: fresh?.seq ?? 0 }, 409);
+  }
+
+  /** Чужие карты, открытые по ссылкам: для «Моих карт» с подписью владельца */
+  async function sharedWithMe(request: Request) {
+    const user = await userOf(request);
+    const rows = await sql.query(
+      `SELECT s.token, s.doc_id, s.role, u.name, u.email, kv.value->>'title', kv.updated_at
+       FROM map_share_members m
+       JOIN map_shares s ON s.token = m.token AND s.revoked_at IS NULL
+       JOIN users u ON u.id = s.owner_id
+       JOIN kv ON kv.user_id = s.owner_id AND kv.key = 'doc:' || s.doc_id AND NOT kv.deleted AND NOT (kv.value ? 'locked')
+       WHERE m.user_id = $1 AND s.owner_id <> $1
+       ORDER BY kv.updated_at DESC LIMIT 200`,
+      [user.id],
+    );
+    const maps = rows.map(([token, docId, role, name, email, title, updatedAt]) => ({
+      token,
+      docId,
+      role,
+      owner: { name: name || (email ?? '').split('@')[0] },
+      title: title ?? '',
+      updatedAt: Number(updatedAt),
+    }));
+    return json({ maps });
+  }
+
+  /** Получатель убирает чужую карту из своего списка (ссылка продолжает действовать) */
+  async function leaveShare(request: Request, token: string) {
+    const user = await userOf(request);
+    await sql.query(`DELETE FROM map_share_members WHERE token = $1 AND user_id = $2`, [token, user.id]);
+    return json({ ok: true });
+  }
+
   /**
    * Запись с оптимистической блокировкой: изменение принимается, только если клиент видел
    * последнюю версию ключа (baseSeq). Иначе — конфликт: клиент заберёт свежую версию, сольёт и повторит.
@@ -1186,6 +1346,16 @@ ${HELP_DOC}`;
     if (m === 'DELETE' && path === '/account') return deleteAccount(request);
     if (m === 'GET' && path === '/sync') return pull(request, url);
     if (m === 'POST' && path === '/sync') return pushItems(request);
+    if (m === 'POST' && path === '/shares') return createShare(request);
+    if (m === 'GET' && path === '/shares') return listShares(request, url);
+    const sh = /^\/shares\/([A-Za-z0-9_-]{10,64})$/.exec(path);
+    if (sh && m === 'DELETE') return revokeShare(request, sh[1]);
+    const sl = /^\/s\/([A-Za-z0-9_-]{10,64})$/.exec(path);
+    if (sl && m === 'GET') return openShare(request, sl[1]);
+    if (sl && m === 'PUT') return saveShared(request, sl[1]);
+    if (m === 'GET' && path === '/shared') return sharedWithMe(request);
+    const sw = /^\/shared\/([A-Za-z0-9_-]{10,64})$/.exec(path);
+    if (sw && m === 'DELETE') return leaveShare(request, sw[1]);
     if (m === 'GET' && path === '/snapshots') return listSnapshots(request);
     if (m === 'POST' && path === '/snapshots') return manualSnapshot(request);
     const snap = /^\/snapshots\/([^/]+)$/.exec(path);

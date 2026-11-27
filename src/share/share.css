@@ -1,0 +1,40 @@
+/* «Поделиться картой» */
+.share-dlg { width: min(460px, 100%); display: flex; flex-direction: column; gap: 12px; }
+.share-note { margin: 0; font-size: 14px; line-height: 1.4; color: var(--text-2); }
+.share-roles { display: flex; flex-direction: column; gap: 8px; }
+.share-role {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; text-align: left; cursor: pointer;
+  border: 1.5px solid var(--border, var(--fill-3)); background: var(--surface-2, var(--fill-3)); color: var(--text); font: inherit;
+}
+.share-role.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--text); }
+.share-role.on > svg { color: var(--accent); }
+.share-role-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.share-role-text b { font-size: 15px; }
+.share-role-text span { font-size: 13px; color: var(--text-2); }
+.share-link { display: flex; align-items: center; gap: 8px; padding: 4px 4px 4px 12px; border-radius: 12px; background: var(--surface-2, var(--fill-3)); }
+.share-link input { flex: 1; min-width: 0; border: 0; outline: none; background: none; color: var(--text); font: inherit; font-size: 14px; height: 36px; }
+.share-go { min-height: 46px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 16px; }
+.share-error { font-size: 14px; color: var(--ios-red, #ff3b30); }
+.share-active { display: flex; flex-direction: column; gap: 6px; padding-top: 4px; }
+.share-h { font-size: 13px; font-weight: 600; color: var(--text-2); text-transform: uppercase; letter-spacing: .02em; }
+.share-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
+.share-item .grow { display: flex; flex-direction: column; min-width: 0; }
+.share-sub { font-size: 13px; color: var(--text-2); }
+.share-item .btn { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
+
+/* плашка под верхней панелью редактора: чья карта и что можно */
+.shared-badge {
+  position: absolute; z-index: 19; top: calc(66px + var(--safe-top)); left: 50%; transform: translateX(-50%);
+  display: inline-flex; align-items: center; gap: 5px; max-width: calc(100% - 32px); padding: 5px 12px; border-radius: 999px;
+  font-size: 13px; font-weight: 600; color: #fff; background: color-mix(in srgb, var(--accent) 88%, #000);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .18); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;
+}
+
+/* «Доступные мне» в списке карт */
+.doc-owner {
+  position: absolute; left: 8px; bottom: 8px; max-width: calc(100% - 16px); display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600; background: rgba(0, 0, 0, .55); color: #fff;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.home-shared-bar { display: flex; align-items: center; gap: 8px; margin: 18px 0 8px; }
+.home-shared-bar h2 { margin: 0; }

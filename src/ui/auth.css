@@ -26,6 +26,7 @@
 .auth-logo { width: 88px; height: 88px; border-radius: 22px; box-shadow: 0 14px 40px color-mix(in srgb, var(--accent) 35%, transparent); }
 .auth-title { font-size: 34px; font-weight: 800; letter-spacing: -0.02em; margin: 18px 0 6px; }
 .auth-sub { color: var(--text-2); text-align: center; font-size: 16px; line-height: 1.45; margin: 0 0 22px; max-width: 340px; }
+.auth-sub.auth-shared { color: var(--accent); font-weight: 600; font-size: 15px; margin-top: -12px; }
 .auth-seg { width: 100%; margin-bottom: 16px; }
 .auth-seg button { flex: 1; }
 

@@ -5,7 +5,7 @@ import { test, mock, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 
 const { nativeSession, webSession, NO_SPEECH_MS } = await import('../src/voice/sessions.ts');
-const { SILENCE_MS } = await import('../src/voice/silence.ts');
+const { SILENCE_MS, FINAL_WAIT_MS } = await import('../src/voice/silence.ts');
 
 beforeEach(() => mock.timers.enable({ apis: ['setTimeout'] }));
 afterEach(() => mock.timers.reset());
@@ -246,8 +246,32 @@ test('SmSpeech: результата нет — через паузу ожида
   await smSession(sr as never, o);
   sr.emit({ type: 'partial', text: 'выпил воды' });
   sr.emit({ type: 'end' });
-  tick(RESULT_WAIT_MS);
-  assert.deepEqual(r.done, ['выпил воды']);
+  tick(FINAL_WAIT_MS - 1);
+  assert.deepEqual(r.done, [], 'ещё ждём окончательный');
+  tick(1);
+  assert.deepEqual(r.done, ['выпил воды'], 'со сказанным текстом долго не ждём');
+});
+
+test('SmSpeech: пауза после слов — итог меньше чем через полторы секунды', async () => {
+  const sr = fakeSm();
+  const { r, o } = rec2();
+  await smSession(sr as never, o);
+  sr.emit({ type: 'partial', text: 'купить молоко' });
+  tick(SILENCE_MS);
+  tick(FINAL_WAIT_MS);
+  assert.deepEqual(r.done, ['купить молоко']);
+  assert.ok(SILENCE_MS + FINAL_WAIT_MS <= 1500);
+});
+
+test('SmSpeech: конец речи без слов — результат ждём дольше', async () => {
+  const sr = fakeSm();
+  const { r, o } = rec2();
+  await smSession(sr as never, o);
+  sr.emit({ type: 'end' });
+  tick(FINAL_WAIT_MS);
+  assert.deepEqual(r.done, []);
+  sr.emit({ type: 'result', text: 'Привет' });
+  assert.deepEqual(r.done, ['Привет']);
 });
 
 test('SmSpeech: ошибки — «ничего не сказали» не ошибка; сеть без слов — ошибка; сеть после слов — берём слова', async () => {
@@ -314,4 +338,26 @@ test('SmSpeech: тишина 9 с — отмена и пустой итог', as
   tick(NO_SPEECH_MS);
   assert.deepEqual(x.r.done, ['']);
   assert.equal(s.cancels, 1);
+});
+
+test('разрешение на микрофон: пустой ответ плагина не роняет голосовой ввод', async () => {
+  const { micAllowed } = await import('../src/voice/sessions.ts');
+  const none = async () => undefined;
+  const st = (s: string) => async () => ({ speechRecognition: s });
+  assert.equal(await micAllowed(none, none, 'speechRecognition'), true, 'неизвестно — решает запуск');
+  assert.equal(await micAllowed(st('granted'), none, 'speechRecognition'), true);
+  assert.equal(await micAllowed(st('prompt'), st('granted'), 'speechRecognition'), true);
+  assert.equal(await micAllowed(st('prompt'), st('denied'), 'speechRecognition'), false);
+  assert.equal(await micAllowed(none, st('denied'), 'speechRecognition'), false);
+});
+
+test('Android: запуск без доступа к микрофону — понятное сообщение', async () => {
+  const sr = fakePlugin();
+  sr.start = async () => {
+    throw new Error('Missing permission');
+  };
+  const { r, o } = recorder();
+  assert.equal(await nativeSession(sr, o), null);
+  assert.equal(r.errors.length, 1);
+  assert.match(r.errors[0], /микрофон/);
 });

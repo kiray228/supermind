@@ -173,6 +173,25 @@ export const SCHEMA = [
   )`,
   `CREATE INDEX IF NOT EXISTS rate_hits_key ON rate_hits (bucket, key, at)`,
   `CREATE INDEX IF NOT EXISTS devices_user ON devices (user_id, last_seen DESC)`,
+  // ссылки на карты: владелец даёт другим смотреть или править свою карту (как в Canva)
+  `CREATE TABLE IF NOT EXISTS map_shares (
+    token text PRIMARY KEY,
+    owner_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    doc_id text NOT NULL,
+    role text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    revoked_at timestamptz
+  )`,
+  `CREATE INDEX IF NOT EXISTS map_shares_owner ON map_shares (owner_id, doc_id)`,
+  // кто открывал карту по ссылке — у них она в «Моих картах» с подписью владельца
+  `CREATE TABLE IF NOT EXISTS map_share_members (
+    token text NOT NULL REFERENCES map_shares(token) ON DELETE CASCADE,
+    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    joined_at timestamptz NOT NULL DEFAULT now(),
+    opened_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (token, user_id)
+  )`,
+  `CREATE INDEX IF NOT EXISTS map_share_members_user ON map_share_members (user_id)`,
   `CREATE TABLE IF NOT EXISTS meta (
     key text PRIMARY KEY,
     value jsonb NOT NULL

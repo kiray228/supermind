@@ -32,8 +32,20 @@ export function newDoc(title = t('Новая карта'), sheet?: Sheet): MindD
   return { id: uid(), title, sheets: [s], activeSheet: s.id, createdAt: now, updatedAt: now };
 }
 
+/** Карта, открытая по чужой ссылке: правки уходят владельцу на сервер, «только просмотр» — без правок */
+export interface SharedOpen {
+  token: string;
+  role: 'view' | 'edit';
+  owner: { name: string };
+  /** версия карты на сервере, которую видел этот редактор */
+  seq: number;
+}
+
 interface DocState {
   doc: MindDoc | null;
+  /** открыта чужая карта по ссылке (null — своя) */
+  shared: SharedOpen | null;
+  openShared(doc: MindDoc, info: SharedOpen): void;
   /** пароль, если документ зашифрован */
   password: string | null;
   selection: ID[];
@@ -141,10 +153,10 @@ export function flushSave(force = false): Promise<void> {
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = null;
   // карта — на момент вызова: close() сразу после flushSave() не должен оставить запись без карты
-  const { doc, password } = useDoc.getState();
+  const { doc, password, shared } = useDoc.getState();
   if (!doc) return inflight ?? Promise.resolve();
   // writeOpen ошибок не бросает, но и чужая ошибка в цепочке не должна отменять следующую запись
-  const p = (inflight ?? Promise.resolve()).catch(() => {}).then(() => writeOpen(doc, password));
+  const p = (inflight ?? Promise.resolve()).catch(() => {}).then(() => (shared ? writeShared(doc, shared.token) : writeOpen(doc, password)));
   inflight = p;
   void p.finally(() => {
     if (inflight === p) inflight = null;
@@ -168,6 +180,8 @@ export async function saveNow(): Promise<{ ok: boolean; doc: MindDoc | null }> {
   if (useDoc.getState().saveError) return { ok: false, doc };
   // карту закрыли при сохранении (пароль поставили на другом устройстве) — правки сохранены отдельной картой
   if (useDoc.getState().doc?.id !== doc.id) return { ok: true, doc };
+  // чужая карта по ссылке хранится у владельца: записана, если сервер принял правку
+  if (useDoc.getState().shared) return { ok: true, doc };
   try {
     const disk = await kvGet<MindDoc | LockedDoc>(`doc:${doc.id}`);
     const ok = !!disk && ('locked' in disk ? !!useDoc.getState().password : disk.updatedAt >= doc.updatedAt);
@@ -180,6 +194,49 @@ export async function saveNow(): Promise<{ ok: boolean; doc: MindDoc | null }> {
 }
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e)) || t('Ошибка записи');
+
+/**
+ * Правка чужой карты по ссылке — сразу владельцу. Карту тем временем изменили (409) — берём номер свежей версии
+ * и записываем свою: как и между своими устройствами, побеждает последняя правка.
+ */
+async function writeShared(doc: MindDoc, token: string) {
+  const cur = () => useDoc.getState().shared;
+  if (cur()?.token !== token || cur()?.role !== 'edit') return;
+  useDoc.setState({ saving: true });
+  try {
+    const { saveShared } = await import('../share/api');
+    let seq = cur()!.seq;
+    for (let attempt = 0; ; attempt++) {
+      const r = await saveShared(token, doc, seq);
+      if (r.ok) {
+        seq = r.seq;
+        break;
+      }
+      if (attempt >= 2 || !r.seq) throw new Error(t('Карту одновременно меняют — попробуйте ещё раз'));
+      seq = r.seq;
+    }
+    const sh = cur();
+    if (sh?.token === token) useDoc.setState({ shared: { ...sh, seq } });
+    if (useDoc.getState().saveError) useDoc.setState({ saveError: null });
+  } catch (e) {
+    const first = !useDoc.getState().saveError;
+    useDoc.setState({ saveError: errText(e) });
+    if (first) {
+      const { toast } = await import('./appStore');
+      toast(t('Правка не дошла до владельца карты: {error}', { error: errText(e) }), { label: t('Ещё раз'), run: () => void flushSave(true) });
+    }
+  } finally {
+    useDoc.setState({ saving: false });
+  }
+}
+
+/** «Только просмотр»: правка не применяется, подсказка — не чаще раза в несколько секунд */
+let viewHintAt = 0;
+function viewOnlyHint() {
+  if (Date.now() - viewHintAt < 4000) return;
+  viewHintAt = Date.now();
+  void import('./appStore').then(({ toast }) => toast(t('Эту карту можно только смотреть — так решил владелец')));
+}
 
 async function writeOpen(doc: MindDoc, password: string | null) {
   useDoc.setState({ saving: true });
@@ -274,6 +331,7 @@ export const useDoc = create<DocState>((set, get) => {
   const activeSheet = (d: MindDoc) => d.sheets.find((s) => s.id === d.activeSheet) ?? d.sheets[0];
 
   const commit = (next: MindDoc, history = true) => {
+    if (get().shared?.role === 'view') return viewOnlyHint();
     const { doc, past } = get();
     if (history) freshId = null;
     if (history && batch === 'pushed') history = false;
@@ -291,6 +349,7 @@ export const useDoc = create<DocState>((set, get) => {
 
   return {
     doc: null,
+    shared: null,
     password: null,
     selection: [],
     editingId: null,
@@ -317,11 +376,16 @@ export const useDoc = create<DocState>((set, get) => {
       markOpened(doc);
       // версия «до правок» — в историю (для карт с паролем история не ведётся)
       if (!password) void snapshot(doc).catch(() => {});
-      set({ doc, password, selection: touch ? [] : [activeSheet(doc).root.id], editingId: null, pendingText: null, past: [], future: [], selectedRel: null, focusId: null, saveError: null });
+      set({ doc, shared: null, password, selection: touch ? [] : [activeSheet(doc).root.id], editingId: null, pendingText: null, past: [], future: [], selectedRel: null, focusId: null, saveError: null });
+    },
+    openShared(doc, info) {
+      const touch = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
+      // чужая карта: без локальной истории версий и без копии в своих картах
+      set({ doc, shared: info, password: null, selection: touch ? [] : [activeSheet(doc).root.id], editingId: null, pendingText: null, past: [], future: [], selectedRel: null, focusId: null, saveError: null });
     },
     close() {
       flushSave();
-      set({ doc: null, password: null, selection: [], editingId: null, past: [], future: [], focusId: null });
+      set({ doc: null, shared: null, password: null, selection: [], editingId: null, past: [], future: [], focusId: null });
     },
     sheet() {
       const d = get().doc;
@@ -343,7 +407,7 @@ export const useDoc = create<DocState>((set, get) => {
     },
     undo() {
       const { past, doc, future } = get();
-      if (!past.length || !doc) return;
+      if (!past.length || !doc || get().shared?.role === 'view') return;
       const prev = past[past.length - 1];
       droppedEdit = get().editingId;
       freshId = null;
@@ -352,7 +416,7 @@ export const useDoc = create<DocState>((set, get) => {
     },
     redo() {
       const { past, doc, future } = get();
-      if (!future.length || !doc) return;
+      if (!future.length || !doc || get().shared?.role === 'view') return;
       const nxt = future[0];
       droppedEdit = get().editingId;
       freshId = null;
